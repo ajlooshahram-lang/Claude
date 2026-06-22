@@ -2901,7 +2901,16 @@ const _FA = {
   'Motor 22kW': 'موتور 22kW',
   'Solar Inverter 10kW': 'اینورتر خورشیدی 10kW',
   'Bathroom Circuit': 'مدار حمام',
-  'Outdoor Circuit': 'مدار فضای باز'
+  'Outdoor Circuit': 'مدار فضای باز',
+  // Live Installation Twin enhancements - Farsi translations
+  'Cable fire': 'آتش‌سوزی کابل',
+  'Water ingress': 'نفوذ آب',
+  'Overload cascade': 'اضافه‌بار آبشاری',
+  'Lightning strike': 'صاعقه',
+  'Click to pin': 'کلیک برای ثابت کردن',
+  'Compliance': 'انطباق',
+  'Thermal capacity': 'ظرفیت حرارتی',
+  'Disconnection': 'قطع اتصال'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -34246,11 +34255,37 @@ function liveGetLoadMultiplier(hour) {
 }
 
 function liveThermalColor(ratio) {
-  // ratio = IB / Iz (0..1+), returns color from blue (cold) -> yellow -> red (hot)
+  // ratio = IB / Iz (0..1+), returns color from blue (cold) -> green -> orange -> red (hot)
+  // Enhanced: finer gradient for thermal visualization
   if (ratio <= 0) return '#2196f3';
+  if (ratio < 0.3) return '#42a5f5';
   if (ratio < 0.5) return '#4caf50';
+  if (ratio < 0.65) return '#8bc34a';
   if (ratio < 0.75) return '#ff9800';
-  if (ratio < 1.0) return '#ff5722';
+  if (ratio < 0.9) return '#ff5722';
+  if (ratio < 1.0) return '#e53935';
+  return '#f44336';
+}
+
+function liveThermalCapacityPct(ib, iz, derating) {
+  // Calculate thermal capacity used as percentage
+  // Based on (IB/Iz)^2 ratio considering derating factor
+  // Returns 0-100+ (can exceed 100 if overloaded)
+  var effectiveIz = iz * (derating || 1.0);
+  if (effectiveIz <= 0) return 0;
+  var thermalRatio = Math.pow(ib / effectiveIz, 2);
+  return thermalRatio * 100;
+}
+
+function liveThermalGradientColor(pct) {
+  // Returns CSS color for thermal capacity visualization
+  // blue=cold(0%) -> green=normal(25-50%) -> orange=warm(50-80%) -> red=hot(80-100%+)
+  if (pct <= 0) return '#2196f3';
+  if (pct < 25) return '#42a5f5';
+  if (pct < 50) return '#4caf50';
+  if (pct < 65) return '#8bc34a';
+  if (pct < 80) return '#ff9800';
+  if (pct < 95) return '#ff5722';
   return '#f44336';
 }
 
@@ -34275,52 +34310,107 @@ function liveMapModule(node) {
 
 function liveSvgSymbols() {
   var d = '<defs>';
-  // #sym-transformer: Two circles (primary/secondary windings) with coupling lines
+  // #sym-transformer: IEC 60617 - two coupled coils (sinusoidal winding representation) with vector group label
   d += '<symbol id="sym-transformer" viewBox="0 0 40 30">';
-  d += '<circle cx="14" cy="15" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<circle cx="26" cy="15" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<line x1="14" y1="4" x2="14" y2="2" stroke="currentColor" stroke-width="1.2"/>';
-  d += '<line x1="26" y1="26" x2="26" y2="28" stroke="currentColor" stroke-width="1.2"/>';
+  d += '<circle cx="13" cy="15" r="9" fill="none" stroke="currentColor" stroke-width="1.4"/>';
+  d += '<circle cx="27" cy="15" r="9" fill="none" stroke="currentColor" stroke-width="1.4"/>';
+  // Winding dots (polarity markers per IEC 60617)
+  d += '<circle cx="9" cy="9" r="1.2" fill="currentColor"/>';
+  d += '<circle cx="23" cy="9" r="1.2" fill="currentColor"/>';
+  // Terminal leads
+  d += '<line x1="13" y1="3" x2="13" y2="1" stroke="currentColor" stroke-width="1.2"/>';
+  d += '<line x1="27" y1="27" x2="27" y2="29" stroke="currentColor" stroke-width="1.2"/>';
+  // Vector group label area
+  d += '<text x="20" y="29" text-anchor="middle" font-size="4" fill="currentColor">Dyn11</text>';
   d += '</symbol>';
-  // #sym-mcb: Rectangle with thermal+magnetic trip indicators (zigzag + arc)
+  // #sym-mcb: IEC 60617 - switch symbol with thermal (bimetal zigzag) + magnetic (solenoid arc) trip indicators
   d += '<symbol id="sym-mcb" viewBox="0 0 40 30">';
   d += '<rect x="4" y="2" width="32" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>';
-  d += '<polyline points="10,8 13,12 10,16 13,20" fill="none" stroke="currentColor" stroke-width="1.2"/>';
-  d += '<path d="M24,8 A6,6 0 0,1 30,14" fill="none" stroke="currentColor" stroke-width="1.2"/>';
-  d += '<line x1="20" y1="4" x2="20" y2="26" stroke="currentColor" stroke-width="0.5" stroke-dasharray="2,1"/>';
+  // Contact (switch blade open)
+  d += '<line x1="14" y1="4" x2="14" y2="10" stroke="currentColor" stroke-width="1.3"/>';
+  d += '<line x1="14" y1="10" x2="20" y2="6" stroke="currentColor" stroke-width="1.5"/>';
+  // Thermal trip (bimetal zigzag) left side
+  d += '<polyline points="8,14 11,16 8,18 11,20 8,22" fill="none" stroke="currentColor" stroke-width="1.1"/>';
+  // Magnetic trip (solenoid arc) right side
+  d += '<path d="M24,12 A5,5 0 0,1 30,17" fill="none" stroke="currentColor" stroke-width="1.2"/>';
+  d += '<line x1="27" y1="17" x2="27" y2="22" stroke="currentColor" stroke-width="1"/>';
+  // Trip mechanism link
+  d += '<line x1="11" y1="22" x2="24" y2="22" stroke="currentColor" stroke-width="0.6" stroke-dasharray="1.5,1"/>';
   d += '</symbol>';
-  // #sym-mccb: Larger rectangle with adjustable trip indicator
+  // #sym-mccb: IEC 60617 - frame-type breaker with adjustable trip unit indicator (rotary knob)
   d += '<symbol id="sym-mccb" viewBox="0 0 40 30">';
-  d += '<rect x="2" y="2" width="36" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<polyline points="8,8 11,12 8,16 11,20" fill="none" stroke="currentColor" stroke-width="1.2"/>';
-  d += '<path d="M22,8 A7,7 0 0,1 29,15" fill="none" stroke="currentColor" stroke-width="1.2"/>';
-  d += '<circle cx="32" cy="22" r="3" fill="none" stroke="currentColor" stroke-width="1"/>';
-  d += '<line x1="30" y1="20" x2="34" y2="24" stroke="currentColor" stroke-width="0.8"/>';
+  d += '<rect x="2" y="2" width="36" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+  // Inner frame outline (double box = frame type)
+  d += '<rect x="5" y="5" width="30" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="0.7"/>';
+  // Thermal trip element
+  d += '<polyline points="9,10 12,12 9,14 12,16 9,18" fill="none" stroke="currentColor" stroke-width="1.1"/>';
+  // Magnetic trip element
+  d += '<path d="M22,9 A6,6 0 0,1 28,15" fill="none" stroke="currentColor" stroke-width="1.2"/>';
+  // Adjustable trip unit (rotary dial indicator)
+  d += '<circle cx="32" cy="21" r="3.5" fill="none" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<line x1="32" y1="21" x2="34" y2="19" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<text x="32" y="23.5" text-anchor="middle" font-size="3" fill="currentColor">Ir</text>';
   d += '</symbol>';
-  // #sym-fuse: Thin rectangle with fusible element line
+  // #sym-fuse: IEC 60617 - fuse-link symbol (rectangle with wire running through)
   d += '<symbol id="sym-fuse" viewBox="0 0 40 30">';
-  d += '<rect x="10" y="5" width="20" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>';
-  d += '<line x1="15" y1="15" x2="25" y2="15" stroke="currentColor" stroke-width="1.8"/>';
-  d += '<circle cx="20" cy="15" r="2" fill="currentColor"/>';
+  // Fuse body rectangle
+  d += '<rect x="10" y="7" width="20" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>';
+  // Fusible element (wire through the body)
+  d += '<line x1="5" y1="15" x2="10" y2="15" stroke="currentColor" stroke-width="1.4"/>';
+  d += '<line x1="30" y1="15" x2="35" y2="15" stroke="currentColor" stroke-width="1.4"/>';
+  d += '<line x1="10" y1="15" x2="30" y2="15" stroke="currentColor" stroke-width="0.9"/>';
+  // Weak point (fuse element constriction)
+  d += '<ellipse cx="20" cy="15" rx="2" ry="1.5" fill="none" stroke="currentColor" stroke-width="0.8"/>';
   d += '</symbol>';
-  // #sym-rcd: Circle with test button symbol
+  // #sym-rcd: IEC 60617 - differential current detector with test button symbol
   d += '<symbol id="sym-rcd" viewBox="0 0 40 30">';
-  d += '<circle cx="20" cy="15" r="11" fill="none" stroke="currentColor" stroke-width="1.3"/>';
-  d += '<line x1="20" y1="6" x2="20" y2="24" stroke="currentColor" stroke-width="1"/>';
-  d += '<rect x="16" y="20" width="8" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="0.8"/>';
-  d += '<text x="20" y="18" text-anchor="middle" font-size="6" fill="currentColor">T</text>';
+  // Toroidal core (circle)
+  d += '<circle cx="20" cy="13" r="10" fill="none" stroke="currentColor" stroke-width="1.3"/>';
+  // Through conductors (vertical lines through core)
+  d += '<line x1="16" y1="3" x2="16" y2="23" stroke="currentColor" stroke-width="1"/>';
+  d += '<line x1="24" y1="3" x2="24" y2="23" stroke="currentColor" stroke-width="1"/>';
+  // Differential symbol (delta)
+  d += '<text x="20" y="16" text-anchor="middle" font-size="7" fill="currentColor">\u0394</text>';
+  // Test button (small rectangle below)
+  d += '<rect x="15" y="24" width="10" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="0.8"/>';
+  d += '<text x="20" y="27.5" text-anchor="middle" font-size="3.5" fill="currentColor">T</text>';
   d += '</symbol>';
-  // #sym-cable: Parallel lines
+  // #sym-cable: IEC 60617 - conductor with insulation layers (PVC/XLPE shown as concentric)
   d += '<symbol id="sym-cable" viewBox="0 0 40 30">';
-  d += '<line x1="8" y1="8" x2="8" y2="22" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<line x1="14" y1="8" x2="14" y2="22" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<line x1="20" y1="8" x2="20" y2="22" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<line x1="26" y1="10" x2="26" y2="20" stroke="currentColor" stroke-width="1" stroke-dasharray="2,1"/>';
+  // Outer sheath
+  d += '<rect x="6" y="5" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2,1"/>';
+  // Individual conductors with insulation (L1, L2, L3, N/PE)
+  d += '<circle cx="14" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<circle cx="26" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<circle cx="14" cy="22" r="3.5" fill="none" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<circle cx="26" cy="22" r="3.5" fill="none" stroke="currentColor" stroke-width="0.9" stroke-dasharray="1.5,1"/>';
+  // Conductor cores
+  d += '<circle cx="14" cy="12" r="1.5" fill="currentColor"/>';
+  d += '<circle cx="26" cy="12" r="1.5" fill="currentColor"/>';
+  d += '<circle cx="14" cy="22" r="1.5" fill="currentColor"/>';
+  d += '<circle cx="26" cy="22" r="1.2" fill="currentColor"/>';
   d += '</symbol>';
-  // #sym-motor: Circle with M letter
+  // #sym-motor: IEC 60617 - M in circle with rotation arrow
   d += '<symbol id="sym-motor" viewBox="0 0 40 30">';
   d += '<circle cx="20" cy="15" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/>';
-  d += '<text x="20" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="currentColor">M</text>';
+  d += '<text x="20" y="19" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor">M</text>';
+  // Rotation arrow (clockwise arc with arrowhead)
+  d += '<path d="M32,10 A14,14 0 0,1 32,20" fill="none" stroke="currentColor" stroke-width="0.9"/>';
+  d += '<polygon points="32,20 30,17 34,17" fill="currentColor"/>';
+  d += '</symbol>';
+  // #sym-distboard: IEC 60617 - distribution board enclosure with DIN rail indication
+  d += '<symbol id="sym-distboard" viewBox="0 0 40 30">';
+  // Enclosure rectangle
+  d += '<rect x="3" y="2" width="34" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>';
+  // DIN rail (horizontal bar)
+  d += '<line x1="6" y1="10" x2="34" y2="10" stroke="currentColor" stroke-width="2"/>';
+  // Modules on DIN rail (3 small rectangles)
+  d += '<rect x="8" y="7" width="5" height="6" rx="0.5" fill="none" stroke="currentColor" stroke-width="0.7"/>';
+  d += '<rect x="15" y="7" width="5" height="6" rx="0.5" fill="none" stroke="currentColor" stroke-width="0.7"/>';
+  d += '<rect x="22" y="7" width="5" height="6" rx="0.5" fill="none" stroke="currentColor" stroke-width="0.7"/>';
+  // Busbar at bottom
+  d += '<line x1="6" y1="20" x2="34" y2="20" stroke="currentColor" stroke-width="1.5"/>';
+  d += '<text x="20" y="26" text-anchor="middle" font-size="4" fill="currentColor">N PE</text>';
   d += '</symbol>';
   // #sym-socket: Small circle with pin indicators
   d += '<symbol id="sym-socket" viewBox="0 0 40 30">';
@@ -34341,6 +34431,9 @@ function liveTooltipHtml(nodeId, tree, mode) {
   var ratio = iz > 0 ? ib / iz : 0;
   var vdrop = node._vdrop || 0;
   var protIn = node.protectionIn || 0;
+  var ikMax = node._ikmax || 0;
+  var ikMin = node._ikmin || 0;
+  var zsVal = node._zs || 0;
   var typeName = node.type === 'transformer' ? tx('Transformer', 'Transformer') :
     (node.type === 'main_board' ? tx('Hovedtavle', 'Main Board') :
     (node.type === 'sub_board' ? tx('Undertavle', 'Sub Board') :
@@ -34352,6 +34445,9 @@ function liveTooltipHtml(nodeId, tree, mode) {
   html += '<div>Iz: ' + iz.toFixed(0) + ' A</div>';
   html += '<div>' + tx('Udnyttelse', 'Utilization') + ': ' + (ratio * 100).toFixed(0) + '%</div>';
   html += '<div>Vdrop: ' + vdrop.toFixed(2) + '%</div>';
+  if (ikMax > 0) html += '<div>Ik(max): ' + (ikMax / 1000).toFixed(2) + ' kA</div>';
+  if (ikMin > 0) html += '<div>Ik(min): ' + (ikMin / 1000).toFixed(2) + ' kA</div>';
+  if (zsVal > 0) html += '<div>Zs: ' + zsVal.toFixed(3) + ' \u03A9</div>';
   // Protection device info
   if (node.protection) {
     var pName = node.protection.model || node.protection.brand || node.protection.type || 'N/A';
@@ -34359,14 +34455,34 @@ function liveTooltipHtml(nodeId, tree, mode) {
   }
   // Cable spec
   if (node.cable) {
-    html += '<div>' + tx('Kabel', 'Cable') + ': ' + (node.cable.model || '') + ' ' + (node.cable.mm2 || '') + 'mm\u00B2</div>';
+    var insType = (node.cable.insulation || 'PVC');
+    html += '<div>' + tx('Kabel', 'Cable') + ': ' + (node.cable.model || '') + ' ' + (node.cable.mm2 || '') + 'mm\u00B2 ' + insType + '</div>';
   }
-  // Compliance status
-  var compliant = (ratio <= 1.0 && vdrop <= 5);
+  // DS/HD 60364 compliance checks with pass/fail indicators
+  html += '<div style="margin-top:4px;border-top:1px solid #eee;padding-top:4px;font-size:0.85em">';
+  html += '<div style="font-weight:600">' + tx('Overensstemmelse', 'Compliance') + ':</div>';
+  // Rule 1: IB <= In <= Iz (DS/HD 60364-4-43 cl.433.1)
+  var ruleIBIn = (protIn > 0) ? (ib <= protIn) : true;
+  var ruleInIz = (protIn > 0) ? (protIn <= iz) : true;
+  var ruleOverload = ruleIBIn && ruleInIz;
+  html += '<div>' + (ruleOverload ? '\u2705' : '\u274C') + ' IB\u2264In\u2264Iz (DS/HD 60364-4-43 \u00A7433.1)</div>';
+  // Rule 2: Voltage drop <= 4% (DS/HD 60364-5-52 cl.525)
+  var ruleVdrop = vdrop <= 4;
+  html += '<div>' + (ruleVdrop ? '\u2705' : '\u274C') + ' Vdrop\u22644% (DS/HD 60364-5-52 \u00A7525)</div>';
+  // Rule 3: Disconnection time (DS/HD 60364-4-41 cl.411.3)
+  var ruleDisconnect = true; // default pass unless we have data to check
+  if (node.type === 'final_circuit' && ikMin > 0 && node.protection) {
+    // Simplified check: sufficient fault current to trip
+    ruleDisconnect = ikMin > (protIn * 3); // MCB should trip at ~3-5x In
+  }
+  html += '<div>' + (ruleDisconnect ? '\u2705' : '\u274C') + ' ' + tx('Frakobling', 'Disconnection') + ' (DS/HD 60364-4-41 \u00A7411.3)</div>';
+  html += '</div>';
+  // Overall compliance
+  var compliant = ruleOverload && ruleVdrop && ruleDisconnect;
   var compLabel = compliant ? tx('Overensstemmende', 'Compliant') : tx('Ikke overensstemmende', 'Non-compliant');
   var compColor = compliant ? '#4caf50' : '#f44336';
-  html += '<div style="color:' + compColor + ';font-weight:bold">' + compLabel + '</div>';
-  // DS/HD 60364 clause
+  html += '<div style="color:' + compColor + ';font-weight:bold;margin-top:2px">' + compLabel + '</div>';
+  // Clause reference based on node type
   if (node.type === 'transformer') {
     html += '<div style="font-size:0.8em;opacity:0.8">DS/HD 60364-4-41 \u00A7411.3</div>';
   } else if (node.type === 'final_circuit') {
@@ -34374,15 +34490,21 @@ function liveTooltipHtml(nodeId, tree, mode) {
   } else {
     html += '<div style="font-size:0.8em;opacity:0.8">DS/HD 60364-4-43 \u00A7432.1</div>';
   }
+  // Pin instruction
+  html += '<div style="font-size:0.75em;opacity:0.6;margin-top:3px">' + tx('Klik for at fastgoere', 'Click to pin') + '</div>';
   return html;
 }
 
+var _liveTooltipPinned = false;
+var _liveTooltipPinnedNodeId = null;
+
 function liveShowTooltip(evt, nodeId) {
+  if (_liveTooltipPinned && _liveTooltipPinnedNodeId !== nodeId) return; // Don't override pinned tooltip
   var el = document.getElementById('live-tooltip');
   if (!el) {
     el = document.createElement('div');
     el.id = 'live-tooltip';
-    el.style.cssText = 'position:absolute;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px 12px;font-size:0.8em;box-shadow:0 2px 8px rgba(0,0,0,0.15);pointer-events:none;max-width:220px;display:none;';
+    el.style.cssText = 'position:absolute;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px 12px;font-size:0.8em;box-shadow:0 2px 8px rgba(0,0,0,0.15);max-width:250px;display:none;';
     document.body.appendChild(el);
   }
   var tree = sldTree || sldCreateTree();
@@ -34392,9 +34514,31 @@ function liveShowTooltip(evt, nodeId) {
   el.style.left = x + 'px';
   el.style.top = y + 'px';
   el.style.display = 'block';
+  el.style.borderColor = _liveTooltipPinned ? '#1976d2' : '#ccc';
+  el.style.borderWidth = _liveTooltipPinned ? '2px' : '1px';
+}
+
+function livePinTooltip(evt, nodeId) {
+  if (_liveTooltipPinned && _liveTooltipPinnedNodeId === nodeId) {
+    // Unpin
+    _liveTooltipPinned = false;
+    _liveTooltipPinnedNodeId = null;
+    liveHideTooltip();
+    return;
+  }
+  _liveTooltipPinned = true;
+  _liveTooltipPinnedNodeId = nodeId;
+  liveShowTooltip(evt, nodeId);
+}
+
+function liveDismissPinnedTooltip() {
+  _liveTooltipPinned = false;
+  _liveTooltipPinnedNodeId = null;
+  liveHideTooltip();
 }
 
 function liveHideTooltip() {
+  if (_liveTooltipPinned) return; // Don't hide if pinned
   var el = document.getElementById('live-tooltip');
   if (el) el.style.display = 'none';
 }
@@ -34500,6 +34644,23 @@ function liveRenderConnections(tree, positions, nodeW, nodeH, mode) {
         var dtY = midY + 10;
         svg += '<text x="' + dtX + '" y="' + dtY + '" font-size="5.5" fill="#ff5722" class="live-delta-t">\u0394T:' + deltaT.toFixed(0) + '\u00B0C</text>';
       }
+      // Thermal capacity bar (percentage of thermal limit used)
+      if (child && child.cable && ib > 0) {
+        var derating = 1.0;
+        if (liveState.disasterScenario === 'high_ambient') derating = 0.82;
+        var thermalPct = liveThermalCapacityPct(ib, iz, derating);
+        var barX = midX + 14;
+        var barY = midY - 10;
+        var barW = 4;
+        var barH = 20;
+        var fillH = Math.min(barH, barH * thermalPct / 100);
+        var barColor = liveThermalGradientColor(thermalPct);
+        svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="1" fill="none" stroke="#ccc" stroke-width="0.5"/>';
+        svg += '<rect x="' + barX + '" y="' + (barY + barH - fillH) + '" width="' + barW + '" height="' + fillH + '" rx="1" fill="' + barColor + '" opacity="0.85" class="live-thermal-bar"/>';
+        if (thermalPct > 50) {
+          svg += '<text x="' + (barX + barW + 2) + '" y="' + (barY + barH / 2 + 2) + '" font-size="4.5" fill="' + barColor + '">' + thermalPct.toFixed(0) + '%</text>';
+        }
+      }
     });
   });
   return svg;
@@ -34562,10 +34723,52 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
         extraClass = ' class="live-node live-thermal"';
       }
     }
+    // New disaster scenarios
+    if (disasterScenario === 'cable_fire') {
+      // Cable overheating leads to fire - nodes above 80% utilization turn red with thermal styling
+      if (ratio > 0.8) {
+        borderColor = '#f44336';
+        fillColor = '#ffcdd2';
+        extraClass = ' class="live-node live-disaster live-heat-shimmer"';
+      }
+    }
+    if (disasterScenario === 'water_ingress') {
+      // IP protection failure - affected nodes show water damage, RCDs trip
+      if (node.type === 'final_circuit') {
+        borderColor = '#1565c0';
+        extraClass = ' class="live-node live-thermal"';
+      }
+      // RCD nodes show tripped state
+      if (node.protection && (node.protection.type === 'RCD' || node.protection.rcdSensitivity)) {
+        borderColor = '#4caf50';
+        fillColor = '#e8f5e9';
+      }
+    }
+    if (disasterScenario === 'overload_cascade') {
+      // Progressive overload from one circuit spreads via shared neutral
+      if (ratio > 0.6) {
+        var cascadeIntensity = Math.min(1.0, ratio * 1.3);
+        borderColor = cascadeIntensity > 0.9 ? '#f44336' : '#ff9800';
+        extraClass = ' class="live-node live-thermal live-heat-shimmer"';
+      }
+    }
+    if (disasterScenario === 'lightning_strike') {
+      // Direct/indirect lightning on supply - SPD operation, surge propagation
+      if (node.type === 'transformer' || node.type === 'main_board') {
+        borderColor = '#ffeb3b';
+        fillColor = '#fffde7';
+        extraClass = ' class="live-node live-disaster live-heat-shimmer"';
+      }
+      // Downstream nodes show surge propagation
+      if (node.type === 'final_circuit' && !node.protection) {
+        borderColor = '#f44336';
+        extraClass = ' class="live-node live-disaster"';
+      }
+    }
     if (mode === 'fault') {
-      onclick = ' onclick="liveInjectFault(\'' + id + '\')" style="cursor:crosshair"';
+      onclick = ' onclick="liveInjectFault(\'' + id + '\')" onmouseover="liveShowTooltip(event,\'' + id + '\')" onmouseout="liveHideTooltip()" style="cursor:crosshair"';
     } else {
-      onclick = ' onclick="switchModule(\'' + liveMapModule(node) + '\')" style="cursor:pointer"';
+      onclick = ' onclick="livePinTooltip(event,\'' + id + '\')" onmouseover="liveShowTooltip(event,\'' + id + '\')" onmouseout="liveHideTooltip()" style="cursor:pointer"';
     }
 
     svg += '<g' + onclick + '>';
@@ -34607,6 +34810,26 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
     }
     if (disasterScenario === 'harmonic' && (node.phases === '1x230' || node.type === 'main_board')) {
       svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="5.5" fill="#ff5722">Nx1.73</text>';
+    }
+    // New disaster detail labels
+    if (disasterScenario === 'cable_fire' && ratio > 0.8) {
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="7" fill="#f44336">\uD83D\uDD25</text>';
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 22) + '" font-size="5" fill="#f44336">' + (ratio * 100).toFixed(0) + '% Iz</text>';
+    }
+    if (disasterScenario === 'water_ingress' && node.type === 'final_circuit') {
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="7" fill="#1565c0">\uD83D\uDCA7</text>';
+      if (node.protection && (node.protection.type === 'RCD' || node.protection.rcdSensitivity)) {
+        svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 22) + '" font-size="5" fill="#4caf50">RCD Trip</text>';
+      }
+    }
+    if (disasterScenario === 'overload_cascade' && ratio > 0.6) {
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="5" fill="#ff9800">' + (ratio * 130).toFixed(0) + '% N</text>';
+    }
+    if (disasterScenario === 'lightning_strike') {
+      if (node.type === 'transformer' || node.type === 'main_board') {
+        svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="7" fill="#ffeb3b">\u26A1</text>';
+        svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 22) + '" font-size="5" fill="#ff9800">SPD</text>';
+      }
     }
 
     svg += '</g>';
@@ -36009,6 +36232,10 @@ function renderLiveInstallation() {
     html += '<button class="sel-btn' + (liveState.disasterScenario === 'neutral_break' ? ' selected' : '') + '" onclick="liveSetDisaster(\'neutral_break\')">' + tx('Neutralbrud', 'Neutral break') + '</button>';
     html += '<button class="sel-btn' + (liveState.disasterScenario === 'high_ambient' ? ' selected' : '') + '" onclick="liveSetDisaster(\'high_ambient\')">' + tx('Hoej omgivelsestemperatur', 'High ambient temperature') + '</button>';
     html += '<button class="sel-btn' + (liveState.disasterScenario === 'harmonic' ? ' selected' : '') + '" onclick="liveSetDisaster(\'harmonic\')">' + tx('Harmonisk overbelastning', 'Harmonic overload') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'cable_fire' ? ' selected' : '') + '" onclick="liveSetDisaster(\'cable_fire\')">' + tx('Kabelbrand', 'Cable fire') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'water_ingress' ? ' selected' : '') + '" onclick="liveSetDisaster(\'water_ingress\')">' + tx('Vandindtraengning', 'Water ingress') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'overload_cascade' ? ' selected' : '') + '" onclick="liveSetDisaster(\'overload_cascade\')">' + tx('Kaskade-overbelastning', 'Overload cascade') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'lightning_strike' ? ' selected' : '') + '" onclick="liveSetDisaster(\'lightning_strike\')">' + tx('Lynnedslag', 'Lightning strike') + '</button>';
     html += '</div>';
     if (liveState.disasterScenario) {
       html += '<div style="margin-top:8px">';
@@ -36020,6 +36247,18 @@ function renderLiveInstallation() {
         html += '<div class="result-row"><span class="label">' + tx('Omgivelse 50C - derating-kaskade aktiv', 'Ambient 50C - derating cascade active') + '</span></div>';
       } else if (liveState.disasterScenario === 'harmonic') {
         html += '<div class="result-row"><span class="label">' + tx('3. harmonisk - neutral x1.73 - neutralopvarmning', '3rd harmonic - neutral x1.73 - neutral heating') + '</span></div>';
+      } else if (liveState.disasterScenario === 'cable_fire') {
+        html += '<div class="result-row"><span class="label" style="color:#f44336">' + tx('Kabel overophedning foerer til brand - termisk loebesituation', 'Cable overheating leads to fire - thermal runaway') + '</span></div>';
+        html += '<div class="result-row"><span class="label">' + tx('Kredse over 80% Iz viser brandfarer', 'Circuits above 80% Iz show fire hazard') + '</span></div>';
+      } else if (liveState.disasterScenario === 'water_ingress') {
+        html += '<div class="result-row"><span class="label" style="color:#1565c0">' + tx('IP-beskyttelsesfejl - vandindtraengning i kapslinger', 'IP protection failure - water ingress in enclosures') + '</span></div>';
+        html += '<div class="result-row"><span class="label">' + tx('HPFI/RCD udloeser ved fejlstroem', 'RCD trips on fault current') + '</span></div>';
+      } else if (liveState.disasterScenario === 'overload_cascade') {
+        html += '<div class="result-row"><span class="label" style="color:#ff9800">' + tx('Progressiv overbelastning via faelles neutral', 'Progressive overload via shared neutral') + '</span></div>';
+        html += '<div class="result-row"><span class="label">' + tx('Neutral opvarmes til 173% af fase-stroemmen', 'Neutral heats to 173% of phase current') + '</span></div>';
+      } else if (liveState.disasterScenario === 'lightning_strike') {
+        html += '<div class="result-row"><span class="label" style="color:#ffeb3b">' + tx('Direkte/indirekte lyn paa forsyning - overspaendingsvaern', 'Direct/indirect lightning on supply - SPD operation') + '</span></div>';
+        html += '<div class="result-row"><span class="label">' + tx('Overspaendingsbølge forplanter sig nedstrøms', 'Surge propagates downstream') + '</span></div>';
       }
       html += '</div>';
     }

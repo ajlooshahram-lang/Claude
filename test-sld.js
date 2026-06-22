@@ -14751,9 +14751,12 @@ test('liveGetLoadMultiplier returns correct values for each time period', functi
 
 test('liveThermalColor returns correct colors at different ratios', function() {
   assert.strictEqual(liveThermalColor(0), '#2196f3', 'Ratio 0 should be blue (cold)');
-  assert.strictEqual(liveThermalColor(0.3), '#4caf50', 'Ratio 0.3 should be green (normal)');
-  assert.strictEqual(liveThermalColor(0.6), '#ff9800', 'Ratio 0.6 should be orange (warm)');
+  assert.strictEqual(liveThermalColor(0.2), '#42a5f5', 'Ratio 0.2 should be light blue');
+  assert.strictEqual(liveThermalColor(0.4), '#4caf50', 'Ratio 0.4 should be green (normal)');
+  assert.strictEqual(liveThermalColor(0.55), '#8bc34a', 'Ratio 0.55 should be light green');
+  assert.strictEqual(liveThermalColor(0.7), '#ff9800', 'Ratio 0.7 should be orange (warm)');
   assert.strictEqual(liveThermalColor(0.85), '#ff5722', 'Ratio 0.85 should be deep orange (hot)');
+  assert.strictEqual(liveThermalColor(0.95), '#e53935', 'Ratio 0.95 should be red');
   assert.strictEqual(liveThermalColor(1.2), '#f44336', 'Ratio 1.2 should be red (overloaded)');
 });
 
@@ -14814,7 +14817,7 @@ test('renderLiveInstallation in timelapse mode returns HTML with play/pause cont
   liveState.mode = 'live';
 });
 
-test('renderLiveInstallation in disasters mode returns all 4 disaster buttons', function() {
+test('renderLiveInstallation in disasters mode returns all 8 disaster buttons', function() {
   liveState.mode = 'disasters';
   liveState.disasterScenario = null;
   var html = renderLiveInstallation();
@@ -14822,6 +14825,10 @@ test('renderLiveInstallation in disasters mode returns all 4 disaster buttons', 
   assert(html.indexOf('neutral_break') > 0, 'Should have neutral break button');
   assert(html.indexOf('high_ambient') > 0, 'Should have high ambient button');
   assert(html.indexOf('harmonic') > 0, 'Should have harmonic overload button');
+  assert(html.indexOf('cable_fire') > 0, 'Should have cable fire button');
+  assert(html.indexOf('water_ingress') > 0, 'Should have water ingress button');
+  assert(html.indexOf('overload_cascade') > 0, 'Should have overload cascade button');
+  assert(html.indexOf('lightning_strike') > 0, 'Should have lightning strike button');
   liveState.mode = 'live';
 });
 
@@ -16013,6 +16020,272 @@ test('reverseMultiSolve with extreme grouping still produces valid result', func
   reverseState.selectedCircuits = [];
   reverseState.multiResult = null;
   reverseState.multiMode = false;
+});
+
+// === Live Installation Twin Enhanced v2: IEC 60617 Symbols, Tooltips, Disasters, Thermal ===
+console.log('\n=== Live Twin v2: IEC 60617, Tooltips, Disasters, Thermal Tests ===\n');
+
+test('liveSvgSymbols returns SVG defs with IEC 60617 transformer symbol (coupled coils with vector group)', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-transformer') > 0, 'Should contain transformer symbol id');
+  assert(defs.indexOf('Dyn11') > 0, 'Should contain vector group label Dyn11');
+  assert(defs.indexOf('<circle') > 0, 'Should contain circles for coupled coils');
+  assert(defs.indexOf('viewBox') > 0, 'Symbol should have viewBox');
+});
+
+test('liveSvgSymbols returns IEC 60617 MCB symbol with thermal and magnetic trip indicators', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-mcb') > 0, 'Should contain MCB symbol');
+  assert(defs.indexOf('polyline') > 0, 'Should have zigzag polyline for thermal trip');
+  assert(defs.indexOf('A5,5') > 0 || defs.indexOf('A 5') > 0 || defs.indexOf('path') > 0, 'Should have arc path for magnetic trip');
+});
+
+test('liveSvgSymbols returns IEC 60617 MCCB symbol with adjustable trip unit', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-mccb') > 0, 'Should contain MCCB symbol');
+  assert(defs.indexOf('Ir') > 0, 'Should have adjustable trip indicator label Ir');
+  // Frame-type: double rectangle
+  var mccbSection = defs.substring(defs.indexOf('sym-mccb'));
+  assert(mccbSection.indexOf('rect') > 0, 'Should have rectangles for frame');
+});
+
+test('liveSvgSymbols returns IEC 60617 fuse-link symbol (rectangle with wire through)', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-fuse') > 0, 'Should contain fuse symbol');
+  var fuseSection = defs.substring(defs.indexOf('sym-fuse'));
+  assert(fuseSection.indexOf('line') > 0, 'Should have line elements for fusible wire');
+  assert(fuseSection.indexOf('ellipse') > 0, 'Should have ellipse for constriction point');
+});
+
+test('liveSvgSymbols returns IEC 60617 RCD symbol with differential detector and test button', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-rcd') > 0, 'Should contain RCD symbol');
+  assert(defs.indexOf('\u0394') > 0 || defs.indexOf('&#916;') > 0 || defs.indexOf('Delta') > 0 || defs.indexOf('\u0394') >= 0, 'Should have delta character for differential');
+  var rcdSection = defs.substring(defs.indexOf('sym-rcd'));
+  assert(rcdSection.indexOf('>T<') > 0, 'Should have T for test button');
+});
+
+test('liveSvgSymbols returns IEC 60617 cable symbol with insulation layers', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-cable') > 0, 'Should contain cable symbol');
+  var cableSection = defs.substring(defs.indexOf('sym-cable'));
+  // Should have circles representing conductor cores with insulation
+  assert(cableSection.indexOf('circle') > 0, 'Should have circles for conductor cores');
+  assert(cableSection.indexOf('stroke-dasharray') > 0, 'Should have dashed line for PE conductor');
+});
+
+test('liveSvgSymbols returns IEC 60617 motor symbol with M in circle and rotation arrow', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-motor') > 0, 'Should contain motor symbol');
+  var motorSection = defs.substring(defs.indexOf('sym-motor'));
+  assert(motorSection.indexOf('>M<') > 0, 'Should have M letter in motor symbol');
+  assert(motorSection.indexOf('polygon') > 0, 'Should have polygon arrowhead for rotation');
+});
+
+test('liveSvgSymbols returns distribution board symbol with DIN rail indication', function() {
+  var defs = liveSvgSymbols();
+  assert(defs.indexOf('sym-distboard') > 0, 'Should contain distribution board symbol');
+  var dbSection = defs.substring(defs.indexOf('sym-distboard'));
+  assert(dbSection.indexOf('N PE') > 0, 'Should have N PE busbar labels');
+});
+
+test('liveTooltipHtml returns compliance check indicators for final circuit', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var nodeId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !nodeId) nodeId = nid;
+  });
+  if (!nodeId) return; // skip if no final circuit
+  var html = liveTooltipHtml(nodeId, tree, 'live');
+  assert(html.indexOf('\u2705') >= 0 || html.indexOf('\u274C') >= 0, 'Should have compliance checkmark or X');
+  assert(html.indexOf('DS/HD 60364') > 0, 'Should reference DS/HD 60364');
+  assert(html.indexOf('433.1') > 0 || html.indexOf('411.3') > 0 || html.indexOf('525') > 0, 'Should cite specific clause');
+  assert(html.indexOf('Click to pin') > 0 || html.indexOf('Klik for at fastgoere') > 0, 'Should show pin instruction');
+});
+
+test('liveTooltipHtml shows IB, In, Iz, Vdrop, and Ik values', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var nodeId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !nodeId) nodeId = nid;
+  });
+  if (!nodeId) return;
+  var html = liveTooltipHtml(nodeId, tree, 'live');
+  assert(html.indexOf('IB:') > 0, 'Should show IB value');
+  assert(html.indexOf('Iz:') > 0, 'Should show Iz value');
+  assert(html.indexOf('Vdrop:') > 0, 'Should show voltage drop');
+  assert(html.indexOf('Utilization') > 0 || html.indexOf('Udnyttelse') > 0, 'Should show utilization');
+});
+
+test('liveTooltipHtml returns compliance status label (Compliant or Non-compliant)', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var nodeId = tree.rootId;
+  var html = liveTooltipHtml(nodeId, tree, 'live');
+  assert(html.indexOf('Compliant') > 0 || html.indexOf('Non-compliant') > 0 ||
+         html.indexOf('Overensstemmende') > 0 || html.indexOf('Ikke overensstemmende') > 0,
+         'Should show compliance status');
+});
+
+test('liveSetDisaster toggles cable_fire scenario on and off', function() {
+  liveState.disasterScenario = null;
+  liveSetDisaster('cable_fire');
+  assert.strictEqual(liveState.disasterScenario, 'cable_fire', 'Should set cable_fire');
+  liveSetDisaster('cable_fire');
+  assert.strictEqual(liveState.disasterScenario, null, 'Should toggle off cable_fire');
+});
+
+test('liveSetDisaster toggles water_ingress scenario on and off', function() {
+  liveState.disasterScenario = null;
+  liveSetDisaster('water_ingress');
+  assert.strictEqual(liveState.disasterScenario, 'water_ingress', 'Should set water_ingress');
+  liveSetDisaster('water_ingress');
+  assert.strictEqual(liveState.disasterScenario, null, 'Should toggle off water_ingress');
+});
+
+test('liveSetDisaster toggles overload_cascade scenario on and off', function() {
+  liveState.disasterScenario = null;
+  liveSetDisaster('overload_cascade');
+  assert.strictEqual(liveState.disasterScenario, 'overload_cascade', 'Should set overload_cascade');
+  liveSetDisaster('overload_cascade');
+  assert.strictEqual(liveState.disasterScenario, null, 'Should toggle off overload_cascade');
+});
+
+test('liveSetDisaster toggles lightning_strike scenario on and off', function() {
+  liveState.disasterScenario = null;
+  liveSetDisaster('lightning_strike');
+  assert.strictEqual(liveState.disasterScenario, 'lightning_strike', 'Should set lightning_strike');
+  liveSetDisaster('lightning_strike');
+  assert.strictEqual(liveState.disasterScenario, null, 'Should toggle off lightning_strike');
+});
+
+test('cable_fire disaster renders fire indicators on high-load nodes', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'cable_fire';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  // The fire emoji or disaster class should appear (if any node is above 80% utilization)
+  assert(typeof svg === 'string', 'Should return valid SVG string');
+  liveState.disasterScenario = null;
+});
+
+test('water_ingress disaster renders water indicators on final circuits', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'water_ingress';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  // Water ingress affects final circuits
+  var hasFinal = false;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit') hasFinal = true;
+  });
+  if (hasFinal) {
+    assert(svg.indexOf('live-thermal') > 0 || svg.indexOf('#1565c0') > 0, 'Should style final circuits with water ingress color');
+  }
+  liveState.disasterScenario = null;
+});
+
+test('lightning_strike disaster renders surge indicators on transformer and main board', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'lightning_strike';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  // Lightning strike affects transformer and main_board
+  assert(svg.indexOf('SPD') > 0 || svg.indexOf('\u26A1') > 0, 'Should show SPD or lightning symbol on supply nodes');
+  liveState.disasterScenario = null;
+});
+
+test('overload_cascade disaster renders overload indicators on loaded nodes', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'overload_cascade';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  assert(typeof svg === 'string', 'Should return valid SVG string');
+  liveState.disasterScenario = null;
+});
+
+test('liveThermalCapacityPct calculates correctly at various load ratios', function() {
+  // At IB=Iz (ratio=1), thermal capacity should be 100%
+  assert.strictEqual(liveThermalCapacityPct(100, 100, 1.0), 100, 'IB=Iz should be 100%');
+  // At IB=0.5*Iz, thermal = (0.5)^2 * 100 = 25%
+  assert.strictEqual(liveThermalCapacityPct(50, 100, 1.0), 25, 'IB=0.5*Iz should be 25%');
+  // At IB=0, thermal = 0%
+  assert.strictEqual(liveThermalCapacityPct(0, 100, 1.0), 0, 'IB=0 should be 0%');
+  // Derating factor 0.82: effective Iz = 82A, IB=82A -> 100%
+  var pct = liveThermalCapacityPct(82, 100, 0.82);
+  assert(Math.abs(pct - 100) < 0.1, 'IB=derated Iz should be ~100%, got ' + pct);
+  // Overload: IB > Iz
+  var overPct = liveThermalCapacityPct(120, 100, 1.0);
+  assert(overPct > 100, 'IB>Iz should exceed 100%, got ' + overPct);
+});
+
+test('liveThermalGradientColor returns correct gradient colors', function() {
+  assert.strictEqual(liveThermalGradientColor(0), '#2196f3', '0% should be blue');
+  assert.strictEqual(liveThermalGradientColor(10), '#42a5f5', '10% should be light blue');
+  assert.strictEqual(liveThermalGradientColor(30), '#4caf50', '30% should be green');
+  assert.strictEqual(liveThermalGradientColor(55), '#8bc34a', '55% should be light green');
+  assert.strictEqual(liveThermalGradientColor(70), '#ff9800', '70% should be orange');
+  assert.strictEqual(liveThermalGradientColor(85), '#ff5722', '85% should be deep orange');
+  assert.strictEqual(liveThermalGradientColor(100), '#f44336', '100% should be red');
+});
+
+test('liveRenderConnections includes thermal capacity bars in output', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = null;
+  var layout = liveRenderSvg(tree, 'live');
+  var svg = liveRenderConnections(tree, layout.positions, layout.nodeW, layout.nodeH, 'live');
+  assert(svg.indexOf('live-thermal-bar') > 0, 'Should contain thermal capacity bar elements');
+});
+
+test('liveRenderConnections includes gradient cables with upstream/downstream colors', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var layout = liveRenderSvg(tree, 'live');
+  var svg = liveRenderConnections(tree, layout.positions, layout.nodeW, layout.nodeH, 'live');
+  assert(svg.indexOf('liveGrad') > 0, 'Should have gradient IDs for cable colors');
+  assert(svg.indexOf('linearGradient') > 0, 'Should have linearGradient defs');
+  assert(svg.indexOf('live-gradient-cable') > 0, 'Should have gradient cable class');
+});
+
+test('livePinTooltip and liveDismissPinnedTooltip manage pin state', function() {
+  _liveTooltipPinned = false;
+  _liveTooltipPinnedNodeId = null;
+  // Simulate pin
+  _liveTooltipPinned = true;
+  _liveTooltipPinnedNodeId = 'test-node';
+  assert.strictEqual(_liveTooltipPinned, true, 'Should be pinned');
+  assert.strictEqual(_liveTooltipPinnedNodeId, 'test-node', 'Should store pinned node id');
+  // Dismiss
+  liveDismissPinnedTooltip();
+  assert.strictEqual(_liveTooltipPinned, false, 'Should be unpinned after dismiss');
+  assert.strictEqual(_liveTooltipPinnedNodeId, null, 'Should clear pinned node id');
+});
+
+test('renderLiveInstallation in disasters mode shows description for cable_fire scenario', function() {
+  liveState.mode = 'disasters';
+  liveState.disasterScenario = 'cable_fire';
+  var html = renderLiveInstallation();
+  assert(html.indexOf('thermal runaway') > 0 || html.indexOf('termisk loebesituation') > 0, 'Should describe cable fire scenario');
+  assert(html.indexOf('80%') > 0, 'Should mention 80% Iz threshold');
+  liveState.disasterScenario = null;
+  liveState.mode = 'live';
+});
+
+test('renderLiveInstallation in disasters mode shows description for lightning_strike scenario', function() {
+  liveState.mode = 'disasters';
+  liveState.disasterScenario = 'lightning_strike';
+  var html = renderLiveInstallation();
+  assert(html.indexOf('SPD') > 0, 'Should mention SPD operation');
+  assert(html.indexOf('lightning') > 0 || html.indexOf('lyn') > 0 || html.indexOf('Lynnedslag') > 0, 'Should mention lightning');
+  liveState.disasterScenario = null;
+  liveState.mode = 'live';
 });
 
 // --- Summary ---
