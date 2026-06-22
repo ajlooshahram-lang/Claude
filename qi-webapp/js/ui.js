@@ -3378,6 +3378,13 @@
         toast("That's the old Word format (.doc). Please save it as .docx first, then upload again.");
         return;
       }
+      // File-size guard: reject files over 50 MB before attempting extraction.
+      if (f.size > 50 * 1024 * 1024) {
+        nameEl.textContent = `${f.name} — too large`;
+        fileInput.value = "";
+        toast("That file is too large (over 50 MB). Try a shorter document or paste the text directly.");
+        return;
+      }
       // Unsupported binary formats (not PDF/DOCX/text).
       if (/\.(pptx?|xlsx?|xlsm|rtf|odt|pages|key|numbers|zip)$/.test(name)) {
         nameEl.textContent = `${f.name} — can't read this type yet`;
@@ -3398,7 +3405,7 @@
             ta.value = txt;
             nameEl.textContent = f.name;
             if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
-          }).catch(() => { toast("Failed to read that .docx file. Try saving it again or paste the text instead."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
+          }).catch((e) => { console.warn("DOCX extraction failed:", e); toast("Failed to read that .docx file. Try saving it again or paste the text instead."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
         };
         reader.onerror = () => { toast("Could not read that file."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; };
         reader.readAsArrayBuffer(f);
@@ -3417,12 +3424,20 @@
             var pages = []; for (var i = 1; i <= pdf.numPages; i++) pages.push(i);
             return Promise.all(pages.map(num => pdf.getPage(num).then(page => page.getTextContent()).then(tc => tc.items.map(item => item.str).join(" "))));
           }).then(pageTexts => {
-            const txt = pageTexts.join("\n").trim();
+            const txt = pageTexts.join("\n\n").trim();
             if (!txt) { toast("Could not extract any text from that PDF. It may be scanned/image-only."); nameEl.textContent = f.name + " — no text found"; fileInput.value = ""; return; }
             ta.value = txt;
             nameEl.textContent = f.name;
             if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
-          }).catch(() => { toast("Failed to read that PDF. It may be encrypted or corrupted."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
+          }).catch((e) => {
+            console.warn("PDF extraction failed:", e);
+            if (e && e.name === "PasswordException") {
+              toast("That PDF is password-protected. Please remove the password first, or paste the text directly.");
+            } else {
+              toast("Failed to read that PDF. It may be encrypted or corrupted.");
+            }
+            nameEl.textContent = f.name + " — error"; fileInput.value = "";
+          });
         };
         reader.onerror = () => { toast("Could not read that file."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; };
         reader.readAsArrayBuffer(f);
