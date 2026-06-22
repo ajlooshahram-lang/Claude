@@ -727,6 +727,24 @@ body.motion-off .fade-in { will-change: auto; }
 .sim-breath { animation: simBreath 3s ease-in-out infinite; transform-origin: center; }
 .sim-neon { animation: simNeonPulse 2.2s ease-in-out infinite; }
 
+/* === Live Installation Twin animations === */
+@keyframes liveCurrentFlow { to { stroke-dashoffset: -22; } }
+@keyframes liveThermalPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes liveFaultSurge { 0% { stroke-dashoffset: 0; opacity: 1; } 50% { opacity: 0.5; } 100% { stroke-dashoffset: -44; opacity: 1; } }
+@keyframes liveTrip { 0% { transform: scale(1); } 50% { transform: scale(1.3); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes liveTimeLapse { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(30deg); } }
+@keyframes liveDisasterFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.live-wire { stroke-dasharray: 8 4; animation: liveCurrentFlow 1s linear infinite; }
+.live-thermal { animation: liveThermalPulse 2s ease-in-out infinite; }
+.live-fault { stroke: #f44336; stroke-width: 3; stroke-dasharray: 12 4; animation: liveFaultSurge 0.3s linear infinite; }
+.live-trip { animation: liveTrip 0.5s ease-in-out 3; }
+.live-node { transition: fill 0.5s ease, stroke 0.5s ease; }
+.live-disaster { animation: liveDisasterFlash 0.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .live-wire, .live-thermal, .live-fault, .live-trip, .live-disaster { animation: none !important; }
+}
+body.motion-off .live-wire, body.motion-off .live-thermal, body.motion-off .live-fault, body.motion-off .live-trip, body.motion-off .live-disaster { animation: none !important; }
+
 /* Dark-mode simulator label and value neon styling */
 body.dark .sim-label { fill: #e0f4ff; }
 body.dark .sim-value { color: #00e5ff; fill: #00e5ff; }
@@ -1128,6 +1146,7 @@ const T = {
       distplan: 'Fordelingsplan',
       elplan: 'Installationsplan',
       controlpanel: 'Styretavle',
+      live: 'Levende Installation',
       archive: 'Projektarkiv'
     },
     // Load module
@@ -1289,6 +1308,7 @@ const T = {
       distplan: 'Distribution Plan',
       elplan: 'Electrical Plan',
       controlpanel: 'Control Panel',
+      live: 'Live Installation',
       archive: 'Project Archive'
     },
     loadTitle: 'Load Calculation',
@@ -1442,6 +1462,7 @@ const T = {
       distplan: 'نقشه توزیع',
       elplan: 'نقشه تاسیسات برقی',
       controlpanel: 'تابلوی کنترل',
+      live: 'نمای زنده تاسیسات',
       archive: 'آرشیو پروژه'
     },
     loadTitle: 'محاسبه بار',
@@ -4863,6 +4884,9 @@ let sldTree = null;
 let sldSelectedId = null;
 let sldNextId = 1;
 
+// Live Installation Twin state
+let liveState = { mode: 'live', faultNodeId: null, faultResult: null, timelapseRunning: false, timelapseHour: 0, timelapseSpeed: 1, timelapseInterval: null, disasterScenario: null, selectedNodeId: null };
+
 function sldCreateNode(type, parentId, overrides) {
   const id = 'node_' + (sldNextId++);
   const defaults = {
@@ -5462,7 +5486,7 @@ const NAV_GROUPS = [
     da: 'Tavle, skinne & tegning', en: 'Panel, busbar & drawing', fa: '\u062A\u0627\u0628\u0644\u0648\u060C \u0634\u06CC\u0646\u0647 \u0648 \u0646\u0642\u0634\u0647',
     descDa: 'Saml installationen fysisk: tavle og skinnesystem, kabelbakke, og det enstregede diagram (tegning) der dokumenterer hvordan alt h\u00E6nger sammen.',
     descEn: 'Put the installation together physically: panel and busbar, cable tray, and the single-line diagram (drawing) that documents how everything connects.',
-    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel']
+    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel', 'live']
   },
   {
     id: 'theory', icon: '\uD83D\uDCD6',
@@ -7102,6 +7126,7 @@ function renderModule(mod) {
     case 'elplan': content = renderElPlan(); break;
     case 'controlpanel': content = renderControlPanel(); break;
     case 'archive': content = renderArchive(); break;
+    case 'live': content = renderLiveInstallation(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -33375,6 +33400,443 @@ function renderControlPanel() {
   html += '<div class="result-row"><span class="label">' + tx('Analoge indgange', 'Analog Inputs') + '</span><span class="value">3 (AI)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Digitale udgange', 'Digital Outputs') + '</span><span class="value">5 (DO)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Kommunikation', 'Communication') + '</span><span class="value">Modbus RTU / Profinet</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// ===== LIVE INSTALLATION TWIN =====
+function liveGetLoadMultiplier(hour) {
+  // 24-hour load profile: morning EV charging, midday solar, evening peak, night baseload
+  if (hour >= 7 && hour < 9) return 1.5;   // Morning EV charging
+  if (hour >= 10 && hour < 14) return 0.5;  // Midday solar generation
+  if (hour >= 17 && hour < 20) return 1.8;  // Evening peak
+  if (hour >= 23 || hour < 5) return 0.3;   // Night baseload
+  return 1.0; // Normal load
+}
+
+function liveThermalColor(ratio) {
+  // ratio = IB / Iz (0..1+), returns color from blue (cold) -> yellow -> red (hot)
+  if (ratio <= 0) return '#2196f3';
+  if (ratio < 0.5) return '#4caf50';
+  if (ratio < 0.75) return '#ff9800';
+  if (ratio < 1.0) return '#ff5722';
+  return '#f44336';
+}
+
+function liveVoltageColor(vdrop) {
+  // vdrop in percent, green at 0, amber at high drop
+  if (vdrop <= 1) return '#4caf50';
+  if (vdrop <= 3) return '#8bc34a';
+  if (vdrop <= 5) return '#ff9800';
+  return '#f44336';
+}
+
+function liveMapModule(node) {
+  // Map SLD node type to a navigable module key
+  if (node.type === 'transformer') return 'trafo';
+  if (node.type === 'main_board' || node.type === 'sub_board') return 'sld';
+  if (node.type === 'final_circuit') {
+    if (node.protection && node.protection.curve) return 'mcb';
+    return 'fuse';
+  }
+  return 'sld';
+}
+function liveRenderSvg(tree, mode) {
+  if (!tree || !tree.rootId) return '<svg width="100%" height="200"></svg>';
+  var root = tree.nodes[tree.rootId];
+  if (!root) return '<svg width="100%" height="200"></svg>';
+
+  var nodeW = 100, nodeH = 56, gapX = 20, gapY = 70;
+  var positions = {};
+  var maxX = 0, maxY = 0;
+
+  function layoutNode(id, x, y) {
+    positions[id] = { x: x, y: y };
+    if (x + nodeW > maxX) maxX = x + nodeW;
+    if (y + nodeH > maxY) maxY = y + nodeH;
+    var node = tree.nodes[id];
+    if (!node || node.childIds.length === 0) return x + nodeW + gapX;
+    var cx = x;
+    node.childIds.forEach(function(cid) {
+      cx = layoutNode(cid, cx, y + gapY + nodeH);
+    });
+    var firstChild = positions[node.childIds[0]];
+    var lastChild = positions[node.childIds[node.childIds.length - 1]];
+    positions[id].x = (firstChild.x + lastChild.x) / 2;
+    return cx;
+  }
+
+  layoutNode(root.id, 20, 20);
+  var svgW = maxX + 40;
+  var svgH = maxY + 40;
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="min-height:220px;max-height:600px;border-radius:8px;background:var(--bg-secondary,#f8f9fa)">';
+  svg += simSvgDefs();
+  // Additional live defs
+  svg += '<defs>';
+  svg += '<linearGradient id="liveHeatGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2196f3"/><stop offset="50%" stop-color="#ffeb3b"/><stop offset="100%" stop-color="#f44336"/></linearGradient>';
+  svg += '<filter id="liveFaultGlow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '</defs>';
+
+  return { svg: svg, positions: positions, svgW: svgW, svgH: svgH, nodeW: nodeW, nodeH: nodeH };
+}
+function liveRenderConnections(tree, positions, nodeW, nodeH, mode) {
+  var svg = '';
+  var multiplier = liveGetLoadMultiplier(liveState.timelapseHour);
+  Object.keys(tree.nodes).forEach(function(id) {
+    var node = tree.nodes[id];
+    var pos = positions[id];
+    if (!node || !pos) return;
+    node.childIds.forEach(function(cid) {
+      var cpos = positions[cid];
+      if (!cpos) return;
+      var child = tree.nodes[cid];
+      var x1 = pos.x + nodeW / 2;
+      var y1 = pos.y + nodeH;
+      var x2 = cpos.x + nodeW / 2;
+      var y2 = cpos.y;
+      var ib = child ? (child._ib || 0) : 0;
+      if (mode === 'timelapse') ib = ib * multiplier;
+      var iz = (child && child.cable) ? (child.cable.iz || 100) : 100;
+      var ratio = iz > 0 ? ib / iz : 0;
+      var wireColor = liveThermalColor(ratio);
+      // Base wire
+      svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + wireColor + '" stroke-width="2.5" stroke-linecap="round"/>';
+      // Animated flow overlay
+      var animSpeed = ib > 0 ? Math.max(0.3, 2 / (ib / 10 + 1)).toFixed(1) : '2';
+      svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + wireColor + '" stroke-width="1.5" class="live-wire" style="animation-duration:' + animSpeed + 's;opacity:0.8"/>';
+      // Power flow label
+      if (child && ib > 0) {
+        var midX = (x1 + x2) / 2 + 8;
+        var midY = (y1 + y2) / 2;
+        var pKw = (child.power_kW || (ib * (child.voltage || 230) * (child.cosPhi || 0.9) / 1000));
+        if (mode === 'timelapse') pKw = pKw * multiplier;
+        svg += '<text x="' + midX + '" y="' + midY + '" font-size="6" fill="var(--text-muted,#666)" text-anchor="start">' + pKw.toFixed(1) + ' kW</text>';
+      }
+    });
+  });
+  return svg;
+}
+function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
+  var svg = '';
+  var multiplier = (mode === 'timelapse') ? liveGetLoadMultiplier(liveState.timelapseHour) : 1;
+  var faultResult = liveState.faultResult;
+  var faultPath = (faultResult && faultResult.path) ? faultResult.path : [];
+  var disasterScenario = liveState.disasterScenario;
+
+  Object.keys(tree.nodes).forEach(function(id) {
+    var node = tree.nodes[id];
+    var pos = positions[id];
+    if (!node || !pos) return;
+    var ib = (node._ib || 0) * multiplier;
+    var iz = (node.cable) ? (node.cable.iz || 100) : 100;
+    var ratio = iz > 0 ? ib / iz : 0;
+    var vdrop = (node._vdrop || 0) * multiplier;
+    var borderColor = liveThermalColor(ratio);
+    var fillColor = 'var(--bg-primary,#fff)';
+    var extraClass = ' class="live-node"';
+    var onclick = '';
+
+    // Fault mode highlights
+    if (mode === 'fault' && faultPath.indexOf(id) >= 0) {
+      extraClass = ' class="live-node live-thermal"';
+      if (faultResult && faultResult.faultNodeId === id) {
+        borderColor = '#f44336';
+        fillColor = '#ffebee';
+        extraClass = ' class="live-node live-disaster"';
+      }
+      if (faultResult && faultResult.trippingDeviceNodeId === id) {
+        borderColor = faultResult.verdict === 'protected' ? '#4caf50' : '#f44336';
+        extraClass = ' class="live-node live-trip"';
+      }
+      if (faultResult && faultResult.selectivityIssues) {
+        for (var si = 0; si < faultResult.selectivityIssues.length; si++) {
+          if (faultResult.selectivityIssues[si].nodeId === id) {
+            borderColor = '#ff9800';
+          }
+        }
+      }
+    }
+
+    // Disaster scenario effects
+    if (disasterScenario === 'neutral_break' && node.phases === '1x230') {
+      borderColor = '#f44336';
+      extraClass = ' class="live-node live-disaster"';
+    }
+    if (disasterScenario === 'high_ambient') {
+      var deratedIz = iz * 0.82; // 50C derating factor approx
+      if (ib > deratedIz) {
+        borderColor = '#f44336';
+        extraClass = ' class="live-node live-thermal"';
+      }
+    }
+    if (disasterScenario === 'harmonic') {
+      if (node.phases === '1x230' || node.type === 'main_board') {
+        extraClass = ' class="live-node live-thermal"';
+      }
+    }
+
+    // Click handler based on mode
+    if (mode === 'fault') {
+      onclick = ' onclick="liveInjectFault(\'' + id + '\')" style="cursor:crosshair"';
+    } else {
+      onclick = ' onclick="switchModule(\'' + liveMapModule(node) + '\')" style="cursor:pointer"';
+    }
+
+    svg += '<g' + onclick + '>';
+
+    if (node.type === 'transformer') {
+      var cx = pos.x + nodeW / 2;
+      var cy = pos.y + nodeH / 2;
+      svg += '<circle cx="' + (cx - 10) + '" cy="' + cy + '" r="16"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2"/>';
+      svg += '<circle cx="' + (cx + 10) + '" cy="' + cy + '" r="16"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2"/>';
+      svg += '<text x="' + cx + '" y="' + (cy + 26) + '" text-anchor="middle" font-size="7" fill="var(--text,#333)">' + (node.power_kVA || 630) + ' kVA</text>';
+      if (disasterScenario === 'trafo_failure') {
+        svg += '<line x1="' + (cx - 18) + '" y1="' + (cy - 18) + '" x2="' + (cx + 18) + '" y2="' + (cy + 18) + '" stroke="#f44336" stroke-width="3" class="live-disaster"/>';
+        svg += '<line x1="' + (cx + 18) + '" y1="' + (cy - 18) + '" x2="' + (cx - 18) + '" y2="' + (cy + 18) + '" stroke="#f44336" stroke-width="3" class="live-disaster"/>';
+      }
+    } else if (node.type === 'main_board' || node.type === 'sub_board') {
+      svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="4"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2"/>';
+      svg += '<line x1="' + (pos.x + 8) + '" y1="' + (pos.y + 13) + '" x2="' + (pos.x + nodeW - 8) + '" y2="' + (pos.y + 13) + '" stroke="' + borderColor + '" stroke-width="2.5"/>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 30) + '" text-anchor="middle" font-size="7" fill="var(--text,#333)">' + sldNodeName(node) + '</text>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 42) + '" text-anchor="middle" font-size="6" fill="var(--text-muted,#666)">' + ib.toFixed(0) + 'A</text>';
+    } else {
+      svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="4"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="1.5"/>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 16) + '" text-anchor="middle" font-size="7" fill="var(--text,#333)">' + sldNodeName(node) + '</text>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 30) + '" text-anchor="middle" font-size="6" fill="var(--text-muted,#666)">' + (node.protectionIn || 0) + 'A ' + (node.cable ? node.cable.mm2 + 'mm\u00B2' : '') + '</text>';
+      // Voltage indicator
+      var vColor = liveVoltageColor(vdrop);
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 44) + '" text-anchor="middle" font-size="5.5" fill="' + vColor + '">Vd:' + vdrop.toFixed(1) + '%</text>';
+    }
+
+    svg += '</g>';
+  });
+  return svg;
+}
+function liveRenderFaultOverlay(tree, positions, nodeW, nodeH) {
+  var svg = '';
+  var result = liveState.faultResult;
+  if (!result || !result.path || result.path.length < 2) return svg;
+
+  // Animate fault current along path from fault point back to source
+  var pathPoints = [];
+  for (var i = result.path.length - 1; i >= 0; i--) {
+    var pos = positions[result.path[i]];
+    if (pos) pathPoints.push({ x: pos.x + nodeW / 2, y: pos.y + nodeH / 2 });
+  }
+  if (pathPoints.length >= 2) {
+    var d = 'M' + pathPoints[0].x + ',' + pathPoints[0].y;
+    for (var j = 1; j < pathPoints.length; j++) {
+      d += ' L' + pathPoints[j].x + ',' + pathPoints[j].y;
+    }
+    svg += '<path d="' + d + '" fill="none" class="live-fault" filter="url(#liveFaultGlow)"/>';
+  }
+
+  // Arc-flash boundary circle if voltage >= 400V
+  var faultNode = tree.nodes[result.faultNodeId];
+  var faultPos = positions[result.faultNodeId];
+  if (faultNode && faultPos && (faultNode.voltage || 0) >= 400) {
+    svg += '<circle cx="' + (faultPos.x + nodeW / 2) + '" cy="' + (faultPos.y + nodeH / 2) + '" r="35" fill="none" stroke="#ff5722" stroke-width="1" stroke-dasharray="3,2" opacity="0.7"/>';
+    svg += '<text x="' + (faultPos.x + nodeW / 2 + 38) + '" y="' + (faultPos.y + nodeH / 2) + '" font-size="5" fill="#ff5722">Arc boundary</text>';
+  }
+
+  // Trip time labels on protection devices in path
+  if (result.trippingDeviceNodeId && positions[result.trippingDeviceNodeId]) {
+    var tp = positions[result.trippingDeviceNodeId];
+    var tripLabel = result.tripTime < Infinity ? result.tripTime.toFixed(2) + 's' : '\u221E';
+    var tripColor = result.verdict === 'protected' ? '#4caf50' : (result.verdict === 'slow' ? '#ff9800' : '#f44336');
+    svg += '<rect x="' + (tp.x + nodeW + 3) + '" y="' + (tp.y + 5) + '" width="40" height="16" rx="3" fill="' + tripColor + '" opacity="0.9"/>';
+    svg += '<text x="' + (tp.x + nodeW + 23) + '" y="' + (tp.y + 16) + '" text-anchor="middle" font-size="7" fill="#fff">' + tripLabel + '</text>';
+  }
+
+  // Zs loop impedance labels
+  for (var zi = 0; zi < result.path.length; zi++) {
+    var zNode = tree.nodes[result.path[zi]];
+    var zPos = positions[result.path[zi]];
+    if (zNode && zPos && zNode._zs > 0 && zNode.type !== 'transformer') {
+      svg += '<text x="' + (zPos.x - 3) + '" y="' + (zPos.y + nodeH + 10) + '" font-size="5" fill="#7b1fa2">Zs:' + zNode._zs.toFixed(3) + '\u03A9</text>';
+    }
+  }
+
+  // Ik fault current label
+  if (result.ikFault > 0 && faultPos) {
+    svg += '<text x="' + (faultPos.x + nodeW / 2) + '" y="' + (faultPos.y - 5) + '" text-anchor="middle" font-size="6" fill="#f44336" font-weight="bold">Ik=' + (result.ikFault / 1000).toFixed(1) + 'kA</text>';
+  }
+
+  return svg;
+}
+function liveInjectFault(nodeId) {
+  if (!sldTree || !nodeId) return;
+  var node = sldTree.nodes[nodeId];
+  if (!node || node.type === 'transformer') return;
+  sldPropagateAll(sldTree);
+  liveState.faultNodeId = nodeId;
+  liveState.faultResult = sldSimulateFault(sldTree, nodeId, 'short_circuit');
+  renderModule('live');
+}
+
+function liveClearFault() {
+  liveState.faultNodeId = null;
+  liveState.faultResult = null;
+  renderModule('live');
+}
+
+function liveStartTimelapse() {
+  liveState.timelapseRunning = true;
+  liveState.timelapseHour = 0;
+  if (liveState.timelapseInterval) clearInterval(liveState.timelapseInterval);
+  var stepMs = Math.round(30000 / (24 * liveState.timelapseSpeed));
+  liveState.timelapseInterval = setInterval(function() {
+    liveState.timelapseHour = (liveState.timelapseHour + 1) % 24;
+    if (liveState.timelapseHour === 0) {
+      liveStopTimelapse();
+      return;
+    }
+    renderModule('live');
+  }, stepMs);
+  renderModule('live');
+}
+
+function liveStopTimelapse() {
+  liveState.timelapseRunning = false;
+  if (liveState.timelapseInterval) {
+    clearInterval(liveState.timelapseInterval);
+    liveState.timelapseInterval = null;
+  }
+  renderModule('live');
+}
+
+function liveSetSpeed(speed) {
+  liveState.timelapseSpeed = speed;
+  if (liveState.timelapseRunning) {
+    liveStopTimelapse();
+    liveStartTimelapse();
+  } else {
+    renderModule('live');
+  }
+}
+
+function liveSetDisaster(scenario) {
+  liveState.disasterScenario = (liveState.disasterScenario === scenario) ? null : scenario;
+  renderModule('live');
+}
+
+function liveSetMode(mode) {
+  liveState.mode = mode;
+  // Clear state when switching modes
+  if (mode !== 'fault') {
+    liveState.faultNodeId = null;
+    liveState.faultResult = null;
+  }
+  if (mode !== 'timelapse') {
+    liveStopTimelapse();
+  }
+  if (mode !== 'disasters') {
+    liveState.disasterScenario = null;
+  }
+  renderModule('live');
+}
+function renderLiveInstallation() {
+  var tree = sldTree || sldCreateTree();
+  sldPropagateAll(tree);
+  if (!sldTree) sldTree = tree;
+
+  var mode = liveState.mode || 'live';
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Levende Installation', 'Live Installation Twin') + '</div>';
+
+  // Mode selector buttons
+  html += '<div class="select-group"><div class="select-label">' + tx('Visningstilstand', 'Display Mode') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (mode === 'live' ? ' selected' : '') + '" onclick="liveSetMode(\'live\')">' + tx('Live', 'Live') + '</button>';
+  html += '<button class="sel-btn' + (mode === 'fault' ? ' selected' : '') + '" onclick="liveSetMode(\'fault\')">' + tx('Fejl / What-If', 'Fault / What-If') + '</button>';
+  html += '<button class="sel-btn' + (mode === 'timelapse' ? ' selected' : '') + '" onclick="liveSetMode(\'timelapse\')">' + tx('Tidsforloeb', 'Time-Lapse') + '</button>';
+  html += '<button class="sel-btn' + (mode === 'disasters' ? ' selected' : '') + '" onclick="liveSetMode(\'disasters\')">' + tx('Katastrofescenarier', 'Disaster Scenarios') + '</button>';
+  html += '</div></div>';
+
+  // Mode-specific controls
+  if (mode === 'fault') {
+    html += '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + tx('Fejltilstand', 'Fault Mode') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Klik paa en komponent for at injicere fejl', 'Click a component to inject a fault') + '</span></div>';
+    if (liveState.faultResult) {
+      var fr = liveState.faultResult;
+      var verdictColor = fr.verdict === 'protected' ? '#4caf50' : (fr.verdict === 'slow' ? '#ff9800' : '#f44336');
+      var verdictText = fr.verdict === 'protected' ? tx('Beskyttet', 'Protected') : (fr.verdict === 'slow' ? tx('For langsom', 'Too slow') : tx('Fejl - ingen udkobling', 'Failed - no trip'));
+      html += '<div class="result-row"><span class="label">Ik</span><span class="value">' + (fr.ikFault / 1000).toFixed(2) + ' kA</span></div>';
+      html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + fr.zsAtFault.toFixed(3) + ' \u03A9</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Udkoblingstid', 'Trip time') + '</span><span class="value">' + (fr.tripTime < Infinity ? fr.tripTime.toFixed(3) + ' s' : '\u221E') + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Krav', 'Required') + '</span><span class="value">\u2264 ' + fr.requiredTime + ' s</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Resultat', 'Verdict') + '</span><span class="value" style="color:' + verdictColor + ';font-weight:bold">' + verdictText + '</span></div>';
+      if (fr.selectivityIssues.length > 0) {
+        html += '<div class="result-row"><span class="label" style="color:#ff9800">' + tx('Selektivitetsproblemer', 'Selectivity issues') + ': ' + fr.selectivityIssues.length + '</span></div>';
+      }
+      html += '<div style="margin-top:8px"><button class="sel-btn" onclick="liveClearFault()">' + tx('Nulstil fejl', 'Clear fault') + '</button></div>';
+    }
+    html += '</div>';
+  }
+
+  if (mode === 'timelapse') {
+    html += '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + tx('Tidsforloeb - 24 timer', 'Time-Lapse - 24 hours') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Klokkeslaet', 'Time') + '</span><span class="value" style="font-size:1.3em;font-weight:bold">' + (liveState.timelapseHour < 10 ? '0' : '') + liveState.timelapseHour + ':00</span></div>';
+    var loadMult = liveGetLoadMultiplier(liveState.timelapseHour);
+    var loadLabel = loadMult >= 1.5 ? tx('Hoej belastning', 'High load') : (loadMult <= 0.5 ? tx('Lav belastning (sol)', 'Low load (solar)') : (loadMult <= 0.3 ? tx('Nat-grundlast', 'Night baseload') : tx('Normal', 'Normal')));
+    html += '<div class="result-row"><span class="label">' + tx('Belastningsfaktor', 'Load factor') + '</span><span class="value">' + loadMult.toFixed(1) + 'x - ' + loadLabel + '</span></div>';
+    html += '<div style="margin-top:8px">';
+    if (!liveState.timelapseRunning) {
+      html += '<button class="sel-btn selected" onclick="liveStartTimelapse()">' + tx('Start', 'Play') + '</button> ';
+    } else {
+      html += '<button class="sel-btn selected" onclick="liveStopTimelapse()">' + tx('Pause', 'Pause') + '</button> ';
+    }
+    html += '<button class="sel-btn' + (liveState.timelapseSpeed === 1 ? ' selected' : '') + '" onclick="liveSetSpeed(1)">1x</button> ';
+    html += '<button class="sel-btn' + (liveState.timelapseSpeed === 2 ? ' selected' : '') + '" onclick="liveSetSpeed(2)">2x</button> ';
+    html += '<button class="sel-btn' + (liveState.timelapseSpeed === 4 ? ' selected' : '') + '" onclick="liveSetSpeed(4)">4x</button>';
+    html += '</div></div>';
+  }
+
+  if (mode === 'disasters') {
+    html += '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + tx('Katastrofescenarier', 'Disaster Scenarios') + '</div>';
+    html += '<div class="select-grid">';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'trafo_failure' ? ' selected' : '') + '" onclick="liveSetDisaster(\'trafo_failure\')">' + tx('Transformersvigt', 'Transformer failure') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'neutral_break' ? ' selected' : '') + '" onclick="liveSetDisaster(\'neutral_break\')">' + tx('Neutralbrud', 'Neutral break') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'high_ambient' ? ' selected' : '') + '" onclick="liveSetDisaster(\'high_ambient\')">' + tx('Hoej omgivelsestemperatur', 'High ambient temperature') + '</button>';
+    html += '<button class="sel-btn' + (liveState.disasterScenario === 'harmonic' ? ' selected' : '') + '" onclick="liveSetDisaster(\'harmonic\')">' + tx('Harmonisk overbelastning', 'Harmonic overload') + '</button>';
+    html += '</div>';
+    if (liveState.disasterScenario) {
+      html += '<div style="margin-top:8px">';
+      if (liveState.disasterScenario === 'trafo_failure') {
+        html += '<div class="result-row"><span class="label">' + tx('Transformer ude af drift - generator autostart efter 10s', 'Transformer offline - generator auto-start after 10s') + '</span></div>';
+      } else if (liveState.disasterScenario === 'neutral_break') {
+        html += '<div class="result-row"><span class="label" style="color:#f44336">' + tx('Overspaending paa 1-fase kredse: U x 1.73', 'Overvoltage on single-phase circuits: U x 1.73') + '</span></div>';
+      } else if (liveState.disasterScenario === 'high_ambient') {
+        html += '<div class="result-row"><span class="label">' + tx('Omgivelse 50C - derating-kaskade aktiv', 'Ambient 50C - derating cascade active') + '</span></div>';
+      } else if (liveState.disasterScenario === 'harmonic') {
+        html += '<div class="result-row"><span class="label">' + tx('3. harmonisk - neutral x1.73 - neutralopvarmning', '3rd harmonic - neutral x1.73 - neutral heating') + '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Render the SVG canvas
+  var layout = liveRenderSvg(tree, mode);
+  var svg = layout.svg;
+  svg += liveRenderConnections(tree, layout.positions, layout.nodeW, layout.nodeH, mode);
+  svg += liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, mode);
+  if (mode === 'fault' && liveState.faultResult) {
+    svg += liveRenderFaultOverlay(tree, layout.positions, layout.nodeW, layout.nodeH);
+  }
+  svg += '</svg>';
+  html += svg;
+
+  // Legend
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Signaturforklaring', 'Legend') + '</div>';
+  html += '<div class="result-row"><span class="label" style="color:#2196f3">\u2588</span><span class="value">' + tx('Kold (lav belastning)', 'Cold (low load)') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#4caf50">\u2588</span><span class="value">' + tx('Normal', 'Normal') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#ff9800">\u2588</span><span class="value">' + tx('Varm (hoej belastning)', 'Warm (high load)') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#f44336">\u2588</span><span class="value">' + tx('Overbelastet', 'Overloaded') + '</span></div>';
+  if (mode === 'live') {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Tip', 'Tip') + '</span><span class="value">' + tx('Klik paa en komponent for at navigere til modulet', 'Click a component to navigate to its module') + '</span></div>';
+  }
   html += '</div>';
 
   html += '</div>';
