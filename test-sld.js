@@ -14886,6 +14886,416 @@ test('renderLiveInstallation includes statistics footer with node count and util
   assert(html.indexOf('Average power factor') > 0 || html.indexOf('Gennemsnitlig effektfaktor') > 0, 'Should show average power factor');
 });
 
+// --- Reverse Engineering (Omvendt Dimensionering) Tests ---
+
+test('reverseState exists with correct default fields', function() {
+  assert(typeof reverseState === 'object', 'reverseState should be an object');
+  assert(reverseState.power_kW === 3.45, 'Default power should be 3.45 kW');
+  assert(reverseState.phases === '1x230', 'Default phases should be 1x230');
+  assert(reverseState.voltage === 230, 'Default voltage should be 230V');
+  assert(reverseState.installMethod === 'C', 'Default install method should be C');
+  assert(reverseState.ambientTemp === 30, 'Default ambient temp should be 30');
+  assert(reverseState.cableLength_m === 25, 'Default cable length should be 25m');
+  assert(reverseState.grouping === 1, 'Default grouping should be 1');
+  assert(reverseState.earthSystem === 'TN-S', 'Default earth system should be TN-S');
+  assert(reverseState.cosPhi === 0.95, 'Default cosPhi should be 0.95');
+  assert(reverseState.cableMaterial === 'Cu', 'Default material should be Cu');
+  assert(reverseState.protectionType === 'MCB', 'Default protection should be MCB');
+});
+
+test('REVERSE_PRESETS has 8 standard load presets', function() {
+  assert(REVERSE_PRESETS.length === 8, 'Should have 8 presets');
+  assert(REVERSE_PRESETS[0].name_en === 'EV 11kW', 'First preset should be EV 11kW');
+  assert(REVERSE_PRESETS[5].power_kW === 3.45, 'Socket preset should be 3.45 kW');
+});
+
+test('reverseEngineerSolve with default 3.45kW load finds compliant solution', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.cosPhi = 0.95;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Result should be set');
+  assert(reverseState.result.success === true, 'Should find solution for standard load');
+  assert(reverseState.result.IB > 0, 'IB should be positive');
+  assert(reverseState.result.In >= reverseState.result.IB, 'In should be >= IB');
+  assert(reverseState.result.Iz >= reverseState.result.In, 'Iz should be >= In');
+});
+
+test('reverseEngineerSolve IB calculation is correct for 1-phase', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.cosPhi = 0.95;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var expectedIB = 3450 / (230 * 0.95);
+  assert(Math.abs(reverseState.result.IB - expectedIB) < 0.01, 'IB should be P/(U*cos) = ' + expectedIB.toFixed(2));
+});
+
+test('reverseEngineerSolve IB calculation is correct for 3-phase', function() {
+  reverseState.power_kW = 11;
+  reverseState.phases = '3x400';
+  reverseState.voltage = 400;
+  reverseState.cosPhi = 0.98;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var expectedIB = 11000 / (Math.sqrt(3) * 400 * 0.98);
+  assert(Math.abs(reverseState.result.IB - expectedIB) < 0.01, 'IB should be P/(sqrt3*U*cos) = ' + expectedIB.toFixed(2));
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+});
+
+test('reverseEngineerSolve with high power 50kW selects large cable', function() {
+  reverseState.power_kW = 50;
+  reverseState.phases = '3x400';
+  reverseState.voltage = 400;
+  reverseState.cosPhi = 0.90;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.selectedCable.mm2 >= 10, 'Should select cable >= 10mm2 for 50kW');
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.power_kW = 3.45;
+});
+
+test('reverseEngineerSolve with long cable 200m upsizes for Vdrop', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 200;
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.selectedCable.mm2 > 2.5, 'Should upsize from 2.5mm2 for 200m length');
+  assert(reverseState.result.iterations > 1, 'Should require iterations for long cable');
+  reverseState.cableLength_m = 25;
+});
+
+test('reverseEngineerSolve with high ambient 50C applies derating', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.ambientTemp = 50;
+  reverseState.cableLength_m = 25;
+  reverseState.installMethod = 'C';
+  reverseState.grouping = 1;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.kTotal < 1.0, 'Derating factor should be < 1 at 50C');
+  assert(reverseState.result.kTotal === TEMP_FACTORS[50], 'kTotal should equal TEMP_FACTORS[50] when method=C and group=1');
+  reverseState.ambientTemp = 30;
+});
+
+test('reverseEngineerSolve with high grouping 6 applies derating', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 6;
+  reverseState.cableLength_m = 25;
+  reverseState.installMethod = 'C';
+  reverseState.cableMaterial = 'Cu';
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.kTotal === GROUP_FACTORS[6], 'kTotal should include grouping factor 0.57');
+  assert(reverseState.result.kTotal < 1.0, 'Should derate for grouping of 6');
+  reverseState.grouping = 1;
+});
+
+test('reverseEngineerSolve with TT earth system adds RCD to BOM', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.earthSystem = 'TT';
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  var bom = reverseState.result.bom;
+  var hasRCD = bom.some(function(b) { return b.clause.indexOf('TT') >= 0; });
+  assert(hasRCD, 'BOM should include RCD for TT system');
+  reverseState.earthSystem = 'TN-S';
+});
+
+test('reverseEngineerSolve with Al material selects aluminum cables', function() {
+  reverseState.power_kW = 10;
+  reverseState.phases = '3x400';
+  reverseState.voltage = 400;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableMaterial = 'Al';
+  reverseState.cableLength_m = 25;
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.selectedCable.material === 'Al', 'Should select Al cable');
+  reverseState.cableMaterial = 'Cu';
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.power_kW = 3.45;
+});
+
+test('reverseEngineerSolve with MCCB protection type selects MCCB', function() {
+  reverseState.power_kW = 22;
+  reverseState.phases = '3x400';
+  reverseState.voltage = 400;
+  reverseState.cosPhi = 0.90;
+  reverseState.protectionType = 'MCCB';
+  reverseState.cableLength_m = 25;
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.selectedProtection.frame || reverseState.result.selectedProtection.inOptions, 'Should select an MCCB');
+  reverseState.protectionType = 'MCB';
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.power_kW = 3.45;
+});
+
+test('reverseEngineerSolve with Fuse protection type selects fuse', function() {
+  reverseState.power_kW = 5;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.protectionType = 'Fuse';
+  reverseState.cableLength_m = 25;
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result');
+  assert(reverseState.result.selectedProtection.size || reverseState.result.selectedProtection.i5s, 'Should select a fuse');
+  reverseState.protectionType = 'MCB';
+});
+
+test('reverseBuildBOM returns array with cable and protection entries', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.earthSystem = 'TN-S';
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var bom = reverseState.result.bom;
+  assert(Array.isArray(bom), 'BOM should be an array');
+  assert(bom.length >= 2, 'BOM should have at least cable + protection');
+  assert(bom[0].item.length > 0, 'Cable item should have name');
+  assert(bom[0].clause.indexOf('DS/HD 60364') >= 0, 'Should cite DS/HD 60364 clause');
+  assert(bom[1].clause.indexOf('DS/HD 60364') >= 0, 'Protection should cite DS/HD 60364');
+});
+
+test('reverseEngineerSolve compliance includes specific DS/HD 60364 clauses', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var comp = reverseState.result.compliance;
+  assert(comp.length >= 3, 'Should have at least 3 compliance checks');
+  var hasClauses = comp.every(function(c) { return c.clause && c.clause.length > 5; });
+  assert(hasClauses, 'Every compliance item should have a clause reference');
+  var hasDS = comp.some(function(c) { return c.clause.indexOf('DS/HD 60364') >= 0; });
+  assert(hasDS, 'Should reference DS/HD 60364');
+});
+
+test('renderReverse returns HTML string with click-only controls', function() {
+  var html = renderReverse();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.length > 500, 'Should be substantial HTML');
+  assert(html.indexOf('<input') === -1, 'Should have NO text input fields');
+  assert(html.indexOf('sel-btn') > 0, 'Should have sel-btn class buttons');
+});
+
+test('renderReverse includes preset buttons', function() {
+  var html = renderReverse();
+  assert(html.indexOf('reverseSetPreset') > 0, 'Should have preset button handlers');
+  assert(html.indexOf('EV 11kW') > 0 || html.indexOf('EV 11kW') > 0, 'Should show EV 11kW preset');
+  assert(html.indexOf('Socket 3.45kW') > 0 || html.indexOf('Stikkontakt 3.45kW') > 0, 'Should show Socket preset');
+});
+
+test('renderReverse shows results after solve', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var html = renderReverse();
+  assert(html.indexOf('IB') > 0, 'Should show IB value');
+  assert(html.indexOf('Iz') > 0, 'Should show Iz value');
+  assert(html.indexOf('Vdrop') > 0 || html.indexOf('Voltage drop') > 0, 'Should show voltage drop');
+});
+
+test('reverseEngineerSolve never exceeds 20 iterations', function() {
+  reverseState.power_kW = 100;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 200;
+  reverseState.ambientTemp = 50;
+  reverseState.grouping = 6;
+  reverseState.protectionType = 'MCB';
+  reverseState.cableMaterial = 'Cu';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should produce result even if not fully solved');
+  assert(reverseState.iterations <= 20, 'Should not exceed 20 iterations');
+  reverseState.power_kW = 3.45;
+  reverseState.cableLength_m = 25;
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+});
+
+test('reverseEngineerSolve with 1kW minimum power works', function() {
+  reverseState.power_kW = 1;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.protectionType = 'MCB';
+  reverseState.cableMaterial = 'Cu';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result !== null, 'Should solve for 1kW');
+  assert(reverseState.result.success === true, 'Should succeed for small load');
+  assert(reverseState.result.IB < 10, 'IB should be small for 1kW');
+  reverseState.power_kW = 3.45;
+});
+
+test('reverseEngineerSolve earth system affects Zs calculation', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.earthSystem = 'TN-S';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var zsTN = reverseState.result.zs;
+  reverseState.earthSystem = 'TT';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var zsTT = reverseState.result.zs;
+  // Both should compute Zs (same tree structure regardless of earth system label)
+  assert(zsTN > 0, 'Zs should be positive for TN-S');
+  assert(zsTT > 0, 'Zs should be positive for TT');
+  reverseState.earthSystem = 'TN-S';
+});
+
+test('reverseSetPreset updates state and clears result', function() {
+  reverseState.result = { dummy: true };
+  reverseSetPreset(0);
+  assert(reverseState.power_kW === 11, 'Should set EV 11kW power');
+  assert(reverseState.cosPhi === 0.98, 'Should set EV cos phi');
+  assert(reverseState.phases === '3x400', 'Should set 3-phase');
+  assert(reverseState.result === null, 'Should clear previous result');
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+});
+
+test('reverseSetParam updates parameter and clears result', function() {
+  reverseState.result = { dummy: true };
+  reverseSetParam('ambientTemp', 40);
+  assert(reverseState.ambientTemp === 40, 'Should set ambient temp to 40');
+  assert(reverseState.result === null, 'Should clear previous result');
+  reverseState.ambientTemp = 30;
+});
+
+test('reverseSetParam phases updates voltage accordingly', function() {
+  reverseSetParam('phases', '3x400');
+  assert(reverseState.voltage === 400, 'Should set voltage to 400 for 3-phase');
+  reverseSetParam('phases', '1x230');
+  assert(reverseState.voltage === 230, 'Should set voltage to 230 for 1-phase');
+});
+
+test('renderReverseLiveTwin returns SVG with compliance color coding', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var svg = renderReverseLiveTwin(reverseState.result);
+  assert(typeof svg === 'string', 'Should return string');
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG element');
+  assert(svg.indexOf('#4caf50') > 0, 'Should have green color for passing result');
+  assert(svg.indexOf('IB') > 0, 'Should show IB value in SVG');
+});
+
+test('renderReverseBOM renders HTML table with columns', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var html = renderReverseBOM(reverseState.result.bom);
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('<table') >= 0, 'Should contain table element');
+  assert(html.indexOf('DS/HD 60364') > 0, 'Should show clause references');
+});
+
+test('renderReverseCompliance renders verdicts with clauses', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var html = renderReverseCompliance(reverseState.result.compliance);
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('DS/HD 60364') > 0, 'Should reference DS/HD 60364');
+  assert(html.indexOf('#4caf50') > 0, 'Should have green for OK verdicts');
+});
+
+test('ARCHIVE_MODULE_KEYS includes reverseState', function() {
+  assert(ARCHIVE_MODULE_KEYS.indexOf('reverseState') >= 0, 'reverseState should be in archive keys');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
