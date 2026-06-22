@@ -7822,7 +7822,11 @@ function syncSharedQuantities(mod) {
           SharedQuantities.set('voltage_phase', 400, 'reverse');
           SharedQuantities.set('install_method', 'C', 'reverse');
           SharedQuantities.set('ambient_temp', 30, 'reverse');
-          SharedQuantities.set('cable_grouping', reverseState.multiResult.circuitCount, 'reverse');
+          var maxGrouping = 1;
+          for (var g = 0; g < reverseState.selectedCircuits.length; g++) {
+            if (reverseState.selectedCircuits[g].grouping > maxGrouping) maxGrouping = reverseState.selectedCircuits[g].grouping;
+          }
+          SharedQuantities.set('cable_grouping', maxGrouping, 'reverse');
           SharedQuantities.set('earth_system', reverseState.earthSystem, 'reverse');
         } else {
           SharedQuantities.set('load_power_kw', reverseState.power_kW, 'reverse');
@@ -35311,6 +35315,7 @@ function reverseMultiSolve() {
         break;
       }
     }
+    sldNextId = oldNextId;
 
     var iz = cable.iz * kTotal;
     var cResult = {
@@ -35447,13 +35452,22 @@ function reverseMultiOptimize(tree, circuits, results) {
       var kT = kInstall * kTemp * kGroup;
       var izSmaller = smaller.iz * kT;
       if (izSmaller >= r.In && izSmaller > r.IB) {
-        suggestions.push({
-          type: 'downsize',
-          circuitIndex: i,
-          suggestion_da: 'Kreds ' + (i + 1) + ' (' + ckt.name_da + '): Kunne bruge ' + smaller.mm2 + 'mm2 i stedet for ' + r.cable.mm2 + 'mm2',
-          suggestion_en: 'Circuit ' + (i + 1) + ' (' + ckt.name_en + '): Could use ' + smaller.mm2 + 'mm2 instead of ' + r.cable.mm2 + 'mm2',
-          saving_pct: Math.round((1 - smaller.mm2 / r.cable.mm2) * 100)
-        });
+        // Verify voltage drop with smaller cable before suggesting
+        var vdropSmaller;
+        if (ckt.phases === '3x400') {
+          vdropSmaller = (Math.sqrt(3) * r.IB * (smaller.r / 1000) * ckt.cableLength_m * ckt.cosPhi) / 400 * 100;
+        } else {
+          vdropSmaller = (2 * r.IB * (smaller.r / 1000) * ckt.cableLength_m * ckt.cosPhi) / 230 * 100;
+        }
+        if (vdropSmaller <= DK_STANDARDS.vdropGeneral) {
+          suggestions.push({
+            type: 'downsize',
+            circuitIndex: i,
+            suggestion_da: 'Kreds ' + (i + 1) + ' (' + ckt.name_da + '): Kunne bruge ' + smaller.mm2 + 'mm2 i stedet for ' + r.cable.mm2 + 'mm2',
+            suggestion_en: 'Circuit ' + (i + 1) + ' (' + ckt.name_en + '): Could use ' + smaller.mm2 + 'mm2 instead of ' + r.cable.mm2 + 'mm2',
+            saving_pct: Math.round((1 - smaller.mm2 / r.cable.mm2) * 100)
+          });
+        }
       }
     }
 
