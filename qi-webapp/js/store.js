@@ -159,6 +159,7 @@
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
     if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
     s.brainPlan = s.brainPlan || null;
+    if (typeof s.brainDescription !== 'string') s.brainDescription = '';
     if (!Array.isArray(s.updates)) s.updates = [];
     return s;
   }
@@ -944,6 +945,10 @@
   function setBrainPlan(plan) { get().brainPlan = plan || null; save(); }
   function getBrainPlan() { return get().brainPlan || null; }
 
+  // ---- Brain Description persistence (per-project) ----
+  function setBrainDescription(text) { get().brainDescription = String(text || ''); save(); }
+  function getBrainDescription() { return get().brainDescription || ''; }
+
   // ---- What-If Scenario Simulator ----
   // Pure in-memory computation — never persists. The user toggles countries or
   // cables on/off, slides permit delays or cost multipliers, and gets an instant
@@ -991,9 +996,15 @@
     var baseCap = cables.reduce(function (a, c) { return a + (c.capacityTbps || 0); }, 0);
     var baseKm = cables.reduce(function (a, c) { return a + (c.lengthKm || 0); }, 0);
 
-    // Timeline
+    // Timeline — uses critical-path logic: only TRUNK segments (sequential)
+    // determine the timeline. Branch segments run in parallel and removing them
+    // does NOT reduce the total duration.
     var baseMonths = prog.durationMonths;
-    var scenarioMonths = Math.round(baseMonths * (activeCables.length / (cables.length || 1))) + permitDelay;
+    var totalTrunkCount = cables.filter(function (c) { return /^STP-T/i.test(c.id); }).length || 1;
+    var activeTrunkCount = activeCables.filter(function (c) { return /^STP-T/i.test(c.id); }).length;
+    var scenarioMonths = activeTrunkCount > 0
+      ? Math.round(baseMonths * (activeTrunkCount / totalTrunkCount)) + permitDelay
+      : permitDelay;
 
     // Risk assessment (plain language)
     var risks = [];
@@ -1067,6 +1078,7 @@
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup,
     setBrainPlan, getBrainPlan,
+    setBrainDescription, getBrainDescription,
     whatIf, weeklySummary, healthHistory };
 
   // --- Feature #7: Weekly project summary snapshot ---

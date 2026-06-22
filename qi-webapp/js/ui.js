@@ -2080,6 +2080,10 @@
         </div>`;
     }
 
+    // BUG 1: Filter cables to only those connected to detected countries.
+    const scopeIds = activeStationIds();
+    const filteredCables = scopeIds ? cables.filter(function (c) { return scopeIds.indexOf(c.from) !== -1 || scopeIds.indexOf(c.to) !== -1; }) : cables;
+
     const r = S.routeRollup();
     const rp = S.routeProgress();
     const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
@@ -2096,7 +2100,7 @@
     // % laid options as a curated dropdown (click-only): 0,10,…,100.
     const pctVals = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-    const cards = cables.map(c => {
+    const cards = filteredCables.map(c => {
       const e = rp[c.id] || { phases: {}, laidKm: 0 };
       const overall = S.routeOverall(c, e);
       const len = Number(c.lengthKm) || 0;
@@ -3346,6 +3350,8 @@
     if (!uiState.brainPlan && S.getBrainPlan) { uiState.brainPlan = S.getBrainPlan(); }
     // If a plan is already available, render the preview so the user sees the result.
     if (uiState.brainPlan) { try { renderBrainPreview(uiState.brainPlan); } catch (e) { /* ignore */ } }
+    // BUG 2: Pre-fill textarea with persisted description.
+    if (S.getBrainDescription && S.getBrainDescription()) ta.value = S.getBrainDescription();
     // 'Programme at a glance' front-door buttons → the two best outputs.
     const heroBrief = $("#heroBrief"), heroGlobe = $("#heroGlobe");
     if (heroBrief) heroBrief.addEventListener("click", () => go("investorbrief"));
@@ -3354,6 +3360,8 @@
     const runAnalyze = (opts) => {
       const text = (ta.value || "").trim();
       if (!text) { toast("Paste or upload a project description first."); return false; }
+      // BUG 2: Persist description so it survives navigation/reload.
+      if (S.setBrainDescription) S.setBrainDescription(text);
       if (!window.QIBrain) { toast("Brain engine not loaded."); return false; }
       const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
       uiState.brainPlan = null;
@@ -3403,6 +3411,7 @@
             const txt = (result.value || "").trim();
             if (!txt) { toast("Could not extract any text from that .docx file."); nameEl.textContent = f.name + " — empty"; fileInput.value = ""; return; }
             ta.value = txt;
+            if (S.setBrainDescription) S.setBrainDescription(txt);
             nameEl.textContent = f.name;
             if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
           }).catch((e) => { console.warn("DOCX extraction failed:", e); toast("Failed to read that .docx file. Try saving it again or paste the text instead."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
@@ -3427,6 +3436,7 @@
             const txt = pageTexts.join("\n\n").trim();
             if (!txt) { toast("Could not extract any text from that PDF. It may be scanned/image-only."); nameEl.textContent = f.name + " — no text found"; fileInput.value = ""; return; }
             ta.value = txt;
+            if (S.setBrainDescription) S.setBrainDescription(txt);
             nameEl.textContent = f.name;
             if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
           }).catch((e) => {
@@ -3456,6 +3466,7 @@
           return;
         }
         ta.value = txt;
+        if (S.setBrainDescription) S.setBrainDescription(txt);
         // Upload alone is enough — the app does the rest automatically.
         if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" — your plan & country frameworks are below.`);
       };
@@ -3698,7 +3709,8 @@
       <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
     const applyBtn = $("#brainApply");
     if (applyBtn) applyBtn.addEventListener("click", () => {
-      const n = applyBrainPlan(plan);
+      const result = applyBrainPlan(plan);
+      const n = result && result.count || 0;
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
       // Diff summary card (step 46)
       const diffItems = [];
@@ -3706,6 +3718,7 @@
       if (plan.milestones.length) diffItems.push(`${plan.milestones.length} milestones created`);
       if (plan.procurement.length) diffItems.push(`${plan.procurement.length} procurement items`);
       if (plan.countryIntel && plan.countryIntel.length) diffItems.push(`${plan.countryIntel.length} countries detected`);
+      if (result && result.diffSummary) diffItems.push(result.diffSummary);
       const diffCard = document.createElement("div");
       diffCard.className = "diff-card";
       diffCard.innerHTML = `<b>What changed:</b><ul class="diff-list">${diffItems.map(d => '<li>' + esc(d) + '</li>').join('')}</ul>`;
@@ -3736,6 +3749,24 @@
     bindGo();
   }
   function applyBrainPlan(plan) {
+    // BUG 3: Auto-snapshot before reanalysis so the user has a one-click restore
+    // point from History & Backups.
+    if (S.get().cases && S.get().cases.length > 0) {
+      S.takeSnapshot('Auto-snapshot before reanalysis');
+    }
+
+    // IMPROVEMENT 1: Capture previous counts for diff summary.
+    var prevCounts = null;
+    try {
+      var st0pre = S.get();
+      prevCounts = {
+        cases: (st0pre.cases || []).length,
+        milestones: (st0pre.registers && st0pre.registers.milestones || []).length,
+        procurement: (st0pre.registers && st0pre.registers.procurement || []).length,
+        stakeholders: (st0pre.stakeholders || []).length
+      };
+    } catch (e) { /* ignore */ }
+
     // Make analyze idempotent: clear previously generated content so a fresh
     // upload produces a fresh full plan (not duplicates). User-posted project
     // updates and route progress are preserved.
@@ -3831,7 +3862,31 @@
     try { if (window.QIGlobe && QIGlobe.setProgress) QIGlobe.setProgress(); } catch (e) { /* ignore */ }
     try { if (window.QIGlobe && QIGlobe.setActiveScope) { var scopeIds = activeStationIds(); QIGlobe.setActiveScope(scopeIds); } } catch (e) { /* ignore */ }
     if (current !== "brain") go(current);
-    return n;
+
+    // IMPROVEMENT 1: Build a diff summary showing what changed.
+    var diffSummary = '';
+    try {
+      var stAfter = S.get();
+      var newCounts = {
+        cases: (stAfter.cases || []).length,
+        milestones: (stAfter.registers && stAfter.registers.milestones || []).length,
+        procurement: (stAfter.registers && stAfter.registers.procurement || []).length,
+        stakeholders: (stAfter.stakeholders || []).length
+      };
+      if (prevCounts) {
+        var parts = [];
+        parts.push(newCounts.cases + ' tasks' + (prevCounts.cases ? ' (was ' + prevCounts.cases + ')' : ''));
+        parts.push(newCounts.milestones + ' milestones' + (prevCounts.milestones ? ' (was ' + prevCounts.milestones + ')' : ''));
+        parts.push(newCounts.procurement + ' procurement' + (prevCounts.procurement ? ' (was ' + prevCounts.procurement + ')' : ''));
+        parts.push(newCounts.stakeholders + ' stakeholders' + (prevCounts.stakeholders ? ' (was ' + prevCounts.stakeholders + ')' : ''));
+        diffSummary = 'Plan regenerated: ' + parts.join(', ') + '.';
+        if (prevCounts.cases > 0) {
+          diffSummary += ' Auto-snapshot saved - you can roll back from History & Backups if needed.';
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    return { count: n, diffSummary: diffSummary };
   }
 
   // ---------- Frameworks & Advisor (auto-generated from a description) ------
