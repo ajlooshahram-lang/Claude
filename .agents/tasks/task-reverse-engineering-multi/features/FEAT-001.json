@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Implement full multi-circuit reverse engineering mode with click-only UI, trilingual strings, complete sldTree integration, BOM, compliance report, and optimization suggestions. Then add 30+ new tests.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Expand reverseState (around line 4908-4914 in el-dimensionering.html): Keep existing multiMode/selectedBuildingType/selectedCategory/selectedCircuits/multiResult/multiSolverLog/multiOptimizations fields. These are the state for the multi-circuit mode.",
     "Step 2 - Add REVERSE_CIRCUIT_TEMPLATES constant (after REVERSE_PRESETS around line 4928): Define circuit templates for common loads (lighting, sockets, cooker, EV charger 11kW, EV charger 22kW, heat pump, motor 5.5kW, motor 11kW, motor 22kW, solar inverter, server/data, bathroom, outdoor). Each template has: id, name_da, name_en, name_fa, power_kW, cosPhi, phases, voltage, installMethod, cableLength_m, protectionType. This gives users click-to-add circuits.",
@@ -32,5 +32,5 @@
     "Run `node test-sld.js` and confirm 0 failures and total passed >= 1675"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 1684 tests pass (1645 existing + 39 new). Multi-circuit mode uses select dropdowns for per-circuit parameter adjustment which is click-only (no text inputs). The sldPropagateAll function overwrites main board power_kW with aggregated child power, so diversity factor is tracked in multiResult.diversifiedPower rather than the tree node itself. The multi-solve uses 10 max iterations (vs 20 for single-circuit) as specified."
 }
