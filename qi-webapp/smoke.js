@@ -2015,5 +2015,57 @@ if (window.QIDisplay) {
   ok(panel && panel.hidden === true, "Clicking close hides the shortcuts panel");
 })();
 
+// BUG FIX: brainPlan state restore on project switch and boot
+(function testBrainPlanRestoreOnSwitch() {
+  // Set up project A with a brainPlan
+  S.reset();
+  S.get().project.name = "ProjA-Brain";
+  S.save();
+  var projAId = S.activeProjectId();
+  // Analyze in project A to generate a brainPlan
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  doc.getElementById("brainText").value = "Submarine cable project, 2000 km, 24 months, South Pacific";
+  doc.getElementById("brainAnalyze").click();
+  var planA = S.getBrainPlan();
+  ok(planA != null, "Project A has a brainPlan after analysis");
+
+  // Create project B (no brainPlan)
+  var projBId = S.addProject("ProjB-NoBrain");
+  S.switchProject(projBId);
+  var planB = S.getBrainPlan();
+  ok(planB == null || planB === undefined, "Project B has no brainPlan initially");
+
+  // Switch back to project A — getBrainPlan should return A's plan
+  S.switchProject(projAId);
+  var restoredA = S.getBrainPlan();
+  ok(restoredA != null, "After switching back to Project A, S.getBrainPlan() is not null");
+  ok(restoredA && restoredA.cases && restoredA.cases.length > 0, "Restored brainPlan for Project A has cases");
+
+  // Switch to project B — getBrainPlan should be null
+  S.switchProject(projBId);
+  var restoredB = S.getBrainPlan();
+  ok(restoredB == null || restoredB === undefined, "After switching to Project B, S.getBrainPlan() is null/undefined");
+})();
+
+// BUG FIX: brainPlan state restore on QIBoot
+(function testBrainPlanRestoreOnBoot() {
+  // Set up a project with a brainPlan and save
+  S.reset();
+  S.get().project.name = "BootTestProj";
+  S.save();
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  doc.getElementById("brainText").value = "Offshore wind farm cable, North Sea, 800 km, 18 months";
+  doc.getElementById("brainAnalyze").click();
+  var planBeforeBoot = S.getBrainPlan();
+  ok(planBeforeBoot != null, "brainPlan exists before re-boot");
+  // Re-boot the app
+  window.QIBoot();
+  // After boot, getBrainPlan should still return the persisted plan
+  var planAfterBoot = S.getBrainPlan();
+  ok(planAfterBoot != null, "After QIBoot(), S.getBrainPlan() returns the persisted plan");
+  ok(planAfterBoot && planAfterBoot.cases && planAfterBoot.cases.length > 0, "After QIBoot(), brainPlan has cases");
+  ok(planAfterBoot && planAfterBoot.summary != null, "After QIBoot(), brainPlan has summary");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

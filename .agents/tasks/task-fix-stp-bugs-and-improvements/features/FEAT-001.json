@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix brainPlan state restore bugs (Bugs 1-2): the project switch dropdown does not restore uiState.brainPlan, and QIBoot does not restore it on page load. This causes Advisor/Frameworks/Executive Summary to show wrong or empty data after switching projects or reloading the page.",
+  "status": "in_progress",
+  "steps": [
+    "In qi-webapp/js/ui.js, find the #projectSwitch change handler (around line 5995). The else branch calls S.switchProject(v); refreshHeader(); go(...) but does NOT restore brainPlan. Add `uiState.brainPlan = S.getBrainPlan() || null;` right after S.switchProject(v), matching what the openproj action does on line 5882.",
+    "In qi-webapp/js/ui.js, find window.QIBoot = function() (around line 6100). It calls S.load() but never restores brainPlan. Add `uiState.brainPlan = S.getBrainPlan() || null;` right after the S.load() call.",
+    "Add smoke test assertions to qi-webapp/smoke.js to verify: (a) After S.switchProject() the brainPlan is restored from the switched-to project, (b) After boot, brainPlan reflects the active project's stored plan."
+  ],
+  "acceptance_criteria": [
+    "After switching projects via the dropdown, uiState.brainPlan reflects the switched-to project's stored plan (not the previous project's).",
+    "After page boot (QIBoot), uiState.brainPlan is populated from the active project's persisted plan.",
+    "New smoke assertions pass covering both scenarios.",
+    "All existing 963+ smoke tests continue to pass.",
+    "npm test and node verify-standalone.js both pass."
+  ],
+  "verification": [
+    "cd /projects/sandbox/Claude/qi-webapp && npm test",
+    "cd /projects/sandbox/Claude/qi-webapp && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

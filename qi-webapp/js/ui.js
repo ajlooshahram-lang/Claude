@@ -5993,7 +5993,7 @@
       e.target.value = S.activeProjectId();
       openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } });
     }
-    else { S.switchProject(v); refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
+    else { S.switchProject(v); uiState.brainPlan = S.getBrainPlan() || null; refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
   });
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") { closeModal(); return; }
@@ -6098,7 +6098,7 @@
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
-    S.load(); checkShareHash(); applyLang(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    S.load(); uiState.brainPlan = S.getBrainPlan() || null; checkShareHash(); applyLang(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
     startAmbientAdaptation();
     // Step 87: Session duration timer
     (function initSessionTimer() {
