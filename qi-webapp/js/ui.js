@@ -2084,8 +2084,19 @@
     const scopeIds = activeStationIds();
     const filteredCables = scopeIds ? cables.filter(function (c) { return scopeIds.indexOf(c.from) !== -1 || scopeIds.indexOf(c.to) !== -1; }) : cables;
 
-    const r = S.routeRollup();
+    // Compute KPIs from filteredCables so they match the cards displayed below.
     const rp = S.routeProgress();
+    const r = { totalKm: 0, laidKm: 0, commissioned: 0, inProgress: 0, planned: 0 };
+    filteredCables.forEach(function (c) {
+      var len = Number(c.lengthKm) || 0;
+      var e = rp[c.id] || { phases: {}, laidKm: 0 };
+      r.totalKm += len;
+      r.laidKm += Math.min(Number(e.laidKm) || 0, len);
+      if (c.status === "commissioned") r.commissioned++;
+      else if (c.status === "in-progress") r.inProgress++;
+      else r.planned++;
+    });
+    r.pctComplete = r.totalKm ? r.laidKm / r.totalKm : 0;
     const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
     const kpis = `
       <div class="grid kpis" style="margin-bottom:16px">
@@ -3372,7 +3383,8 @@
       // are populated immediately — the user expects Analyze = done, not a
       // separate "Apply" step. The preview still shows for review, and the
       // Apply button remains for re-applying if the user changes the description.
-      applyBrainPlan(plan);
+      var result = applyBrainPlan(plan);
+      if (result && result.diffSummary) { toast(result.diffSummary, {ms: 4000}); }
       if (opts && opts.scroll) { const out = $("#brainOut"); try { if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { /* jsdom / unsupported */ } }
       return true;
     };
@@ -3751,7 +3763,8 @@
   function applyBrainPlan(plan) {
     // BUG 3: Auto-snapshot before reanalysis so the user has a one-click restore
     // point from History & Backups.
-    if (S.get().cases && S.get().cases.length > 0) {
+    var st = S.get();
+    if (st.cases && st.cases.length > 0) {
       S.takeSnapshot('Auto-snapshot before reanalysis');
     }
 
