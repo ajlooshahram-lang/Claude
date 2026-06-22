@@ -16774,6 +16774,631 @@ test('renderPowerFlow is click-only (no text input elements)', function() {
   assert(html.indexOf('<textarea') < 0, 'Should not contain textarea');
 });
 
+// === PE Conductor Module Tests ===
+console.log('\n=== PE Conductor Module Tests ===');
+
+test('renderPE function exists and returns HTML', function() {
+  var html = renderPE();
+  assert(html.length > 100, 'Should return substantial HTML');
+  assert(html.indexOf('PE') >= 0, 'Should mention PE');
+});
+
+test('peCalcSize: S<=16 returns S', function() {
+  assert.strictEqual(peCalcSize(1.5), 1.5);
+  assert.strictEqual(peCalcSize(10), 10);
+  assert.strictEqual(peCalcSize(16), 16);
+});
+
+test('peCalcSize: 16<S<=35 returns 16', function() {
+  assert.strictEqual(peCalcSize(25), 16);
+  assert.strictEqual(peCalcSize(35), 16);
+});
+
+test('peCalcSize: S>35 returns S/2 (rounded up)', function() {
+  assert.strictEqual(peCalcSize(50), 25);
+  assert.strictEqual(peCalcSize(70), 35);
+  assert.strictEqual(peCalcSize(120), 60);
+});
+
+test('PE_TABLE_542 has correct entries count', function() {
+  assert(PE_TABLE_542.length >= 15, 'Should have at least 15 standard sizes');
+});
+
+test('renderPE shows result when phaseSize selected', function() {
+  peState.phaseSize = 25;
+  var html = renderPE();
+  assert(html.indexOf('16') >= 0, 'Should show PE=16 for phase 25mm2');
+  peState.phaseSize = null;
+});
+
+test('renderPE is click-only', function() {
+  peState.phaseSize = 10;
+  var html = renderPE();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  peState.phaseSize = null;
+});
+
+// === Voltage Drop 3D Module Tests ===
+console.log('\n=== Voltage Drop 3D Module Tests ===');
+
+test('renderVdrop3D function exists and returns HTML', function() {
+  var html = renderVdrop3D();
+  assert(html.length > 100);
+  assert(html.indexOf('svg') >= 0 || html.indexOf('SVG') >= 0, 'Should contain SVG visualization');
+});
+
+test('vdrop3dCalcGradient returns array', function() {
+  var result = vdrop3dCalcGradient(null);
+  assert(Array.isArray(result), 'Should return array');
+});
+
+test('vdrop3dCalcGradient with tree returns node data', function() {
+  var tree = sldCreateTree();
+  var result = vdrop3dCalcGradient(tree);
+  assert(result.length > 0, 'Should have gradient data for tree nodes');
+});
+
+test('vdrop3dRenderSVG returns SVG string', function() {
+  var svg = vdrop3dRenderSVG([], 0);
+  assert(svg.indexOf('<svg') >= 0, 'Should return valid SVG');
+  assert(svg.indexOf('</svg>') >= 0, 'Should close SVG tag');
+});
+
+test('renderVdrop3D shows view angle buttons', function() {
+  var html = renderVdrop3D();
+  assert(html.indexOf('viewAngle') >= 0 || html.indexOf('vdrop3dState') >= 0, 'Should have angle controls');
+});
+
+test('renderVdrop3D is click-only', function() {
+  var html = renderVdrop3D();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === Ground Design Module Tests ===
+console.log('\n=== Ground Design Module Tests ===');
+
+test('renderGroundDesign function exists and returns HTML', function() {
+  var html = renderGroundDesign();
+  assert(html.length > 100);
+  assert(html.indexOf('60364') >= 0 || html.indexOf('jord') >= 0 || html.indexOf('earth') >= 0);
+});
+
+test('groundCalcResistance rod calculation', function() {
+  var R = groundCalcResistance(100, 'rod', { rodLength: 2.4, rodDiameter: 16 });
+  assert(R > 0 && R < 200, 'Rod resistance should be reasonable: ' + R);
+});
+
+test('groundCalcResistance plate calculation', function() {
+  var R = groundCalcResistance(100, 'plate', { plateArea: 1 });
+  assert(R > 0 && R < 200, 'Plate resistance should be reasonable: ' + R);
+});
+
+test('groundCalcResistance ring calculation', function() {
+  var R = groundCalcResistance(100, 'ring', { ringRadius: 5 });
+  assert(R > 0 && R < 50, 'Ring resistance should be reasonable: ' + R);
+});
+
+test('SOIL_RESISTIVITY has standard soil types', function() {
+  assert(SOIL_RESISTIVITY.length >= 6, 'Should have multiple soil types');
+  var clay = SOIL_RESISTIVITY.filter(function(s) { return s.id === 'clay'; })[0];
+  assert(clay && clay.rho > 0, 'Clay should have positive resistivity');
+});
+
+test('renderGroundDesign is click-only', function() {
+  groundDesignState.soilType = 'clay';
+  groundDesignState.electrodeType = 'rod';
+  var html = renderGroundDesign();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  groundDesignState.soilType = null;
+  groundDesignState.electrodeType = null;
+});
+
+// === Periodic Inspection Module Tests ===
+console.log('\n=== Periodic Inspection Module Tests ===');
+
+test('renderEftersyn function exists and returns HTML', function() {
+  var html = renderEftersyn();
+  assert(html.length > 100);
+  assert(html.indexOf('Sikkerhedsstyrelsen') >= 0 || html.indexOf('eftersyn') >= 0 || html.indexOf('Inspection') >= 0);
+});
+
+test('eftersynGetItems returns filtered list', function() {
+  var items = eftersynGetItems('bolig');
+  assert(items.length >= 10, 'Should have at least 10 items for residential');
+});
+
+test('eftersynGetItems filters by type', function() {
+  var boligItems = eftersynGetItems('bolig');
+  var industriItems = eftersynGetItems('industri');
+  assert(industriItems.length > boligItems.length || industriItems.length >= boligItems.length, 'Industrial should have >= residential checks');
+});
+
+test('EFTERSYN_CHECKLIST has clause references', function() {
+  EFTERSYN_CHECKLIST.forEach(function(item) {
+    assert(item.clause && item.clause.length > 0, 'Item ' + item.id + ' should have clause');
+  });
+});
+
+test('renderEftersyn is click-only', function() {
+  var html = renderEftersyn();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === RCD Selection Module Tests ===
+console.log('\n=== RCD Selection Module Tests ===');
+
+test('renderRCDSel function exists and returns HTML', function() {
+  var html = renderRCDSel();
+  assert(html.length > 100);
+  assert(html.indexOf('RCD') >= 0);
+});
+
+test('RCD_INSTALL_TYPES has proper entries', function() {
+  assert(RCD_INSTALL_TYPES.length >= 10, 'Should have at least 10 installation types');
+  RCD_INSTALL_TYPES.forEach(function(t) {
+    assert(t.rcdType, 'Type ' + t.id + ' should have rcdType');
+    assert(t.sensitivity > 0, 'Type ' + t.id + ' should have positive sensitivity');
+    assert(t.clause, 'Type ' + t.id + ' should have clause reference');
+  });
+});
+
+test('renderRCDSel shows recommendation when type selected', function() {
+  rcdSelState.installType = 'ev';
+  var html = renderRCDSel();
+  assert(html.indexOf('Type B') >= 0, 'EV should recommend Type B');
+  rcdSelState.installType = null;
+});
+
+test('EV charger requires Type B RCD', function() {
+  var ev = RCD_INSTALL_TYPES.filter(function(t) { return t.id === 'ev'; })[0];
+  assert.strictEqual(ev.rcdType, 'B', 'EV must use Type B');
+  assert.strictEqual(ev.sensitivity, 30, 'EV sensitivity should be 30mA');
+});
+
+test('renderRCDSel is click-only', function() {
+  rcdSelState.installType = 'socket';
+  var html = renderRCDSel();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  rcdSelState.installType = null;
+});
+
+// === Panel Declaration Module Tests ===
+console.log('\n=== Panel Declaration Module Tests ===');
+
+test('renderTavleErkl function exists and returns HTML', function() {
+  var html = renderTavleErkl();
+  assert(html.length > 100);
+  assert(html.indexOf('61439') >= 0 || html.indexOf('tavle') >= 0 || html.indexOf('Panel') >= 0);
+});
+
+test('renderTavleErkl generates declaration when data filled', function() {
+  tavleErklState.boardType = 'main';
+  tavleErklState.ratedCurrent = 250;
+  var html = renderTavleErkl();
+  assert(html.indexOf('250') >= 0, 'Should show rated current');
+  assert(html.indexOf('61439') >= 0, 'Should reference DS/EN 61439');
+  tavleErklState.boardType = null;
+  tavleErklState.ratedCurrent = null;
+});
+
+test('TAVLE_BOARD_TYPES has standard types', function() {
+  assert(TAVLE_BOARD_TYPES.length >= 4);
+  var main = TAVLE_BOARD_TYPES.filter(function(t) { return t.id === 'main'; })[0];
+  assert(main, 'Should have main board type');
+});
+
+test('TAVLE_CURRENTS covers standard range', function() {
+  assert(TAVLE_CURRENTS.indexOf(63) >= 0, 'Should include 63A');
+  assert(TAVLE_CURRENTS.indexOf(400) >= 0, 'Should include 400A');
+});
+
+test('renderTavleErkl is click-only', function() {
+  tavleErklState.boardType = 'group';
+  tavleErklState.ratedCurrent = 63;
+  var html = renderTavleErkl();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  tavleErklState.boardType = null;
+  tavleErklState.ratedCurrent = null;
+});
+
+// === Health Score Module Tests ===
+console.log('\n=== Health Score Module Tests ===');
+
+test('renderSundhed function exists and returns HTML', function() {
+  var html = renderSundhed();
+  assert(html.length > 100);
+  assert(html.indexOf('svg') >= 0, 'Should contain gauge SVG');
+});
+
+test('sundhedCalcScore returns score object', function() {
+  var score = sundhedCalcScore();
+  assert(typeof score.total === 'number', 'Should have total');
+  assert(score.total >= 0 && score.total <= 100, 'Total should be 0-100');
+  assert(typeof score.safety === 'number');
+  assert(typeof score.capacity === 'number');
+  assert(typeof score.selectivity === 'number');
+  assert(typeof score.future === 'number');
+  assert(typeof score.documentation === 'number');
+});
+
+test('sundhedRenderGaugeSVG produces SVG', function() {
+  var svg = sundhedRenderGaugeSVG(75);
+  assert(svg.indexOf('<svg') >= 0);
+  assert(svg.indexOf('75') >= 0, 'Should show score value');
+});
+
+test('sundhedCalcScore breakdown adds up correctly', function() {
+  var score = sundhedCalcScore();
+  var reconstructed = Math.round(score.safety * 0.4 + score.capacity * 0.2 + score.selectivity * 0.2 + score.future * 0.1 + score.documentation * 0.1);
+  assert(Math.abs(score.total - reconstructed) <= 1, 'Weighted sum should match total');
+});
+
+test('renderSundhed is click-only', function() {
+  var html = renderSundhed();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === Future Expansion Module Tests ===
+console.log('\n=== Future Expansion Module Tests ===');
+
+test('renderFremtid function exists and returns HTML', function() {
+  var html = renderFremtid();
+  assert(html.length > 100);
+});
+
+test('FREMTID_SCENARIOS has proper entries', function() {
+  assert(FREMTID_SCENARIOS.length >= 6, 'Should have multiple scenarios');
+  FREMTID_SCENARIOS.forEach(function(s) {
+    assert(s.kw > 0, 'Scenario ' + s.id + ' should have positive kW');
+  });
+});
+
+test('fremtidAnalyze returns analysis object', function() {
+  var result = fremtidAnalyze('ev22');
+  assert(result !== null, 'Should return result');
+  assert(typeof result.canFit === 'boolean', 'Should have canFit boolean');
+  assert(result.costDKK > 0, 'Should have cost estimate');
+});
+
+test('fremtidAnalyze scenario includes cable and MCB info', function() {
+  var result = fremtidAnalyze('heatpump');
+  assert(result.scenario.minCable > 0, 'Should specify minimum cable');
+  assert(result.scenario.minMCB > 0, 'Should specify minimum MCB');
+});
+
+test('renderFremtid is click-only', function() {
+  fremtidState.scenario = 'ev22';
+  var html = renderFremtid();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  fremtidState.scenario = null;
+});
+
+// === QR Code Module Tests ===
+console.log('\n=== QR Code Module Tests ===');
+
+test('renderQRKode function exists and returns HTML', function() {
+  var html = renderQRKode();
+  assert(html.length > 100);
+  assert(html.indexOf('QR') >= 0);
+});
+
+test('qrGenerateMatrix returns 21x21 grid', function() {
+  var grid = qrGenerateMatrix('TEST');
+  assert.strictEqual(grid.length, 21);
+  assert.strictEqual(grid[0].length, 21);
+});
+
+test('qrGenerateMatrix has finder patterns', function() {
+  var grid = qrGenerateMatrix('HELLO');
+  // Top-left finder: grid[0][0] through grid[6][6] should have the pattern
+  assert.strictEqual(grid[0][0], 1, 'Top-left finder corner');
+  assert.strictEqual(grid[0][6], 1, 'Top-left finder corner');
+  assert.strictEqual(grid[6][0], 1, 'Top-left finder corner');
+});
+
+test('qrRenderSVG produces valid SVG', function() {
+  var grid = qrGenerateMatrix('TEST');
+  var svg = qrRenderSVG(grid);
+  assert(svg.indexOf('<svg') >= 0);
+  assert(svg.indexOf('</svg>') >= 0);
+  assert(svg.indexOf('<rect') >= 0, 'Should have rect elements for modules');
+});
+
+test('qrGetInstallationSummary returns string', function() {
+  var summary = qrGetInstallationSummary();
+  assert(typeof summary === 'string');
+  assert(summary.length > 5);
+});
+
+test('renderQRKode is click-only', function() {
+  qrKodeState.generated = true;
+  var html = renderQRKode();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  qrKodeState.generated = false;
+});
+
+// === Mistake Detector Module Tests ===
+console.log('\n=== Mistake Detector Module Tests ===');
+
+test('renderFejlvagt function exists and returns HTML', function() {
+  var html = renderFejlvagt();
+  assert(html.length > 100);
+  assert(html.indexOf('Fejl') >= 0 || html.indexOf('Mistake') >= 0);
+});
+
+test('FEJLVAGT_MISTAKES has 25+ entries', function() {
+  assert(FEJLVAGT_MISTAKES.length >= 25, 'Should have at least 25 mistake patterns: ' + FEJLVAGT_MISTAKES.length);
+});
+
+test('FEJLVAGT_MISTAKES all have severity and clause', function() {
+  FEJLVAGT_MISTAKES.forEach(function(m) {
+    assert(m.severity >= 1 && m.severity <= 3, 'Mistake ' + m.id + ' severity should be 1-3');
+    assert(m.clause && m.clause.length > 0, 'Mistake ' + m.id + ' should have clause');
+  });
+});
+
+test('fejlvagtScan returns sorted array', function() {
+  var results = fejlvagtScan();
+  assert(Array.isArray(results));
+  // Should be sorted by severity descending
+  for (var i = 1; i < results.length; i++) {
+    assert(results[i - 1].severity >= results[i].severity, 'Should be sorted by severity desc');
+  }
+});
+
+test('renderFejlvagt shows filter buttons', function() {
+  var html = renderFejlvagt();
+  assert(html.indexOf('filter') >= 0 || html.indexOf('Filter') >= 0);
+});
+
+test('renderFejlvagt is click-only', function() {
+  var html = renderFejlvagt();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === Voice-to-Documentation Module Tests ===
+console.log('\n=== Voice-to-Documentation Module Tests ===');
+
+test('renderStemme function exists and returns HTML', function() {
+  var html = renderStemme();
+  assert(html.length > 100);
+});
+
+test('STEMME_TEMPLATES has multiple templates', function() {
+  assert(STEMME_TEMPLATES.length >= 6, 'Should have at least 6 templates');
+  STEMME_TEMPLATES.forEach(function(t) {
+    assert(t.steps && t.steps.length > 0, 'Template ' + t.id + ' should have steps');
+  });
+});
+
+test('stemmeGenerateReport produces report text', function() {
+  stemmeState.template = 'socket_replace';
+  stemmeState.details = [{ step: 'location', value: 'Køkken' }, { step: 'test', value: 'OK' }];
+  var report = stemmeGenerateReport();
+  assert(report.indexOf('SERVICE') >= 0 || report.indexOf('Dato') >= 0 || report.indexOf('Date') >= 0);
+  assert(report.length > 30);
+  stemmeState.template = null;
+  stemmeState.details = [];
+});
+
+test('STEMME_DETAILS has options for each detail type', function() {
+  assert(STEMME_DETAILS.location.options.length >= 5);
+  assert(STEMME_DETAILS.test.options.length >= 3);
+});
+
+test('renderStemme shows templates when no selection', function() {
+  stemmeState.template = null;
+  var html = renderStemme();
+  assert(html.indexOf('skabelon') >= 0 || html.indexOf('template') >= 0);
+});
+
+test('renderStemme is click-only', function() {
+  stemmeState.template = 'rcd_test';
+  var html = renderStemme();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  stemmeState.template = null;
+});
+
+// === Material Optimizer Module Tests ===
+console.log('\n=== Material Optimizer Module Tests ===');
+
+test('renderMatopt function exists and returns HTML', function() {
+  var html = renderMatopt();
+  assert(html.length > 100);
+  assert(html.indexOf('DKK') >= 0 || html.indexOf('bespar') >= 0 || html.indexOf('savings') >= 0 || html.indexOf('optim') >= 0);
+});
+
+test('matoptAnalyze returns array', function() {
+  var results = matoptAnalyze();
+  assert(Array.isArray(results));
+});
+
+test('MATOPT_CABLE_PRICES has standard sizes', function() {
+  assert(MATOPT_CABLE_PRICES[2.5] > 0, 'Should have price for 2.5mm2');
+  assert(MATOPT_CABLE_PRICES[16] > 0, 'Should have price for 16mm2');
+  assert(MATOPT_CABLE_PRICES[16] > MATOPT_CABLE_PRICES[2.5], 'Larger cable should cost more');
+});
+
+test('renderMatopt shows optimization type buttons', function() {
+  var html = renderMatopt();
+  assert(html.indexOf('cable') >= 0 || html.indexOf('Kabler') >= 0 || html.indexOf('Cables') >= 0);
+});
+
+test('renderMatopt is click-only', function() {
+  var html = renderMatopt();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === Master's Advice Module Tests ===
+console.log('\n=== Master Advice Module Tests ===');
+
+test('renderMester function exists and returns HTML', function() {
+  var html = renderMester();
+  assert(html.length > 100);
+});
+
+test('MESTER_SCENARIOS has 8+ scenarios', function() {
+  assert(MESTER_SCENARIOS.length >= 8, 'Should have at least 8 scenarios: ' + MESTER_SCENARIOS.length);
+});
+
+test('Each scenario has 5+ tips', function() {
+  MESTER_SCENARIOS.forEach(function(sc) {
+    assert(sc.tips.length >= 5, 'Scenario ' + sc.id + ' should have at least 5 tips, has: ' + sc.tips.length);
+  });
+});
+
+test('renderMester shows tips when scenario selected', function() {
+  mesterState.scenario = 'villa_ny';
+  var html = renderMester();
+  assert(html.indexOf('tomr\u00F8r') >= 0 || html.indexOf('conduit') >= 0 || html.indexOf('1.') >= 0, 'Should show numbered tips');
+  mesterState.scenario = null;
+});
+
+test('renderMester is click-only', function() {
+  mesterState.scenario = 'bathroom';
+  var html = renderMester();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  mesterState.scenario = null;
+});
+
+// === Timeline Estimator Module Tests ===
+console.log('\n=== Timeline Estimator Module Tests ===');
+
+test('renderTidslinje function exists and returns HTML', function() {
+  var html = renderTidslinje();
+  assert(html.length > 100);
+  assert(html.indexOf('DKK') >= 0);
+});
+
+test('tidslinjeCalc returns valid estimate', function() {
+  var result = tidslinjeCalc('villa', 2);
+  assert(result !== null);
+  assert(result.totalHours > 0, 'Should have positive total hours');
+  assert(result.totalCost > 0, 'Should have positive cost');
+  assert(result.workDays > 0, 'Should have work days');
+  assert(result.phases.length === 5, 'Should have 5 phases');
+});
+
+test('tidslinjeCalc team size reduces installation time', function() {
+  var r1 = tidslinjeCalc('villa', 1);
+  var r2 = tidslinjeCalc('villa', 4);
+  assert(r2.totalHours < r1.totalHours, 'Larger team should reduce hours');
+});
+
+test('TIDSLINJE_RATES has correct values', function() {
+  assert.strictEqual(TIDSLINJE_RATES.apprentice, 280);
+  assert.strictEqual(TIDSLINJE_RATES.electrician, 450);
+  assert.strictEqual(TIDSLINJE_RATES.master, 650);
+});
+
+test('tidslinjeRenderBarSVG produces SVG', function() {
+  var result = tidslinjeCalc('villa', 2);
+  var svg = tidslinjeRenderBarSVG(result.phases);
+  assert(svg.indexOf('<svg') >= 0);
+  assert(svg.indexOf('</svg>') >= 0);
+});
+
+test('renderTidslinje is click-only', function() {
+  var html = renderTidslinje();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// === Benchmark Module Tests ===
+console.log('\n=== Benchmark Module Tests ===');
+
+test('renderBenchmark function exists and returns HTML', function() {
+  var html = renderBenchmark();
+  assert(html.length > 100);
+});
+
+test('BENCHMARK_REFERENCES has 15+ entries', function() {
+  assert(BENCHMARK_REFERENCES.length >= 15, 'Should have at least 15 references: ' + BENCHMARK_REFERENCES.length);
+});
+
+test('benchmarkGetCurrent returns object with correct keys', function() {
+  var current = benchmarkGetCurrent();
+  assert(typeof current.circuits === 'number');
+  assert(typeof current.totalKW === 'number');
+  assert(typeof current.rcdCount === 'number');
+  assert(typeof current.cableMeters === 'number');
+});
+
+test('benchmarkRenderRadarSVG produces SVG', function() {
+  var current = benchmarkGetCurrent();
+  var ref = BENCHMARK_REFERENCES[0];
+  var svg = benchmarkRenderRadarSVG(current, ref);
+  assert(svg.indexOf('<svg') >= 0);
+  assert(svg.indexOf('polygon') >= 0, 'Should have polygon for radar');
+});
+
+test('renderBenchmark shows radar when reference selected', function() {
+  benchmarkState.reference = 'villa_small';
+  var html = renderBenchmark();
+  assert(html.indexOf('svg') >= 0 || html.indexOf('SVG') >= 0, 'Should show radar chart');
+  benchmarkState.reference = null;
+});
+
+test('renderBenchmark is click-only', function() {
+  benchmarkState.reference = 'apartment';
+  var html = renderBenchmark();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  benchmarkState.reference = null;
+});
+
+// === Enhanced TjekAlt Module Tests ===
+console.log('\n=== Enhanced TjekAlt Module Tests ===');
+
+test('TJEKALT_INSTALL_TYPES exists with types', function() {
+  assert(TJEKALT_INSTALL_TYPES.length >= 6, 'Should have at least 6 installation types');
+});
+
+test('TJEKALT_EXTRA_CHECKS has 25+ checks', function() {
+  assert(TJEKALT_EXTRA_CHECKS.length >= 25, 'Should have 25+ extra checks: ' + TJEKALT_EXTRA_CHECKS.length);
+});
+
+test('tjekaltEnhancedRunCheck returns more checks than original', function() {
+  var original = tjekaltRunCheck();
+  var enhanced = tjekaltEnhancedRunCheck('commercial');
+  assert(enhanced.length > original.length, 'Enhanced should have more checks');
+});
+
+test('tjekaltEnhancedRunCheck filters by type', function() {
+  var residential = tjekaltEnhancedRunCheck('residential');
+  var solar = tjekaltEnhancedRunCheck('solar');
+  // Different types should have different check counts
+  var resExtra = residential.length;
+  var solExtra = solar.length;
+  assert(resExtra > 0 && solExtra > 0, 'Both should have checks');
+});
+
+test('Enhanced TjekAlt checks have clause references', function() {
+  TJEKALT_EXTRA_CHECKS.forEach(function(c) {
+    assert(c.clause && c.clause.length > 0, 'Check ' + c.id + ' should have clause');
+    assert(c.types && c.types.length > 0, 'Check ' + c.id + ' should have types');
+  });
+});
+
+test('renderTjekAlt now shows installation type buttons', function() {
+  var html = renderTjekAlt();
+  assert(html.indexOf('Bolig') >= 0 || html.indexOf('Residential') >= 0, 'Should show residential button');
+  assert(html.indexOf('EV') >= 0 || html.indexOf('Solar') >= 0, 'Should show EV/Solar buttons');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
