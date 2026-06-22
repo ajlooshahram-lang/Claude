@@ -2255,8 +2255,17 @@
     const pctMilestones = msTotal ? msDone / msTotal : 0;
     const healthScore = Math.round((pctClosed * 40 + pctNotBlocked * 30 + pctMilestones * 30) * 100 / 100);
     const healthCls = healthScore > 70 ? "green" : healthScore >= 40 ? "amber" : "red";
-    // Health trend sparkline (step 39) — 5-point trend using current score + 4 slightly-lower prior points
-    const sparkPts = [Math.max(0, healthScore - 18), Math.max(0, healthScore - 12), Math.max(0, healthScore - 7), Math.max(0, healthScore - 3), healthScore];
+    // Health trend sparkline (step 39) — real historical data from weekly snapshots
+    const sparkHist = (S.healthHistory && S.healthHistory()) || [];
+    var sparkPts;
+    if (sparkHist.length > 0) {
+      // Use historical scores plus current as the last point, cap at 5 total
+      var combined = sparkHist.concat([healthScore]);
+      sparkPts = combined.length > 5 ? combined.slice(combined.length - 5) : combined;
+    } else {
+      // No history yet — flat line (honest)
+      sparkPts = [healthScore, healthScore, healthScore, healthScore, healthScore];
+    }
     const sparkMax = 100, sparkW = 56, sparkH = 22, sparkPad = 2;
     const sparkPoints = sparkPts.map(function(v, i) {
       var x = sparkPad + (i / (sparkPts.length - 1)) * (sparkW - sparkPad * 2);

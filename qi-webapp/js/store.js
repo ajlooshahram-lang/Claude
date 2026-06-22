@@ -1067,22 +1067,40 @@
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup,
     setBrainPlan, getBrainPlan,
-    whatIf, weeklySummary };
+    whatIf, weeklySummary, healthHistory };
 
   // --- Feature #7: Weekly project summary snapshot ---
   // Stores a KPI snapshot each week and generates a plain-language comparison
   // between now and the previous saved snapshot. Designed for zero-PM users.
   var WSNAP_KEY = "qi_weekly_snap";
   function _loadWeeklySnap() {
-    try { var raw = localStorage.getItem(WSNAP_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+    try {
+      var raw = localStorage.getItem(WSNAP_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      // Backward-compat: migrate old single-object format to 1-element array
+      if (parsed && !Array.isArray(parsed) && parsed.ts) return [parsed];
+      if (Array.isArray(parsed)) return parsed;
+      return [];
+    } catch (e) { return []; }
   }
   function _saveWeeklySnap(snap) {
-    try { localStorage.setItem(WSNAP_KEY, JSON.stringify(snap)); } catch (e) {}
+    try {
+      var arr = _loadWeeklySnap();
+      arr.push(snap);
+      if (arr.length > 5) arr = arr.slice(arr.length - 5);
+      localStorage.setItem(WSNAP_KEY, JSON.stringify(arr));
+    } catch (e) {}
+  }
+  function healthHistory() {
+    var arr = _loadWeeklySnap();
+    return arr.map(function(entry) { return entry.healthScore || 0; });
   }
   function weeklySummary() {
     var now = kpis();
     var hs = healthScore();
-    var prev = _loadWeeklySnap();
+    var arr = _loadWeeklySnap();
+    var prev = arr.length > 0 ? arr[arr.length - 1] : null;
     var today = new Date();
     var dayMs = 86400000;
     // Decide if we should save a new snapshot (once every 7 days max)

@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix fabricated health sparkline (Bug 3): The dashboard sparkline for health trend creates a fake upward trend by subtracting arbitrary numbers from the current score. Replace with real historical data from the weekly snapshot system, or show a flat line (honest) when no history exists.",
+  "status": "in_progress",
+  "steps": [
+    "In qi-webapp/js/ui.js, find the sparkline code around line 2280 where `sparkPts` is defined as `[Math.max(0, healthScore - 18), Math.max(0, healthScore - 12), Math.max(0, healthScore - 7), Math.max(0, healthScore - 3), healthScore]`.",
+    "Replace this with real data: use S.weeklySummary() to access historical snapshots. The _loadWeeklySnap() function in store.js saves `{ ts, kpis, healthScore }` once per week. However, only one snapshot is stored at a time. To support a proper trend, extend the store to keep up to 5 historical health scores.",
+    "In qi-webapp/js/store.js, modify the weekly snapshot system: change WSNAP_KEY storage from a single object to an array of up to 5 entries (newest last). Each entry has { ts, kpis, healthScore }. Update _loadWeeklySnap to return the array, _saveWeeklySnap to append and cap at 5. Update weeklySummary() to compare against the most recent previous entry (index length-2 if length >= 2).",
+    "In the dashboard sparkline (ui.js), read the historical health scores from the weekly snapshot array. If fewer than 5 data points exist, pad with the current score (flat line = honest 'no history'). This means: when new install, show flat; as weeks pass, show real trend.",
+    "Add smoke test assertions: (a) The sparkline SVG renders on the dashboard (already there via the healthCard). (b) The sparkPts variable uses real historical values when available, flat current score when not. Verify the store's new array-based weekly snapshot works correctly."
+  ],
+  "acceptance_criteria": [
+    "The dashboard sparkline no longer fabricates an upward trend.",
+    "When no historical data exists, the sparkline shows a flat line at the current health score.",
+    "The weekly snapshot system stores up to 5 historical data points as an array.",
+    "weeklySummary() still works correctly with the new array format (compares current vs most recent previous).",
+    "All existing smoke tests pass (no regressions in the weekly summary assertions).",
+    "npm test passes."
+  ],
+  "verification": [
+    "cd /projects/sandbox/Claude/qi-webapp && npm test",
+    "cd /projects/sandbox/Claude/qi-webapp && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

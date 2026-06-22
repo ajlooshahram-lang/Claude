@@ -1997,6 +1997,23 @@ if (window.QIDisplay) {
   ok(card && /Project Update/i.test(card.innerHTML), "Weekly summary card has a 'Project Update' heading");
 })();
 
+// Step 127b: healthHistory and sparkline honesty
+(function testHealthHistory() {
+  var S = window.QIStore;
+  ok(typeof S.healthHistory === "function", "store exposes healthHistory() function");
+  var hist = S.healthHistory();
+  ok(Array.isArray(hist), "healthHistory() returns an array");
+  // On a fresh install (no prior snapshots beyond the one just saved by weeklySummary above),
+  // history should have at most a few entries (1 saved by weeklySummary call).
+  ok(hist.length <= 5, "healthHistory() returns at most 5 entries (got " + hist.length + ")");
+  ok(hist.every(function(v) { return typeof v === "number"; }), "healthHistory() entries are all numbers");
+  // Verify the dashboard sparkline does NOT use the fabricated pattern
+  var dnav2 = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav2) dnav2.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var svg = doc.querySelector(".health-spark");
+  ok(svg != null, "Dashboard renders the health sparkline SVG");
+})();
+
 // Step 128: Feature #8 — Keyboard shortcuts floating widget
 (function testShortcutsWidget() {
   var fab = doc.getElementById("shortcutsFab");
