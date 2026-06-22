@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix applyBrainPlan to fully reset route progress, persist brainPlan per project, and force a complete view re-render after analysis - so uploading a new project description properly clears old project state (especially route/cabling direction) and shows the fresh plan.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1 - Reset routeProgress in applyBrainPlan (qi-webapp/js/ui.js line ~3632): In the 'clear previously generated content' block at the top of applyBrainPlan, add `st0.routeProgress = {};` to completely wipe the old route progress data. Currently only `S.setRouteLaidKm(cab.id, 0)` is called later (which sets km to 0 but preserves old phase statuses from the previous project). The full wipe ensures no stale route data from the previous project persists.",
+    "Step 2 - Persist brainPlan per-project in the store (qi-webapp/js/store.js): Add a `brainPlan` field to the project state. In normalize(), ensure `s.brainPlan = s.brainPlan || null;`. Add two new API methods: `setBrainPlan(plan)` which sets `get().brainPlan = plan; save();` and `getBrainPlan()` which returns `get().brainPlan`. Export them on the Store API object.",
+    "Step 3 - Wire UI to persist/restore brainPlan (qi-webapp/js/ui.js): In runAnalyze (around line 3320), after `uiState.brainPlan = plan;`, also call `S.setBrainPlan(plan);`. On app load and project switch, restore: when the AFTER.brain function runs, check `S.getBrainPlan()` and if it exists, set `uiState.brainPlan = S.getBrainPlan();`. Also in the project-switch handler (line ~5865 `act === 'openproj'`), after `S.switchProject(id)`, restore `uiState.brainPlan = S.getBrainPlan() || null;`.",
+    "Step 4 - Force full view re-render after applyBrainPlan (qi-webapp/js/ui.js): At the end of applyBrainPlan (after the existing refreshHeader/refreshBadges calls), add `go(current);` to fully re-render the current view. This ensures Dashboard, Globe, Route Progress, or whatever view the user is on gets refreshed with the new data. The `current` variable is already in scope (module-level).",
+    "Step 5 - Clear uiState.brainPlan before overwriting in runAnalyze: Before `uiState.brainPlan = plan;`, add `uiState.brainPlan = null;` to ensure any stale reference is dropped before the new plan is set. This is a defensive measure.",
+    "Step 6 - Add new smoke tests (qi-webapp/smoke.js): Add assertions AFTER the existing brain tests (around line 755) to verify: (a) After running applyBrainPlan, routeProgress is freshly initialized (all phases 'Not started', laidKm 0), (b) Re-analyzing with a completely different description still results in clean route progress (no leftover from previous), (c) S.getBrainPlan() returns the applied plan (persistence), (d) After S.reset() + switchProject, uiState.brainPlan should be cleared."
+  ],
+  "acceptance_criteria": [
+    "Running `npm test` passes all existing 783+ smoke assertions plus the new ones",
+    "After applyBrainPlan, routeProgress for all cable segments has all phases set to 'Not started' and laidKm = 0",
+    "Re-analyzing with a different project description completely resets route progress (no data from previous analysis persists)",
+    "uiState.brainPlan (and S.getBrainPlan()) stores the analysis result and survives view navigation",
+    "Switching projects restores the correct brainPlan for that project",
+    "The current view re-renders after analysis (go(current) is called)"
+  ],
+  "verification": [
+    "cd qi-webapp && npm test",
+    "cd qi-webapp && npm run build:standalone && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

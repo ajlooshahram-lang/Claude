@@ -3307,6 +3307,10 @@
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
+    // Restore persisted brainPlan if the transient reference was lost (e.g. view navigation).
+    if (!uiState.brainPlan && S.getBrainPlan) { uiState.brainPlan = S.getBrainPlan(); }
+    // If a plan is already available, render the preview so the user sees the result.
+    if (uiState.brainPlan) { try { renderBrainPreview(uiState.brainPlan); } catch (e) { /* ignore */ } }
     // 'Programme at a glance' front-door buttons → the two best outputs.
     const heroBrief = $("#heroBrief"), heroGlobe = $("#heroGlobe");
     if (heroBrief) heroBrief.addEventListener("click", () => go("investorbrief"));
@@ -3317,7 +3321,9 @@
       if (!text) { toast("Paste or upload a project description first."); return false; }
       if (!window.QIBrain) { toast("Brain engine not loaded."); return false; }
       const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
+      uiState.brainPlan = null;
       uiState.brainPlan = plan;
+      S.setBrainPlan(plan);
       renderBrainPreview(plan);
       // Auto-apply the plan to the active project so Risk Register, FMEA, etc.
       // are populated immediately — the user expects Analyze = done, not a
@@ -3640,6 +3646,7 @@
         st0.registers = st0.registers || {};
         ["milestones", "procurement", "decisions", "resources"].forEach(function (r) { st0.registers[r] = []; });
         st0.stakeholders = [];
+        st0.routeProgress = {};
       }
     } catch (e) { /* ignore */ }
 
@@ -3682,9 +3689,18 @@
 
     // 3) Route progress: initialise every cable segment so the Route Progress
     //    module and the 3D map show the full route immediately (0% laid).
+    //    We directly assign fresh entries with all phases "Not started" rather
+    //    than using routeEntry/setRouteLaidKm (which would re-seed from cable
+    //    status and preserve non-zero progress for in-progress cables).
     try {
-      if (window.QIGlobe && Array.isArray(QIGlobe.CABLES) && S.setRouteLaidKm) {
-        QIGlobe.CABLES.forEach(function (cab) { S.setRouteLaidKm(cab.id, 0); });
+      if (window.QIGlobe && Array.isArray(QIGlobe.CABLES) && S.ROUTE_PHASES) {
+        var rp = S.get().routeProgress;
+        QIGlobe.CABLES.forEach(function (cab) {
+          var phases = {};
+          S.ROUTE_PHASES.forEach(function (p) { phases[p.key] = "Not started"; });
+          rp[cab.id] = { phases: phases, laidKm: 0 };
+        });
+        if (S.save) S.save();
       }
     } catch (e) { /* ignore */ }
 
@@ -3713,6 +3729,7 @@
     refreshHeader();
     try { if (typeof refreshBadges === "function") refreshBadges(); } catch (e) { /* ignore */ }
     try { if (window.QIGlobe && QIGlobe.setProgress) QIGlobe.setProgress(); } catch (e) { /* ignore */ }
+    if (current !== "brain") go(current);
     return n;
   }
 
@@ -5862,7 +5879,7 @@
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
     else if (act === "diffSnaps") showDiffModal();
-    else if (act === "openproj") { S.switchProject(id); refreshHeader(); go("dashboard"); toast("Switched project."); }
+    else if (act === "openproj") { S.switchProject(id); uiState.brainPlan = S.getBrainPlan() || null; refreshHeader(); go("dashboard"); toast("Switched project."); }
     else if (act === "newproj") { openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }); }
     else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); openProjectNameModal({ title: "Rename project", current: cur ? cur.name : "", okLabel: "Rename", onPick: n => { S.renameProject(id, n); refreshHeader(); go("portfolio"); toast("Renamed."); } }); }
     else if (act === "dupproj") { S.duplicateProject(id); refreshHeader(); go("dashboard"); toast("Project duplicated."); }

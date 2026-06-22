@@ -158,6 +158,7 @@
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
     if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
+    s.brainPlan = s.brainPlan || null;
     if (!Array.isArray(s.updates)) s.updates = [];
     return s;
   }
@@ -939,6 +940,10 @@
     };
   }
 
+  // ---- Brain Plan persistence (per-project) ----
+  function setBrainPlan(plan) { get().brainPlan = plan || null; save(); }
+  function getBrainPlan() { return get().brainPlan || null; }
+
   // ---- What-If Scenario Simulator ----
   // Pure in-memory computation — never persists. The user toggles countries or
   // cables on/off, slides permit delays or cost multipliers, and gets an instant
@@ -1061,6 +1066,7 @@
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup,
+    setBrainPlan, getBrainPlan,
     whatIf, weeklySummary };
 
   // --- Feature #7: Weekly project summary snapshot ---

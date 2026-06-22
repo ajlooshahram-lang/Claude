@@ -910,6 +910,48 @@ ok(allEight.countryIntel.length === 8, "Submarine project with no named country 
 doc.getElementById("brainApply").click();
 ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-enriched cases");
 
+// 39c) Brain reanalysis state reset — routeProgress fully cleared and brainPlan persisted
+(function () {
+  S.reset();
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  doc.getElementById("brainText").value =
+    "Submarine fibre cable system connecting Indonesia, Malaysia and Thailand, 3000 km, 36 months";
+  doc.getElementById("brainAnalyze").click();
+  // After applyBrainPlan, routeProgress should be freshly initialized
+  var rp = S.routeProgress();
+  var cables = window.QIGlobe.CABLES;
+  cables.forEach(function (cab) {
+    var entry = rp[cab.id];
+    ok(entry != null, "routeProgress has entry for cable " + cab.id + " after applyBrainPlan");
+    ok(entry.laidKm === 0, "cable " + cab.id + " laidKm is 0 after applyBrainPlan");
+    S.ROUTE_PHASES.forEach(function (p) {
+      ok(entry.phases[p.key] === "Not started", "cable " + cab.id + " phase " + p.key + " is 'Not started'");
+    });
+  });
+  // S.getBrainPlan() returns the stored plan
+  ok(S.getBrainPlan() != null, "S.getBrainPlan() returns the persisted plan");
+  ok(S.getBrainPlan().cases.length > 0, "Persisted brainPlan has cases");
+  ok(S.getBrainPlan().summary != null, "Persisted brainPlan has a summary");
+  // Now re-analyze with a completely different description — no leftover data
+  // First, manually set some route progress to dirty values
+  S.setRouteLaidKm(cables[0].id, 999);
+  S.setRoutePhase(cables[0].id, S.ROUTE_PHASES[0].key, "Complete");
+  doc.getElementById("brainText").value =
+    "Offshore wind farm cabling project, North Sea, 500 km, 24 months";
+  doc.getElementById("brainAnalyze").click();
+  var rp2 = S.routeProgress();
+  cables.forEach(function (cab) {
+    var entry = rp2[cab.id];
+    ok(entry != null, "Re-analysis: routeProgress has entry for cable " + cab.id);
+    ok(entry.laidKm === 0, "Re-analysis: cable " + cab.id + " laidKm is 0 (no leftover)");
+    S.ROUTE_PHASES.forEach(function (p) {
+      ok(entry.phases[p.key] === "Not started", "Re-analysis: cable " + cab.id + " phase " + p.key + " reset to 'Not started'");
+    });
+  });
+  // brainPlan field exists in the persisted state
+  ok(S.get().brainPlan != null, "brainPlan field exists in the persisted project state");
+})();
+
 // 40) Per-country briefing (powers the 3D map station drill-down) — pure data
 ok(typeof window.QICountryData.briefing === "function", "QICountryData.briefing() exposed for the 3D drill-down");
 const STN = [
