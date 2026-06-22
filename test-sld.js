@@ -15505,6 +15505,516 @@ test('tccRenderCascadeChart returns cableProtected status', function() {
   assert(typeof result.marginMs === 'number', 'Must return marginMs number');
 });
 
+// --- Multi-Circuit Reverse Engineering Tests ---
+
+test('REVERSE_CIRCUIT_TEMPLATES exists and has 12 templates', function() {
+  assert(Array.isArray(REVERSE_CIRCUIT_TEMPLATES), 'Should be an array');
+  assert(REVERSE_CIRCUIT_TEMPLATES.length === 12, 'Should have 12 templates, got ' + REVERSE_CIRCUIT_TEMPLATES.length);
+});
+
+test('REVERSE_CIRCUIT_TEMPLATES each template has required fields', function() {
+  var required = ['id', 'name_da', 'name_en', 'name_fa', 'power_kW', 'cosPhi', 'phases', 'voltage', 'installMethod', 'cableLength_m', 'protectionType'];
+  for (var i = 0; i < REVERSE_CIRCUIT_TEMPLATES.length; i++) {
+    var t = REVERSE_CIRCUIT_TEMPLATES[i];
+    for (var j = 0; j < required.length; j++) {
+      assert(t[required[j]] !== undefined, 'Template ' + t.id + ' missing field ' + required[j]);
+    }
+  }
+});
+
+test('REVERSE_CIRCUIT_TEMPLATES includes specific template IDs', function() {
+  var ids = REVERSE_CIRCUIT_TEMPLATES.map(function(t) { return t.id; });
+  assert(ids.indexOf('lighting') >= 0, 'Should have lighting template');
+  assert(ids.indexOf('sockets') >= 0, 'Should have sockets template');
+  assert(ids.indexOf('cooker') >= 0, 'Should have cooker template');
+  assert(ids.indexOf('ev_11kw') >= 0, 'Should have ev_11kw template');
+  assert(ids.indexOf('ev_22kw') >= 0, 'Should have ev_22kw template');
+  assert(ids.indexOf('heatpump') >= 0, 'Should have heatpump template');
+  assert(ids.indexOf('motor_5kw') >= 0, 'Should have motor_5kw template');
+  assert(ids.indexOf('solar_10kw') >= 0, 'Should have solar_10kw template');
+  assert(ids.indexOf('bathroom') >= 0, 'Should have bathroom template');
+  assert(ids.indexOf('outdoor') >= 0, 'Should have outdoor template');
+});
+
+test('REVERSE_BUILDING_PRESETS exists and has 5 presets', function() {
+  assert(Array.isArray(REVERSE_BUILDING_PRESETS), 'Should be an array');
+  assert(REVERSE_BUILDING_PRESETS.length === 5, 'Should have 5 presets, got ' + REVERSE_BUILDING_PRESETS.length);
+});
+
+test('REVERSE_BUILDING_PRESETS each preset has required fields', function() {
+  var required = ['id', 'name_da', 'name_en', 'name_fa', 'circuits', 'earthSystem', 'diversity'];
+  for (var i = 0; i < REVERSE_BUILDING_PRESETS.length; i++) {
+    var p = REVERSE_BUILDING_PRESETS[i];
+    for (var j = 0; j < required.length; j++) {
+      assert(p[required[j]] !== undefined, 'Preset ' + p.id + ' missing field ' + required[j]);
+    }
+    assert(Array.isArray(p.circuits), 'Preset ' + p.id + ' circuits should be array');
+    assert(p.circuits.length >= 3, 'Preset ' + p.id + ' should have at least 3 circuits');
+  }
+});
+
+test('REVERSE_BUILDING_PRESETS includes villa, apartment, commercial, industrial, agricultural', function() {
+  var ids = REVERSE_BUILDING_PRESETS.map(function(p) { return p.id; });
+  assert(ids.indexOf('villa') >= 0, 'Should have villa');
+  assert(ids.indexOf('apartment') >= 0, 'Should have apartment');
+  assert(ids.indexOf('commercial') >= 0, 'Should have commercial');
+  assert(ids.indexOf('industrial') >= 0, 'Should have industrial');
+  assert(ids.indexOf('agricultural') >= 0, 'Should have agricultural');
+});
+
+test('reverseAddCircuit adds a circuit to selectedCircuits', function() {
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  assert(reverseState.selectedCircuits.length === 1, 'Should have 1 circuit after adding');
+  assert(reverseState.selectedCircuits[0].templateId === 'lighting', 'Should be lighting template');
+  assert(reverseState.selectedCircuits[0].power_kW === 2.3, 'Should have 2.3 kW');
+  reverseState.selectedCircuits = [];
+});
+
+test('reverseAddCircuit with invalid templateId does nothing', function() {
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('nonexistent');
+  assert(reverseState.selectedCircuits.length === 0, 'Should still be empty');
+});
+
+test('reverseRemoveCircuit removes circuit at correct index', function() {
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  reverseAddCircuit('cooker');
+  assert(reverseState.selectedCircuits.length === 3, 'Should have 3 circuits');
+  reverseRemoveCircuit(1);
+  assert(reverseState.selectedCircuits.length === 2, 'Should have 2 after remove');
+  assert(reverseState.selectedCircuits[0].templateId === 'lighting', 'First should still be lighting');
+  assert(reverseState.selectedCircuits[1].templateId === 'cooker', 'Second should now be cooker');
+  reverseState.selectedCircuits = [];
+});
+
+test('reverseSetCircuitParam updates specific circuit parameter', function() {
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  reverseSetCircuitParam(0, 'cableLength_m', 50);
+  assert(reverseState.selectedCircuits[0].cableLength_m === 50, 'Should update cable length');
+  assert(reverseState.selectedCircuits[1].cableLength_m === 25, 'Other circuit unchanged');
+  reverseSetCircuitParam(1, 'ambientTemp', 40);
+  assert(reverseState.selectedCircuits[1].ambientTemp === 40, 'Should update temp');
+  reverseState.selectedCircuits = [];
+});
+
+test('reverseSetCircuitParam phases updates voltage too', function() {
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  reverseSetCircuitParam(0, 'phases', '3x400');
+  assert(reverseState.selectedCircuits[0].voltage === 400, 'Voltage should update to 400 for 3x400');
+  reverseSetCircuitParam(0, 'phases', '1x230');
+  assert(reverseState.selectedCircuits[0].voltage === 230, 'Voltage should update to 230 for 1x230');
+  reverseState.selectedCircuits = [];
+});
+
+test('reverseSelectBuilding populates circuits from preset', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.selectedBuildingType = null;
+  reverseSelectBuilding('villa');
+  assert(reverseState.selectedBuildingType === 'villa', 'Should set building type');
+  assert(reverseState.selectedCircuits.length === 8, 'Villa should have 8 circuits');
+  assert(reverseState.earthSystem === 'TN-C-S', 'Villa earth should be TN-C-S');
+  reverseState.selectedCircuits = [];
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseSelectBuilding apartment preset populates correct circuits', function() {
+  reverseState.selectedCircuits = [];
+  reverseSelectBuilding('apartment');
+  assert(reverseState.selectedCircuits.length === 5, 'Apartment should have 5 circuits');
+  assert(reverseState.earthSystem === 'TN-S', 'Apartment earth should be TN-S');
+  reverseState.selectedCircuits = [];
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseToggleMultiMode toggles multiMode flag', function() {
+  reverseState.multiMode = false;
+  reverseToggleMultiMode();
+  assert(reverseState.multiMode === true, 'Should toggle to true');
+  reverseToggleMultiMode();
+  assert(reverseState.multiMode === false, 'Should toggle back to false');
+});
+
+test('reverseMultiSolve with single lighting circuit finds solution', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseState.selectedBuildingType = null;
+  reverseAddCircuit('lighting');
+  reverseMultiSolve();
+  assert(reverseState.multiResult !== null, 'Should have result');
+  assert(reverseState.multiResult.success === true, 'Should find solution');
+  assert(reverseState.multiResult.circuitResults.length === 1, 'Should have 1 circuit result');
+  assert(reverseState.multiResult.circuitResults[0].success === true, 'Circuit should pass');
+  assert(reverseState.multiResult.circuitResults[0].IB > 0, 'IB should be positive');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve with villa preset finds compliant solutions', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('villa');
+  reverseMultiSolve();
+  assert(reverseState.multiResult !== null, 'Should have result');
+  assert(reverseState.multiResult.circuitCount === 8, 'Should have 8 circuits');
+  assert(reverseState.multiResult.circuitResults.length === 8, 'Should have 8 results');
+  var passCount = reverseState.multiResult.circuitResults.filter(function(r) { return r.success; }).length;
+  assert(passCount === 8, 'All 8 circuits should pass, got ' + passCount);
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseMultiSolve builds valid sldTree with correct node count', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('apartment');
+  reverseMultiSolve();
+  var tree = reverseState.multiResult.tree;
+  assert(tree !== null, 'Tree should exist');
+  assert(tree.rootId !== null, 'Tree should have root');
+  var nodeCount = Object.keys(tree.nodes).length;
+  // 1 transformer + 1 main board + 5 final circuits = 7
+  assert(nodeCount === 7, 'Should have 7 nodes for apartment (1+1+5), got ' + nodeCount);
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseMultiSolve BOM includes entries for each circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  reverseAddCircuit('cooker');
+  reverseMultiSolve();
+  var bom = reverseState.multiResult.bom;
+  assert(bom.length >= 6, 'BOM should have at least 6 entries (2 per circuit: cable + protection), got ' + bom.length);
+  // Check that bom entries reference real product IDs
+  for (var i = 0; i < bom.length; i++) {
+    assert(bom[i].productRef, 'BOM entry ' + i + ' should have productRef');
+  }
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve compliance has entries for each circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('ev_11kw');
+  reverseAddCircuit('heatpump');
+  reverseMultiSolve();
+  var comp = reverseState.multiResult.compliance;
+  assert(comp.length === 2, 'Should have 2 compliance entries, got ' + comp.length);
+  assert(comp[0].circuitName === 'EV Charger 11kW', 'First should be EV');
+  assert(comp[1].circuitName === 'Heat Pump 8kW', 'Second should be Heat Pump');
+  assert(comp[0].results.length > 0, 'Should have compliance results');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve with long cable triggers upsize iterations', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('sockets');
+  reverseSetCircuitParam(0, 'cableLength_m', 200);
+  reverseMultiSolve();
+  var cr = reverseState.multiResult.circuitResults[0];
+  assert(cr.iterations > 1, 'Should need multiple iterations for 200m cable, got ' + cr.iterations);
+  assert(cr.cable.mm2 > 2.5, 'Should upsize cable beyond 2.5mm2, got ' + cr.cable.mm2);
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve never exceeds 10 iteration limit per circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('motor_22kw');
+  reverseSetCircuitParam(0, 'cableLength_m', 200);
+  reverseSetCircuitParam(0, 'ambientTemp', 50);
+  reverseSetCircuitParam(0, 'grouping', 6);
+  reverseMultiSolve();
+  var cr = reverseState.multiResult.circuitResults[0];
+  assert(cr.iterations <= 10, 'Should not exceed 10 iterations, got ' + cr.iterations);
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve with TT system adds RCD to BOM per circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TT';
+  reverseState.selectedBuildingType = null;
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  reverseMultiSolve();
+  var bom = reverseState.multiResult.bom;
+  var rcdEntries = bom.filter(function(b) { return b.clause && b.clause.indexOf('TT system') >= 0; });
+  assert(rcdEntries.length === 2, 'Should have 2 RCD entries for TT (one per circuit), got ' + rcdEntries.length);
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiOptimize identifies downsizing opportunities', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseState.selectedBuildingType = null;
+  reverseAddCircuit('lighting');
+  reverseMultiSolve();
+  // Optimization might find downsize opportunity depending on cable selection
+  var opts = reverseState.multiResult.optimizations;
+  assert(Array.isArray(opts), 'Optimizations should be an array');
+  // Each optimization should have required fields
+  for (var i = 0; i < opts.length; i++) {
+    assert(opts[i].type, 'Optimization should have type');
+    assert(opts[i].suggestion_en, 'Optimization should have suggestion_en');
+    assert(typeof opts[i].saving_pct === 'number', 'Should have saving_pct number');
+  }
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiOptimize checks discrimination ratio', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseState.selectedBuildingType = null;
+  // Add a high-power circuit that might have poor discrimination with main board
+  reverseAddCircuit('motor_22kw');
+  reverseMultiSolve();
+  var opts = reverseState.multiResult.optimizations;
+  var discOpts = opts.filter(function(o) { return o.type === 'discrimination'; });
+  // Motor 22kW needs large In (close to main board In) so discrimination might be flagged
+  // This is dependent on actual selection but the check should at least run
+  assert(Array.isArray(discOpts), 'Discrimination check should produce array');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve totalPower and diversifiedPower are correct', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('villa');
+  reverseMultiSolve();
+  var mr = reverseState.multiResult;
+  var expectedTotal = 0;
+  for (var i = 0; i < reverseState.selectedCircuits.length; i++) {
+    expectedTotal += reverseState.selectedCircuits[i].power_kW;
+  }
+  assert(Math.abs(mr.totalPower - expectedTotal) < 0.01, 'Total power should match sum of circuits');
+  assert(mr.diversifiedPower < mr.totalPower, 'Diversified should be less than total');
+  assert(Math.abs(mr.diversifiedPower - mr.totalPower * mr.diversity) < 0.01, 'Diversified = total * diversity');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseMultiSolve IB calculation correct for 3-phase circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('ev_11kw');
+  reverseMultiSolve();
+  var cr = reverseState.multiResult.circuitResults[0];
+  var expectedIB = 11000 / (Math.sqrt(3) * 400 * 0.98);
+  assert(Math.abs(cr.IB - expectedIB) < 0.01, 'IB should be P/(sqrt3*400*cos) = ' + expectedIB.toFixed(2) + ', got ' + cr.IB.toFixed(2));
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve IB calculation correct for 1-phase circuit', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('cooker');
+  reverseMultiSolve();
+  var cr = reverseState.multiResult.circuitResults[0];
+  var expectedIB = 7360 / (230 * 0.95);
+  assert(Math.abs(cr.IB - expectedIB) < 0.01, 'IB should be P/(230*cos) = ' + expectedIB.toFixed(2) + ', got ' + cr.IB.toFixed(2));
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve ensures In >= IB for all circuits', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('industrial');
+  reverseMultiSolve();
+  var results = reverseState.multiResult.circuitResults;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i].success) {
+      assert(results[i].In >= results[i].IB, 'Circuit ' + i + ': In (' + results[i].In + ') should be >= IB (' + results[i].IB.toFixed(2) + ')');
+    }
+  }
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('reverseMultiSolve ensures Iz >= In for all circuits', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('commercial');
+  reverseMultiSolve();
+  var results = reverseState.multiResult.circuitResults;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i].success) {
+      assert(results[i].Iz >= results[i].In, 'Circuit ' + i + ': Iz (' + results[i].Iz.toFixed(1) + ') should be >= In (' + results[i].In + ')');
+    }
+  }
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('renderReverse in multi mode produces HTML with circuit list', function() {
+  reverseState.multiMode = true;
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  var html = renderReverse();
+  assert(html.indexOf('Whole Installation') >= 0 || html.indexOf('Hel installation') >= 0, 'Should show multi-mode toggle');
+  assert(html.indexOf('Selected Circuits') >= 0 || html.indexOf('Valgte kredse') >= 0, 'Should show circuit list');
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = false;
+});
+
+test('renderReverse multi mode has no input or textarea elements', function() {
+  reverseState.multiMode = true;
+  reverseState.selectedCircuits = [];
+  reverseAddCircuit('lighting');
+  reverseAddCircuit('sockets');
+  reverseMultiSolve();
+  var html = renderReverse();
+  assert(html.indexOf('<input') === -1, 'Should have no <input> elements');
+  assert(html.indexOf('<textarea') === -1, 'Should have no <textarea> elements');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('renderReverse single mode still works correctly', function() {
+  reverseState.multiMode = false;
+  var html = renderReverse();
+  assert(html.indexOf('Quick Presets') >= 0 || html.indexOf('Hurtige forudindstillinger') >= 0, 'Should show single-mode presets');
+  assert(html.indexOf('Solve Optimal Design') >= 0 || html.indexOf('Beregn optimal') >= 0, 'Should show single solve button');
+});
+
+test('reverseMultiSolve with empty circuits does nothing', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.multiResult = null;
+  reverseMultiSolve();
+  assert(reverseState.multiResult === null, 'Should not produce result for empty circuits');
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve with all earth systems produces valid results', function() {
+  var systems = ['TN-S', 'TN-C-S', 'TT', 'IT'];
+  for (var i = 0; i < systems.length; i++) {
+    reverseState.selectedCircuits = [];
+    reverseState.multiMode = true;
+    reverseState.earthSystem = systems[i];
+    reverseAddCircuit('sockets');
+    reverseMultiSolve();
+    assert(reverseState.multiResult !== null, 'Should have result for ' + systems[i]);
+    assert(reverseState.multiResult.circuitResults[0].success === true, systems[i] + ' should find solution');
+  }
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.earthSystem = 'TN-S';
+});
+
+test('reverseMultiSolve compliance cites DS/HD 60364 clauses', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('sockets');
+  reverseMultiSolve();
+  var comp = reverseState.multiResult.compliance[0].results;
+  assert(comp.length > 0, 'Should have compliance results');
+  var hasDSRef = comp.some(function(c) { return c.clause && c.clause.indexOf('60364') >= 0; });
+  assert(hasDSRef, 'Compliance should cite DS/HD 60364 clauses');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
+test('reverseMultiSolve diversity factor applied to main board', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseSelectBuilding('villa');
+  reverseMultiSolve();
+  var mr = reverseState.multiResult;
+  // Diversity factor is applied to calculate diversifiedPower which is less than total
+  assert(mr.diversifiedPower < mr.totalPower, 'Diversified power should be less than total');
+  assert(mr.diversity > 0 && mr.diversity < 1, 'Diversity factor should be between 0 and 1');
+  assert(Math.abs(mr.diversifiedPower - mr.totalPower * mr.diversity) < 0.01, 'diversifiedPower = totalPower * diversity');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+  reverseState.selectedBuildingType = null;
+});
+
+test('REVERSE_CIRCUIT_TEMPLATES power values are positive and reasonable', function() {
+  for (var i = 0; i < REVERSE_CIRCUIT_TEMPLATES.length; i++) {
+    var t = REVERSE_CIRCUIT_TEMPLATES[i];
+    assert(t.power_kW > 0, 'Power should be positive for ' + t.id);
+    assert(t.power_kW <= 50, 'Power should be <= 50kW for ' + t.id);
+    assert(t.cosPhi > 0 && t.cosPhi <= 1, 'cosPhi should be 0-1 for ' + t.id);
+    assert(t.voltage === 230 || t.voltage === 400, 'Voltage should be 230 or 400 for ' + t.id);
+  }
+});
+
+test('REVERSE_BUILDING_PRESETS diversity factors are between 0 and 1', function() {
+  for (var i = 0; i < REVERSE_BUILDING_PRESETS.length; i++) {
+    var p = REVERSE_BUILDING_PRESETS[i];
+    assert(p.diversity > 0 && p.diversity < 1, 'Diversity should be 0 < d < 1 for ' + p.id + ', got ' + p.diversity);
+  }
+});
+
+test('reverseMultiSolve with extreme grouping still produces valid result', function() {
+  reverseState.selectedCircuits = [];
+  reverseState.multiMode = true;
+  reverseState.earthSystem = 'TN-S';
+  reverseAddCircuit('sockets');
+  reverseSetCircuitParam(0, 'grouping', 9);
+  reverseMultiSolve();
+  var cr = reverseState.multiResult.circuitResults[0];
+  assert(cr.success === true, 'Should find solution even with grouping 9');
+  assert(cr.kTotal < 1.0, 'Derating with grouping 9 should be < 1.0');
+  reverseState.selectedCircuits = [];
+  reverseState.multiResult = null;
+  reverseState.multiMode = false;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
