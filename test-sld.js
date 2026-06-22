@@ -14797,6 +14797,95 @@ test('relayState has curveType with default value of SI', function() {
   assert.strictEqual(relayState.curveType, 'SI', 'curveType should default to SI');
 });
 
+// === Live Installation Twin Enhanced Tests ===
+
+test('renderLiveInstallation in timelapse mode returns HTML with play/pause controls', function() {
+  liveState.mode = 'timelapse';
+  liveState.timelapseRunning = false;
+  liveState.timelapseHour = 8;
+  var html = renderLiveInstallation();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('liveStartTimelapse') > 0 || html.indexOf('liveStopTimelapse') > 0, 'Should have play/pause controls');
+  assert(html.indexOf('liveSetSpeed') > 0, 'Should have speed controls');
+  assert(html.indexOf('24') > 0 || html.indexOf('Load Profile') > 0 || html.indexOf('belastningsprofil') > 0, 'Should have 24h load profile bar chart');
+  assert(html.indexOf('Max temp') > 0 || html.indexOf('Maks temp') > 0, 'Should have max temperature indicator');
+  liveState.mode = 'live';
+});
+
+test('renderLiveInstallation in disasters mode returns all 4 disaster buttons', function() {
+  liveState.mode = 'disasters';
+  liveState.disasterScenario = null;
+  var html = renderLiveInstallation();
+  assert(html.indexOf('trafo_failure') > 0, 'Should have transformer failure button');
+  assert(html.indexOf('neutral_break') > 0, 'Should have neutral break button');
+  assert(html.indexOf('high_ambient') > 0, 'Should have high ambient button');
+  assert(html.indexOf('harmonic') > 0, 'Should have harmonic overload button');
+  liveState.mode = 'live';
+});
+
+test('renderLiveInstallation in fault mode returns fault injection text', function() {
+  liveState.mode = 'fault';
+  liveState.faultResult = null;
+  var html = renderLiveInstallation();
+  assert(html.indexOf('fault') > 0 || html.indexOf('Fejl') > 0, 'Should mention fault mode');
+  assert(html.indexOf('liveInjectFault') > 0, 'Should have click-to-inject fault handler on nodes');
+  liveState.mode = 'live';
+});
+
+test('liveRenderNodes with neutral_break disaster applies correct styling', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'neutral_break';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  // Check for disaster class on 1-phase nodes and voltage label
+  var has1Phase = false;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].phases === '1x230') has1Phase = true;
+  });
+  if (has1Phase) {
+    assert(svg.indexOf('live-disaster') > 0, 'Should have disaster class on 1-phase nodes');
+    assert(svg.indexOf('398V') > 0, 'Should show overvoltage label 398V');
+  } else {
+    assert(typeof svg === 'string', 'Should return string even without 1-phase nodes');
+  }
+  liveState.disasterScenario = null;
+});
+
+test('liveRenderNodes with high_ambient applies overload styling when derated Iz exceeded', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  liveState.disasterScenario = 'high_ambient';
+  var layout = liveRenderSvg(tree, 'disasters');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'disasters');
+  // Find a node where ib > iz*0.82 (derated)
+  var hasOverloaded = false;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    var n = tree.nodes[nid];
+    if (!n) return;
+    var nIb = n._ib || 0;
+    var nIz = (n.cable) ? (n.cable.iz || 100) : 100;
+    if (nIb > nIz * 0.82) hasOverloaded = true;
+  });
+  if (hasOverloaded) {
+    assert(svg.indexOf('live-thermal') > 0, 'Should have thermal class on overloaded nodes');
+    assert(svg.indexOf('0.82') > 0, 'Should show derating factor 0.82');
+  } else {
+    assert(typeof svg === 'string', 'Should return string even without overloaded nodes');
+  }
+  liveState.disasterScenario = null;
+});
+
+test('renderLiveInstallation includes statistics footer with node count and utilization', function() {
+  liveState.mode = 'live';
+  var html = renderLiveInstallation();
+  assert(html.indexOf('live-stats-footer') > 0, 'Should have statistics footer');
+  assert(html.indexOf('Total nodes') > 0 || html.indexOf('Noder i alt') > 0, 'Should show total node count');
+  assert(html.indexOf('Total load current') > 0 || html.indexOf('Total belastningsstroemme') > 0, 'Should show total load current');
+  assert(html.indexOf('Max utilization') > 0 || html.indexOf('Maks udnyttelsesgrad') > 0, 'Should show max utilization ratio');
+  assert(html.indexOf('Average power factor') > 0 || html.indexOf('Gennemsnitlig effektfaktor') > 0, 'Should show average power factor');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
