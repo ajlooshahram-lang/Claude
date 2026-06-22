@@ -1147,7 +1147,8 @@ const T = {
       elplan: 'Installationsplan',
       controlpanel: 'Styretavle',
       live: 'Levende Installation',
-      archive: 'Projektarkiv'
+      archive: 'Projektarkiv',
+      reverse: 'Omvendt Dim.'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1309,7 +1310,8 @@ const T = {
       elplan: 'Electrical Plan',
       controlpanel: 'Control Panel',
       live: 'Live Installation',
-      archive: 'Project Archive'
+      archive: 'Project Archive',
+      reverse: 'Reverse Engineering'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1463,7 +1465,8 @@ const T = {
       elplan: 'نقشه تاسیسات برقی',
       controlpanel: 'تابلوی کنترل',
       live: 'نمای زنده تاسیسات',
-      archive: 'آرشیو پروژه'
+      archive: 'آرشیو پروژه',
+      reverse: 'مهندسی معکوس'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -4884,6 +4887,36 @@ let sldTree = null;
 let sldSelectedId = null;
 let sldNextId = 1;
 
+// Reverse Engineering (Omvendt Dimensionering) state
+let reverseState = {
+  loadType: null,
+  power_kW: 3.45,
+  phases: '1x230',
+  voltage: 230,
+  installMethod: 'C',
+  ambientTemp: 30,
+  cableLength_m: 25,
+  grouping: 1,
+  earthSystem: 'TN-S',
+  cosPhi: 0.95,
+  cableMaterial: 'Cu',
+  protectionType: 'MCB',
+  result: null,
+  iterations: 0,
+  solverLog: []
+};
+
+var REVERSE_PRESETS = [
+  { name_da: 'EV 11kW', name_en: 'EV 11kW', power_kW: 11, cosPhi: 0.98, phases: '3x400' },
+  { name_da: 'EV 22kW', name_en: 'EV 22kW', power_kW: 22, cosPhi: 0.98, phases: '3x400' },
+  { name_da: 'Varmepumpe 8kW', name_en: 'Heat pump 8kW', power_kW: 8, cosPhi: 0.90, phases: '3x400' },
+  { name_da: 'Komfur 7.36kW', name_en: 'Cooker 7.36kW', power_kW: 7.36, cosPhi: 0.95, phases: '1x230' },
+  { name_da: 'Belysning 2.3kW', name_en: 'Lighting 2.3kW', power_kW: 2.3, cosPhi: 0.92, phases: '1x230' },
+  { name_da: 'Stikkontakt 3.45kW', name_en: 'Socket 3.45kW', power_kW: 3.45, cosPhi: 0.95, phases: '1x230' },
+  { name_da: 'Motor 5.5kW', name_en: 'Motor 5.5kW', power_kW: 5.5, cosPhi: 0.85, phases: '3x400' },
+  { name_da: 'Solceller 10kW', name_en: 'Solar 10kW', power_kW: 10, cosPhi: 1.0, phases: '3x400' }
+];
+
 // Live Installation Twin state
 let liveState = { mode: 'live', faultNodeId: null, faultResult: null, timelapseRunning: false, timelapseHour: 0, timelapseSpeed: 1, timelapseInterval: null, disasterScenario: null, selectedNodeId: null };
 
@@ -5451,7 +5484,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here', fa: '\u0627\u0632 \u0627\u06CC\u0646\u062C\u0627 \u0634\u0631\u0648\u0639 \u06A9\u0646\u06CC\u062F',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -7482,6 +7515,21 @@ function syncSharedQuantities(mod) {
         if (_pBoard && _pBoard.totalKw) SharedQuantities.set('load_power_kw', _pBoard.totalKw, 'panel');
       }
       break;
+    case 'reverse':
+      // Reverse engineering module pushes computed values
+      if (typeof reverseState !== 'undefined') {
+        SharedQuantities.set('load_power_kw', reverseState.power_kW, 'reverse');
+        SharedQuantities.set('cos_phi', reverseState.cosPhi, 'reverse');
+        SharedQuantities.set('voltage_phase', reverseState.phases === '3x400' ? 400 : 230, 'reverse');
+        if (reverseState.result && reverseState.result.selectedCable) {
+          SharedQuantities.set('cable_mm2', reverseState.result.selectedCable.mm2, 'reverse');
+        }
+        SharedQuantities.set('install_method', reverseState.installMethod, 'reverse');
+        SharedQuantities.set('ambient_temp', reverseState.ambientTemp, 'reverse');
+        SharedQuantities.set('cable_grouping', reverseState.grouping, 'reverse');
+        SharedQuantities.set('earth_system', reverseState.earthSystem, 'reverse');
+      }
+      break;
   }
 }
 
@@ -7577,6 +7625,7 @@ function renderModule(mod) {
     case 'controlpanel': content = renderControlPanel(); break;
     case 'archive': content = renderArchive(); break;
     case 'live': content = renderLiveInstallation(); break;
+    case 'reverse': content = renderReverse(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -11925,7 +11974,7 @@ var ARCHIVE_MODULE_KEYS = [
   'trefaseState', 'motorteoriState', 'relayState', 'faultState', 'dcState',
   'lysState', 'magnetState', 'kapacitorState', 'varmeState', 'dcmaskineState',
   'faktorState', 'analyzerState', 'bidState', 'examState', 'brainState',
-  'guideState', 'diversityState'
+  'guideState', 'diversityState', 'reverseState'
 ];
 
 // Restore archive from localStorage
@@ -34219,6 +34268,540 @@ function liveSetMode(mode) {
   }
   renderModule('live');
 }
+// ===== REVERSE ENGINEERING (OMVENDT DIMENSIONERING) MODULE =====
+// Auto-solver: given load parameters, find compliant cable + protection per DS/HD 60364
+
+function reverseSetPreset(idx) {
+  var p = REVERSE_PRESETS[idx];
+  if (!p) return;
+  reverseState.power_kW = p.power_kW;
+  reverseState.cosPhi = p.cosPhi;
+  reverseState.phases = p.phases;
+  reverseState.voltage = p.phases === '3x400' ? 400 : 230;
+  reverseState.loadType = p.name_en;
+  reverseState.result = null;
+  renderModule('reverse');
+}
+
+function reverseSetParam(key, val) {
+  reverseState[key] = val;
+  if (key === 'phases') {
+    reverseState.voltage = val === '3x400' ? 400 : 230;
+  }
+  reverseState.result = null;
+  renderModule('reverse');
+}
+
+function reverseEngineerSolve() {
+  var st = reverseState;
+  var log = [];
+  st.solverLog = log;
+  st.iterations = 0;
+
+  // Step a: Calculate design current IB
+  var P = st.power_kW * 1000;
+  var cos = st.cosPhi;
+  var IB;
+  if (st.phases === '3x400') {
+    IB = P / (Math.sqrt(3) * 400 * cos);
+  } else {
+    IB = P / (230 * cos);
+  }
+  log.push('IB = ' + IB.toFixed(2) + ' A');
+
+  // Step b: Derating factor
+  var kInstall = INSTALL_METHODS[st.installMethod] || 1.0;
+  var kTemp = TEMP_FACTORS[st.ambientTemp] || 1.0;
+  var kGroup = GROUP_FACTORS[st.grouping] || 1.0;
+  var kTotal = kInstall * kTemp * kGroup;
+  log.push('k = ' + kInstall.toFixed(2) + ' x ' + kTemp.toFixed(2) + ' x ' + kGroup.toFixed(2) + ' = ' + kTotal.toFixed(3));
+
+  // Step c: Select protection device (In >= IB)
+  var protDevice = null;
+  var protIn = 0;
+  var protCurve = 'B';
+
+  function selectProtection(minIn, prefType) {
+    if (prefType === 'MCB') {
+      var mcbs = PRODUCTS.mcbs.filter(function(m) { return m.rating >= minIn; });
+      mcbs.sort(function(a, b) { return a.rating - b.rating; });
+      if (mcbs.length > 0) { return { device: mcbs[0], In: mcbs[0].rating }; }
+    } else if (prefType === 'MCCB') {
+      for (var i = 0; i < PRODUCTS.mccbs.length; i++) {
+        var mccb = PRODUCTS.mccbs[i];
+        for (var j = 0; j < mccb.inOptions.length; j++) {
+          if (mccb.inOptions[j] >= minIn) {
+            return { device: mccb, In: mccb.inOptions[j] };
+          }
+        }
+      }
+    } else if (prefType === 'Fuse') {
+      var fuses = PRODUCTS.fuses.filter(function(f) { return f.rating >= minIn; });
+      fuses.sort(function(a, b) { return a.rating - b.rating; });
+      if (fuses.length > 0) { return { device: fuses[0], In: fuses[0].rating }; }
+    }
+    return null;
+  }
+  function selectCable(minIz, material) {
+    var cables = PRODUCTS.cables.filter(function(c) {
+      return c.material === material && c.iz * kTotal >= minIz;
+    });
+    cables.sort(function(a, b) { return a.iz - b.iz; });
+    return cables.length > 0 ? cables[0] : null;
+  }
+
+  // Initial selection
+  var prot = selectProtection(IB, st.protectionType);
+  if (!prot) {
+    // Try MCCB as fallback
+    prot = selectProtection(IB, 'MCCB');
+    if (!prot) {
+      st.result = { success: false, error: 'No protection device found for IB=' + IB.toFixed(1) + 'A' };
+      return;
+    }
+  }
+  protDevice = prot.device;
+  protIn = prot.In;
+  protCurve = protDevice.curve || 'C';
+  log.push('Initial protection: ' + (protDevice.model || protDevice.brand) + ' In=' + protIn + 'A');
+
+  // Select cable: Iz*k >= In (conservative: use In, not IB)
+  var cable = selectCable(protIn, st.cableMaterial);
+  if (!cable) {
+    st.result = { success: false, error: 'No cable found for Iz*k >= In=' + protIn + 'A (' + st.cableMaterial + ')' };
+    return;
+  }
+  log.push('Initial cable: ' + cable.model + ' ' + cable.mm2 + 'mm2, Iz=' + cable.iz + 'A');
+
+  // Iterative verification loop
+  var maxIter = 20;
+  var solved = false;
+  var compliance = [];
+  var vdrop = 0;
+  var ikData = { ikmax: 0, ikmin: 0, zs: 0, z1: 0 };
+  var tree = null;
+
+  for (var iter = 0; iter < maxIter; iter++) {
+    st.iterations = iter + 1;
+
+    // Build SLD tree for verification
+    var oldNextId = sldNextId;
+    tree = { nodes: {}, rootId: null };
+    var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 4 });
+    tree.nodes[trafo.id] = trafo;
+    tree.rootId = trafo.id;
+    var mainBoard = sldCreateNode('main_board', trafo.id, {
+      cable: PRODUCTS.cables.find(function(c){ return c.mm2 === 50 && c.material === 'Cu'; }),
+      protection: PRODUCTS.mccbs[0],
+      protectionIn: 100,
+      length_m: 10
+    });
+    tree.nodes[mainBoard.id] = mainBoard;
+    trafo.childIds.push(mainBoard.id);
+    var fc = sldCreateNode('final_circuit', mainBoard.id, {
+      power_kW: st.power_kW,
+      cosPhi: st.cosPhi,
+      phases: st.phases,
+      voltage: st.voltage,
+      cable: cable,
+      protection: protDevice,
+      protectionIn: protIn,
+      length_m: st.cableLength_m,
+      installMethod: st.installMethod,
+      temp: st.ambientTemp,
+      grouping: st.grouping
+    });
+    tree.nodes[fc.id] = fc;
+    mainBoard.childIds.push(fc.id);
+
+    sldPropagateAll(tree);
+    compliance = sldVerifyNode(tree, fc.id);
+    vdrop = sldCalcNodeVdrop(tree, fc.id);
+    ikData = sldCalcNodeIk(tree, fc.id);
+
+    // Check if all pass
+    var hasFailure = false;
+    for (var ci = 0; ci < compliance.length; ci++) {
+      if (compliance[ci].status === 'fail') { hasFailure = true; break; }
+    }
+
+    if (!hasFailure) {
+      solved = true;
+      log.push('Iteration ' + (iter + 1) + ': All checks pass');
+      break;
+    }
+    // Determine failure type and upsize
+    var failedRules = compliance.filter(function(c) { return c.status === 'fail'; });
+    var vdropFail = failedRules.some(function(c) { return c.rule.indexOf('Vdrop') >= 0; });
+    var ibInIzFail = failedRules.some(function(c) { return c.rule.indexOf('IB <= In <= Iz') >= 0; });
+    var icuFail = failedRules.some(function(c) { return c.rule.indexOf('Icu') >= 0; });
+    var zsFail = failedRules.some(function(c) { return c.rule.indexOf('Zs') >= 0; });
+
+    if (vdropFail || zsFail) {
+      // Upsize cable (lower impedance helps both Vdrop and Zs)
+      var biggerCables = PRODUCTS.cables.filter(function(c) {
+        return c.material === st.cableMaterial && c.mm2 > cable.mm2;
+      });
+      biggerCables.sort(function(a, b) { return a.mm2 - b.mm2; });
+      if (biggerCables.length > 0) {
+        cable = biggerCables[0];
+        log.push('Iteration ' + (iter + 1) + ': Upsize cable to ' + cable.mm2 + 'mm2 (Vdrop/Zs fix)');
+        continue;
+      }
+    }
+
+    if (ibInIzFail) {
+      // First try bigger cable
+      var biggerCables2 = PRODUCTS.cables.filter(function(c) {
+        return c.material === st.cableMaterial && c.mm2 > cable.mm2;
+      });
+      biggerCables2.sort(function(a, b) { return a.mm2 - b.mm2; });
+      if (biggerCables2.length > 0) {
+        cable = biggerCables2[0];
+        log.push('Iteration ' + (iter + 1) + ': Upsize cable to ' + cable.mm2 + 'mm2 (IB/In/Iz fix)');
+        continue;
+      }
+    }
+
+    if (icuFail) {
+      // Try higher Icu device: switch to iC60H or MCCB
+      if (st.protectionType === 'MCB') {
+        var higherIcu = PRODUCTS.mcbs.filter(function(m) {
+          return m.rating >= protIn && m.icu > (protDevice.icu || 0);
+        });
+        higherIcu.sort(function(a, b) { return a.icu - b.icu || a.rating - b.rating; });
+        if (higherIcu.length > 0) {
+          protDevice = higherIcu[0];
+          protIn = protDevice.rating;
+          log.push('Iteration ' + (iter + 1) + ': Upgrade to ' + protDevice.model + ' Icu=' + protDevice.icu + 'kA');
+          continue;
+        }
+        // Switch to MCCB
+        var mccbProt = selectProtection(protIn, 'MCCB');
+        if (mccbProt) {
+          protDevice = mccbProt.device;
+          protIn = mccbProt.In;
+          log.push('Iteration ' + (iter + 1) + ': Switch to MCCB ' + protDevice.model + ' In=' + protIn + 'A');
+          continue;
+        }
+      }
+    }
+
+    // Generic fallback: upsize cable
+    var fallbackCables = PRODUCTS.cables.filter(function(c) {
+      return c.material === st.cableMaterial && c.mm2 > cable.mm2;
+    });
+    fallbackCables.sort(function(a, b) { return a.mm2 - b.mm2; });
+    if (fallbackCables.length > 0) {
+      cable = fallbackCables[0];
+      log.push('Iteration ' + (iter + 1) + ': Fallback upsize cable to ' + cable.mm2 + 'mm2');
+    } else {
+      log.push('Iteration ' + (iter + 1) + ': Cannot resolve - no larger cables available');
+      break;
+    }
+  }
+
+  // Build BOM
+  var bom = reverseBuildBOM({
+    cable: cable,
+    cableLength_m: st.cableLength_m,
+    protDevice: protDevice,
+    protIn: protIn,
+    earthSystem: st.earthSystem,
+    phases: st.phases,
+    protIn: protIn
+  });
+
+  // Store result
+  var iz = cable.iz * kTotal;
+  st.result = {
+    success: solved,
+    selectedCable: cable,
+    selectedProtection: protDevice,
+    protectionIn: protIn,
+    IB: IB,
+    In: protIn,
+    Iz: iz,
+    IzRaw: cable.iz,
+    kTotal: kTotal,
+    vdrop: vdrop,
+    ikmax: ikData.ikmax,
+    ikmin: ikData.ikmin,
+    zs: ikData.zs,
+    compliance: compliance,
+    bom: bom,
+    tree: tree,
+    iterations: st.iterations,
+    log: log
+  };
+}
+function reverseBuildBOM(params) {
+  var bom = [];
+  // Cable
+  bom.push({
+    item: params.cable.model + ' ' + params.cable.mm2 + 'mm2 ' + params.cable.material,
+    qty: params.cableLength_m + ' m',
+    spec: 'Iz=' + params.cable.iz + 'A, R=' + params.cable.r + ' mohm/m',
+    productRef: params.cable.id,
+    clause: 'DS/HD 60364-5-52 cl. 523'
+  });
+  // Protection device
+  var protName = (params.protDevice.model || params.protDevice.brand) + ' ' + params.protIn + 'A';
+  if (params.protDevice.curve) protName += ' curve ' + params.protDevice.curve;
+  bom.push({
+    item: protName,
+    qty: '1',
+    spec: 'Icu=' + (params.protDevice.icu || 0) + 'kA',
+    productRef: params.protDevice.id,
+    clause: 'DS/HD 60364-4-43 cl. 433.1'
+  });
+  // RCD for TT system (mandatory per DS/HD 60364-4-41)
+  if (params.earthSystem === 'TT') {
+    var rcdPoles = params.phases === '3x400' ? '4P' : '2P';
+    var rcd = PRODUCTS.rcds.find(function(r) {
+      return r.poles === rcdPoles && r.rating >= params.protIn && r.sensitivity === 30;
+    });
+    if (!rcd) {
+      rcd = PRODUCTS.rcds.find(function(r) { return r.poles === rcdPoles && r.sensitivity === 30; });
+    }
+    bom.push({
+      item: rcd ? (rcd.brand + ' ' + rcd.model + ' ' + rcd.rating + 'A 30mA') : ('RCD ' + rcdPoles + ' 30mA'),
+      qty: '1',
+      spec: 'Type A, 30mA',
+      productRef: rcd ? rcd.id : 'RCD-required',
+      clause: 'DS/HD 60364-4-41 cl. 411.5 (TT system)'
+    });
+  }
+  return bom;
+}
+
+function renderReverseLiveTwin(result) {
+  if (!result || !result.tree) return '';
+  var w = 500, h = 220;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:100%;border:1px solid #444;border-radius:8px;background:#1a1a2e">';
+  // Transformer
+  svg += '<rect x="20" y="80" width="80" height="60" rx="6" fill="#2d2d44" stroke="#64b5f6" stroke-width="2"/>';
+  svg += '<text x="60" y="105" text-anchor="middle" fill="#90caf9" font-size="10">Transformer</text>';
+  svg += '<text x="60" y="125" text-anchor="middle" fill="#aaa" font-size="9">630 kVA</text>';
+  // Main Board
+  svg += '<line x1="100" y1="110" x2="160" y2="110" stroke="#64b5f6" stroke-width="2"/>';
+  svg += '<rect x="160" y="80" width="90" height="60" rx="6" fill="#2d2d44" stroke="#64b5f6" stroke-width="2"/>';
+  svg += '<text x="205" y="105" text-anchor="middle" fill="#90caf9" font-size="10">Main Board</text>';
+  svg += '<text x="205" y="125" text-anchor="middle" fill="#aaa" font-size="9">100A MCCB</text>';
+  // Final Circuit
+  var fcColor = result.success ? '#4caf50' : '#f44336';
+  svg += '<line x1="250" y1="110" x2="310" y2="110" stroke="' + fcColor + '" stroke-width="2"/>';
+  svg += '<rect x="310" y="60" width="160" height="100" rx="6" fill="#2d2d44" stroke="' + fcColor + '" stroke-width="2"/>';
+  svg += '<text x="390" y="82" text-anchor="middle" fill="' + fcColor + '" font-size="10" font-weight="bold">' + tx('Slutkreds', 'Final Circuit') + '</text>';
+  // Values on final circuit node
+  svg += '<text x="320" y="100" fill="#fff" font-size="9">IB = ' + result.IB.toFixed(1) + ' A</text>';
+  svg += '<text x="320" y="115" fill="#fff" font-size="9">In = ' + result.In + ' A</text>';
+  svg += '<text x="320" y="130" fill="#fff" font-size="9">Iz = ' + result.Iz.toFixed(1) + ' A (derated)</text>';
+  svg += '<text x="320" y="145" fill="#fff" font-size="9">Vdrop = ' + result.vdrop.toFixed(2) + ' %</text>';
+  svg += '<text x="320" y="160" fill="#fff" font-size="9">Ik = ' + (result.ikmax / 1000).toFixed(2) + ' kA</text>';
+  // Status indicator
+  var statusText = result.success ? tx('OK', 'PASS') : tx('FEJL', 'FAIL');
+  svg += '<circle cx="460" y="75" r="8" fill="' + fcColor + '"/>';
+  svg += '<text x="460" y="195" text-anchor="middle" fill="' + fcColor + '" font-size="11" font-weight="bold">' + statusText + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+function renderReverseBOM(bom) {
+  if (!bom || bom.length === 0) return '';
+  var html = '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Stykliste (BOM)', 'Bill of Materials') + '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.85em;color:#ddd">';
+  html += '<tr style="border-bottom:1px solid #555"><th style="text-align:left;padding:4px">' + tx('Komponent', 'Item') + '</th>';
+  html += '<th style="text-align:left;padding:4px">' + tx('Antal', 'Qty') + '</th>';
+  html += '<th style="text-align:left;padding:4px">' + tx('Specifikation', 'Specification') + '</th>';
+  html += '<th style="text-align:left;padding:4px">' + tx('Produkt', 'Product Ref') + '</th>';
+  html += '<th style="text-align:left;padding:4px">' + tx('Standard', 'Clause') + '</th></tr>';
+  for (var i = 0; i < bom.length; i++) {
+    var b = bom[i];
+    html += '<tr style="border-bottom:1px solid #333">';
+    html += '<td style="padding:4px">' + b.item + '</td>';
+    html += '<td style="padding:4px">' + b.qty + '</td>';
+    html += '<td style="padding:4px">' + b.spec + '</td>';
+    html += '<td style="padding:4px;font-size:0.8em;color:#888">' + b.productRef + '</td>';
+    html += '<td style="padding:4px;font-size:0.8em;color:#90caf9">' + b.clause + '</td>';
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+function renderReverseCompliance(results) {
+  if (!results || results.length === 0) return '';
+  // Sort: fails first, then warnings, then ok
+  var sorted = results.slice().sort(function(a, b) {
+    var order = { fail: 0, warning: 1, ok: 2 };
+    return (order[a.status] || 2) - (order[b.status] || 2);
+  });
+  var html = '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Compliance (DS/HD 60364)', 'Compliance (DS/HD 60364)') + '</div>';
+  for (var i = 0; i < sorted.length; i++) {
+    var c = sorted[i];
+    var icon = c.status === 'ok' ? '\u2705' : (c.status === 'warning' ? '\u26A0\uFE0F' : '\u274C');
+    var color = c.status === 'ok' ? '#4caf50' : (c.status === 'warning' ? '#ff9800' : '#f44336');
+    html += '<div style="padding:4px 0;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">';
+    html += '<span style="font-size:1.1em">' + icon + '</span>';
+    html += '<span style="color:' + color + ';font-weight:bold;min-width:160px">' + c.rule + '</span>';
+    html += '<span style="color:#888;font-size:0.85em;min-width:200px">' + c.clause + '</span>';
+    html += '<span style="color:#ddd;font-size:0.85em">' + c.detail + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+function renderReverse() {
+  var st = reverseState;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Omvendt Dimensionering', 'Reverse Engineering Mode') + '</div>';
+  html += '<p style="color:#aaa;margin:0 0 12px">' + tx('Angiv belastning og installationsforhold - systemet finder automatisk den mindste, sikre kombination af kabel og beskyttelse iht. DS/HD 60364.', 'Specify load and installation conditions - the system automatically finds the smallest safe cable and protection combination per DS/HD 60364.') + '</p>';
+
+  // Quick presets
+  html += '<div class="select-group"><div class="select-label">' + tx('Hurtige forudindstillinger', 'Quick Presets') + '</div><div class="select-grid">';
+  for (var i = 0; i < REVERSE_PRESETS.length; i++) {
+    var p = REVERSE_PRESETS[i];
+    var sel = (st.power_kW === p.power_kW && st.cosPhi === p.cosPhi && st.phases === p.phases) ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + '" onclick="reverseSetPreset(' + i + ')">' + tx(p.name_da, p.name_en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Phase selection
+  html += '<div class="select-group"><div class="select-label">' + tx('Faser / Spaending', 'Phases / Voltage') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (st.phases === '1x230' ? ' selected' : '') + '" onclick="reverseSetParam(\'phases\',\'1x230\')">1x230V</button>';
+  html += '<button class="sel-btn' + (st.phases === '3x400' ? ' selected' : '') + '" onclick="reverseSetParam(\'phases\',\'3x400\')">3x400V</button>';
+  html += '</div></div>';
+
+  // Power selection
+  var powers = [1, 1.5, 2, 2.3, 3, 3.45, 4, 5, 5.5, 6, 7, 7.36, 8, 10, 11, 15, 18.5, 22, 30, 37, 45, 50, 55, 75, 90, 100, 125, 150, 200, 250, 315, 400, 500];
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt (kW)', 'Power (kW)') + '</div><div class="select-grid">';
+  for (var pi = 0; pi < powers.length; pi++) {
+    var pw = powers[pi];
+    html += '<button class="sel-btn' + (st.power_kW === pw ? ' selected' : '') + '" onclick="reverseSetParam(\'power_kW\',' + pw + ')">' + pw + '</button>';
+  }
+  html += '</div></div>';
+
+  // cos phi
+  var cosPhis = [0.70, 0.75, 0.80, 0.85, 0.90, 0.92, 0.95, 0.98, 1.0];
+  html += '<div class="select-group"><div class="select-label">cos\u03C6</div><div class="select-grid">';
+  for (var ci = 0; ci < cosPhis.length; ci++) {
+    var cp = cosPhis[ci];
+    html += '<button class="sel-btn' + (st.cosPhi === cp ? ' selected' : '') + '" onclick="reverseSetParam(\'cosPhi\',' + cp + ')">' + cp.toFixed(2) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Cable material
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabelmateriale', 'Cable Material') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (st.cableMaterial === 'Cu' ? ' selected' : '') + '" onclick="reverseSetParam(\'cableMaterial\',\'Cu\')">Cu (' + tx('Kobber', 'Copper') + ')</button>';
+  html += '<button class="sel-btn' + (st.cableMaterial === 'Al' ? ' selected' : '') + '" onclick="reverseSetParam(\'cableMaterial\',\'Al\')">Al (' + tx('Aluminium', 'Aluminium') + ')</button>';
+  html += '</div></div>';
+
+  // Install method
+  var methods = ['A1','A2','B1','B2','C','D','D1','D2','E','F','G'];
+  var methodDescs = { A1: 'Enclosed in insulated wall', A2: 'Enclosed in conduit in wall', B1: 'Clipped direct', B2: 'In conduit on wall', C: 'On cable tray/surface', D: 'Direct in ground', D1: 'In duct in ground', D2: 'In buried conduit', E: 'Free air, spaced', F: 'Free air, touching', G: 'Wire-spaced, vertical' };
+  html += '<div class="select-group"><div class="select-label">' + tx('Installationsmetode (DS/HD 60364-5-52)', 'Install Method (DS/HD 60364-5-52)') + '</div><div class="select-grid">';
+  for (var mi = 0; mi < methods.length; mi++) {
+    var m = methods[mi];
+    html += '<button class="sel-btn' + (st.installMethod === m ? ' selected' : '') + '" onclick="reverseSetParam(\'installMethod\',\'' + m + '\')" title="' + (methodDescs[m] || m) + '">' + m + ' (' + INSTALL_METHODS[m] + ')</button>';
+  }
+  html += '</div></div>';
+  // Ambient temperature
+  var temps = [10, 15, 20, 25, 30, 35, 40, 45, 50];
+  html += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur', 'Ambient Temperature') + '</div><div class="select-grid">';
+  for (var ti = 0; ti < temps.length; ti++) {
+    var t = temps[ti];
+    html += '<button class="sel-btn' + (st.ambientTemp === t ? ' selected' : '') + '" onclick="reverseSetParam(\'ambientTemp\',' + t + ')">' + t + '\u00B0C (' + TEMP_FACTORS[t] + ')</button>';
+  }
+  html += '</div></div>';
+
+  // Cable length
+  var lengths = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 200];
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabelllaengde', 'Cable Length') + '</div><div class="select-grid">';
+  for (var li = 0; li < lengths.length; li++) {
+    var l = lengths[li];
+    html += '<button class="sel-btn' + (st.cableLength_m === l ? ' selected' : '') + '" onclick="reverseSetParam(\'cableLength_m\',' + l + ')">' + l + ' m</button>';
+  }
+  html += '</div></div>';
+
+  // Grouping
+  html += '<div class="select-group"><div class="select-label">' + tx('Gruppering (antal parallelle kabler)', 'Grouping (number of parallel cables)') + '</div><div class="select-grid">';
+  for (var gi = 1; gi <= 9; gi++) {
+    html += '<button class="sel-btn' + (st.grouping === gi ? ' selected' : '') + '" onclick="reverseSetParam(\'grouping\',' + gi + ')">' + gi + ' (' + GROUP_FACTORS[gi] + ')</button>';
+  }
+  html += '</div></div>';
+
+  // Earth system
+  html += '<div class="select-group"><div class="select-label">' + tx('Jordsystem', 'Earth System') + '</div><div class="select-grid">';
+  var earthSystems = ['TN-S', 'TN-C-S', 'TT', 'IT'];
+  for (var ei = 0; ei < earthSystems.length; ei++) {
+    var es = earthSystems[ei];
+    html += '<button class="sel-btn' + (st.earthSystem === es ? ' selected' : '') + '" onclick="reverseSetParam(\'earthSystem\',\'' + es + '\')">' + es + '</button>';
+  }
+  html += '</div></div>';
+
+  // Protection type
+  html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelsestype', 'Protection Type') + '</div><div class="select-grid">';
+  var protTypes = ['MCB', 'MCCB', 'Fuse'];
+  for (var pti = 0; pti < protTypes.length; pti++) {
+    var pt = protTypes[pti];
+    html += '<button class="sel-btn' + (st.protectionType === pt ? ' selected' : '') + '" onclick="reverseSetParam(\'protectionType\',\'' + pt + '\')">' + pt + '</button>';
+  }
+  html += '</div></div>';
+
+  // Solve button
+  html += '<div style="margin:16px 0;text-align:center"><button class="sel-btn selected" style="padding:12px 32px;font-size:1.1em" onclick="reverseEngineerSolve();renderModule(\'reverse\')">' + tx('Beregn optimal losning', 'Solve Optimal Design') + '</button></div>';
+
+  // Results section
+  if (st.result) {
+    var r = st.result;
+    if (r.success === false && r.error) {
+      html += '<div class="result-box" style="border-color:#f44336"><div class="result-title" style="color:#f44336">' + tx('Fejl', 'Error') + '</div>';
+      html += '<p style="color:#f44336">' + r.error + '</p></div>';
+    } else {
+      // Success header
+      var headerColor = r.success ? '#4caf50' : '#ff9800';
+      var headerText = r.success ? tx('Losning fundet', 'Solution Found') : tx('Delvis losning (kontroller manuelt)', 'Partial Solution (verify manually)');
+      html += '<div class="result-box" style="border-color:' + headerColor + '"><div class="result-title" style="color:' + headerColor + '">' + headerText + ' (' + r.iterations + ' ' + tx('iterationer', 'iterations') + ')</div>';
+
+      // Key values
+      html += '<div class="result-row"><span class="label">IB (' + tx('driftstroemme', 'design current') + ')</span><span class="value">' + r.IB.toFixed(2) + ' A</span></div>';
+      html += '<div class="result-row"><span class="label">In (' + tx('maerkestroemme', 'rated current') + ')</span><span class="value">' + r.In + ' A</span></div>';
+      html += '<div class="result-row"><span class="label">Iz (' + tx('stroembaereevne, derated', 'current capacity, derated') + ')</span><span class="value">' + r.Iz.toFixed(1) + ' A (raw: ' + r.IzRaw + ' A, k=' + r.kTotal.toFixed(3) + ')</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage drop') + '</span><span class="value">' + r.vdrop.toFixed(2) + ' % (max ' + DK_STANDARDS.vdropGeneral + '%)</span></div>';
+      html += '<div class="result-row"><span class="label">Ik,max</span><span class="value">' + (r.ikmax / 1000).toFixed(2) + ' kA</span></div>';
+      html += '<div class="result-row"><span class="label">Ik,min</span><span class="value">' + (r.ikmin / 1000).toFixed(2) + ' kA</span></div>';
+      html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + r.zs.toFixed(4) + ' \u03A9</span></div>';
+      // Selected components
+      html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + r.selectedCable.brand + ' ' + r.selectedCable.model + ' ' + r.selectedCable.mm2 + 'mm\u00B2 ' + r.selectedCable.material + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Beskyttelse', 'Protection') + '</span><span class="value">' + (r.selectedProtection.brand || '') + ' ' + (r.selectedProtection.model || '') + ' ' + r.protectionIn + 'A' + (r.selectedProtection.curve ? ' curve ' + r.selectedProtection.curve : '') + ' Icu=' + (r.selectedProtection.icu || 0) + 'kA</span></div>';
+      html += '</div>';
+
+      // Compliance results
+      html += renderReverseCompliance(r.compliance);
+
+      // BOM table
+      html += renderReverseBOM(r.bom);
+
+      // Live Twin SVG
+      html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Kredsdiagram', 'Circuit Diagram') + '</div>';
+      html += renderReverseLiveTwin(r);
+      html += '</div>';
+
+      // Solver log
+      if (r.log && r.log.length > 0) {
+        html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Solver-log', 'Solver Log') + '</div>';
+        html += '<div style="font-family:monospace;font-size:0.8em;color:#aaa;max-height:200px;overflow-y:auto">';
+        for (var li = 0; li < r.log.length; li++) {
+          html += '<div>' + r.log[li] + '</div>';
+        }
+        html += '</div></div>';
+      }
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function renderLiveInstallation() {
   var tree = sldTree || sldCreateTree();
   sldPropagateAll(tree);

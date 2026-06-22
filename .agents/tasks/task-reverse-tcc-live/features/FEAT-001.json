@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement Omvendt Dimensionering (Reverse Engineering Mode) - complete auto-solver with 100% click-only UI, iterative DS/HD 60364 validation, BOM generation, compliance report, and Live Twin SVG visualization. The module key 'reverse' is already registered in NAV_GROUPS (line 5457), translations (lines 1151/1314/1469), syncSharedQuantities (line 7488), and renderModule switch (line 7598). Only the implementation (reverseState + renderReverse + solver functions) is missing.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1: Define the reverseState global state object near other module states (around line 4891 near liveState). Fields: loadType (null), power_kW (3.45), phases ('1x230'), voltage (230), installMethod ('C'), ambientTemp (30), cableLength_m (25), grouping (1), earthSystem ('TN-S'), cosPhi (0.95), cableMaterial ('Cu'), protectionType ('MCB'), result (null), iterations (0), solverLog ([]). Also define load presets array with common loads.",
+    "Step 2: Implement reverseEngineerSolve() function. Algorithm: (a) Calc IB from power_kW/voltage/cosPhi/phases. (b) Select smallest protection device In >= IB from PRODUCTS (filter by protectionType). (c) Calc derating k = INSTALL_METHODS[method] * TEMP_FACTORS[temp] * GROUP_FACTORS[grouping]. (d) Select smallest cable where cable.iz * k >= In (filter by material). (e) Build sldTree: transformer -> main_board -> final_circuit with selected components. (f) Call sldPropagateAll. (g) Run sldVerifyNode to get compliance. (h) Check voltage drop <= 4% (DK_STANDARDS.vdropGeneral). (i) Check Zs*Ia <= U0. (j) Check Icu >= Ikmax. (k) If ANY check fails: upsize cable first, then protection, then try curve C, then MCCB. Max 20 iterations. (l) Store result object with all computed values, selected components, compliance results, BOM, optimization notes. Always err on safety side - pick larger component when ambiguous.",
+    "Step 3: Implement reverseBuildBOM(result) function. Generates array of {item, qty, spec, productRef, clause} from solved design. Include cable (with length), protection device, RCD if TT system. Reference actual PRODUCTS entries and DS/HD 60364 clauses.",
+    "Step 4: Implement renderReverse() function returning full click-only UI HTML. Structure: (a) Title card explaining the module. (b) Quick preset buttons for common loads (EV 11kW, EV 22kW, Heat pump 8kW, Cooker 7.36kW, Lighting 2.3kW, Socket 3.45kW, Motor 5.5kW, Solar 10kW) - clicking a preset sets power_kW, cosPhi, phases appropriately. (c) Parameter selection button grids: voltage (1x230 / 3x400), power (stepped values 1-500 kW), cosPhi (0.7-1.0), cable material (Cu/Al), install method (A1-G with DS/HD 60364-5-52 descriptions), ambient temp (10-50C), cable length (5-200m), grouping (1-9), earth system (TN-S/TN-C-S/TT/IT), protection type (MCB/MCCB/Fuse). (d) Action button calling reverseEngineerSolve(). (e) Results section (shown when result != null): compliance verdicts with color coding, selected components with clause references, Vdrop/Ik/Zs values, BOM table, solver iterations log, optimization notes. (f) Live Twin SVG of solved tree.",
+    "Step 5: Implement renderReverseLiveTwin(result) helper - SVG showing transformer -> board -> circuit with color-coded compliance status (green=ok, red=fail), key values on each node (IB, In, Iz, Vdrop, Ik). Use simple rects and lines similar to liveRenderSvg.",
+    "Step 6: Implement renderReverseBOM(bom) helper - HTML table rendering the BOM. Columns: Item, Qty, Specification, Product Ref, DS/HD 60364 Clause.",
+    "Step 7: Implement renderReverseCompliance(results) helper - renders compliance verdicts grouped by status (fails first, then ok). Each shows: rule, clause, status icon, detail string.",
+    "Step 8: Wire up archiveAutoSave integration - reverseState should be included in the archive module states collection (archiveCollectModuleStates around line 11983). Add 'reverseState' to the list.",
+    "Step 9: Add comprehensive tests to test-sld.js (insert before the Summary section). At least 20 tests covering: reverseState exists, reverseEngineerSolve with simple 3.45kW load (IB<=In<=Iz), high power 50kW (selects large cable), long cable 200m (upsizes for Vdrop), high ambient 50C (applies derating), high grouping 6 (applies derating), TT earth system (adds RCD to BOM), Cu vs Al material selection, MCB vs MCCB vs Fuse protection types, BOM structure validation, compliance all-pass for standard scenario, renderReverse returns HTML string, preset buttons exist in output, edge cases (1kW minimum, 500kW maximum), solver iteration limit (max 20), earth system affects Zs calculation."
+  ],
+  "acceptance_criteria": [
+    "renderReverse() exists and returns HTML string with click-only controls (no <input type=text>)",
+    "reverseEngineerSolve() correctly calculates IB and selects compliant components",
+    "Solver iterates and upsizes when DS/HD 60364 checks fail - always conservative",
+    "BOM includes cable + protection + RCD (for TT) with product references and clause citations",
+    "Live Twin SVG renders the solved topology with compliance color coding",
+    "SharedQuantities integration works (already wired at line 7488)",
+    "archiveAutoSave includes reverseState",
+    "All existing 1598 tests pass plus at least 20 new reverse tests pass",
+    "Every compliance verdict cites a specific DS/HD 60364 clause",
+    "node test-sld.js exits with 0 failures"
+  ],
+  "verification": [
+    "Run: node test-sld.js - expect 0 failures, at least 1618 total passing",
+    "Run: node --check el-dimensionering.html - expect no syntax errors"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
