@@ -1148,7 +1148,10 @@ const T = {
       controlpanel: 'Styretavle',
       live: 'Levende Installation',
       archive: 'Projektarkiv',
-      reverse: 'Omvendt Dim.'
+      reverse: 'Omvendt Dim.',
+      selmatrix: 'Selektivitetsmatrix',
+      autocoord: 'Auto-koordinering',
+      powerflow: 'Effektflow'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1311,7 +1314,10 @@ const T = {
       controlpanel: 'Control Panel',
       live: 'Live Installation',
       archive: 'Project Archive',
-      reverse: 'Reverse Engineering'
+      reverse: 'Reverse Engineering',
+      selmatrix: 'Selectivity Matrix',
+      autocoord: 'Auto Coordination',
+      powerflow: 'Power Flow'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1466,7 +1472,10 @@ const T = {
       controlpanel: 'تابلوی کنترل',
       live: 'نمای زنده تاسیسات',
       archive: 'آرشیو پروژه',
-      reverse: 'مهندسی معکوس'
+      reverse: 'مهندسی معکوس',
+      selmatrix: 'ماتریس گزینش‌پذیری',
+      autocoord: 'هماهنگی خودکار',
+      powerflow: 'جریان توان'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -4961,7 +4970,9 @@ let reverseState = {
   selectedCircuits: [],
   multiResult: null,
   multiSolverLog: [],
-  multiOptimizations: []
+  multiOptimizations: [],
+  diversityOverrides: {},
+  reportVisible: false
 };
 
 var REVERSE_PRESETS = [
@@ -5001,6 +5012,15 @@ var REVERSE_BUILDING_PRESETS = [
 
 // Live Installation Twin state
 let liveState = { mode: 'live', faultNodeId: null, faultResult: null, timelapseRunning: false, timelapseHour: 0, timelapseSpeed: 1, timelapseInterval: null, disasterScenario: null, selectedNodeId: null };
+
+// Selectivity Matrix state
+let selMatrixState = { selectedPair: null, faultMult: 1.0 };
+
+// Auto Coordination Optimizer state
+let autoCoordState = { solutions: null, applied: null };
+
+// Power Flow Animation state
+let powerFlowState = { mode: 'normal', selectedCable: null, animSpeed: 1 };
 
 function sldCreateNode(type, parentId, overrides) {
   const id = 'node_' + (sldNextId++);
@@ -5580,7 +5600,7 @@ const NAV_GROUPS = [
     da: 'Beskyttelse & jording', en: 'Protection & earthing', fa: '\u062D\u0641\u0627\u0638\u062A \u0648 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
     descDa: 'Hvordan mennesker og udstyr beskyttes mod st\u00F8d, overspaending og lysbue \u2014 og s\u00E6rlige omr\u00E5der med skrappere krav (bad, pool, byggeplads, landbrug, Ex).',
     descEn: 'How people and equipment are protected from shock, surges and arc flash \u2014 plus special locations with stricter rules (bathroom, pool, site, agriculture, Ex).',
-    keys: ['relay', 'fault', 'earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex']
+    keys: ['relay', 'fault', 'earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex', 'selmatrix', 'autocoord']
   },
   {
     id: 'apps', icon: '\uD83D\uDD0C',
@@ -5594,7 +5614,7 @@ const NAV_GROUPS = [
     da: 'Str\u00F8mkvalitet & termisk', en: 'Power quality & thermal', fa: '\u06A9\u06CC\u0641\u06CC\u062A \u062A\u0648\u0627\u0646 \u0648 \u062D\u0631\u0627\u0631\u062A\u06CC',
     descDa: 'Det der p\u00E5virker kvalitet og levetid: harmoniske, effektfaktor, n\u00F8dstr\u00F8m, varme i kablet og EMC.',
     descEn: 'What affects quality and lifetime: harmonics, power factor, backup supply, cable heating and EMC.',
-    keys: ['harmonic', 'pfc', 'ups', 'thermal', 'cablelife', 'emc', 'energy']
+    keys: ['harmonic', 'pfc', 'ups', 'thermal', 'cablelife', 'emc', 'energy', 'powerflow']
   },
   {
     id: 'layout', icon: '\uD83D\uDCD0',
@@ -7248,6 +7268,55 @@ function renderCascadeTCC() {
       html += '<tr><td>' + to.name + '</td><td>' + to.In + '</td><td>' + (to.trips ? to.tMax.toFixed(3) : '-') + '</td><td>' + (toI2t ? tccFormatI2t(toI2t.total) : '-') + '</td><td>' + (to.trips ? 'Yes' : 'No') + '</td></tr>';
     }
     html += '</table>';
+
+    // I2t Energy Let-Through Comparison Table (DS/HD 60364-4-43 cl.434.5.2)
+    var ikNode = sldCalcNodeIk(tree, tccState.selectedNodeId);
+    var ikMinVal = ikNode.ikmin || cursorCurrent * 0.3;
+    var ikMaxVal = ikNode.ikmax || cursorCurrent;
+    var cableK = cable ? tccGetCableK(cable) : 143;
+    var cableS = cable ? cable.mm2 : 0;
+    var k2s2Val = cableK * cableK * cableS * cableS;
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('I\u00B2t Energi-gennemslipstabel', 'I\u00B2t Energy Let-Through Comparison Table') + ' - DS/HD 60364-4-43 cl.434.5.2</div>';
+    html += '<table class="result-table"><tr><th>' + tx('Enhed','Device') + '</th><th>In [A]</th><th>I\u00B2t @ Ik,min</th><th>I\u00B2t @ Ik,max</th><th>k\u00B2S\u00B2</th><th>' + tx('Udnyttelse','Utilization') + '</th><th>' + tx('Status','Status') + '</th></tr>';
+    var allProtected = true;
+    for (var ei = 0; ei < devices.length; ei++) {
+      var eDev = devices[ei];
+      var eI2tMin = tccCalcI2t(eDev.device, eDev.In, ikMinVal);
+      var eI2tMax = tccCalcI2t(eDev.device, eDev.In, ikMaxVal);
+      var eRatio = (k2s2Val > 0 && eI2tMax.total > 0) ? (eI2tMax.total / k2s2Val * 100) : 0;
+      var eProtected = (k2s2Val > 0) ? (eI2tMax.total <= k2s2Val) : true;
+      if (!eProtected) allProtected = false;
+      var eStatusColor = eProtected ? '#16a34a' : '#dc2626';
+      var eStatusText = eProtected ? tx('OK','OK') : tx('FARE','DANGER');
+      html += '<tr><td>' + eDev.name + '</td><td>' + eDev.In + '</td>';
+      html += '<td>' + tccFormatI2t(eI2tMin.total) + '</td>';
+      html += '<td>' + tccFormatI2t(eI2tMax.total) + '</td>';
+      html += '<td>' + (k2s2Val > 0 ? tccFormatI2t(k2s2Val) : '-') + '</td>';
+      html += '<td>' + (k2s2Val > 0 ? eRatio.toFixed(1) + '%' : '-') + '</td>';
+      html += '<td style="color:' + eStatusColor + ';font-weight:bold">' + eStatusText + '</td></tr>';
+    }
+    // Summary row
+    var summaryColor = allProtected ? '#16a34a' : '#dc2626';
+    var summaryText = allProtected ? tx('Alle enheder beskytter kablen','All devices protect the cable') : tx('ADVARSEL: Kabel ikke beskyttet af alle enheder','WARNING: Cable not protected by all devices');
+    html += '<tr style="border-top:2px solid ' + summaryColor + '"><td colspan="7" style="color:' + summaryColor + ';font-weight:bold;text-align:center">' + summaryText + '</td></tr>';
+    html += '</table></div>';
+
+    // Non-selective pair highlighting
+    var selAnalysis = sldSelectivityAnalysis(tree);
+    var nonSelectivePairs = selAnalysis.filter(function(p) { return p.verdict !== 'full'; });
+    if (nonSelectivePairs.length > 0) {
+      html += '<div class="result-box" style="margin-top:12px;border-left:3px solid #dc2626"><div class="result-title" style="color:#dc2626">' + tx('Ikke-selektive par','Non-Selective Pairs') + ' - DS/HD 60364-5-53 cl.536.4</div>';
+      for (var nsi = 0; nsi < nonSelectivePairs.length; nsi++) {
+        var nsp = nonSelectivePairs[nsi];
+        var nspColor = nsp.verdict === 'partial' ? '#b8860b' : '#dc2626';
+        var nspVerdict = nsp.verdict === 'partial' ? tx('Delvis','Partial') : tx('Ingen','None');
+        html += '<div class="result-row"><span class="label" style="color:' + nspColor + '">' + nsp.upstreamName + ' \u2192 ' + nsp.downstreamName + '</span><span class="value" style="color:' + nspColor + '">' + nspVerdict;
+        if (nsp.limitCurrent) html += ' (Is=' + (nsp.limitCurrent >= 1000 ? (nsp.limitCurrent / 1000).toFixed(1) + 'kA' : nsp.limitCurrent.toFixed(0) + 'A') + ')';
+        html += '</span></div>';
+      }
+      html += '</div>';
+    }
+
     html += '<div class="result-box"><div class="result-title">' + tx('Koordineringsmargin','Grading Margin') + ' - DS/HD 60364-5-53 cl.536.4</div>';
     html += '<div class="result-row"><span class="label">' + tx('Selektivitet','Selectivity') + '</span><span class="value">' + (chartResult.selective ? tx('Selektiv','Selective') : tx('Ikke-selektiv','Non-selective')) + '</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Margin','Margin') + '</span><span class="value">' + chartResult.marginMs.toFixed(0) + ' ms</span></div>';
@@ -7947,6 +8016,9 @@ function renderModule(mod) {
     case 'archive': content = renderArchive(); break;
     case 'live': content = renderLiveInstallation(); break;
     case 'reverse': content = renderReverse(); break;
+    case 'selmatrix': content = renderSelMatrix(); break;
+    case 'autocoord': content = renderAutoCoord(); break;
+    case 'powerflow': content = renderPowerFlow(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -14283,6 +14355,216 @@ function sldVerifySelectivityAll(tree) {
     }
   });
   return results;
+}
+
+// --- Full Selective Coordination Analysis Engine ---
+// sldSelectivityAnalysis(tree): Identifies ALL protection device pairs in series
+// and performs comprehensive selectivity analysis per DS/HD 60364-5-53 cl.536.4
+// and IEC 60947-2 Annex A.
+var _selectivityStatus = null;
+var _selectivityPairs = [];
+
+function sldSelectivityAnalysis(tree) {
+  if (!tree || !tree.rootId) return [];
+  sldPropagateAll(tree);
+  var results = [];
+  var nodeIds = Object.keys(tree.nodes);
+
+  for (var ni = 0; ni < nodeIds.length; ni++) {
+    var nodeId = nodeIds[ni];
+    var node = tree.nodes[nodeId];
+    if (!node || node.type === 'transformer' || !node.parentId) continue;
+    if (!node.protection) continue;
+
+    // Walk up the path to find ALL upstream protection devices (not just immediate parent)
+    var path = sldGetPath(tree, nodeId);
+    var dsIn = node.protectionIn || (node.protection ? node.protection.rating : 0);
+    if (!dsIn) continue;
+
+    for (var pi = 0; pi < path.length - 1; pi++) {
+      var upId = path[pi];
+      if (upId === nodeId) continue;
+      var upNode = tree.nodes[upId];
+      if (!upNode || !upNode.protection || upNode.type === 'transformer') continue;
+      var usIn = upNode.protectionIn || (upNode.protection ? upNode.protection.rating : 0);
+      if (!usIn) continue;
+
+      // Calculate fault current range at downstream device location
+      var ikData = sldCalcNodeIk(tree, nodeId);
+      var ikmin = ikData.ikmin || 0;
+      var ikmax = ikData.ikmax || 0;
+
+      // Get trip times at both Ik,min and Ik,max for both devices
+      var dsTripAtIkmin = sldGetTripTime(node.protection, dsIn, ikmin, null);
+      var dsTripAtIkmax = sldGetTripTime(node.protection, dsIn, ikmax, null);
+      var usTripAtIkmin = sldGetTripTime(upNode.protection, usIn, ikmin, null);
+      var usTripAtIkmax = sldGetTripTime(upNode.protection, usIn, ikmax, null);
+
+      // Calculate I2t values
+      var dsI2tAtIkmin = tccCalcI2t(node.protection, dsIn, ikmin);
+      var dsI2tAtIkmax = tccCalcI2t(node.protection, dsIn, ikmax);
+      var usI2tAtIkmin = tccCalcI2t(upNode.protection, usIn, ikmin);
+      var usI2tAtIkmax = tccCalcI2t(upNode.protection, usIn, ikmax);
+
+      // Time margin at Ik,max (must be > 0 for full selectivity)
+      var marginMs = 0;
+      if (usTripAtIkmax !== Infinity && dsTripAtIkmax !== Infinity && dsTripAtIkmax > 0) {
+        marginMs = (usTripAtIkmax - dsTripAtIkmax) * 1000;
+      } else if (usTripAtIkmax === Infinity && dsTripAtIkmax !== Infinity) {
+        marginMs = 9999; // Upstream does not trip = fully selective
+      }
+
+      // Determine selectivity across the entire fault current range
+      var selective = false;
+      var verdict = 'none';
+      var limitCurrent = null;
+
+      // Check if downstream always trips before upstream across the range
+      var dsTripsFirst = true;
+      var partialLimit = null;
+      var testCurrents = [];
+      if (ikmin > 0 && ikmax > 0) {
+        // Test at logarithmic intervals through the fault current range
+        var logMin = Math.log10(Math.max(ikmin, 10));
+        var logMax = Math.log10(Math.max(ikmax, 100));
+        for (var si = 0; si <= 10; si++) {
+          testCurrents.push(Math.pow(10, logMin + (logMax - logMin) * si / 10));
+        }
+      } else if (ikmax > 0) {
+        testCurrents = [ikmax * 0.2, ikmax * 0.5, ikmax * 0.8, ikmax];
+      }
+
+      for (var ti = 0; ti < testCurrents.length; ti++) {
+        var testI = testCurrents[ti];
+        var dsTime = sldGetTripTime(node.protection, dsIn, testI, null);
+        var usTime = sldGetTripTime(upNode.protection, usIn, testI, null);
+        if (dsTime === Infinity && usTime === Infinity) continue; // Neither trips
+        if (dsTime === Infinity) { dsTripsFirst = false; break; } // DS doesn't trip but US would
+        if (usTime === Infinity) continue; // US doesn't trip = selective at this point
+        if (dsTime >= usTime) {
+          dsTripsFirst = false;
+          if (!partialLimit) partialLimit = testI;
+          break;
+        }
+      }
+
+      // I2t back-up protection ratio (IEC 60947-2 Annex A)
+      var i2tRatio = 0;
+      if (usI2tAtIkmax.total > 0 && dsI2tAtIkmax.total > 0) {
+        i2tRatio = dsI2tAtIkmax.total / usI2tAtIkmax.total;
+      }
+
+      if (dsTripsFirst && marginMs > 0) {
+        verdict = 'full';
+        selective = true;
+      } else if (dsTripsFirst && marginMs <= 0 && marginMs > -50) {
+        // Very close margin - partial
+        verdict = 'partial';
+        limitCurrent = ikmax * 0.9;
+      } else if (partialLimit) {
+        verdict = 'partial';
+        limitCurrent = partialLimit;
+      } else {
+        verdict = 'none';
+        limitCurrent = ikmin > 0 ? ikmin : null;
+      }
+
+      // Also check using existing sldAnalyzeSelectivity for the immediate pair
+      if (node.parentId === upId) {
+        var existingResult = sldAnalyzeSelectivity(tree, nodeId);
+        if (existingResult) {
+          // Use existing analysis verdict if it is more conservative
+          if (existingResult.verdict === 'none' && verdict !== 'none') {
+            verdict = 'none';
+            selective = false;
+          }
+          if (existingResult.verdict === 'partial' && verdict === 'full') {
+            verdict = 'partial';
+            selective = false;
+            limitCurrent = existingResult.limitCurrent || limitCurrent;
+          }
+          if (existingResult.limitCurrent && !limitCurrent) {
+            limitCurrent = existingResult.limitCurrent;
+          }
+        }
+      }
+
+      results.push({
+        upstream: upId,
+        downstream: nodeId,
+        upstreamName: sldNodeName(upNode),
+        downstreamName: sldNodeName(node),
+        upstreamIn: usIn,
+        downstreamIn: dsIn,
+        selective: selective,
+        limitCurrent: limitCurrent,
+        margin_ms: marginMs,
+        i2tRatio: i2tRatio,
+        ikmin: ikmin,
+        ikmax: ikmax,
+        verdict: verdict,
+        clause: 'DS/HD 60364-5-53 cl.536.4'
+      });
+    }
+  }
+
+  // Update shared selectivity state
+  _selectivityPairs = results;
+  var hasNone = results.some(function(r) { return r.verdict === 'none'; });
+  var hasPartial = results.some(function(r) { return r.verdict === 'partial'; });
+  if (hasNone) {
+    _selectivityStatus = 'fail';
+  } else if (hasPartial) {
+    _selectivityStatus = 'warning';
+  } else if (results.length > 0) {
+    _selectivityStatus = 'ok';
+  } else {
+    _selectivityStatus = null;
+  }
+
+  return results;
+}
+
+// Helper: Get fix suggestions for non-selective pairs
+function sldSelectivityFixSuggestions(pair, tree) {
+  var suggestions = [];
+  if (!pair || pair.verdict === 'full') return suggestions;
+  var upNode = tree ? tree.nodes[pair.upstream] : null;
+  var downNode = tree ? tree.nodes[pair.downstream] : null;
+
+  // Suggestion 1: Increase upstream time delay (if adjustable MCCB/relay)
+  if (upNode && upNode.protection && (upNode.protection.frame || upNode.protection.inOptions)) {
+    suggestions.push({
+      da: 'Oeg korttidsforsinkelsen paa opstroemsenhed (' + pair.upstreamName + ') til mindst 100ms for tidsgradering',
+      en: 'Increase short-time delay on upstream device (' + pair.upstreamName + ') to at least 100ms for time-grading'
+    });
+  }
+
+  // Suggestion 2: Replace downstream with current-limiting device
+  if (downNode && downNode.protection && !downNode.protection.i5s) {
+    suggestions.push({
+      da: 'Erstat nedstroemsenhed med stroembegraensende sikring (gG) for bedre I2t-koordinering',
+      en: 'Replace downstream device with current-limiting fuse (gG) for better I2t coordination'
+    });
+  }
+
+  // Suggestion 3: Use cascading/back-up coordination
+  if (pair.i2tRatio > 0 && pair.i2tRatio < 1) {
+    suggestions.push({
+      da: 'Anvend kaskadekoordinering (back-up beskyttelse) iht. fabrikantens tabeller og IEC 60947-2 Annex A',
+      en: 'Use cascading coordination (back-up protection) per manufacturer tables and IEC 60947-2 Annex A'
+    });
+  }
+
+  // Suggestion 4: Upsize upstream device
+  if (pair.upstreamIn && pair.downstreamIn && pair.upstreamIn / pair.downstreamIn < 2) {
+    suggestions.push({
+      da: 'Oeg opstroemsenhedens maerkestroemforhold (anbefalet >= 2:1, nuvaerende: ' + (pair.upstreamIn / pair.downstreamIn).toFixed(1) + ':1)',
+      en: 'Increase upstream device rating ratio (recommended >= 2:1, current: ' + (pair.upstreamIn / pair.downstreamIn).toFixed(1) + ':1)'
+    });
+  }
+
+  return suggestions;
 }
 
 // --- PHASE 3: Fault Simulation Engine ---
@@ -20796,6 +21078,65 @@ function renderDiscrim() {
     analysis.recommendation;
   html += renderVerdict(safe, verdictText);
   html += '</div>';
+
+  // === Enhanced Discrimination: Full Installation Selectivity Matrix ===
+  var tree = typeof sldCreateTree === 'function' ? sldCreateTree() : null;
+  if (tree) {
+    sldPropagateAll(tree);
+    var selPairs = sldSelectivityAnalysis(tree);
+    if (selPairs.length > 0) {
+      html += '<div class="card fade-in">';
+      html += '<div class="card-title">' + tx('Installationens Selektivitetsmatrix', 'Installation Selectivity Matrix') + '</div>';
+      html += '<div class="info-row">' + tx('Alle beskyttelsesenhedspar i serie analyseret iht. DS/HD 60364-5-53 cl.536.4 og IEC 60947-2 Annex A', 'All protection device pairs in series analyzed per DS/HD 60364-5-53 cl.536.4 and IEC 60947-2 Annex A') + '</div>';
+
+      // Color-coded matrix table
+      html += '<table class="result-table selectivity-matrix"><tr><th>' + tx('Opstr.', 'Upstream') + '</th><th>' + tx('Nedstr.', 'Downstream') + '</th><th>' + tx('Dom', 'Verdict') + '</th><th>' + tx('Graense Is', 'Limit Is') + '</th><th>' + tx('Margin', 'Margin') + '</th><th>I\u00B2t ' + tx('Forhold', 'Ratio') + '</th></tr>';
+      for (var mi = 0; mi < selPairs.length; mi++) {
+        var mp = selPairs[mi];
+        var mColor = mp.verdict === 'full' ? '#16a34a' : (mp.verdict === 'partial' ? '#b8860b' : '#dc2626');
+        var mVerdictText = mp.verdict === 'full' ? tx('Fuld', 'Full') : (mp.verdict === 'partial' ? tx('Delvis', 'Partial') : tx('Ingen', 'None'));
+        var mIsText = mp.limitCurrent ? (mp.limitCurrent >= 1000 ? (mp.limitCurrent / 1000).toFixed(1) + ' kA' : mp.limitCurrent.toFixed(0) + ' A') : '-';
+        var mMarginText = mp.margin_ms > 0 ? mp.margin_ms.toFixed(0) + ' ms' : (mp.margin_ms === 0 ? '0 ms' : '-');
+        var mRatioText = mp.i2tRatio > 0 ? (mp.i2tRatio * 100).toFixed(1) + '%' : '-';
+        html += '<tr style="border-left:3px solid ' + mColor + '">';
+        html += '<td>' + mp.upstreamName + ' (' + mp.upstreamIn + 'A)</td>';
+        html += '<td>' + mp.downstreamName + ' (' + mp.downstreamIn + 'A)</td>';
+        html += '<td style="color:' + mColor + ';font-weight:bold">' + mVerdictText + '</td>';
+        html += '<td>' + mIsText + '</td>';
+        html += '<td>' + mMarginText + '</td>';
+        html += '<td>' + mRatioText + '</td></tr>';
+      }
+      html += '</table>';
+
+      // Fix suggestions section for non-selective pairs
+      var nonSelective = selPairs.filter(function(p) { return p.verdict !== 'full'; });
+      if (nonSelective.length > 0) {
+        html += '<div class="result-box" style="margin-top:12px;border-left:3px solid #b8860b"><div class="result-title">' + tx('Forbedringsforslag', 'Fix Suggestions') + '</div>';
+        for (var fsi = 0; fsi < nonSelective.length; fsi++) {
+          var fsPair = nonSelective[fsi];
+          var suggestions = sldSelectivityFixSuggestions(fsPair, tree);
+          if (suggestions.length > 0) {
+            html += '<div style="margin:8px 0;padding:6px;border-radius:4px;background:var(--bg-secondary,#f9f9f9)">';
+            html += '<div style="font-weight:bold;margin-bottom:4px">' + fsPair.upstreamName + ' \u2192 ' + fsPair.downstreamName + ':</div>';
+            for (var sgi = 0; sgi < suggestions.length; sgi++) {
+              html += '<div style="margin-left:12px;font-size:0.9em">\u2022 ' + tx(suggestions[sgi].da, suggestions[sgi].en) + '</div>';
+            }
+            html += '</div>';
+          }
+        }
+        html += '</div>';
+      }
+
+      // Overall status summary
+      var overallOk = nonSelective.length === 0;
+      html += '<div class="result-box" style="margin-top:8px">';
+      html += '<div class="result-row"><span class="label">' + tx('Samlet status', 'Overall Status') + '</span><span class="value" style="color:' + (overallOk ? '#16a34a' : '#dc2626') + ';font-weight:bold">' + (overallOk ? tx('Fuld selektivitet i hele installationen', 'Full selectivity throughout installation') : tx('Selektivitetsproblemer fundet - se forslag ovenfor', 'Selectivity issues found - see suggestions above')) + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-5-53 cl.536.4, IEC 60947-2 Annex A</span></div>';
+      html += '</div>';
+      html += '</div>';
+    }
+  }
+
   return html;
 }
 // ===== EARTHING SYSTEM MODULE =====
@@ -34661,6 +35002,22 @@ function liveRenderConnections(tree, positions, nodeW, nodeH, mode) {
           svg += '<text x="' + (barX + barW + 2) + '" y="' + (barY + barH / 2 + 2) + '" font-size="4.5" fill="' + barColor + '">' + thermalPct.toFixed(0) + '%</text>';
         }
       }
+      // Selectivity warning indicator on non-selective connections
+      if (_selectivityPairs && _selectivityPairs.length > 0) {
+        var selWarn = null;
+        for (var swi = 0; swi < _selectivityPairs.length; swi++) {
+          if (_selectivityPairs[swi].upstream === id && _selectivityPairs[swi].downstream === cid && _selectivityPairs[swi].verdict !== 'full') {
+            selWarn = _selectivityPairs[swi]; break;
+          }
+        }
+        if (selWarn) {
+          var swColor = selWarn.verdict === 'partial' ? '#b8860b' : '#dc2626';
+          var swX = midX - 10;
+          var swY = midY + 5;
+          svg += '<circle cx="' + swX + '" cy="' + swY + '" r="5" fill="' + swColor + '" opacity="0.9" class="live-selectivity-warn"/>';
+          svg += '<text x="' + swX + '" y="' + (swY + 2.5) + '" font-size="6" fill="#fff" text-anchor="middle" font-weight="bold">!</text>';
+        }
+      }
     });
   });
   return svg;
@@ -35357,6 +35714,90 @@ function reverseSelectBuilding(presetId) {
   renderModule('reverse');
 }
 
+// DS/HD 60364-5-52 Table G.1 Diversity (Simultaneity) Factors
+// Returns per-type diversity factors based on circuit counts and types
+function reverseCalcDiversityFactors(circuits) {
+  // Count circuits by type category
+  var counts = { lighting: 0, sockets: 0, cooking: 0, heating: 0, ev: 0, motor: 0, other: 0 };
+  for (var i = 0; i < circuits.length; i++) {
+    var cid = circuits[i].id || circuits[i].templateId || '';
+    if (cid === 'lighting') counts.lighting++;
+    else if (cid === 'sockets' || cid === 'bathroom' || cid === 'outdoor') counts.sockets++;
+    else if (cid === 'cooker') counts.cooking++;
+    else if (cid === 'heatpump' || cid.indexOf('heating') >= 0) counts.heating++;
+    else if (cid.indexOf('ev_') === 0) counts.ev++;
+    else if (cid.indexOf('motor') === 0) counts.motor++;
+    else counts.other++;
+  }
+
+  // DS/HD 60364-5-52 Table G.1 diversity factors
+  var factors = {};
+  // Lighting: 0.9
+  factors.lighting = 0.9;
+  // Socket outlets: depends on count (1-5: 0.9, 6-10: 0.7, >10: 0.6)
+  if (counts.sockets <= 5) factors.sockets = 0.9;
+  else if (counts.sockets <= 10) factors.sockets = 0.7;
+  else factors.sockets = 0.6;
+  // Cooking appliances: diversity formula per IEC - factor = 0.1 + 0.9/N for N appliances
+  factors.cooking = counts.cooking > 0 ? Math.min(1.0, 0.1 + 0.9 / counts.cooking) : 1.0;
+  // Heating/AC: 0.8
+  factors.heating = 0.8;
+  // EV with load management: 0.5-0.8 depending on count
+  if (counts.ev <= 1) factors.ev = 0.8;
+  else if (counts.ev <= 3) factors.ev = 0.6;
+  else factors.ev = 0.5;
+  // Motors: 0.8 for industrial groups
+  factors.motor = 0.8;
+  // Other: 1.0 (no diversity)
+  factors.other = 1.0;
+
+  // Check for diversity overrides in state
+  var overrides = reverseState.diversityOverrides || {};
+  if (overrides.lighting !== undefined) factors.lighting = overrides.lighting;
+  if (overrides.sockets !== undefined) factors.sockets = overrides.sockets;
+  if (overrides.cooking !== undefined) factors.cooking = overrides.cooking;
+  if (overrides.heating !== undefined) factors.heating = overrides.heating;
+  if (overrides.ev !== undefined) factors.ev = overrides.ev;
+  if (overrides.motor !== undefined) factors.motor = overrides.motor;
+
+  // Calculate overall weighted diversity factor
+  var totalRaw = 0;
+  var totalDiversified = 0;
+  for (var j = 0; j < circuits.length; j++) {
+    var c = circuits[j];
+    var pwr = c.power_kW || 0;
+    var cid2 = c.id || c.templateId || '';
+    var f = 1.0;
+    if (cid2 === 'lighting') f = factors.lighting;
+    else if (cid2 === 'sockets' || cid2 === 'bathroom' || cid2 === 'outdoor') f = factors.sockets;
+    else if (cid2 === 'cooker') f = factors.cooking;
+    else if (cid2 === 'heatpump' || cid2.indexOf('heating') >= 0) f = factors.heating;
+    else if (cid2.indexOf('ev_') === 0) f = factors.ev;
+    else if (cid2.indexOf('motor') === 0) f = factors.motor;
+    else f = factors.other;
+    totalRaw += pwr;
+    totalDiversified += pwr * f;
+  }
+
+  var overallFactor = totalRaw > 0 ? totalDiversified / totalRaw : 1.0;
+
+  return {
+    factors: factors,
+    counts: counts,
+    totalRaw: totalRaw,
+    totalDiversified: totalDiversified,
+    overallFactor: overallFactor,
+    clause: 'DS/HD 60364-5-52 Table G.1'
+  };
+}
+
+function reverseSetDiversityOverride(category, value) {
+  if (!reverseState.diversityOverrides) reverseState.diversityOverrides = {};
+  reverseState.diversityOverrides[category] = value;
+  reverseState.multiResult = null;
+  renderModule('reverse');
+}
+
 function reverseMultiSolve() {
   var st = reverseState;
   var circuits = st.selectedCircuits;
@@ -35368,12 +35809,11 @@ function reverseMultiSolve() {
   var allBom = [];
   var allCompliance = [];
 
-  // Determine diversity factor
-  var preset = null;
-  for (var bp = 0; bp < REVERSE_BUILDING_PRESETS.length; bp++) {
-    if (REVERSE_BUILDING_PRESETS[bp].id === st.selectedBuildingType) { preset = REVERSE_BUILDING_PRESETS[bp]; break; }
-  }
-  var diversity = preset ? preset.diversity : 0.8;
+  // Calculate diversity factors per DS/HD 60364-5-52 Table G.1
+  var divCalc = reverseCalcDiversityFactors(circuits);
+  var diversity = divCalc.overallFactor;
+  log.push('Diversity factor (DS/HD 60364-5-52 Table G.1): ' + diversity.toFixed(3));
+  log.push('  Raw total: ' + divCalc.totalRaw.toFixed(1) + ' kW, Diversified: ' + divCalc.totalDiversified.toFixed(1) + ' kW');
 
   // Helper: select protection
   function selectProtection(minIn, prefType) {
@@ -35585,11 +36025,8 @@ function reverseMultiSolve() {
   fullTree.rootId = tNode.id;
 
   // Calculate total power for main board sizing
-  var totalPower = 0;
-  for (var tp2 = 0; tp2 < circuits.length; tp2++) {
-    totalPower += circuits[tp2].power_kW;
-  }
-  var diversifiedPower = totalPower * diversity;
+  var totalPower = divCalc.totalRaw;
+  var diversifiedPower = divCalc.totalDiversified;
 
   // Select main board protection based on diversified load
   var mainIB;
@@ -35648,6 +36085,9 @@ function reverseMultiSolve() {
     totalPower: totalPower,
     diversifiedPower: diversifiedPower,
     diversity: diversity,
+    diversityFactors: divCalc.factors,
+    diversityCounts: divCalc.counts,
+    diversityClause: divCalc.clause,
     circuitCount: circuits.length,
     optimizations: optimizations,
     log: log
@@ -36144,6 +36584,484 @@ function renderReverseMultiSVG(result) {
   }
   svg += '</svg>';
   return svg;
+}
+
+// ============================================================================
+// === SELECTIVITY MATRIX MODULE (selmatrix) - DS/HD 60364-5-53 cl.536.4 ===
+// ============================================================================
+
+function selMatrixGetPairs(tree) {
+  if (!tree || !tree.rootId) return [];
+  sldPropagateAll(tree);
+  var pairs = [];
+  var nodeIds = Object.keys(tree.nodes);
+  var protectedNodes = [];
+  for (var i = 0; i < nodeIds.length; i++) {
+    var n = tree.nodes[nodeIds[i]];
+    if (n && n.protection && n.type !== 'transformer') protectedNodes.push(n);
+  }
+  for (var d = 0; d < protectedNodes.length; d++) {
+    var dsNode = protectedNodes[d];
+    var path = sldGetPath(tree, dsNode.id);
+    for (var u = 0; u < path.length; u++) {
+      var upId = path[u];
+      if (upId === dsNode.id) continue;
+      var upNode = tree.nodes[upId];
+      if (!upNode || !upNode.protection || upNode.type === 'transformer') continue;
+      var usIn = upNode.protectionIn || (upNode.protection ? upNode.protection.rating : 0);
+      var dsIn = dsNode.protectionIn || (dsNode.protection ? dsNode.protection.rating : 0);
+      if (!usIn || !dsIn) continue;
+      var ikData = sldCalcNodeIk(tree, dsNode.id);
+      var ikmax = ikData.ikmax || 1000;
+      var faultCurrents = [0.5, 1.0, 1.5, 2.0];
+      var worstVerdict = 'full';
+      var worstMargin = 9999;
+      for (var f = 0; f < faultCurrents.length; f++) {
+        var testI = ikmax * faultCurrents[f] * selMatrixState.faultMult;
+        if (testI < 1) continue;
+        var dsTime = sldGetTripTime(dsNode.protection, dsIn, testI, null);
+        var usTime = sldGetTripTime(upNode.protection, usIn, testI, null);
+        if (dsTime === Infinity && usTime === Infinity) continue;
+        if (dsTime === Infinity) { worstVerdict = 'none'; worstMargin = 0; break; }
+        if (usTime === Infinity) continue;
+        var margin = (usTime - dsTime) * 1000;
+        if (margin < worstMargin) worstMargin = margin;
+        if (margin <= 0) { worstVerdict = 'none'; break; }
+        else if (margin < 50 && worstVerdict === 'full') worstVerdict = 'partial';
+      }
+      pairs.push({
+        upstream: upNode.id, downstream: dsNode.id,
+        upstreamName: sldNodeName(upNode), downstreamName: sldNodeName(dsNode),
+        upstreamIn: usIn, downstreamIn: dsIn,
+        verdict: worstVerdict, margin_ms: Math.round(worstMargin),
+        ikmax: ikmax
+      });
+    }
+  }
+  return pairs;
+}
+function selMatrixRenderSVG(pairs, protectedNodes) {
+  var n = protectedNodes.length;
+  if (n === 0) return '<p>' + tx('Ingen beskyttelsesenheder fundet', 'No protection devices found') + '</p>';
+  var cellSize = 40;
+  var labelW = 120;
+  var w = labelW + n * cellSize + 20;
+  var h = labelW + n * cellSize + 20;
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:600px;height:auto;" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="#1a1a2e"/>';
+  // Column headers (upstream)
+  for (var c = 0; c < n; c++) {
+    var x = labelW + c * cellSize + cellSize / 2;
+    svg += '<text x="' + x + '" y="' + (labelW - 5) + '" fill="#aaa" font-size="8" text-anchor="middle" transform="rotate(-45 ' + x + ' ' + (labelW - 5) + ')">' + (protectedNodes[c].protectionIn || '?') + 'A</text>';
+  }
+  // Row headers (downstream)
+  for (var r = 0; r < n; r++) {
+    var y = labelW + r * cellSize + cellSize / 2 + 4;
+    svg += '<text x="' + (labelW - 5) + '" y="' + y + '" fill="#aaa" font-size="8" text-anchor="end">' + (protectedNodes[r].protectionIn || '?') + 'A</text>';
+  }
+  // Cells
+  for (var r2 = 0; r2 < n; r2++) {
+    for (var c2 = 0; c2 < n; c2++) {
+      var cx = labelW + c2 * cellSize;
+      var cy = labelW + r2 * cellSize;
+      var pair = null;
+      for (var p = 0; p < pairs.length; p++) {
+        if (pairs[p].upstream === protectedNodes[c2].id && pairs[p].downstream === protectedNodes[r2].id) {
+          pair = pairs[p]; break;
+        }
+      }
+      var color = '#333';
+      if (pair) {
+        if (pair.verdict === 'full') color = '#2d6b2d';
+        else if (pair.verdict === 'partial') color = '#8b7a2d';
+        else color = '#8b2d2d';
+      } else if (r2 === c2) {
+        color = '#222';
+      }
+      var selected = selMatrixState.selectedPair && pair && selMatrixState.selectedPair.upstream === pair.upstream && selMatrixState.selectedPair.downstream === pair.downstream;
+      svg += '<rect x="' + cx + '" y="' + cy + '" width="' + (cellSize - 1) + '" height="' + (cellSize - 1) + '" fill="' + color + '" stroke="' + (selected ? '#fff' : '#555') + '" stroke-width="' + (selected ? 2 : 0.5) + '" rx="3"';
+      if (pair) {
+        svg += ' onclick="selMatrixState.selectedPair={upstream:\'' + pair.upstream + '\',downstream:\'' + pair.downstream + '\',upstreamName:\'' + pair.upstreamName.replace(/'/g,'') + '\',downstreamName:\'' + pair.downstreamName.replace(/'/g,'') + '\',verdict:\'' + pair.verdict + '\',margin_ms:' + pair.margin_ms + ',upstreamIn:' + pair.upstreamIn + ',downstreamIn:' + pair.downstreamIn + '};renderModule(\'selmatrix\')" style="cursor:pointer"';
+      }
+      svg += '/>';
+      if (pair) {
+        var symbol = pair.verdict === 'full' ? '\u2713' : pair.verdict === 'partial' ? '~' : '\u2717';
+        svg += '<text x="' + (cx + cellSize / 2) + '" y="' + (cy + cellSize / 2 + 4) + '" fill="#fff" font-size="12" text-anchor="middle" pointer-events="none">' + symbol + '</text>';
+      }
+    }
+  }
+  // Legend
+  svg += '<rect x="5" y="5" width="12" height="12" fill="#2d6b2d" rx="2"/><text x="20" y="14" fill="#aaa" font-size="9">' + tx('Fuld','Full') + '</text>';
+  svg += '<rect x="5" y="22" width="12" height="12" fill="#8b7a2d" rx="2"/><text x="20" y="31" fill="#aaa" font-size="9">' + tx('Delvis','Partial') + '</text>';
+  svg += '<rect x="5" y="39" width="12" height="12" fill="#8b2d2d" rx="2"/><text x="20" y="48" fill="#aaa" font-size="9">' + tx('Ingen','None') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+function renderSelMatrix() {
+  var tree = sldTree || sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var protectedNodes = [];
+  for (var i = 0; i < nodeIds.length; i++) {
+    var n = tree.nodes[nodeIds[i]];
+    if (n && n.protection && n.type !== 'transformer') protectedNodes.push(n);
+  }
+  var pairs = selMatrixGetPairs(tree);
+  var fullCount = pairs.filter(function(p) { return p.verdict === 'full'; }).length;
+  var partialCount = pairs.filter(function(p) { return p.verdict === 'partial'; }).length;
+  var noneCount = pairs.filter(function(p) { return p.verdict === 'none'; }).length;
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Selektivitetsmatrix', 'Selectivity Matrix') + '</div>';
+  html += '<p style="color:#aaa;font-size:0.85em;">' + tx('NxN matrix af alle beskyttelsespar. Klik en celle for detaljer.', 'NxN matrix of all protection pairs. Click a cell for details.') + '</p>';
+  html += '<p style="color:#888;font-size:0.8em;">' + tx('Reference: DS/HD 60364-5-53 cl.536.4, IEC 60947-2 Annex A', 'Reference: DS/HD 60364-5-53 cl.536.4, IEC 60947-2 Annex A') + '</p>';
+  // Fault multiplier buttons
+  html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroemsfaktor', 'Fault Current Multiplier') + ' (Ik)</div><div class="select-grid">';
+  var mults = [0.5, 1.0, 1.5, 2.0];
+  for (var m = 0; m < mults.length; m++) {
+    html += '<button class="sel-btn ' + (selMatrixState.faultMult === mults[m] ? 'selected' : '') + '" onclick="selMatrixState.faultMult=' + mults[m] + ';renderModule(\'selmatrix\')">' + mults[m] + 'x</button>';
+  }
+  html += '</div></div>';
+  // Summary
+  html += '<div class="result-box"><div class="result-title">' + tx('Oversigt', 'Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Par analyseret', 'Pairs analyzed') + '</span><span class="value">' + pairs.length + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#4a4">' + tx('Fuld selektivitet', 'Full selectivity') + '</span><span class="value">' + fullCount + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#aa4">' + tx('Delvis selektivitet', 'Partial selectivity') + '</span><span class="value">' + partialCount + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#a44">' + tx('Ingen selektivitet', 'No selectivity') + '</span><span class="value">' + noneCount + '</span></div>';
+  html += '</div>';
+  // SVG Matrix
+  html += selMatrixRenderSVG(pairs, protectedNodes);
+  // Selected pair detail
+  if (selMatrixState.selectedPair) {
+    var sp = selMatrixState.selectedPair;
+    var verdictColor = sp.verdict === 'full' ? '#4a4' : sp.verdict === 'partial' ? '#aa4' : '#a44';
+    var verdictText = sp.verdict === 'full' ? tx('Fuld selektivitet', 'Full selectivity') : sp.verdict === 'partial' ? tx('Delvis selektivitet', 'Partial selectivity') : tx('Ingen selektivitet', 'No selectivity');
+    html += '<div class="result-box" style="border-left:3px solid ' + verdictColor + '">';
+    html += '<div class="result-title">' + tx('Valgt par', 'Selected Pair') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Opstroems', 'Upstream') + '</span><span class="value">' + sp.upstreamName + ' (' + sp.upstreamIn + 'A)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Nedstroems', 'Downstream') + '</span><span class="value">' + sp.downstreamName + ' (' + sp.downstreamIn + 'A)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Resultat', 'Verdict') + '</span><span class="value" style="color:' + verdictColor + '">' + verdictText + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Tidsmargin', 'Time margin') + '</span><span class="value">' + sp.margin_ms + ' ms</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">DS/HD 60364-5-53 cl.536.4</span></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+// ============================================================================
+// === AUTO COORDINATION OPTIMIZER MODULE (autocoord) ===
+// ============================================================================
+
+function autoCoordScoreDevice(device, In, node, tree, parentNode) {
+  // Score a protection device for a given node
+  var score = { selectivity: 0, cost: 0, safety: 0, total: 0 };
+  var IB = node._IB || (node.power_kW * 1000 / (node.voltage || 230));
+  var Iz = node.cable ? node.cable.iz : 100;
+  // Safety check: IB <= In <= Iz
+  if (In < IB || In > Iz) return null;
+  // Breaking capacity check
+  var ikData = sldCalcNodeIk(tree, node.id);
+  var ikmax = ikData.ikmax || 6000;
+  var icu = device.icu || device.ics || 6;
+  if (icu * 1000 < ikmax) return null;
+  // Selectivity score (compare with upstream)
+  if (parentNode && parentNode.protection) {
+    var usIn = parentNode.protectionIn || (parentNode.protection.rating || 0);
+    if (usIn > 0) {
+      var ratio = usIn / In;
+      if (ratio >= 2.5) score.selectivity = 1.0;
+      else if (ratio >= 1.6) score.selectivity = 0.8;
+      else if (ratio >= 1.3) score.selectivity = 0.5;
+      else score.selectivity = 0.2;
+    }
+  } else {
+    score.selectivity = 0.7;
+  }
+  // Cost score (lower rating = cheaper, approximate)
+  var maxRating = 63;
+  score.cost = 1.0 - (In / maxRating) * 0.5;
+  if (score.cost < 0.1) score.cost = 0.1;
+  // Safety margin score
+  var marginIz = (Iz - In) / Iz;
+  var marginIB = (In - IB) / In;
+  score.safety = Math.min(1.0, marginIz * 0.5 + marginIB * 0.5 + 0.3);
+  // Combined
+  score.total = score.selectivity * 0.4 + score.cost * 0.3 + score.safety * 0.3;
+  return score;
+}
+
+function autoCoordSolve(tree) {
+  if (!tree || !tree.rootId) return [];
+  sldPropagateAll(tree);
+  var solutions = [];
+  var nodeIds = Object.keys(tree.nodes);
+  var candidates = [];
+  // Gather nodes bottom-up (final circuits first)
+  for (var i = 0; i < nodeIds.length; i++) {
+    var n = tree.nodes[nodeIds[i]];
+    if (n && n.protection && n.type !== 'transformer') candidates.push(n);
+  }
+  candidates.sort(function(a, b) { return (b.childIds ? 0 : 1) - (a.childIds ? 0 : 1); });
+  // Generate up to 3 solutions with different optimization biases
+  var biases = [
+    { name_da: 'Bedste selektivitet', name_en: 'Best selectivity', name_fa: 'بهترین گزینش‌پذیری', selW: 0.6, costW: 0.1, safeW: 0.3 },
+    { name_da: 'Laveste pris', name_en: 'Lowest cost', name_fa: 'کمترین هزینه', selW: 0.2, costW: 0.6, safeW: 0.2 },
+    { name_da: 'Bedste sikkerhed', name_en: 'Best safety margin', name_fa: 'بهترین حاشیه ایمنی', selW: 0.3, costW: 0.1, safeW: 0.6 }
+  ];
+  for (var b = 0; b < biases.length; b++) {
+    var bias = biases[b];
+    var sol = { name_da: bias.name_da, name_en: bias.name_en, name_fa: bias.name_fa, devices: [], totalScore: 0 };
+    for (var c = 0; c < candidates.length; c++) {
+      var node = candidates[c];
+      var parentNode = node.parentId ? tree.nodes[node.parentId] : null;
+      var bestDevice = null;
+      var bestIn = 0;
+      var bestScore = -1;
+      // Try MCBs
+      for (var mi = 0; mi < PRODUCTS.mcbs.length; mi++) {
+        var mcb = PRODUCTS.mcbs[mi];
+        var sc = autoCoordScoreDevice(mcb, mcb.rating, node, tree, parentNode);
+        if (sc) {
+          var adjusted = sc.selectivity * bias.selW + sc.cost * bias.costW + sc.safety * bias.safeW;
+          if (adjusted > bestScore) { bestScore = adjusted; bestDevice = mcb; bestIn = mcb.rating; }
+        }
+      }
+      // Try MCCBs for larger circuits
+      if (node.type === 'main_board' || node.type === 'sub_board') {
+        for (var mci = 0; mci < PRODUCTS.mccbs.length; mci++) {
+          var mccb = PRODUCTS.mccbs[mci];
+          var ratings = [mccb.rating * 0.6, mccb.rating * 0.8, mccb.rating];
+          for (var ri = 0; ri < ratings.length; ri++) {
+            var rIn = Math.round(ratings[ri]);
+            var sc2 = autoCoordScoreDevice(mccb, rIn, node, tree, parentNode);
+            if (sc2) {
+              var adjusted2 = sc2.selectivity * bias.selW + sc2.cost * bias.costW + sc2.safety * bias.safeW;
+              if (adjusted2 > bestScore) { bestScore = adjusted2; bestDevice = mccb; bestIn = rIn; }
+            }
+          }
+        }
+      }
+      if (bestDevice) {
+        sol.devices.push({ nodeId: node.id, nodeName: sldNodeName(node), device: bestDevice, In: bestIn, score: bestScore });
+        sol.totalScore += bestScore;
+      }
+    }
+    if (sol.devices.length > 0) sol.totalScore = sol.totalScore / sol.devices.length;
+    solutions.push(sol);
+  }
+  return solutions;
+}
+function autoCoordApply(solIndex) {
+  if (!autoCoordState.solutions || !autoCoordState.solutions[solIndex]) return;
+  var sol = autoCoordState.solutions[solIndex];
+  var tree = sldTree || sldCreateTree();
+  for (var i = 0; i < sol.devices.length; i++) {
+    var d = sol.devices[i];
+    var node = tree.nodes[d.nodeId];
+    if (node) {
+      node.protection = d.device;
+      node.protectionIn = d.In;
+    }
+  }
+  sldPropagateAll(tree);
+  autoCoordState.applied = solIndex;
+  sldSave(tree);
+}
+
+function renderAutoCoord() {
+  var tree = sldTree || sldCreateTree();
+  if (!autoCoordState.solutions) {
+    autoCoordState.solutions = autoCoordSolve(tree);
+  }
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Auto-koordinering', 'Auto Coordination') + '</div>';
+  html += '<p style="color:#aaa;font-size:0.85em;">' + tx('Finder optimal kombination af beskyttelsesenheder for fuld selektivitet, laveste pris og overholdelse af DS/HD 60364.', 'Finds optimal combination of protection devices for full selectivity, lowest cost and DS/HD 60364 compliance.') + '</p>';
+  html += '<div class="select-group"><button class="sel-btn selected" onclick="autoCoordState.solutions=null;autoCoordState.applied=null;renderModule(\'autocoord\')">' + tx('Genberegn', 'Recalculate') + '</button></div>';
+  if (autoCoordState.applied !== null) {
+    html += '<div class="result-box" style="border-left:3px solid #4a4"><div class="result-row"><span class="label" style="color:#4a4">' + tx('Anvendt loesning', 'Applied solution') + '</span><span class="value">#' + (autoCoordState.applied + 1) + '</span></div></div>';
+  }
+  var solutions = autoCoordState.solutions || [];
+  for (var s = 0; s < solutions.length; s++) {
+    var sol = solutions[s];
+    var solName = tx(sol.name_da, sol.name_en);
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Loesning', 'Solution') + ' #' + (s + 1) + ': ' + solName + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Score', 'Score') + '</span><span class="value">' + (sol.totalScore * 100).toFixed(0) + '%</span></div>';
+    html += '<table style="width:100%;font-size:0.8em;color:#ccc;border-collapse:collapse;margin:8px 0;">';
+    html += '<tr style="border-bottom:1px solid #444"><th style="text-align:left;padding:4px">' + tx('Node', 'Node') + '</th><th>' + tx('Enhed', 'Device') + '</th><th>In</th><th>' + tx('Score', 'Score') + '</th></tr>';
+    for (var d = 0; d < sol.devices.length; d++) {
+      var dev = sol.devices[d];
+      var devName = dev.device.model || dev.device.brand || 'MCB';
+      html += '<tr style="border-bottom:1px solid #333"><td style="padding:4px">' + dev.nodeName + '</td><td style="text-align:center">' + devName + '</td><td style="text-align:center">' + dev.In + 'A</td><td style="text-align:center">' + (dev.score * 100).toFixed(0) + '%</td></tr>';
+    }
+    html += '</table>';
+    html += '<button class="sel-btn" onclick="autoCoordApply(' + s + ');renderModule(\'autocoord\')">' + tx('Anvend', 'Apply') + '</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+// ============================================================================
+// === POWER FLOW ANIMATION MODULE (powerflow) ===
+// ============================================================================
+
+function powerFlowCalcNode(node, tree, mode) {
+  var mult = mode === 'peak' ? 1.5 : mode === 'night' ? 0.3 : 1.0;
+  var P = (node.power_kW || 0) * mult;
+  var cosPhi = node.cosPhi || 0.95;
+  var S = cosPhi > 0 ? P / cosPhi : P;
+  var Q = Math.sqrt(Math.max(0, S * S - P * P));
+  var V = node.voltage || 230;
+  var phases = (node.phases && node.phases.indexOf('3') >= 0) ? 3 : 1;
+  var I = phases === 3 ? (S * 1000 / (V * 1.732)) : (S * 1000 / V);
+  // Cable losses
+  var losses = 0;
+  if (node.cable && node.length_m) {
+    var R = (node.cable.r || 0) * node.length_m / 1000;
+    losses = I * I * R / 1000; // kW
+  }
+  return { P: P, Q: Q, S: S, I: I, cosPhi: cosPhi, losses: losses, V: V };
+}
+
+function powerFlowRenderSVG(tree, mode) {
+  if (!tree || !tree.rootId) return '<p>No tree</p>';
+  sldPropagateAll(tree);
+  var nodeIds = Object.keys(tree.nodes);
+  var nodes = [];
+  for (var i = 0; i < nodeIds.length; i++) {
+    var n = tree.nodes[nodeIds[i]];
+    if (n) nodes.push(n);
+  }
+  var w = 700, h = 400;
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;max-width:700px;" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<defs>';
+  svg += '<style>';
+  svg += '@keyframes flowRight { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }';
+  svg += '@keyframes flowLeft { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 20; } }';
+  svg += '.flow-line { stroke-dasharray: 4 6; animation: flowRight ' + (2 / powerFlowState.animSpeed) + 's linear infinite; }';
+  svg += '.flow-line-rev { stroke-dasharray: 4 6; animation: flowLeft ' + (2 / powerFlowState.animSpeed) + 's linear infinite; }';
+  svg += '</style></defs>';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="#0d1117"/>';
+  // Layout: simple tree layout
+  var levels = {};
+  function getLevel(nodeId, depth) {
+    levels[nodeId] = depth;
+    var nd = tree.nodes[nodeId];
+    if (nd && nd.childIds) {
+      for (var c = 0; c < nd.childIds.length; c++) getLevel(nd.childIds[c], depth + 1);
+    }
+  }
+  getLevel(tree.rootId, 0);
+  var maxLevel = 0;
+  for (var k in levels) { if (levels[k] > maxLevel) maxLevel = levels[k]; }
+  var levelCounts = {};
+  var levelIdx = {};
+  for (var k2 in levels) {
+    var lv = levels[k2];
+    levelCounts[lv] = (levelCounts[lv] || 0) + 1;
+    levelIdx[k2] = levelCounts[lv] - 1;
+  }
+  // Positions
+  var positions = {};
+  for (var k3 in levels) {
+    var lvl = levels[k3];
+    var count = levelCounts[lvl] || 1;
+    var idx = levelIdx[k3];
+    var px = 80 + (w - 160) * lvl / Math.max(maxLevel, 1);
+    var py = 60 + (h - 120) * (idx + 0.5) / count;
+    positions[k3] = { x: px, y: py };
+  }
+  // Total stats
+  var totalP = 0, totalQ = 0, totalLosses = 0;
+  // Draw connections (cables with flow animation)
+  for (var ni = 0; ni < nodes.length; ni++) {
+    var nd2 = nodes[ni];
+    if (!nd2.parentId || !positions[nd2.id] || !positions[nd2.parentId]) continue;
+    var pf = powerFlowCalcNode(nd2, tree, mode);
+    totalP += pf.P;
+    totalQ += pf.Q;
+    totalLosses += pf.losses;
+    var p1 = positions[nd2.parentId];
+    var p2 = positions[nd2.id];
+    // Color based on power factor
+    var pfColor = pf.cosPhi >= 0.95 ? '#4ade80' : pf.cosPhi >= 0.8 ? '#facc15' : '#ef4444';
+    var lineW = Math.max(1.5, Math.min(6, pf.I / 20));
+    var isGen = nd2.type === 'solar' || nd2.type === 'bess' || nd2.type === 'generator';
+    var flowClass = isGen ? 'flow-line-rev' : 'flow-line';
+    svg += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + pfColor + '" stroke-width="' + lineW + '" class="' + flowClass + '" opacity="0.8"';
+    svg += ' onclick="powerFlowState.selectedCable=\'' + nd2.id + '\';renderModule(\'powerflow\')" style="cursor:pointer"';
+    svg += '/>';
+    // Losses indicator (heat dissipation circles)
+    if (pf.losses > 0.01) {
+      var midX = (p1.x + p2.x) / 2;
+      var midY = (p1.y + p2.y) / 2;
+      var lossR = Math.min(8, pf.losses * 10 + 2);
+      svg += '<circle cx="' + midX + '" cy="' + midY + '" r="' + lossR + '" fill="#ff6b3520" stroke="#ff6b35" stroke-width="0.5"/>';
+      svg += '<text x="' + midX + '" y="' + (midY - lossR - 2) + '" fill="#ff6b35" font-size="7" text-anchor="middle">' + pf.losses.toFixed(2) + 'kW</text>';
+    }
+  }
+  // Draw nodes
+  for (var nj = 0; nj < nodes.length; nj++) {
+    var nd3 = nodes[nj];
+    if (!positions[nd3.id]) continue;
+    var pos = positions[nd3.id];
+    var pf2 = powerFlowCalcNode(nd3, tree, mode);
+    var nodeR = Math.max(8, Math.min(25, pf2.P * 2 + 5));
+    var nodeFill = nd3.type === 'transformer' ? '#6366f1' : nd3.type === 'main_board' ? '#3b82f6' : nd3.type === 'sub_board' ? '#8b5cf6' : '#22c55e';
+    svg += '<circle cx="' + pos.x + '" cy="' + pos.y + '" r="' + nodeR + '" fill="' + nodeFill + '40" stroke="' + nodeFill + '" stroke-width="1.5"/>';
+    svg += '<text x="' + pos.x + '" y="' + (pos.y + 3) + '" fill="#fff" font-size="8" text-anchor="middle">' + (nd3.protectionIn || (nd3.power_kVA ? nd3.power_kVA + 'kVA' : '')) + '</text>';
+    svg += '<text x="' + pos.x + '" y="' + (pos.y + nodeR + 10) + '" fill="#aaa" font-size="7" text-anchor="middle">' + sldNodeName(nd3).substring(0, 12) + '</text>';
+  }
+  // Direction arrows
+  svg += '<text x="' + (w - 100) + '" y="20" fill="#666" font-size="9">' + tx('Effektretning', 'Power direction') + ' \u2192</text>';
+  svg += '</svg>';
+  // System PF
+  var systemPF = totalP > 0 ? totalP / Math.sqrt(totalP * totalP + totalQ * totalQ) : 1;
+  return { svg: svg, totalP: totalP, totalQ: totalQ, totalLosses: totalLosses, systemPF: systemPF };
+}
+function renderPowerFlow() {
+  var tree = sldTree || sldCreateTree();
+  var result = powerFlowRenderSVG(tree, powerFlowState.mode);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Effektflow Animation', 'Power Flow Animation') + '</div>';
+  html += '<p style="color:#aaa;font-size:0.85em;">' + tx('Animeret visning af effektflow gennem installationen. Partiklfarve: groen=cosfi 1, gul=0.8, roed=0.5. Stoerrelse proportional med effekt.', 'Animated display of power flow through the installation. Particle color: green=PF 1, yellow=0.8, red=0.5. Size proportional to power.') + '</p>';
+  // Mode buttons
+  html += '<div class="select-group"><div class="select-label">' + tx('Driftstilstand', 'Operating Mode') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn ' + (powerFlowState.mode === 'normal' ? 'selected' : '') + '" onclick="powerFlowState.mode=\'normal\';renderModule(\'powerflow\')">' + tx('Normal', 'Normal') + '</button>';
+  html += '<button class="sel-btn ' + (powerFlowState.mode === 'peak' ? 'selected' : '') + '" onclick="powerFlowState.mode=\'peak\';renderModule(\'powerflow\')">' + tx('Spids', 'Peak') + '</button>';
+  html += '<button class="sel-btn ' + (powerFlowState.mode === 'night' ? 'selected' : '') + '" onclick="powerFlowState.mode=\'night\';renderModule(\'powerflow\')">' + tx('Nat', 'Night') + '</button>';
+  html += '</div></div>';
+  // Animation speed
+  html += '<div class="select-group"><div class="select-label">' + tx('Animationshastighed', 'Animation Speed') + '</div><div class="select-grid">';
+  var speeds = [0.5, 1, 2, 4];
+  for (var si = 0; si < speeds.length; si++) {
+    html += '<button class="sel-btn ' + (powerFlowState.animSpeed === speeds[si] ? 'selected' : '') + '" onclick="powerFlowState.animSpeed=' + speeds[si] + ';renderModule(\'powerflow\')">' + speeds[si] + 'x</button>';
+  }
+  html += '</div></div>';
+  // SVG
+  html += result.svg;
+  // Selected cable detail
+  if (powerFlowState.selectedCable && tree.nodes[powerFlowState.selectedCable]) {
+    var nd = tree.nodes[powerFlowState.selectedCable];
+    var pf = powerFlowCalcNode(nd, tree, powerFlowState.mode);
+    html += '<div class="result-box" style="border-left:3px solid #3b82f6">';
+    html += '<div class="result-title">' + tx('Kabeldetaljer', 'Cable Details') + ': ' + sldNodeName(nd) + '</div>';
+    html += '<div class="result-row"><span class="label">P</span><span class="value">' + pf.P.toFixed(2) + ' kW</span></div>';
+    html += '<div class="result-row"><span class="label">Q</span><span class="value">' + pf.Q.toFixed(2) + ' kvar</span></div>';
+    html += '<div class="result-row"><span class="label">S</span><span class="value">' + pf.S.toFixed(2) + ' kVA</span></div>';
+    html += '<div class="result-row"><span class="label">I</span><span class="value">' + pf.I.toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">cos\u03C6</span><span class="value">' + pf.cosPhi.toFixed(2) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + pf.losses.toFixed(3) + ' kW</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Spaending', 'Voltage') + '</span><span class="value">' + pf.V + ' V</span></div>';
+    html += '</div>';
+  }
+  // Statistics footer
+  html += '<div class="result-box"><div class="result-title">' + tx('Systemstatistik', 'System Statistics') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total P', 'Total P') + '</span><span class="value">' + result.totalP.toFixed(1) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total Q', 'Total Q') + '</span><span class="value">' + result.totalQ.toFixed(1) + ' kvar</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + result.totalLosses.toFixed(3) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('System PF', 'System PF') + '</span><span class="value">' + result.systemPF.toFixed(3) + '</span></div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 function renderLiveInstallation() {

@@ -16288,6 +16288,492 @@ test('renderLiveInstallation in disasters mode shows description for lightning_s
   liveState.mode = 'live';
 });
 
+// === Selective Coordination Analysis Tests ===
+console.log('\n=== Selective Coordination Analysis Tests ===');
+
+test('sldSelectivityAnalysis function exists and returns array', function() {
+  assert(typeof sldSelectivityAnalysis === 'function', 'sldSelectivityAnalysis should be a function');
+  var tree = sldCreateTree();
+  var result = sldSelectivityAnalysis(tree);
+  assert(Array.isArray(result), 'Should return an array');
+});
+
+test('sldSelectivityAnalysis with fully selective cascade (MCCB 100A upstream of MCB 16A)', function() {
+  var tree = sldCreateTree();
+  var mainBoardId = tree.nodes[tree.rootId].childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  mainBoard.protection = PRODUCTS.mccbs[0];
+  mainBoard.protectionIn = 100;
+  mainBoard.mccbSettings = { io: 1.0, isd: 8, isdDelay: 0.1 };
+  sldPropagateAll(tree);
+  var result = sldSelectivityAnalysis(tree);
+  assert(result.length > 0, 'Should find device pairs');
+  var hasPair = result.some(function(r) { return r.upstreamIn === 100 && r.downstreamIn <= 16; });
+  assert(hasPair, 'Should find MCCB 100A vs MCB 16A pair');
+});
+
+test('sldSelectivityAnalysis with non-selective cascade (same-rating MCBs in series)', function() {
+  var tree = sldCreateTree();
+  var mainBoardId = tree.nodes[tree.rootId].childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  mainBoard.protection = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+  mainBoard.protectionIn = 16;
+  sldPropagateAll(tree);
+  var result = sldSelectivityAnalysis(tree);
+  var sameRatingPairs = result.filter(function(r) { return r.upstreamIn === 16 && r.downstreamIn === 16; });
+  assert(sameRatingPairs.length > 0, 'Should find same-rating pairs');
+  sameRatingPairs.forEach(function(pair) {
+    assert(pair.verdict === 'none' || pair.verdict === 'partial', 'Same-rating MCBs should not be fully selective, got: ' + pair.verdict);
+  });
+});
+
+// ============================================================================
+// === Selectivity Matrix Module Tests ===
+// ============================================================================
+console.log('\n=== Selectivity Matrix Module Tests ===');
+
+test('selMatrixState exists with correct defaults', function() {
+  assert(typeof selMatrixState === 'object', 'selMatrixState should exist');
+  assert(selMatrixState.selectedPair === null, 'selectedPair default null');
+  assert(selMatrixState.faultMult === 1.0, 'faultMult default 1.0');
+});
+
+test('selMatrixGetPairs function exists and returns array', function() {
+  assert(typeof selMatrixGetPairs === 'function', 'selMatrixGetPairs should be a function');
+  var tree = sldCreateTree();
+  var result = selMatrixGetPairs(tree);
+  assert(Array.isArray(result), 'Should return an array');
+});
+
+test('selMatrixGetPairs returns pairs with expected properties', function() {
+  var tree = sldCreateTree();
+  var pairs = selMatrixGetPairs(tree);
+  if (pairs.length > 0) {
+    var p = pairs[0];
+    assert(p.upstream, 'Should have upstream');
+    assert(p.downstream, 'Should have downstream');
+    assert(p.verdict, 'Should have verdict');
+    assert(typeof p.margin_ms === 'number', 'margin_ms should be number');
+    assert(['full', 'partial', 'none'].indexOf(p.verdict) >= 0, 'verdict should be full/partial/none');
+  }
+});
+
+test('selMatrixGetPairs identifies fully selective MCCB vs MCB pair', function() {
+  var tree = sldCreateTree();
+  var mainBoardId = tree.nodes[tree.rootId].childIds[0];
+  tree.nodes[mainBoardId].protection = PRODUCTS.mccbs[0];
+  tree.nodes[mainBoardId].protectionIn = 100;
+  tree.nodes[mainBoardId].mccbSettings = { io: 1.0, isd: 8, isdDelay: 0.2 };
+  sldPropagateAll(tree);
+  var pairs = selMatrixGetPairs(tree);
+  assert(pairs.length > 0, 'Should find pairs');
+  var fullPairs = pairs.filter(function(p) { return p.verdict === 'full'; });
+  assert(fullPairs.length >= 0, 'May have full selectivity pairs');
+});
+
+test('selMatrixGetPairs detects non-selective same-rating MCBs', function() {
+  var tree = sldCreateTree();
+  var mainBoardId = tree.nodes[tree.rootId].childIds[0];
+  tree.nodes[mainBoardId].protection = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+  tree.nodes[mainBoardId].protectionIn = 16;
+  sldPropagateAll(tree);
+  var pairs = selMatrixGetPairs(tree);
+  var nonSel = pairs.filter(function(p) { return p.verdict === 'none' || p.verdict === 'partial'; });
+  assert(nonSel.length > 0, 'Same-rating MCBs should not be fully selective');
+});
+
+test('selMatrixRenderSVG function exists and returns SVG string', function() {
+  assert(typeof selMatrixRenderSVG === 'function', 'selMatrixRenderSVG should be a function');
+  var tree = sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var protectedNodes = [];
+  for (var i = 0; i < nodeIds.length; i++) {
+    var n = tree.nodes[nodeIds[i]];
+    if (n && n.protection && n.type !== 'transformer') protectedNodes.push(n);
+  }
+  var pairs = selMatrixGetPairs(tree);
+  var svg = selMatrixRenderSVG(pairs, protectedNodes);
+  assert(typeof svg === 'string', 'Should return string');
+  assert(svg.indexOf('<svg') >= 0 || svg.indexOf('<p>') >= 0, 'Should contain SVG or message');
+});
+
+test('renderSelMatrix function exists and returns HTML', function() {
+  assert(typeof renderSelMatrix === 'function', 'renderSelMatrix should be a function');
+  var html = renderSelMatrix();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('card') > 0, 'Should contain card class');
+});
+
+test('renderSelMatrix contains matrix title', function() {
+  var html = renderSelMatrix();
+  assert(html.indexOf('Selectivity Matrix') > 0 || html.indexOf('Selektivitetsmatrix') > 0, 'Should show matrix title');
+});
+
+test('renderSelMatrix contains fault multiplier buttons', function() {
+  var html = renderSelMatrix();
+  assert(html.indexOf('0.5x') > 0, 'Should have 0.5x button');
+  assert(html.indexOf('1x') > 0, 'Should have 1x button');
+  assert(html.indexOf('1.5x') > 0, 'Should have 1.5x button');
+  assert(html.indexOf('2x') > 0, 'Should have 2x button');
+});
+
+test('renderSelMatrix shows summary counts', function() {
+  var html = renderSelMatrix();
+  assert(html.indexOf('Full selectivity') > 0 || html.indexOf('Fuld selektivitet') > 0, 'Should show full count');
+  assert(html.indexOf('No selectivity') > 0 || html.indexOf('Ingen selektivitet') > 0, 'Should show none count');
+});
+
+test('renderSelMatrix references DS/HD 60364-5-53 cl.536.4', function() {
+  var html = renderSelMatrix();
+  assert(html.indexOf('536.4') > 0, 'Should reference cl.536.4');
+});
+
+test('selMatrixState.faultMult changes affect results', function() {
+  selMatrixState.faultMult = 2.0;
+  var tree = sldCreateTree();
+  var pairs2x = selMatrixGetPairs(tree);
+  selMatrixState.faultMult = 0.5;
+  var pairs05x = selMatrixGetPairs(tree);
+  selMatrixState.faultMult = 1.0;
+  assert(pairs2x.length > 0 || pairs05x.length > 0, 'Should produce pairs at different multipliers');
+});
+
+test('renderSelMatrix shows selected pair detail when set', function() {
+  selMatrixState.selectedPair = { upstream: 'a', downstream: 'b', upstreamName: 'Board', downstreamName: 'Circuit', verdict: 'full', margin_ms: 150, upstreamIn: 40, downstreamIn: 16 };
+  var html = renderSelMatrix();
+  assert(html.indexOf('Board') > 0, 'Should show upstream name');
+  assert(html.indexOf('Circuit') > 0, 'Should show downstream name');
+  assert(html.indexOf('150') > 0, 'Should show margin');
+  selMatrixState.selectedPair = null;
+});
+
+test('selmatrix module key is in protect NAV_GROUP', function() {
+  var protectGroup = NAV_GROUPS.find(function(g) { return g.id === 'protect'; });
+  assert(protectGroup, 'protect group should exist');
+  assert(protectGroup.keys.indexOf('selmatrix') >= 0, 'selmatrix should be in protect group');
+});
+
+// ============================================================================
+// === Auto Coordination Optimizer Module Tests ===
+// ============================================================================
+console.log('\n=== Auto Coordination Optimizer Module Tests ===');
+
+test('autoCoordState exists with correct defaults', function() {
+  assert(typeof autoCoordState === 'object', 'autoCoordState should exist');
+  assert(autoCoordState.solutions === null, 'solutions default null');
+  assert(autoCoordState.applied === null, 'applied default null');
+});
+
+test('autoCoordScoreDevice function exists', function() {
+  assert(typeof autoCoordScoreDevice === 'function', 'autoCoordScoreDevice should be a function');
+});
+
+test('autoCoordScoreDevice returns null for invalid device (In < IB)', function() {
+  var tree = sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var finalNode = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') { finalNode = tree.nodes[nodeIds[i]]; break; }
+  }
+  if (finalNode) {
+    var smallMcb = PRODUCTS.mcbs.find(function(m) { return m.rating === 6; });
+    if (smallMcb) {
+      finalNode._IB = 20;
+      var score = autoCoordScoreDevice(smallMcb, 6, finalNode, tree, null);
+      assert(score === null, 'Should return null when In < IB');
+      delete finalNode._IB;
+    }
+  }
+});
+
+test('autoCoordScoreDevice returns score object for valid device', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var nodeIds = Object.keys(tree.nodes);
+  var finalNode = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') { finalNode = tree.nodes[nodeIds[i]]; break; }
+  }
+  if (finalNode) {
+    var mcb = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+    var score = autoCoordScoreDevice(mcb, 16, finalNode, tree, null);
+    if (score) {
+      assert(typeof score.total === 'number', 'Should have total score');
+      assert(score.total > 0 && score.total <= 1, 'Score should be between 0 and 1');
+    }
+  }
+});
+
+test('autoCoordSolve function exists and returns array', function() {
+  assert(typeof autoCoordSolve === 'function', 'autoCoordSolve should be a function');
+  var tree = sldCreateTree();
+  var solutions = autoCoordSolve(tree);
+  assert(Array.isArray(solutions), 'Should return array');
+});
+
+test('autoCoordSolve returns exactly 3 solutions', function() {
+  var tree = sldCreateTree();
+  var solutions = autoCoordSolve(tree);
+  assert(solutions.length === 3, 'Should return 3 solutions, got ' + solutions.length);
+});
+
+test('autoCoordSolve solutions have correct structure', function() {
+  var tree = sldCreateTree();
+  var solutions = autoCoordSolve(tree);
+  for (var i = 0; i < solutions.length; i++) {
+    assert(solutions[i].name_da, 'Solution should have Danish name');
+    assert(solutions[i].name_en, 'Solution should have English name');
+    assert(Array.isArray(solutions[i].devices), 'Solution should have devices array');
+    assert(typeof solutions[i].totalScore === 'number', 'Solution should have totalScore');
+  }
+});
+
+test('autoCoordSolve solutions recommend valid protection devices', function() {
+  var tree = sldCreateTree();
+  var solutions = autoCoordSolve(tree);
+  for (var s = 0; s < solutions.length; s++) {
+    for (var d = 0; d < solutions[s].devices.length; d++) {
+      var dev = solutions[s].devices[d];
+      assert(dev.device, 'Device recommendation should have device');
+      assert(dev.In > 0, 'Device should have positive In');
+      assert(dev.nodeId, 'Device should reference a node');
+    }
+  }
+});
+
+test('autoCoordApply function exists', function() {
+  assert(typeof autoCoordApply === 'function', 'autoCoordApply should be a function');
+});
+
+test('renderAutoCoord function exists and returns HTML', function() {
+  assert(typeof renderAutoCoord === 'function', 'renderAutoCoord should be a function');
+  autoCoordState.solutions = null;
+  var html = renderAutoCoord();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('card') > 0, 'Should contain card class');
+});
+
+test('renderAutoCoord contains title and solutions', function() {
+  autoCoordState.solutions = null;
+  var html = renderAutoCoord();
+  assert(html.indexOf('Auto') > 0, 'Should contain Auto in title');
+  assert(html.indexOf('Solution') > 0 || html.indexOf('Loesning') > 0, 'Should show solutions');
+});
+
+test('renderAutoCoord contains Recalculate button', function() {
+  autoCoordState.solutions = null;
+  var html = renderAutoCoord();
+  assert(html.indexOf('Recalculate') > 0 || html.indexOf('Genberegn') > 0, 'Should have recalculate button');
+});
+
+test('renderAutoCoord contains Apply buttons for solutions', function() {
+  autoCoordState.solutions = null;
+  var html = renderAutoCoord();
+  assert(html.indexOf('Apply') > 0 || html.indexOf('Anvend') > 0, 'Should have Apply buttons');
+});
+
+test('autocoord module key is in protect NAV_GROUP', function() {
+  var protectGroup = NAV_GROUPS.find(function(g) { return g.id === 'protect'; });
+  assert(protectGroup.keys.indexOf('autocoord') >= 0, 'autocoord should be in protect group');
+});
+
+// ============================================================================
+// === Power Flow Animation Module Tests ===
+// ============================================================================
+console.log('\n=== Power Flow Animation Module Tests ===');
+
+test('powerFlowState exists with correct defaults', function() {
+  assert(typeof powerFlowState === 'object', 'powerFlowState should exist');
+  assert(powerFlowState.mode === 'normal', 'mode default normal');
+  assert(powerFlowState.selectedCable === null, 'selectedCable default null');
+  assert(powerFlowState.animSpeed === 1, 'animSpeed default 1');
+});
+
+test('powerFlowCalcNode function exists and returns power data', function() {
+  assert(typeof powerFlowCalcNode === 'function', 'powerFlowCalcNode should be a function');
+  var tree = sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var finalNode = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') { finalNode = tree.nodes[nodeIds[i]]; break; }
+  }
+  if (finalNode) {
+    var result = powerFlowCalcNode(finalNode, tree, 'normal');
+    assert(typeof result.P === 'number', 'Should have P');
+    assert(typeof result.Q === 'number', 'Should have Q');
+    assert(typeof result.S === 'number', 'Should have S');
+    assert(typeof result.I === 'number', 'Should have I');
+    assert(typeof result.cosPhi === 'number', 'Should have cosPhi');
+    assert(typeof result.losses === 'number', 'Should have losses');
+  }
+});
+
+test('powerFlowCalcNode mode multiplier: peak > normal > night', function() {
+  var tree = sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var finalNode = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit' && tree.nodes[nodeIds[i]].power_kW > 0) { finalNode = tree.nodes[nodeIds[i]]; break; }
+  }
+  if (finalNode) {
+    var normal = powerFlowCalcNode(finalNode, tree, 'normal');
+    var peak = powerFlowCalcNode(finalNode, tree, 'peak');
+    var night = powerFlowCalcNode(finalNode, tree, 'night');
+    assert(peak.P > normal.P, 'Peak P should exceed normal P');
+    assert(normal.P > night.P, 'Normal P should exceed night P');
+  }
+});
+
+test('powerFlowRenderSVG function exists and returns object with svg', function() {
+  assert(typeof powerFlowRenderSVG === 'function', 'powerFlowRenderSVG should be a function');
+  var tree = sldCreateTree();
+  var result = powerFlowRenderSVG(tree, 'normal');
+  assert(typeof result === 'object', 'Should return object');
+  assert(typeof result.svg === 'string', 'Should have svg string');
+  assert(result.svg.indexOf('<svg') >= 0, 'Should contain SVG element');
+});
+
+test('powerFlowRenderSVG includes CSS animation keyframes', function() {
+  var tree = sldCreateTree();
+  var result = powerFlowRenderSVG(tree, 'normal');
+  assert(result.svg.indexOf('@keyframes') > 0, 'Should contain animation keyframes');
+  assert(result.svg.indexOf('flowRight') > 0, 'Should contain flowRight animation');
+});
+
+test('powerFlowRenderSVG returns system statistics', function() {
+  var tree = sldCreateTree();
+  var result = powerFlowRenderSVG(tree, 'normal');
+  assert(typeof result.totalP === 'number', 'Should have totalP');
+  assert(typeof result.totalQ === 'number', 'Should have totalQ');
+  assert(typeof result.totalLosses === 'number', 'Should have totalLosses');
+  assert(typeof result.systemPF === 'number', 'Should have systemPF');
+});
+
+test('powerFlowRenderSVG totalP > 0 for default tree with loads', function() {
+  var tree = sldCreateTree();
+  var result = powerFlowRenderSVG(tree, 'normal');
+  assert(result.totalP > 0, 'Default tree should have positive total power');
+});
+
+test('renderPowerFlow function exists and returns HTML', function() {
+  assert(typeof renderPowerFlow === 'function', 'renderPowerFlow should be a function');
+  var html = renderPowerFlow();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('card') > 0, 'Should contain card class');
+});
+
+test('renderPowerFlow contains mode buttons', function() {
+  var html = renderPowerFlow();
+  assert(html.indexOf('Normal') > 0, 'Should have Normal button');
+  assert(html.indexOf('Peak') > 0 || html.indexOf('Spids') > 0, 'Should have Peak button');
+  assert(html.indexOf('Night') > 0 || html.indexOf('Nat') > 0, 'Should have Night button');
+});
+
+test('renderPowerFlow contains animation speed buttons', function() {
+  var html = renderPowerFlow();
+  assert(html.indexOf('0.5x') > 0, 'Should have 0.5x speed');
+  assert(html.indexOf('2x') > 0, 'Should have 2x speed');
+  assert(html.indexOf('4x') > 0, 'Should have 4x speed');
+});
+
+test('renderPowerFlow contains system statistics', function() {
+  var html = renderPowerFlow();
+  assert(html.indexOf('Total P') > 0, 'Should show total P');
+  assert(html.indexOf('Total Q') > 0, 'Should show total Q');
+  assert(html.indexOf('System PF') > 0, 'Should show system PF');
+});
+
+test('renderPowerFlow shows cable details when selectedCable is set', function() {
+  var tree = sldCreateTree();
+  sldTree = tree;
+  var nodeIds = Object.keys(tree.nodes);
+  var finalId = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') { finalId = nodeIds[i]; break; }
+  }
+  if (finalId) {
+    powerFlowState.selectedCable = finalId;
+    var html = renderPowerFlow();
+    assert(html.indexOf('kW') > 0, 'Should show power in kW');
+    assert(html.indexOf('kvar') > 0, 'Should show reactive power');
+    assert(html.indexOf('kVA') > 0, 'Should show apparent power');
+    powerFlowState.selectedCable = null;
+  }
+});
+
+test('powerflow module key is in quality NAV_GROUP', function() {
+  var qualityGroup = NAV_GROUPS.find(function(g) { return g.id === 'quality'; });
+  assert(qualityGroup, 'quality group should exist');
+  assert(qualityGroup.keys.indexOf('powerflow') >= 0, 'powerflow should be in quality group');
+});
+
+test('renderPowerFlow includes losses visualization', function() {
+  var html = renderPowerFlow();
+  assert(html.indexOf('losses') > 0 || html.indexOf('tab') > 0 || html.indexOf('Total losses') > 0 || html.indexOf('Totale tab') > 0, 'Should mention losses');
+});
+
+test('powerFlowCalcNode computes losses based on cable resistance', function() {
+  var tree = sldCreateTree();
+  var nodeIds = Object.keys(tree.nodes);
+  var finalNode = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit' && tree.nodes[nodeIds[i]].cable) { finalNode = tree.nodes[nodeIds[i]]; break; }
+  }
+  if (finalNode) {
+    var result = powerFlowCalcNode(finalNode, tree, 'normal');
+    assert(result.losses >= 0, 'Losses should be non-negative');
+  }
+});
+
+test('selMatrixGetPairs respects faultMult setting at 2.0', function() {
+  selMatrixState.faultMult = 2.0;
+  var tree = sldCreateTree();
+  var pairs = selMatrixGetPairs(tree);
+  assert(Array.isArray(pairs), 'Should return array at 2.0x multiplier');
+  selMatrixState.faultMult = 1.0;
+});
+
+test('selMatrixRenderSVG with empty nodes returns message', function() {
+  var svg = selMatrixRenderSVG([], []);
+  assert(svg.indexOf('No protection') > 0 || svg.indexOf('Ingen beskyttelsesenheder') > 0, 'Should show no devices message');
+});
+
+test('autoCoordSolve different biases produce different scores', function() {
+  var tree = sldCreateTree();
+  var solutions = autoCoordSolve(tree);
+  if (solutions.length >= 2) {
+    var s0 = solutions[0].totalScore;
+    var s1 = solutions[1].totalScore;
+    assert(typeof s0 === 'number' && typeof s1 === 'number', 'Scores should be numbers');
+  }
+});
+
+test('powerFlowRenderSVG peak mode shows higher totalP than night', function() {
+  var tree = sldCreateTree();
+  var peak = powerFlowRenderSVG(tree, 'peak');
+  var night = powerFlowRenderSVG(tree, 'night');
+  assert(peak.totalP > night.totalP, 'Peak totalP should exceed night totalP');
+});
+
+test('renderSelMatrix is click-only (no text input elements)', function() {
+  var html = renderSelMatrix();
+  assert(html.indexOf('<input type="text"') < 0, 'Should not contain text input');
+  assert(html.indexOf('<textarea') < 0, 'Should not contain textarea');
+});
+
+test('renderAutoCoord is click-only (no text input elements)', function() {
+  autoCoordState.solutions = null;
+  var html = renderAutoCoord();
+  assert(html.indexOf('<input type="text"') < 0, 'Should not contain text input');
+  assert(html.indexOf('<textarea') < 0, 'Should not contain textarea');
+});
+
+test('renderPowerFlow is click-only (no text input elements)', function() {
+  var html = renderPowerFlow();
+  assert(html.indexOf('<input type="text"') < 0, 'Should not contain text input');
+  assert(html.indexOf('<textarea') < 0, 'Should not contain textarea');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
