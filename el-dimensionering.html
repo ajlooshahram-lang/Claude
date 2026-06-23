@@ -19092,7 +19092,22 @@ function renderSPD() {
   var product = spdRecommendProduct(risk, spdState.hasLPS);
   var coord = spdCheckCoordination(spdState.hasLPS, 15);
 
-  // Results
+  // ═══ MATHCAD PRIME SUMMARY ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:16px 20px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('SPD Risikovurdering', 'SPD Risk Assessment') + '</div>';
+  html += mcPrimeDefLine([
+    { sym: 'N<sub>g</sub>', val: spdState.ng, unit: '/km\u00B2\u00B7\u00E5r' },
+    { sym: 'A<sub>c</sub>', val: (acResult.ac * 1e6).toFixed(0), unit: 'm\u00B2' },
+    { sym: 'C<sub>d</sub>', val: loc.cd, unit: '' }
+  ]);
+  html += mcPrimeLine('N<sub>d</sub>', ':= N<sub>g</sub> \u00B7 A<sub>c</sub> \u00B7 C<sub>d</sub> =', spdState.ng + ' \u00B7 ' + acResult.ac.toFixed(6) + ' \u00B7 ' + loc.cd, strikeResult.nd.toFixed(4), '/\u00E5r', mcPrimeRef('IEC 62305-2'));
+  html += '<div style="margin:8px 0;font-size:1.0rem">N<sub>d</sub> ' + (risk.mandatory ? '> 0,05' : '\u2264 0,05') + mcPrimeArrow() + (risk.mandatory ? '<span class="mc-fail">SPD ' + tx('OBLIGATORISK','MANDATORY') + '</span>' : '<span class="mc-ok">' + tx('Anbefalet','Recommended') + '</span>') + '</div>';
+  html += mcPrimeDecision(product.brand + ' ' + product.model + ' \u2014 ' + product.spdType + ' (I<sub>max</sub>=' + product.imax + ' kA, U<sub>p</sub>=' + product.up + ' kV)');
+  html += '<div style="margin-top:8px;font-family:sans-serif">' + mcPrimeRef('DS/HD 60364-4-443') + ' ' + mcPrimeRef('DS/HD 60364-5-534') + ' ' + mcPrimeRef('IEC 62305') + '</div>';
+  html += '</div>';
+
+  // Results (detailed)
+  html += '<details class="eng-advanced"><summary>\uD83D\uDCE6 ' + tx('Detaljeret SPD-specifikation', 'Detailed SPD specification') + '</summary><div class="eng-advanced-body">';
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Risikovurdering', 'Risk Assessment') + ' - ' + acResult.clause + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Opsamlingsareal Ac', 'Collection Area Ac') + '</span><span class="value">' + (acResult.ac * 1e6).toFixed(0) + ' m\u00B2 (' + acResult.ac.toFixed(6) + ' km\u00B2)</span></div>';
@@ -19139,6 +19154,7 @@ function renderSPD() {
   html += '</div>';
 
   // Simulator
+  html += '</div></details>'; // close eng-advanced
   html += renderSPDSim(strikeResult.nd, risk.level, mainType, spec.inKA, spec.imaxKA, risk.mandatory);
 
   // Verdict
@@ -19298,6 +19314,19 @@ function renderUPS() {
   html += '<div class="result-row"><span class="label">' + tx('Total VA (inkl. 25% margin)', 'Total VA (incl. 25% margin)') + '</span><span class="value">' + load.totalVA + ' VA</span></div>';
   html += '</div>';
 
+  // ═══ MATHCAD PRIME SUMMARY ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:16px 20px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 UPS ' + tx('Dimensionering', 'Sizing') + '</div>';
+  html += mcPrimeLine('P<sub>last</sub>', ':= \u2211 P<sub>udstyr</sub> =', '', load.totalW, 'W', '');
+  html += mcPrimeLine('S<sub>UPS</sub>', ':= P<sub>last</sub> / 0,8 =', load.totalVA + ' / 0,8', upsSize, 'VA', tx('80% maks belastning','80% max loading') + ' ' + mcPrimeRef('IEC 62040'));
+  html += mcPrimeLine('C<sub>bat</sub>', ':=', '', battery.ah, 'Ah', battery.voltage + ' V, ' + upsState.autonomy + ' min');
+  html += mcPrimeResult('S<sub>UPS</sub>', (upsSize >= 1000 ? (upsSize / 1000) + ' kVA' : upsSize + ' VA'), '');
+  html += '<div style="font-family:sans-serif">' + mcPrimeRef('IEC 62040') + ' ' + mcPrimeRef('DS/HD 60364') + '</div>';
+  html += '</div>';
+
+  // Results (detailed) - wrapped in collapsible
+  html += '<details class="eng-advanced"><summary>\uD83D\uDCE6 ' + tx('Detaljeret UPS-specifikation', 'Detailed UPS specification') + '</summary><div class="eng-advanced-body">';
+
   // UPS Size
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Valgt UPS', 'Selected UPS') + ' - IEC 62040</div>';
@@ -19337,6 +19366,7 @@ function renderUPS() {
   html += '</div>';
 
   // Simulator
+  html += '</div></details>'; // close eng-advanced
   html += renderUPSSim(load.totalW, upsSize, upsState.autonomy, battery.ah, upsState.topology);
 
   // Verdict
