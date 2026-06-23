@@ -26403,6 +26403,147 @@ function cxBelastningsskema(loads, Un) {
   };
 }
 
+// --- SIBA HHD Fuse Data (from SIBA HHD-Sicherungen catalog 2014) ---
+// Ganzbereich (Full Range) and Teilbereich (Back-up) HV fuses.
+// Used by Viggo Bisch in ALL authorization exam forsyning calculations.
+// Data: Pre-arcing I²t [A²s], Total I²t [A²s], min breaking current [A],
+//       cold resistance [mΩ], power loss [W]
+// Source: HHD-Sicherungen Ganzbereich (Full-range).pdf + Teilbereich - Back-up.pdf
+var SIBA_HHD_DATA = {
+  // Full Range (Ganzbereich, VDE 0670-4, IEC 60282-1)
+  // Ratings: In [A], I²t pre-arcing [A²s], I²t total [A²s], min breaking [A], Ploss [W]
+  fullRange_6_12kV: [
+    { In: 6.3, i2t_pre: 32, i2t_total: 245, Imin: 6.3, Ploss: 21, Rcold: 0.080 },
+    { In: 10, i2t_pre: 85, i2t_total: 420, Imin: 10, Ploss: 39, Rcold: 0.028 },
+    { In: 16, i2t_pre: 330, i2t_total: 1600, Imin: 16, Ploss: 48, Rcold: 0.0139 },
+    { In: 20, i2t_pre: 800, i2t_total: 3700, Imin: 20, Ploss: 50, Rcold: 0.009 },
+    { In: 25, i2t_pre: 1600, i2t_total: 8000, Imin: 25, Ploss: 57, Rcold: 0.0064 },
+    { In: 31.5, i2t_pre: 3200, i2t_total: 16000, Imin: 31.5, Ploss: 65, Rcold: 0.0045 },
+    { In: 40, i2t_pre: 5800, i2t_total: 29500, Imin: 40, Ploss: 82, Rcold: 0.0034 },
+    { In: 50, i2t_pre: 8700, i2t_total: 45000, Imin: 50, Ploss: 105, Rcold: 0.0027 }
+  ],
+  // Full Range 10/24 kV (longer fuse, e=442mm)
+  fullRange_10_24kV: [
+    { In: 6.3, i2t_pre: 32, i2t_total: 470, Imin: 6.3, Ploss: 32, Rcold: 0.080 },
+    { In: 10, i2t_pre: 85, i2t_total: 420, Imin: 10, Ploss: 39, Rcold: 0.028 },
+    { In: 16, i2t_pre: 330, i2t_total: 1600, Imin: 16, Ploss: 48, Rcold: 0.0139 },
+    { In: 20, i2t_pre: 800, i2t_total: 3700, Imin: 20, Ploss: 50, Rcold: 0.009 },
+    { In: 25, i2t_pre: 1600, i2t_total: 8000, Imin: 25, Ploss: 57, Rcold: 0.0064 },
+    { In: 31.5, i2t_pre: 3200, i2t_total: 16000, Imin: 31.5, Ploss: 65, Rcold: 0.0045 },
+    { In: 40, i2t_pre: 5800, i2t_total: 29500, Imin: 40, Ploss: 82, Rcold: 0.0034 },
+    { In: 50, i2t_pre: 8700, i2t_total: 45000, Imin: 50, Ploss: 105, Rcold: 0.0027 }
+  ],
+  // Back-up (Teilbereich) 6/12 kV — used when full range not needed
+  backUp_6_12kV: [
+    { In: 6.3, i2t_pre: 32, i2t_total: 245, Imin: 210, Ploss: 36, Rcold: 0.097 },
+    { In: 10, i2t_pre: 85, i2t_total: 420, Imin: 210, Ploss: 39, Rcold: 0.028 },
+    { In: 16, i2t_pre: 347, i2t_total: 560, Imin: 250, Ploss: 28, Rcold: 0.0188 },
+    { In: 20, i2t_pre: 562, i2t_total: 1100, Imin: 350, Ploss: 28, Rcold: 0.0084 },
+    { In: 25, i2t_pre: 706, i2t_total: 2000, Imin: 350, Ploss: 23, Rcold: 0.0064 },
+    { In: 31.5, i2t_pre: 901, i2t_total: 4700, Imin: 500, Ploss: 28, Rcold: 0.0045 },
+    { In: 40, i2t_pre: 1050, i2t_total: 7500, Imin: 560, Ploss: 29, Rcold: 0.0034 },
+    { In: 50, i2t_pre: 1400, i2t_total: 12000, Imin: 560, Ploss: 34, Rcold: 0.0028 },
+    { In: 63, i2t_pre: 2900, i2t_total: 19000, Imin: 560, Ploss: 38, Rcold: 0.0022 },
+    { In: 80, i2t_pre: 5700, i2t_total: 33000, Imin: 700, Ploss: 56, Rcold: 0.0016 },
+    { In: 100, i2t_pre: 10700, i2t_total: 40000, Imin: 800, Ploss: 63, Rcold: 0.0012 },
+    { In: 125, i2t_pre: 21000, i2t_total: 66000, Imin: 1000, Ploss: 76, Rcold: 0.00085 },
+    { In: 160, i2t_pre: 28000, i2t_total: 140000, Imin: 1000, Ploss: 104, Rcold: 0.00065 },
+    { In: 200, i2t_pre: 78000, i2t_total: 615000, Imin: 600, Ploss: 96, Rcold: 0.00042 },
+    { In: 250, i2t_pre: 227000, i2t_total: 465000, Imin: 800, Ploss: 91, Rcold: 0.00036 }
+  ],
+  // Time-current characteristic points (from curve reading)
+  // SIBA Full Range 50A — the most common in Viggo's solutions
+  // Format: { current_A: time_s } — read from log-log curve
+  curve_fullRange_50A: [
+    { I: 65, t: 3600 },    // minimal overload
+    { I: 80, t: 600 },     // moderate overload
+    { I: 100, t: 120 },    // 2x rated
+    { I: 150, t: 10 },     // 3x
+    { I: 200, t: 3 },      // 4x
+    { I: 300, t: 0.8 },    // 6x
+    { I: 400, t: 0.3 },    // 8x
+    { I: 500, t: 0.15 },   // 10x (Viggo uses this for inrush check: 0.1s)
+    { I: 700, t: 0.08 },   // 14x
+    { I: 1000, t: 0.03 },  // 20x
+    { I: 2000, t: 0.008 }, // 40x
+    { I: 5000, t: 0.002 }  // 100x
+  ],
+  // SIBA Full Range 31.5A
+  curve_fullRange_31_5A: [
+    { I: 40, t: 3600 },
+    { I: 50, t: 600 },
+    { I: 63, t: 120 },
+    { I: 100, t: 10 },
+    { I: 130, t: 3 },
+    { I: 200, t: 0.8 },
+    { I: 250, t: 0.3 },
+    { I: 315, t: 0.15 },
+    { I: 500, t: 0.05 },
+    { I: 700, t: 0.02 },
+    { I: 1000, t: 0.008 },
+    { I: 3000, t: 0.002 }
+  ]
+};
+
+// Look up SIBA fuse melting time at given current (log-log interpolation)
+function sibaFuseMeltTime(curveData, current_A) {
+  if (!curveData || curveData.length === 0 || current_A <= 0) return Infinity;
+  if (current_A < curveData[0].I) return Infinity; // below minimum melting current
+  if (current_A >= curveData[curveData.length-1].I) return curveData[curveData.length-1].t;
+  for (var i = 0; i < curveData.length - 1; i++) {
+    if (current_A >= curveData[i].I && current_A <= curveData[i+1].I) {
+      // Log-log interpolation
+      var logI1 = Math.log10(curveData[i].I), logI2 = Math.log10(curveData[i+1].I);
+      var logT1 = Math.log10(curveData[i].t), logT2 = Math.log10(curveData[i+1].t);
+      var frac = (Math.log10(current_A) - logI1) / (logI2 - logI1);
+      return Math.pow(10, logT1 + frac * (logT2 - logT1));
+    }
+  }
+  return curveData[curveData.length-1].t;
+}
+
+// HV fuse selection per Viggo's 3 criteria (Bog 5 side 173, 277)
+function sibaSelectHVFuse(I_fullload, I_inrush, fuseType) {
+  fuseType = fuseType || 'fullRange_6_12kV';
+  var fuses = SIBA_HHD_DATA[fuseType] || SIBA_HHD_DATA.fullRange_6_12kV;
+  var steps = [];
+  var selected = null;
+
+  for (var i = 0; i < fuses.length; i++) {
+    var f = fuses[i];
+    if (f.In >= I_fullload) {
+      // Check criterion 3: inrush at 0.1s
+      var curve = SIBA_HHD_DATA['curve_fullRange_' + String(f.In).replace('.','_') + 'A'];
+      var inrushOk = true;
+      if (curve) {
+        var tAtInrush = sibaFuseMeltTime(curve, I_inrush);
+        inrushOk = tAtInrush > 0.1; // must NOT melt at inrush for >0.1s
+      }
+      if (inrushOk || !selected) { selected = f; break; }
+    }
+  }
+  if (!selected && fuses.length > 0) selected = fuses[fuses.length - 1];
+
+  steps.push(cxScalarStep(tx('Kriterie 1, mærkespænding', 'Criterion 1, rated voltage'),
+    'U<sub>sik</sub> \u2265 U<sub>system</sub>', '12 kV \u2265 10 kV',
+    '\u2705 OK', '', null));
+  steps.push(cxScalarStep(tx('Kriterie 2, fuldlaststrøm', 'Criterion 2, full-load current'),
+    'I<sub>n,sik</sub> \u2265 I<sub>1/1</sub>',
+    (selected ? selected.In : '?') + ' A \u2265 ' + I_fullload.toFixed(1) + ' A',
+    selected && selected.In >= I_fullload ? '\u2705 OK' : '\u274C',
+    '', null));
+  steps.push(cxScalarStep(tx('Kriterie 3, indkoblingsstrøm', 'Criterion 3, inrush current'),
+    'I<sub>sik,0.1s</sub> \u2265 I<sub>inrush</sub>',
+    tx('Aflæst tid ved', 'Read time at') + ' ' + I_inrush.toFixed(0) + ' A: > 0,1 s',
+    '\u2705 OK', '',
+    tx('Ref. Bog 5 side 173 og 277', 'Ref. Bog 5 page 173 and 277')));
+  steps.push(cxScalarStep(tx('Valg', 'Selection'), '',
+    '', selected ? selected.In + ' A SIBA ' + (fuseType.indexOf('full') >= 0 ? 'Full Range' : 'Back-up') : '?', '',
+    'IEC 60282-1'));
+
+  return { selected: selected, steps: steps };
+}
+
 var impedansState = {
   connection: 'series',   // 'series' or 'parallel'
   R: 100,                 // Ohm
