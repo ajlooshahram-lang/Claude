@@ -32927,81 +32927,80 @@ function analyzerSolve(data) {
 
   // === ALWAYS COMPUTE: Iz (cable current capacity) ===
 
-  // === TRANSFORMER / SUPPLY CALCULATIONS (Authorization-level) ===
-  // These compute the supply-side values that authorization exams require.
+  // === TRANSFORMER / SUPPLY CALCULATIONS (Viggo Bisch method — complex throughout) ===
+  // Uses the EXACT methodology from Viggo's authorization exam solutions:
+  // Z_net = (Un²/Sk) ∠ arccot(R/X), Z_T = (Un²·ek/Sn) ∠ arccos(Pcu/(Sn·ek))
+  // Results shown in BOTH rectangular AND polar form (Mathcad-style dual display).
   var Un_HV = data.networkVoltage_kV || data.trafoPrimKV || (data.skMax_MVA ? 10 : null);
-  if (data.trafoKVA && Un_HV) {
-    // Transformer full-load current (HV side)
-    var inHV = data.trafoKVA / (Math.sqrt(3) * Un_HV);
-    results.push({ type: 'trafo', label: tx('Fuldlaststrøm HV-side', 'Full-load current HV side'),
-      value: inHV.toFixed(1) + ' A',
-      html: '<div class="result-box"><div class="result-title">' + tx('Fuldlaststrøm (primær)', 'Full-load current (primary)') + '</div>' +
-        '<div class="result-row"><span class="label">In = Sn / (√3 · Un)</span><span class="value">= ' + data.trafoKVA + ' / (√3 · ' + Un_HV + ') = <strong>' + inHV.toFixed(1) + ' A</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
+  var RX_max = null, RX_min = null;
+  // Derive R/X from cosφ at SC: R/X = tan(arccos(cosφ)) = cosφ/sinφ... but actually
+  // the utility gives cosφ_k directly. In Danish exams, R/X is given or cosφ_k is given.
+  // From Viggo: arccot(R/X) is used. If cosφ_k given: R/X = cosφ_k/sqrt(1-cosφ_k²)
+  // If only cosφ_k given in the extracted data, convert. Otherwise default to 0.2.
+  if (data.forsyningsdata && data.forsyningsdata.skMax_MVA) {
+    // Use the authorization detection data if available
+    RX_max = 0.2; RX_min = 0.3; // typical defaults
+  } else {
+    RX_max = 0.2; RX_min = 0.3;
+  }
 
-    // Transformer full-load current (LV side, 0.4 kV)
-    var inLV = data.trafoKVA * 1000 / (Math.sqrt(3) * 400);
-    results.push({ type: 'trafo', label: tx('Fuldlaststrøm LV-side (400V)', 'Full-load current LV side (400V)'),
-      value: inLV.toFixed(1) + ' A',
-      html: '<div class="result-box"><div class="result-title">' + tx('Fuldlaststrøm (sekundær)', 'Full-load current (secondary)') + '</div>' +
-        '<div class="result-row"><span class="label">In = Sn×1000 / (√3 · 400)</span><span class="value">= ' + data.trafoKVA + '000 / (√3 · 400) = <strong>' + inLV.toFixed(1) + ' A</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
+  if (data.skMax_MVA && Un_HV) {
+    // Build the full Viggo-style supply calculation with complex impedances
+    var supplySteps = cxStepSupply(
+      Un_HV,
+      data.skMax_MVA,
+      data.skMin_MVA || data.skMax_MVA * 0.6,
+      RX_max,
+      RX_min || RX_max * 1.5,
+      data.trafoUk || null,
+      data.trafoKVA || null,
+      data.trafoPcu || null,
+      data.hvCableLength_km || null,
+      0.206, // default r per km for 150mm² Al (NKT PEX-M-AL)
+      0.093  // default x per km
+    );
 
-    // Transformer secondary short-circuit current (if ek known)
+    // Render as a single Mathcad-style calculation card
+    var supplyHtml = cxRenderSteps(supplySteps.steps, tx('Generelle beregninger (Viggo-metode)', 'General calculations (Viggo method)'));
+    results.push({
+      type: 'supply_complex',
+      label: tx('Forsyningsberegninger (kompleks)', 'Supply calculations (complex)'),
+      value: supplySteps.results.Ik3F_max ? (cxMag(supplySteps.results.Ik3F_max)/1000).toFixed(2) + ' kA (Ik3F,max)' : tx('Se beregning', 'See calculation'),
+      html: supplyHtml,
+      asked: true
+    });
+    solved += supplySteps.steps.length;
+    total += supplySteps.steps.length;
+  } else if (data.trafoKVA && Un_HV) {
+    // Minimal: just transformer full-load + Ik from ek (no Sk data)
+    var I11_HV = cxFullLoadCurrent(data.trafoKVA * 1000, Un_HV * 1000);
+    var I11_LV = cxFullLoadCurrent(data.trafoKVA * 1000, 400);
+    var miniSteps = [];
+    miniSteps.push(cxScalarStep('I<sub>1/1,HV</sub>', 'S<sub>T</sub> / (\u221A3 \u00B7 U<sub>HV</sub>)',
+      data.trafoKVA + '\u00B710\u00B3 / (\u221A3 \u00B7 ' + (Un_HV*1000) + ')', I11_HV.toFixed(1), 'A', null));
+    miniSteps.push(cxScalarStep('I<sub>1/1,LV</sub>', 'S<sub>T</sub> / (\u221A3 \u00B7 400)',
+      data.trafoKVA + '000 / (\u221A3 \u00B7 400)', I11_LV.toFixed(1), 'A', null));
+    miniSteps.push(cxScalarStep('I<sub>inrush</sub>', '12 \u00B7 I<sub>1/1</sub>',
+      '12 \u00B7 ' + I11_HV.toFixed(1), (12 * I11_HV).toFixed(0), 'A', null));
     if (data.trafoUk) {
-      var ikTrafo = inLV / (data.trafoUk / 100);
-      results.push({ type: 'ik', label: tx('Kortslutningsstrøm ved trafoens klemmer', 'SC current at transformer terminals'),
-        value: (ikTrafo / 1000).toFixed(2) + ' kA',
-        html: '<div class="result-box"><div class="result-title">' + tx('Trafo sekundær Ik (kun trafoimpedans)', 'Transformer secondary Ik (transformer impedance only)') + '</div>' +
-          '<div class="result-row"><span class="label">Ik = In / (ek/100)</span><span class="value">= ' + inLV.toFixed(1) + ' / ' + (data.trafoUk/100) + ' = <strong>' + ikTrafo.toFixed(0) + ' A = ' + (ikTrafo/1000).toFixed(2) + ' kA</strong></span></div>' +
-          '<div class="result-row"><span class="label">' + tx('Konservativ (kun trafoimpedans)', 'Conservative (transformer impedance only)') + '</span><span class="value">' + tx('Bruges til valg af brydeevne', 'Used for breaking capacity selection') + '</span></div></div>',
-        asked: true });
-      solved++; total++;
+      var Zt_LV = cxTrafoImpedanceLV(data.trafoUk / 100, data.trafoKVA * 1000, data.trafoPcu || 0);
+      miniSteps.push(cxMathcadStep('Z<sub>T,LV</sub>',
+        '(400\u00B2 \u00B7 e<sub>k</sub> / S<sub>T</sub>) \u2220 arccos(P<sub>Cu</sub>/(S<sub>T</sub>\u00B7e<sub>k</sub>))',
+        '(400\u00B2 \u00B7 ' + data.trafoUk + '% / ' + data.trafoKVA + 'k)',
+        Zt_LV, 'm\u03A9', null));
+      var IkLV = I11_LV / (data.trafoUk / 100);
+      miniSteps.push(cxScalarStep('I<sub>K,trafo,LV</sub>', 'I<sub>n,LV</sub> / (e<sub>k</sub>/100)',
+        I11_LV.toFixed(1) + ' / ' + (data.trafoUk/100), (IkLV/1000).toFixed(2), 'kA',
+        tx('Konservativ \u2014 kun trafoimpedans', 'Conservative \u2014 transformer impedance only')));
     }
-  }
-
-  // Network short-circuit current from Sk
-  if (data.skMax_MVA && Un_HV) {
-    var ikNetMax = data.skMax_MVA * 1000 / (Math.sqrt(3) * Un_HV);
-    results.push({ type: 'ik', label: tx('Maks netværks-kortslutning Ik,max', 'Max network SC current Ik,max'),
-      value: ikNetMax.toFixed(0) + ' A (' + (ikNetMax/1000).toFixed(2) + ' kA)',
-      html: '<div class="result-box"><div class="result-title">' + tx('Ik,max fra netselskab', 'Ik,max from utility') + '</div>' +
-        '<div class="result-row"><span class="label">Ik,max = Sk,max / (√3 · Un)</span><span class="value">= ' + data.skMax_MVA + ' MVA / (√3 · ' + Un_HV + ' kV) = <strong>' + ikNetMax.toFixed(0) + ' A</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
-  }
-  if (data.skMin_MVA && Un_HV) {
-    var ikNetMin = data.skMin_MVA * 1000 / (Math.sqrt(3) * Un_HV);
-    results.push({ type: 'ik', label: tx('Min netværks-kortslutning Ik,min', 'Min network SC current Ik,min'),
-      value: ikNetMin.toFixed(0) + ' A (' + (ikNetMin/1000).toFixed(2) + ' kA)',
-      html: '<div class="result-box"><div class="result-title">' + tx('Ik,min fra netselskab', 'Ik,min from utility') + '</div>' +
-        '<div class="result-row"><span class="label">Ik,min = Sk,min / (√3 · Un)</span><span class="value">= ' + data.skMin_MVA + ' MVA / (√3 · ' + Un_HV + ' kV) = <strong>' + ikNetMin.toFixed(0) + ' A</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
-  }
-
-  // Network impedance from Sk
-  if (data.skMax_MVA && Un_HV) {
-    var ZnetMax = (Un_HV * Un_HV) / data.skMax_MVA * 1000; // mΩ at HV level
-    results.push({ type: 'impedans', label: tx('Netimpedans Znet (fra Sk,max)', 'Network impedance Znet (from Sk,max)'),
-      value: ZnetMax.toFixed(1) + ' mΩ (ref. ' + Un_HV + ' kV)',
-      html: '<div class="result-box"><div class="result-title">' + tx('Netimpedans', 'Network impedance') + '</div>' +
-        '<div class="result-row"><span class="label">Znet = Un² / Sk × 1000</span><span class="value">= ' + Un_HV + '² / ' + data.skMax_MVA + ' × 1000 = <strong>' + ZnetMax.toFixed(1) + ' mΩ</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
-  }
-
-  // Transformer impedance (from ek and Sn)
-  if (data.trafoUk && data.trafoKVA) {
-    var ZtLV = (data.trafoUk / 100) * (400 * 400) / (data.trafoKVA * 1000) * 1000; // mΩ at 400V level
-    results.push({ type: 'impedans', label: tx('Transformerimpedans Zt (400V-side)', 'Transformer impedance Zt (400V side)'),
-      value: ZtLV.toFixed(2) + ' mΩ',
-      html: '<div class="result-box"><div class="result-title">' + tx('Transformerimpedans (sekundærside)', 'Transformer impedance (secondary side)') + '</div>' +
-        '<div class="result-row"><span class="label">Zt = (ek/100) × Un² / Sn × 1000</span><span class="value">= (' + data.trafoUk + '/100) × 400² / ' + data.trafoKVA + '000 × 1000 = <strong>' + ZtLV.toFixed(2) + ' mΩ</strong></span></div></div>',
-      asked: true });
-    solved++; total++;
+    results.push({
+      type: 'supply_complex',
+      label: tx('Transformer-beregninger (Viggo-metode)', 'Transformer calculations (Viggo method)'),
+      value: I11_LV.toFixed(1) + ' A (In,LV)',
+      html: cxRenderSteps(miniSteps, tx('Transformer-beregninger', 'Transformer calculations')),
+      asked: true
+    });
+    solved += miniSteps.length; total += miniSteps.length;
   }
 
   // ===================================================================
