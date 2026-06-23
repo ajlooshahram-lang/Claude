@@ -26290,6 +26290,7 @@ function cxFBKontrol(Ik_min_A, deviceIn, deviceType, deviceCurve, earthSystem, c
 // Returns: { Iz_tabel, kt, ks, kd, ktm, Iz_corrected, steps[], ok }
 // Each correction factor cites its specific table reference.
 function cxCableSizing(In_A, installMethod, temperature, grouping, cableMm2, material, insulation) {
+  if (In_A === null || In_A === undefined || isNaN(In_A)) In_A = 0;
   material = material || 'Cu';
   insulation = insulation || 'XLPE';
   var steps = [];
@@ -26400,6 +26401,195 @@ function cxBelastningsskema(loads, Un) {
     IB: IB, angleIB: angleIB,
     rows: rows,
     cosPhi_total: Math.cos(Math.abs(angleIB) * Math.PI / 180)
+  };
+}
+
+// === MCCB MICROLOGIC SETTINGS ENGINE (Viggo Bisch method) ===
+// Computes and displays Schneider Electric Compact NSX Micrologic 2.2/5.2/6.2 settings.
+// Input: frame name, In, Io multiplier, Isd multiplier, optional Ii multiplier.
+// Output: step-by-step calculation + rendered HTML for analyzer display.
+// DS/HD 60364-4-43 cl.434.5.2 (overload), cl.435 (short-circuit coordination).
+
+function cxMCCBSettings(params) {
+  var frame = params.frame || 'NSX 250';
+  var In = params.In || 250;
+  var Io_mult = params.Io_mult || 1.0;
+  var Isd_mult = params.Isd_mult || 10;
+  var Ii_mult = params.Ii_mult || 12;
+  var IB = params.IB || null;  // load current (for coordination check)
+  var Iz = params.Iz || null;  // cable capacity (for coordination check)
+  var Ik_min = params.Ik_min || null; // min fault current (for FB check)
+
+  // Compute the Micrologic settings
+  var Ir = In * Io_mult;       // Long-time pickup (overload threshold)
+  var Isd = Ir * Isd_mult;    // Short-time delay pickup
+  var Isd_min = Isd * 0.9;    // ±10% tolerance band
+  var Isd_max = Isd * 1.1;
+  var Ii = In * Ii_mult;       // Instantaneous trip (fixed at ~12×In for Micrologic 2.2)
+
+  // Schneider Micrologic 2.2 specifics:
+  // - Ir adjustable: 0.4×In to 1.0×In (via Io dial)
+  // - Isd adjustable: 1.5×Ir to 10×Ir (via Isd dial)
+  // - Ii fixed at 12×In (Micrologic 2.2) or adjustable 2-15×In (5.2/6.2)
+  var Ir_min = In * 0.4;
+  var Ir_max = In * 1.0;
+
+  // Build Viggo-style step-by-step
+  var steps = [];
+
+  steps.push(cxScalarStep(
+    tx('Ramme / udløser', 'Frame / trip unit'),
+    '', '',
+    frame + ' Micrologic 2.2',
+    'In = ' + In + ' A',
+    tx('Schneider Electric Compact NSX', 'Schneider Electric Compact NSX')
+  ));
+
+  steps.push(cxScalarStep(
+    'I<sub>r</sub> (' + tx('overlast', 'overload') + ')',
+    'I<sub>o</sub> \u00D7 I<sub>n</sub>',
+    Io_mult + ' \u00D7 ' + In,
+    Ir.toFixed(0),
+    'A',
+    tx('Indstillelig: ', 'Adjustable: ') + Ir_min.toFixed(0) + ' \u2013 ' + Ir_max.toFixed(0) + ' A'
+  ));
+
+  steps.push(cxScalarStep(
+    'I<sub>sd</sub> (' + tx('kort tidsforsinket', 'short-time delay') + ')',
+    'I<sub>sd,mult</sub> \u00D7 I<sub>r</sub>',
+    Isd_mult + ' \u00D7 ' + Ir.toFixed(0),
+    Isd.toFixed(0),
+    'A (\u00B110%: ' + Isd_min.toFixed(0) + ' \u2013 ' + Isd_max.toFixed(0) + ' A)',
+    tx('Indstillelig: 1,5 \u2013 10 \u00D7 Ir', 'Adjustable: 1.5 \u2013 10 \u00D7 Ir')
+  ));
+
+  steps.push(cxScalarStep(
+    'I<sub>i</sub> (' + tx('momentan', 'instantaneous') + ')',
+    Ii_mult + ' \u00D7 I<sub>n</sub>',
+    Ii_mult + ' \u00D7 ' + In,
+    Ii.toFixed(0),
+    'A',
+    tx('Fast v\u00e6rdi for Micrologic 2.2', 'Fixed value for Micrologic 2.2')
+  ));
+
+  // Coordination checks (DS/HD 60364-4-43)
+  var coordOk = true;
+  var coordChecks = [];
+
+  if (IB !== null) {
+    var check1 = IB <= Ir;
+    coordChecks.push({
+      label: 'I<sub>B</sub> \u2264 I<sub>r</sub>',
+      calc: IB.toFixed(1) + ' \u2264 ' + Ir.toFixed(0),
+      ok: check1
+    });
+    if (!check1) coordOk = false;
+  }
+
+  if (IB !== null && Iz !== null) {
+    var check2 = Ir <= Iz;
+    coordChecks.push({
+      label: 'I<sub>r</sub> \u2264 I<sub>z</sub>',
+      calc: Ir.toFixed(0) + ' \u2264 ' + Iz.toFixed(1),
+      ok: check2
+    });
+    if (!check2) coordOk = false;
+
+    var check3 = Ir <= 1.45 * Iz;
+    coordChecks.push({
+      label: 'I<sub>r</sub> \u2264 1,45 \u00D7 I<sub>z</sub>',
+      calc: Ir.toFixed(0) + ' \u2264 ' + (1.45 * Iz).toFixed(0),
+      ok: check3
+    });
+    if (!check3) coordOk = false;
+  }
+
+  if (Ik_min !== null) {
+    // FB check: Isd or Ii must trip before cable damage
+    var fbOk = Ik_min >= Isd;
+    coordChecks.push({
+      label: 'I<sub>k,min</sub> \u2265 I<sub>sd</sub> (FB)',
+      calc: Ik_min.toFixed(0) + ' \u2265 ' + Isd.toFixed(0),
+      ok: fbOk
+    });
+    if (!fbOk) coordOk = false;
+  }
+
+  if (coordChecks.length > 0) {
+    var coordNote = coordChecks.map(function(c) {
+      return (c.ok ? '\u2705 ' : '\u274C ') + c.label + ': ' + c.calc;
+    }).join('\n');
+    steps.push(cxScalarStep(
+      tx('Koordinering', 'Coordination'),
+      'DS/HD 60364-4-43',
+      '',
+      coordOk ? '\u2705 OK' : '\u274C ' + tx('FEJL', 'FAIL'),
+      '',
+      coordNote
+    ));
+  }
+
+  return {
+    frame: frame,
+    In: In,
+    Ir: Ir, Ir_min: Ir_min, Ir_max: Ir_max,
+    Isd: Isd, Isd_min: Isd_min, Isd_max: Isd_max,
+    Ii: Ii,
+    Io_mult: Io_mult, Isd_mult: Isd_mult, Ii_mult: Ii_mult,
+    coordOk: coordOk, coordChecks: coordChecks,
+    steps: steps
+  };
+}
+
+// Auto-recommend MCCB settings for a given load current and cable capacity.
+// Returns recommended Io multiplier and frame selection.
+function cxMCCBRecommend(IB, Iz, Ik_min) {
+  // Find smallest frame where In >= IB
+  var frames = ['NSX 100', 'NSX 160', 'NSX 250', 'NSX 400', 'NSX 630'];
+  var bestFrame = null, bestIn = null;
+  for (var fi = 0; fi < frames.length; fi++) {
+    var fData = MCCB_FRAMES[frames[fi]];
+    if (!fData) continue;
+    for (var ii = 0; ii < fData.inOptions.length; ii++) {
+      var candidateIn = fData.inOptions[ii];
+      if (candidateIn >= IB) {
+        bestFrame = frames[fi];
+        bestIn = candidateIn;
+        break;
+      }
+    }
+    if (bestFrame) break;
+  }
+  if (!bestFrame) { bestFrame = 'NSX 630'; bestIn = 630; }
+
+  // Compute optimal Io multiplier: smallest Io such that Ir = Io×In >= IB
+  var optIo = 1.0;
+  for (var oi = 0; oi < MCCB_IO_RANGE.length; oi++) {
+    if (MCCB_IO_RANGE[oi] * bestIn >= IB) {
+      optIo = MCCB_IO_RANGE[oi];
+      break;
+    }
+  }
+
+  // Isd multiplier: use 10 (max) by default for maximum short-circuit sensitivity.
+  // If Ik_min is low, lower Isd_mult so Isd doesn't exceed Ik_min.
+  var optIsd = 10;
+  if (Ik_min) {
+    var Ir = optIo * bestIn;
+    for (var si = MCCB_ISD_MULT.length - 1; si >= 0; si--) {
+      if (MCCB_ISD_MULT[si] * Ir <= Ik_min) {
+        optIsd = MCCB_ISD_MULT[si];
+        break;
+      }
+    }
+  }
+
+  return {
+    frame: bestFrame,
+    In: bestIn,
+    Io_mult: optIo,
+    Isd_mult: optIsd,
+    Ii_mult: 12
   };
 }
 
@@ -33930,6 +34120,30 @@ function analyzerSolve(data) {
       });
       results.push({ type: 'rec_device', label: tx('Anbefalet sikring/MCB', 'Recommended fuse/MCB'), value: recIn + ' A', html: recHtml, asked: false, bonus: true });
       solved++; total++;
+
+      // For larger loads (IB > 63A), also show full MCCB Micrologic settings
+      if (ib > 63 && typeof cxMCCBRecommend === 'function') {
+        var mccbRec = cxMCCBRecommend(ib, izCorrected, null);
+        var mccbCalc = cxMCCBSettings({
+          frame: mccbRec.frame,
+          In: mccbRec.In,
+          Io_mult: mccbRec.Io_mult,
+          Isd_mult: mccbRec.Isd_mult,
+          Ii_mult: mccbRec.Ii_mult,
+          IB: ib,
+          Iz: izCorrected
+        });
+        var mccbHtml = cxRenderSteps(mccbCalc.steps, tx('MCCB Micrologic 2.2 \u2014 indstillinger', 'MCCB Micrologic 2.2 \u2014 settings'));
+        results.push({
+          type: 'mccb_settings',
+          label: tx('MCCB Micrologic indstillinger', 'MCCB Micrologic settings'),
+          value: mccbCalc.frame + ' ' + mccbCalc.In + 'A, Ir=' + mccbCalc.Ir.toFixed(0) + 'A',
+          html: mccbHtml,
+          asked: hasQuestion(data, 'device') || hasQuestion(data, 'coord'),
+          bonus: !hasQuestion(data, 'device') && !hasQuestion(data, 'coord')
+        });
+        solved++; total++;
+      }
     } else if (izCorrected) {
       // No standard rating fits between IB and Iz -> conservative flag (never invent).
       flagged.push(tx('Ingen standard In passer mellem IB og Iz \u2014 v\u00e6lg st\u00f8rre kabel', 'No standard In fits between IB and Iz \u2014 choose a larger cable'));
@@ -35616,9 +35830,129 @@ function renderAutorisationReview() {
   return html;
 }
 
+// === AUTO-GENERATED ENSTREGSDIAGRAM (One-Line Diagram) ===
+// Generates a read-only SVG single-line diagram from analyzer-extracted data.
+// Shows: Transformer → HV fuse → Main board (bus) → Circuit breakers → Cables → Loads
+// This is a simplified visualization for exam/project context — not the full interactive SLD.
+function analyzerAutoSLD(data, results) {
+  if (!data) return '';
+  // Determine what we have to draw
+  var hasTrafo = !!(data.trafoKVA || data.trafoPrimKV);
+  var hasLoads = !!(data.multiLoads && data.multiLoads.length > 0);
+  var hasSingleLoad = !!(data.power_kW && !hasLoads);
+  if (!hasTrafo && !hasLoads && !hasSingleLoad) return '';
+
+  var trafoKVA = data.trafoKVA || 630;
+  var primKV = data.trafoPrimKV || 10;
+  var secV = data.voltage || 400;
+  var earthSys = data.earthSystem || 'TN-S';
+
+  // Build circuit list from multiLoads or single load
+  var circuits = [];
+  if (hasLoads) {
+    for (var i = 0; i < data.multiLoads.length && i < 8; i++) {
+      var ld = data.multiLoads[i];
+      circuits.push({ name: ld.name, kW: ld.P_kW, I_A: ld.P_kW * 1000 / (ld.phases === 3 ? Math.sqrt(3) * 400 * ld.cosPhi : 230 * ld.cosPhi) * ld.Sf });
+    }
+  } else if (hasSingleLoad) {
+    var singleI = data.power_kW * 1000 / (data.phases === 3 ? Math.sqrt(3) * 400 * (data.cosPhi || 0.9) : 230 * (data.cosPhi || 0.9));
+    circuits.push({ name: tx('Last', 'Load'), kW: data.power_kW, I_A: singleI });
+  }
+
+  // SVG layout constants
+  var circuitCount = circuits.length || 1;
+  var colW = 110;  // width per circuit column
+  var svgW = Math.max(400, circuitCount * colW + 100);
+  var svgH = hasTrafo ? 380 : 260;
+  var midX = svgW / 2;
+  var busY = hasTrafo ? 190 : 60;
+  var busW = Math.max(200, circuitCount * colW - 20);
+  var busX1 = midX - busW / 2;
+  var busX2 = midX + busW / 2;
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="min-height:200px;max-height:420px;border:1px solid var(--border);border-radius:8px;background:#fafbfc;font-family:sans-serif">';
+
+  // --- Transformer symbol (two interlocking circles) ---
+  if (hasTrafo) {
+    var tY = 60;
+    svg += '<circle cx="' + (midX - 14) + '" cy="' + tY + '" r="22" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+    svg += '<circle cx="' + (midX + 14) + '" cy="' + tY + '" r="22" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+    svg += '<text x="' + midX + '" y="' + (tY - 30) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a5f">' + primKV + ' kV / ' + secV + ' V</text>';
+    svg += '<text x="' + midX + '" y="' + (tY + 38) + '" text-anchor="middle" font-size="10" fill="#333">' + trafoKVA + ' kVA, ' + earthSys + '</text>';
+
+    // HV supply line (incoming)
+    svg += '<line x1="' + midX + '" y1="5" x2="' + midX + '" y2="' + (tY - 22) + '" stroke="#1e3a5f" stroke-width="2"/>';
+    // HV fuse symbol (small rectangle)
+    svg += '<rect x="' + (midX - 4) + '" y="12" width="8" height="16" fill="#f59e0b" stroke="#92400e" stroke-width="1" rx="1"/>';
+    svg += '<text x="' + (midX + 12) + '" y="24" font-size="8" fill="#92400e">HV</text>';
+
+    // Connection from transformer to main bus
+    svg += '<line x1="' + midX + '" y1="' + (tY + 22) + '" x2="' + midX + '" y2="' + (busY - 15) + '" stroke="#333" stroke-width="2"/>';
+
+    // Main breaker symbol (before bus)
+    var mbY = busY - 30;
+    svg += '<rect x="' + (midX - 6) + '" y="' + mbY + '" width="12" height="18" fill="#fff" stroke="#333" stroke-width="1.5" rx="2"/>';
+    svg += '<line x1="' + (midX - 3) + '" y1="' + (mbY + 4) + '" x2="' + (midX + 3) + '" y2="' + (mbY + 14) + '" stroke="#333" stroke-width="1.5"/>';
+    svg += '<line x1="' + midX + '" y1="' + (mbY + 18) + '" x2="' + midX + '" y2="' + busY + '" stroke="#333" stroke-width="2"/>';
+  }
+
+  // --- Main bus (thick horizontal bar) ---
+  svg += '<line x1="' + busX1 + '" y1="' + busY + '" x2="' + busX2 + '" y2="' + busY + '" stroke="#333" stroke-width="4" stroke-linecap="round"/>';
+  svg += '<text x="' + busX1 + '" y="' + (busY - 8) + '" font-size="9" fill="#666">' + tx('Hovedtavle', 'Main board') + '</text>';
+
+  // --- Circuit branches ---
+  var circStartX = midX - ((circuitCount - 1) * colW) / 2;
+  for (var ci = 0; ci < circuits.length; ci++) {
+    var cx = circStartX + ci * colW;
+    var circ = circuits[ci];
+    var cbY = busY + 25; // circuit breaker Y position
+    var cableY = cbY + 30; // cable Y
+    var loadY = cableY + 50; // load Y
+
+    // Vertical line from bus down
+    svg += '<line x1="' + cx + '" y1="' + busY + '" x2="' + cx + '" y2="' + cbY + '" stroke="#333" stroke-width="1.5"/>';
+
+    // Circuit breaker symbol
+    svg += '<rect x="' + (cx - 5) + '" y="' + cbY + '" width="10" height="14" fill="#fff" stroke="#333" stroke-width="1.2" rx="1.5"/>';
+    svg += '<line x1="' + (cx - 2) + '" y1="' + (cbY + 3) + '" x2="' + (cx + 2) + '" y2="' + (cbY + 11) + '" stroke="#333" stroke-width="1.2"/>';
+
+    // Cable line (from breaker to load)
+    svg += '<line x1="' + cx + '" y1="' + (cbY + 14) + '" x2="' + cx + '" y2="' + loadY + '" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2"/>';
+
+    // Load symbol (circle with arrow or M for motor)
+    var isMotor = /motor|pumpe|kompressor/i.test(circ.name);
+    if (isMotor) {
+      svg += '<circle cx="' + cx + '" cy="' + (loadY + 12) + '" r="14" fill="#fff" stroke="#333" stroke-width="1.5"/>';
+      svg += '<text x="' + cx + '" y="' + (loadY + 16) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#333">M</text>';
+    } else {
+      svg += '<circle cx="' + cx + '" cy="' + (loadY + 12) + '" r="12" fill="#fff" stroke="#333" stroke-width="1.5"/>';
+      svg += '<line x1="' + (cx - 5) + '" y1="' + (loadY + 8) + '" x2="' + (cx + 5) + '" y2="' + (loadY + 16) + '" stroke="#333" stroke-width="1.2"/>';
+      svg += '<line x1="' + (cx + 5) + '" y1="' + (loadY + 8) + '" x2="' + (cx - 5) + '" y2="' + (loadY + 16) + '" stroke="#333" stroke-width="1.2"/>';
+    }
+
+    // Labels
+    svg += '<text x="' + cx + '" y="' + (loadY + 35) + '" text-anchor="middle" font-size="8" font-weight="600" fill="#333">' + circ.name.substring(0, 12) + '</text>';
+    svg += '<text x="' + cx + '" y="' + (loadY + 46) + '" text-anchor="middle" font-size="7" fill="#666">' + circ.kW.toFixed(1) + ' kW / ' + circ.I_A.toFixed(0) + ' A</text>';
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+// Render the analyzer auto-SLD as a card (called from renderAnalyzerResults)
+function renderAnalyzerAutoSLDCard(data, results) {
+  var svgContent = analyzerAutoSLD(data, results);
+  if (!svgContent) return '';
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">\u26A1 ' + tx('Enstregsdiagram (auto-genereret)', 'One-line diagram (auto-generated)') + '</div>';
+  html += '<div class="info-row">' + tx('Automatisk genereret fra de udtrukne data. Viser installationens opbygning: trafo \u2192 hovedtavle \u2192 kredse.', 'Auto-generated from extracted data. Shows installation structure: transformer \u2192 main board \u2192 circuits.') + '</div>';
+  html += svgContent;
+  html += '<div style="margin-top:6px;font-size:0.72rem;color:var(--text-muted)">' + tx('Klik p\u00e5 SLD-modulet for den fulde interaktive version med selektivitet og fejlsimulering.', 'Click the SLD module for the full interactive version with selectivity and fault simulation.') + '</div>';
+  html += '</div>';
+  return html;
+}
+
 // Render a Viggo Bisch-style belastningsskema table in the analyzer output.
-// Shows: Mrk | P [kW] | cos φ | Sf | I₁/₁ [A] | Fase | ∠°
-// Then per-phase vectorial sums and the dimensioning current IB.
 function renderAnalyzerBelastningsskema(bsResult, loads, Un) {
   var html = '';
   html += '<div style="overflow-x:auto;margin:8px 0">';
@@ -35781,6 +36115,11 @@ function renderAnalyzerResults() {
   }
 
   html += '</div>';
+
+  // === AUTO-GENERATED ONE-LINE DIAGRAM ===
+  if (analyzerState.extracted) {
+    html += renderAnalyzerAutoSLDCard(analyzerState.extracted, analyzerState.results);
+  }
 
   // === CAPSTONE: Complete Exam Solution (click-only) ===
   html += examSolutionCard();
