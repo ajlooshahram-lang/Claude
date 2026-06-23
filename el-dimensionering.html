@@ -25758,43 +25758,15 @@ function cxStepImpedance(R, L, C, f, connection) {
   });
 
   if (connection === 'series') {
-    // Step 5: Complex impedance (rectangular)
+    // Mathcad-style: Z shown in BOTH rectangular AND polar (dual display)
     var Z = cxRect(R, X);
-    steps.push({
-      label: tx('Kompleks impedans (rektangul\u00E6r)', 'Complex impedance (rectangular)'),
-      formula: 'Z = R + jX',
-      substitution: 'Z = ' + R + ' + j(' + X.toFixed(3) + ')',
-      result: cxFmtRect(Z, 2) + ' \u03A9',
-      note: tx('Reel del = resistans, imagin\u00E6r del = reaktans', 'Real part = resistance, imaginary part = reactance')
-    });
-
-    // Step 6: Magnitude
-    steps.push({
-      label: tx('Impedansens st\u00F8rrelse', 'Impedance magnitude'),
-      formula: '|Z| = \u221A(R\u00B2 + X\u00B2)',
-      substitution: '|Z| = \u221A(' + R + '\u00B2 + ' + X.toFixed(3) + '\u00B2)',
-      result: cxMag(Z).toFixed(3) + ' \u03A9',
-      note: null
-    });
-
-    // Step 7: Phase angle
-    var phi = cxAngleDeg(Z);
-    steps.push({
-      label: tx('Fasevinkel', 'Phase angle'),
-      formula: '\u03C6 = arctan(X/R)',
-      substitution: '\u03C6 = arctan(' + X.toFixed(3) + '/' + R + ')',
-      result: phi.toFixed(2) + '\u00B0',
-      note: phi > 0 ? tx('Induktiv: str\u00F8m halter', 'Inductive: current lags') : phi < 0 ? tx('Kapacitiv: str\u00F8m f\u00F8rer', 'Capacitive: current leads') : tx('Resistiv: i fase', 'Resistive: in phase')
-    });
-
-    // Step 8: Polar form
-    steps.push({
-      label: tx('Impedans (pol\u00E6r form)', 'Impedance (polar form)'),
-      formula: 'Z = |Z|\u2220\u03C6',
-      substitution: null,
-      result: cxFmtPolar(Z, 2) + ' \u03A9',
-      note: tx('Bruges til multiplikation og division af fasorer', 'Used for multiplication and division of phasors')
-    });
+    steps.push(cxMathcadStep(
+      'Z',
+      'R + jX',
+      R + ' + j(' + X.toFixed(3) + ')',
+      Z, '\u03a9',
+      tx('Reel del = resistans, imagin\u00e6r del = reaktans', 'Real part = resistance, imaginary part = reactance')
+    ));
 
     return { Z: Z, steps: steps };
   }
@@ -25881,22 +25853,73 @@ function cxStepPower(Z, U) {
   return { I: I, S: S, steps: steps };
 }
 
-// Render steps as HTML (card format, click-only)
+// Mathcad-style explicit calculation renderer.
+// Each line: symbol formula = numerical substitution = result {rect + polar}
+// Matches the Danish authorization exam solution format exactly.
 function cxRenderSteps(steps, title) {
-  var html = '<div class="card fade-in"><div class="card-title">' + (title || tx('Beregningsskridt', 'Calculation Steps')) + '</div>';
-  html += '<div class="result-box">';
+  var html = '<div class="card fade-in"><div class="card-title" style="font-family:\'Times New Roman\',serif">' + (title || tx('Generelle beregninger', 'General calculations')) + '</div>';
+  html += '<div style="font-family:\'Times New Roman\',serif;font-size:1.05rem;line-height:2.2;padding:12px">';
   for (var i = 0; i < steps.length; i++) {
     var s = steps[i];
-    html += '<div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid var(--border)">';
-    html += '<div style="font-weight:700;color:var(--primary);font-size:0.85rem">' + tx('Trin', 'Step') + ' ' + (i+1) + ': ' + s.label + '</div>';
-    if (s.formula) html += '<div style="font-family:monospace;margin:4px 0;font-size:0.9rem;color:var(--text)">' + s.formula + '</div>';
-    if (s.substitution) html += '<div style="font-family:monospace;margin:2px 0;font-size:0.85rem;color:var(--text-muted)">' + s.substitution + '</div>';
-    html += '<div style="font-weight:600;margin:4px 0;font-size:0.95rem;color:var(--success)">' + s.result + '</div>';
-    if (s.note) html += '<div style="font-size:0.78rem;color:var(--text-muted);font-style:italic">' + s.note + '</div>';
+    // Mathcad layout: Name = Formula = Substitution = Result (both forms)
+    html += '<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">';
+    // Line 1: Symbol = Formula = Numbers = Result
+    html += '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px">';
+    // Left: symbol/name (italic, like a variable)
+    html += '<span style="min-width:80px;font-style:italic;white-space:nowrap">' + s.label + '</span>';
+    // Formula
+    if (s.formula) {
+      html += '<span style="color:var(--text-muted)">= ' + s.formula + '</span>';
+    }
+    // Substitution with numbers
+    if (s.substitution) {
+      html += '<span style="color:var(--text)">= ' + s.substitution + '</span>';
+    }
+    // Result — show BOTH rectangular + polar in a stacked brace if complex
+    if (s.resultRect && s.resultPolar) {
+      html += '<span style="font-weight:700;color:var(--success);white-space:nowrap">=</span>';
+      html += '<span style="display:inline-flex;flex-direction:column;border-left:2px solid var(--success);padding-left:6px;font-weight:700;color:var(--success);line-height:1.5">';
+      html += '<span>' + s.resultRect + '</span>';
+      html += '<span>' + s.resultPolar + '</span>';
+      html += '</span>';
+    } else {
+      html += '<span style="font-weight:700;color:var(--success);white-space:nowrap">= ' + s.result + '</span>';
+    }
+    html += '</div>';
+    // Note (if any) — small italic below
+    if (s.note) {
+      html += '<div style="font-size:0.78rem;color:var(--text-muted);font-style:italic;margin-top:2px;padding-left:80px">' + s.note + '</div>';
+    }
     html += '</div>';
   }
   html += '</div></div>';
   return html;
+}
+
+// Build a Mathcad-style step with dual (rect + polar) result
+function cxMathcadStep(label, formula, substitution, z, unit, note) {
+  return {
+    label: label,
+    formula: formula,
+    substitution: substitution,
+    result: cxFmtBoth(z, 3) + ' ' + (unit || ''),
+    resultRect: cxFmtRect(z, 4) + ' ' + (unit || ''),
+    resultPolar: cxFmtPolar(z, 3) + ' ' + (unit || ''),
+    note: note || null
+  };
+}
+
+// Build a simple scalar step (no dual form)
+function cxScalarStep(label, formula, substitution, value, unit, note) {
+  return {
+    label: label,
+    formula: formula,
+    substitution: substitution,
+    result: value + ' ' + (unit || ''),
+    resultRect: null,
+    resultPolar: null,
+    note: note || null
+  };
 }
 
 // Render a phasor diagram (SVG) for Z, I, and/or power
@@ -25933,6 +25956,251 @@ function cxRenderPhasorDiagram(phasors, title) {
 // ===== AC IMPEDANCE CALCULATOR MODULE (Elektroteknik Opgavesamling Ch.6) =====
 
 // State for the AC impedance calculator — all user selections.
+// ============================================================================
+// ===== VIGGO BISCH METHOD — SUPPLY & INSTALLATION CALCULATION ENGINE =====
+// ============================================================================
+// Implements the EXACT calculation methodology from Viggo Bisch's authorization
+// exam solutions (2015-2023), verified against Bog 5 (Forsyningsnet og
+// transformerstationer) and the DS/HD 60364 standard series.
+//
+// KEY DIFFERENCES from naive scalar calculation:
+// 1. ALL impedances are COMPLEX from start (not scalar magnitude)
+// 2. Network impedance angle from arccot(R/X) — NOT arctan
+// 3. Transformer impedance angle from arccos(Pcu/(Sn·ek))
+// 4. Fault currents from COMPLEX DIVISION (result has magnitude + angle)
+// 5. Path impedances ADDED as complex vectors
+// 6. Results ALWAYS shown in BOTH rectangular AND polar form
+//
+// Formula source: Bog 5, side 285-297 + Viggo Bisch VB files 2016-2023.
+
+// --- Network impedance (from utility Sk data) ---
+// Z_net = (U_HV² / Sk) ∠ arccot(R/X)
+// arccot(R/X) = arctan(X/R) = 90° - arctan(R/X)
+// The angle represents the network's X/R ratio as reported by the utility.
+function cxNetImpedance(Un_kV, Sk_MVA, RoverX) {
+  // Un in kV, Sk in MVA, RoverX = R/X ratio (dimensionless, e.g. 0.2)
+  var Un = Un_kV * 1000; // convert to V
+  var Sk = Sk_MVA * 1e6; // convert to VA
+  var magnitude = (Un * Un) / Sk; // |Znet| in Ω (at HV level)
+  var angleDeg = 90 - Math.atan(RoverX) * 180 / Math.PI; // arccot(R/X) in degrees
+  return cxPolar(magnitude, angleDeg);
+}
+
+// Network impedance referred to LV level (400V):
+// Z_net_LV = Z_net_HV * (U_LV/U_HV)² — but since we compute from Sk directly:
+// Z_net_LV = (U_LV² / Sk) ∠ arccot(R/X) [same formula, different Un]
+function cxNetImpedanceLV(Sk_MVA, RoverX, Un_LV) {
+  Un_LV = Un_LV || 400;
+  var Sk = Sk_MVA * 1e6;
+  var magnitude = (Un_LV * Un_LV) / Sk * 1000; // mΩ at LV level
+  var angleDeg = 90 - Math.atan(RoverX) * 180 / Math.PI;
+  return cxPolar(magnitude, angleDeg); // result in mΩ
+}
+
+// --- Transformer impedance ---
+// Z_T = (U_N² · ek / S_T) ∠ arccos(er/ek)
+// where er = Pcu / Sn (resistive component of ek)
+// Bog 5 side 295: "Transformerimpedansen på 400 V niveau"
+function cxTrafoImpedance(Un_V, ek_pu, Sn_VA, Pcu_W) {
+  // Un in V (e.g. 10000 for HV or 400 for LV)
+  // ek_pu = ek as fraction (e.g. 0.05 for 5%)
+  // Sn_VA in VA (e.g. 800000 for 800 kVA)
+  // Pcu_W = copper/load loss in W
+  var magnitude = (Un_V * Un_V * ek_pu) / Sn_VA; // |Zt| in Ω
+  var er_pu = Pcu_W / Sn_VA; // er as fraction
+  var cosAngle = er_pu / ek_pu; // er/ek
+  if (cosAngle > 1) cosAngle = 1;
+  if (cosAngle < 0) cosAngle = 0;
+  var angleDeg = Math.acos(cosAngle) * 180 / Math.PI;
+  return cxPolar(magnitude, angleDeg);
+}
+
+// Transformer impedance at LV (400V) level — most common usage:
+// Z_T_LV = (400² · ek / Sn) ∠ arccos(Pcu/(Sn·ek)) [mΩ]
+function cxTrafoImpedanceLV(ek_pu, Sn_VA, Pcu_W) {
+  var Un = 400; // standard Danish LV
+  var magnitude = (Un * Un * ek_pu) / Sn_VA * 1000; // mΩ
+  var er_pu = Pcu_W / Sn_VA;
+  var cosAngle = er_pu / ek_pu;
+  if (cosAngle > 1) cosAngle = 1;
+  var angleDeg = Math.acos(cosAngle) * 180 / Math.PI;
+  return cxPolar(magnitude, angleDeg);
+}
+
+// --- Cable impedance (complex) ---
+// Z_kabel = l · (r + jx) [Ω, with r and x in Ω/km, l in km]
+function cxCableImpedance(length_km, r_per_km, x_per_km) {
+  return cxRect(length_km * r_per_km, length_km * x_per_km);
+}
+
+// Cable impedance in mΩ (for LV calculations where l is in meters):
+function cxCableImpedanceMOhm(length_m, r_per_km, x_per_km) {
+  var l_km = length_m / 1000;
+  return cxScale(cxRect(l_km * r_per_km, l_km * x_per_km), 1000); // mΩ
+}
+
+// For parallel cables: Z_parallel = Z_single / n_parallel
+function cxCableImpedanceParallel(length_km, r_per_km, x_per_km, nParallel) {
+  var zSingle = cxCableImpedance(length_km, r_per_km, x_per_km);
+  return cxScale(zSingle, 1 / (nParallel || 1));
+}
+
+// --- Path (cumulative) impedance ---
+// Z_total = Z_net + Z_kabel1 + Z_kabel2 + ... + Z_trafo [complex addition]
+function cxPathImpedance(impedances) {
+  var total = cxRect(0, 0);
+  for (var i = 0; i < impedances.length; i++) {
+    total = cxAdd(total, impedances[i]);
+  }
+  return total;
+}
+
+// --- Fault current (from complex impedance) ---
+// I_K3F = c · U_n / (√3 · |Z_total|) — magnitude, with angle from Z
+// Per IEC 60909: c_max = 1.05 (for Ik,max), c_min = 0.95 (for Ik,min)
+function cxFaultCurrent3F(Un_V, Ztotal, cFactor) {
+  cFactor = cFactor || 1.0;
+  // I = c·U / (√3·Z) as complex division
+  var U_phasor = cxRect(cFactor * Un_V / Math.sqrt(3), 0); // U/√3 as reference
+  return cxDiv(U_phasor, Ztotal);
+}
+
+// Single-phase fault (phase-earth in TN): I_KFN = c · U0 / Z_s
+// where Z_s = fault loop impedance (includes return path factor 2)
+function cxFaultCurrentFN(U0_V, Zs, cFactor) {
+  cFactor = cFactor || 0.95;
+  var U_phasor = cxRect(cFactor * U0_V, 0);
+  return cxDiv(U_phasor, Zs);
+}
+
+// Two-phase fault: I_K2F = I_K3F · √3/2
+function cxFaultCurrent2F(Ik3F) {
+  return cxScale(Ik3F, Math.sqrt(3) / 2);
+}
+
+// --- Full-load current ---
+function cxFullLoadCurrent(Sn_VA, Un_V) {
+  return Sn_VA / (Math.sqrt(3) * Un_V);
+}
+
+// Transformer inrush: typically 12 × I_1/1
+function cxInrushCurrent(I_fullload, factor) {
+  return I_fullload * (factor || 12);
+}
+
+// --- Earth conductor sizing (adiabatic per DS/EN 50522) ---
+// S ≥ (I_K / k) · √(t / ln((θ_f + β) / (θ_i + β)))
+// k = 226 (Cu), 148 (Al); β = 234.5 (Cu), 228 (Al); θ_f = 300°C, θ_i = 35°C typical
+function cxEarthConductorSize(Ik_A, t_s, material) {
+  var k = material === 'Al' ? 148 : 226;
+  var beta = material === 'Al' ? 228 : 234.5;
+  var thetaF = 300; // final temperature °C
+  var thetaI = 35;  // initial temperature °C
+  var lnTerm = Math.log((thetaF + beta) / (thetaI + beta));
+  if (lnTerm <= 0) return Infinity;
+  return (Ik_A / k) * Math.sqrt(t_s / lnTerm);
+}
+
+// --- Fasekompensering (Power factor correction) ---
+// Q_C = P · (tan(φ_old) - tan(φ_new))
+// n_batteries = Q_C / Q_per_battery
+function cxPFCorrection(P_kW, cosPhi_old, cosPhi_target) {
+  cosPhi_target = cosPhi_target || 0.95;
+  var phi_old = Math.acos(cosPhi_old);
+  var phi_new = Math.acos(cosPhi_target);
+  var Qc_kvar = P_kW * (Math.tan(phi_old) - Math.tan(phi_new));
+  return { Qc_kvar: Qc_kvar, P_kW: P_kW, cosPhi_old: cosPhi_old, cosPhi_target: cosPhi_target };
+}
+
+// --- Viggo-style step builder for supply calculations ---
+function cxStepSupply(Un_kV, Sk_max_MVA, Sk_min_MVA, RX_max, RX_min, ek_pct, Sn_kVA, Pcu_W, cableLengths_km, r_per_km, x_per_km) {
+  var steps = [];
+  var results = {};
+
+  // 1. Network impedance (min and max)
+  var Znet_min = cxNetImpedance(Un_kV, Sk_max_MVA, RX_max);
+  steps.push(cxMathcadStep(
+    'Z<sub>net,min</sub>',
+    '(U<sub>HV</sub>\u00B2 / S<sub>kn,max</sub>) \u2220 arccot(R/X<sub>max</sub>)',
+    '(' + (Un_kV*1000) + '\u00B2 / ' + Sk_max_MVA + '\u00B710\u2076) \u2220 arccot(' + RX_max + ')',
+    Znet_min, '\u03A9', null
+  ));
+  results.Znet_min = Znet_min;
+
+  var Znet_max = cxNetImpedance(Un_kV, Sk_min_MVA, RX_min);
+  steps.push(cxMathcadStep(
+    'Z<sub>net,max</sub>',
+    '(U<sub>HV</sub>\u00B2 / S<sub>kn,min</sub>) \u2220 arccot(R/X<sub>min</sub>)',
+    '(' + (Un_kV*1000) + '\u00B2 / ' + Sk_min_MVA + '\u00B710\u2076) \u2220 arccot(' + RX_min + ')',
+    Znet_max, '\u03A9', null
+  ));
+  results.Znet_max = Znet_max;
+
+  // 2. Cable impedance (if provided)
+  if (cableLengths_km && r_per_km && x_per_km) {
+    var totalLength = Array.isArray(cableLengths_km) ? cableLengths_km.reduce(function(a,b){return a+b;},0) : cableLengths_km;
+    var Zkabel = cxCableImpedance(totalLength, r_per_km, x_per_km);
+    steps.push(cxMathcadStep(
+      'Z<sub>kabel</sub>',
+      'l<sub>kabel</sub> \u00B7 (r + jx)',
+      totalLength.toFixed(1) + ' \u00B7 (' + r_per_km + ' + j' + x_per_km + ')',
+      Zkabel, '\u03A9', null
+    ));
+    results.Zkabel = Zkabel;
+  }
+
+  // 3. Transformer impedance
+  if (ek_pct && Sn_kVA) {
+    var Sn_VA = Sn_kVA * 1000;
+    var ek_pu = ek_pct / 100;
+    var Un_V = Un_kV * 1000;
+    var Zt = cxTrafoImpedance(Un_V, ek_pu, Sn_VA, Pcu_W || 0);
+    var formula = '(U<sub>N,tr</sub>\u00B2 \u00B7 e<sub>k</sub> / S<sub>T</sub>) \u2220 arccos(P<sub>Cu</sub> / (S<sub>T</sub> \u00B7 e<sub>k</sub>))';
+    var subst = '(' + Un_V + '\u00B2 \u00B7 ' + ek_pct + '% / ' + Sn_kVA + '\u00B710\u00B3)';
+    if (Pcu_W) subst += ' \u2220 arccos(' + Pcu_W + ' / (' + Sn_kVA + '\u00B710\u00B3 \u00B7 ' + ek_pct + '%))';
+    steps.push(cxMathcadStep('Z<sub>T</sub>', formula, subst, Zt, '\u03A9', null));
+    results.Zt = Zt;
+  }
+
+  // 4. Full-load current
+  if (Sn_kVA && Un_kV) {
+    var I11 = cxFullLoadCurrent(Sn_kVA * 1000, Un_kV * 1000);
+    steps.push(cxScalarStep(
+      'I<sub>1/1</sub>',
+      'S<sub>T</sub> / (\u221A3 \u00B7 U<sub>N,tr</sub>)',
+      Sn_kVA + '\u00B710\u00B3 / (\u221A3 \u00B7 ' + (Un_kV*1000) + ')',
+      I11.toFixed(1), 'A', null
+    ));
+    results.I11 = I11;
+
+    var Iinrush = cxInrushCurrent(I11);
+    steps.push(cxScalarStep(
+      'I<sub>inrush</sub>',
+      '12 \u00B7 I<sub>1/1</sub>',
+      '12 \u00B7 ' + I11.toFixed(1),
+      Iinrush.toFixed(0), 'A', null
+    ));
+    results.Iinrush = Iinrush;
+  }
+
+  // 5. 3-phase fault current at transformer terminals
+  if (results.Znet_min && results.Zkabel) {
+    var Zpath = cxAdd(results.Znet_min, results.Zkabel);
+    if (results.Zt) Zpath = cxAdd(Zpath, results.Zt);
+    var Ik3F = cxFaultCurrent3F(Un_kV * 1000, Zpath, 1.0);
+    steps.push(cxMathcadStep(
+      'I<sub>K3F,max</sub>',
+      'U<sub>HV</sub> / (\u221A3 \u00B7 Z<sub>total</sub>)',
+      (Un_kV*1000) + ' / (\u221A3 \u00B7 ' + cxFmtPolar(Zpath, 3) + ')',
+      Ik3F, 'A',
+      tx('Konservativ — bruges til dimensionering af brydeevne', 'Conservative — used for breaking capacity selection')
+    ));
+    results.Ik3F_max = Ik3F;
+  }
+
+  return { steps: steps, results: results };
+}
+
 var impedansState = {
   connection: 'series',   // 'series' or 'parallel'
   R: 100,                 // Ohm
