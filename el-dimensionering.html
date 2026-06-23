@@ -43913,125 +43913,799 @@ function renderKundportal() {
 
 
 // ===== INSTALL3D MODULE =====
-let install3dState = { viewMode: 'electrician', selectedNode: null, floor: 0 };
+// Professional 3D Visualization Engine for Danish Electrical Installations
+// Isometric SVG-based rendering with animated current flow, fault simulation,
+// and data-driven component visualization from the SLD tree.
 
+let install3dState = {
+  viewMode: 'electrician',  // 'electrician' | 'customer'
+  displayMode: 'panel',     // 'panel' | 'room' | 'fault' | 'flow'
+  selectedNode: null,
+  faultLocation: null,
+  animating: false,
+  floor: 0
+};
+
+// --- Color Palette ---
+var VIS3D_COLORS = {
+  panelBg: '#0f172a',
+  panelBorder: '#334155',
+  dinRail: '#94a3b8',
+  busbarL: '#ef4444',
+  busbarN: '#3b82f6',
+  busbarPE: '#22c55e',
+  socket: '#3b82f6',
+  lighting: '#f59e0b',
+  cooker: '#ef4444',
+  ev: '#10b981',
+  heatpump: '#8b5cf6',
+  motor: '#f97316',
+  general: '#64748b',
+  cableCopper: '#d97706',
+  cableAluminium: '#94a3b8',
+  faultSpark: '#fbbf24',
+  flowNormal: '#38bdf8',
+  flowOverload: '#ef4444',
+  flowFault: '#fbbf24'
+};
+
+
+// --- 1. Isometric 3D Engine Core ---
+function vis3dIso(x, y, z) {
+  // Convert 3D coordinates to 2D isometric projection
+  var isoX = (x - z) * 0.866;
+  var isoY = (x + z) * 0.5 - y;
+  return { x: isoX, y: isoY };
+}
+
+function vis3dShadow(x, y, w, h) {
+  return '<ellipse cx="' + (x + w/2) + '" cy="' + (y + h + 4) + '" rx="' + (w/2 + 2) + '" ry="3" fill="rgba(0,0,0,0.2)" filter="url(#vis3dBlur)"/>';
+}
+
+function vis3dGradient(id, color1, color2, angle) {
+  var a = (angle || 0) * Math.PI / 180;
+  var x1 = 50 - Math.cos(a) * 50, y1 = 50 - Math.sin(a) * 50;
+  var x2 = 50 + Math.cos(a) * 50, y2 = 50 + Math.sin(a) * 50;
+  return '<linearGradient id="' + id + '" x1="' + x1 + '%" y1="' + y1 + '%" x2="' + x2 + '%" y2="' + y2 + '%">' +
+    '<stop offset="0%" stop-color="' + color1 + '"/>' +
+    '<stop offset="100%" stop-color="' + color2 + '"/></linearGradient>';
+}
+
+function vis3dDefs() {
+  var d = '<defs>';
+  // Blur filter for shadows
+  d += '<filter id="vis3dBlur"><feGaussianBlur stdDeviation="2"/></filter>';
+  d += '<filter id="vis3dGlow"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  // Gradients
+  d += vis3dGradient('vis3dPanelGrad', '#1e293b', '#0f172a', 180);
+  d += vis3dGradient('vis3dMetalGrad', '#64748b', '#475569', 135);
+  d += vis3dGradient('vis3dBusbarGrad', '#dc2626', '#991b1b', 0);
+  d += vis3dGradient('vis3dNbarGrad', '#2563eb', '#1d4ed8', 0);
+  d += vis3dGradient('vis3dPEbarGrad', '#16a34a', '#15803d', 0);
+  d += vis3dGradient('vis3dFloorGrad', '#1e293b', '#0f172a', 90);
+  d += vis3dGradient('vis3dWallGrad', '#334155', '#1e293b', 180);
+  d += vis3dGradient('vis3dCeilingGrad', '#475569', '#334155', 0);
+  // PE striped pattern
+  d += '<pattern id="vis3dPEstripe" width="6" height="6" patternUnits="userSpaceOnUse">';
+  d += '<rect width="6" height="6" fill="#16a34a"/>';
+  d += '<rect x="0" y="0" width="3" height="6" fill="#eab308"/></pattern>';
+  // CSS animations
+  d += '<style>';
+  d += '@keyframes vis3dFlow{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}';
+  d += '@keyframes vis3dFlowFast{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}';
+  d += '@keyframes vis3dPulse{0%{opacity:0.4;r:2}50%{opacity:1;r:4}100%{opacity:0.4;r:2}}';
+  d += '@keyframes vis3dFault{0%{opacity:0;transform:scale(0.5)}20%{opacity:1;transform:scale(1.5)}40%{opacity:0.8;transform:scale(1)}60%{opacity:1;transform:scale(1.3)}100%{opacity:0;transform:scale(0.2)}}';
+  d += '@keyframes vis3dTrip{0%{fill:#22c55e}50%{fill:#ef4444}100%{fill:#ef4444}}';
+  d += '@keyframes vis3dParticle{0%{offset-distance:0%}100%{offset-distance:100%}}';
+  d += '@keyframes vis3dGlowPulse{0%{opacity:0.3}50%{opacity:0.8}100%{opacity:0.3}}';
+  d += '@keyframes vis3dBlink{0%{opacity:1}50%{opacity:0.3}100%{opacity:1}}';
+  d += '.vis3d-flow{animation:vis3dFlow 1.5s linear infinite}';
+  d += '.vis3d-flow-fast{animation:vis3dFlowFast 0.4s linear infinite}';
+  d += '.vis3d-pulse{animation:vis3dPulse 2s ease-in-out infinite}';
+  d += '.vis3d-fault{animation:vis3dFault 0.8s ease-out forwards}';
+  d += '.vis3d-trip{animation:vis3dTrip 0.3s ease-out forwards}';
+  d += '.vis3d-glow{animation:vis3dGlowPulse 2s ease-in-out infinite}';
+  d += '.vis3d-blink{animation:vis3dBlink 1s ease-in-out infinite}';
+  d += '</style>';
+  d += '</defs>';
+  return d;
+}
+
+
+// --- 2. Component Library (inline SVG builders) ---
+
+function vis3dPanel(x, y, z, modules, rails) {
+  // Distribution board with DIN rails, busbar, PE/N bars
+  modules = modules || 12;
+  rails = rails || 3;
+  var w = modules * 4.5 + 20, h = rails * 35 + 60;
+  var svg = '';
+  // Enclosure shadow
+  svg += vis3dShadow(x, y + h, w, 8);
+  // Metal enclosure
+  svg += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4" fill="url(#vis3dPanelGrad)" stroke="#475569" stroke-width="2"/>';
+  // Depth effect (3D side)
+  svg += '<polygon points="' + (x+w) + ',' + y + ' ' + (x+w+6) + ',' + (y+4) + ' ' + (x+w+6) + ',' + (y+h+4) + ' ' + (x+w) + ',' + (y+h) + '" fill="#0f172a" stroke="#334155" stroke-width="0.5"/>';
+  svg += '<polygon points="' + x + ',' + y + ' ' + (x+w) + ',' + y + ' ' + (x+w+6) + ',' + (y+4) + ' ' + (x+6) + ',' + (y+4) + '" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>';
+  // Busbar (L1, L2, L3)
+  for (var b = 0; b < 3; b++) {
+    svg += '<rect x="' + (x + 8) + '" y="' + (y + 12 + b*5) + '" width="' + (w - 16) + '" height="3" rx="1" fill="url(#vis3dBusbarGrad)" opacity="' + (0.9 - b*0.1) + '"/>';
+  }
+  // N bar
+  svg += '<rect x="' + (x + 8) + '" y="' + (y + h - 22) + '" width="' + (w - 16) + '" height="4" rx="1" fill="url(#vis3dNbarGrad)"/>';
+  // PE bar (striped)
+  svg += '<rect x="' + (x + 8) + '" y="' + (y + h - 14) + '" width="' + (w - 16) + '" height="4" rx="1" fill="url(#vis3dPEstripe)"/>';
+  // DIN rails
+  for (var r = 0; r < rails; r++) {
+    var ry = y + 35 + r * 35;
+    svg += '<rect x="' + (x + 6) + '" y="' + ry + '" width="' + (w - 12) + '" height="5" rx="1" fill="url(#vis3dMetalGrad)"/>';
+  }
+  return svg;
+}
+
+function vis3dMCB(x, y, curve, rating, state) {
+  curve = curve || 'B'; rating = rating || 16; state = state || 'on';
+  var color = curve === 'B' ? '#3b82f6' : curve === 'C' ? '#22c55e' : '#ef4444';
+  var stateColor = state === 'on' ? '#22c55e' : state === 'tripped' ? '#ef4444' : '#94a3b8';
+  var svg = '';
+  // MCB body
+  svg += '<rect x="' + x + '" y="' + y + '" width="9" height="28" rx="1" fill="#1e293b" stroke="' + color + '" stroke-width="1"/>';
+  // Toggle
+  svg += '<rect x="' + (x+2) + '" y="' + (state === 'on' ? y+3 : y+15) + '" width="5" height="10" rx="1" fill="' + stateColor + '"/>';
+  // Rating label
+  svg += '<text x="' + (x+4.5) + '" y="' + (y+27) + '" text-anchor="middle" font-size="4" fill="' + color + '" font-weight="bold">' + curve + rating + '</text>';
+  // Status indicator
+  svg += '<circle cx="' + (x+4.5) + '" cy="' + (y-2) + '" r="1.5" fill="' + stateColor + '"' + (state==='tripped'?' class="vis3d-blink"':'') + '/>';
+  return svg;
+}
+
+function vis3dRCD(x, y, type, rating, state) {
+  type = type || 'A'; rating = rating || 30; state = state || 'on';
+  var stateColor = state === 'on' ? '#22c55e' : '#ef4444';
+  var svg = '';
+  // RCD body (wider, 2 module width)
+  svg += '<rect x="' + x + '" y="' + y + '" width="18" height="28" rx="1" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>';
+  // Toggle
+  svg += '<rect x="' + (x+5) + '" y="' + (state==='on'?y+3:y+15) + '" width="8" height="10" rx="1" fill="' + stateColor + '"/>';
+  // Test button
+  svg += '<circle cx="' + (x+14) + '" cy="' + (y+24) + '" r="2" fill="#f59e0b" stroke="#d97706" stroke-width="0.5"/>';
+  svg += '<text x="' + (x+14) + '" cy="' + (y+25) + '" text-anchor="middle" font-size="3" fill="#1e293b">T</text>';
+  // Label
+  svg += '<text x="' + (x+9) + '" y="' + (y+27) + '" text-anchor="middle" font-size="3.5" fill="#8b5cf6">' + type + ' ' + rating + 'mA</text>';
+  return svg;
+}
+
+function vis3dFuse(x, y, rating) {
+  rating = rating || 63;
+  var svg = '';
+  svg += '<rect x="' + x + '" y="' + y + '" width="9" height="28" rx="1" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>';
+  svg += '<rect x="' + (x+2) + '" y="' + (y+5) + '" width="5" height="18" rx="2" fill="#78350f" stroke="#f59e0b" stroke-width="0.5"/>';
+  svg += '<text x="' + (x+4.5) + '" y="' + (y+27) + '" text-anchor="middle" font-size="4" fill="#f59e0b">' + rating + '</text>';
+  return svg;
+}
+
+function vis3dCable(x1, y1, x2, y2, mm2, material, animated) {
+  mm2 = mm2 || 2.5; material = material || 'Cu';
+  var thickness = Math.max(1, Math.min(5, Math.sqrt(mm2) * 0.8));
+  var color = material === 'Cu' ? VIS3D_COLORS.cableCopper : VIS3D_COLORS.cableAluminium;
+  var svg = '';
+  svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + color + '" stroke-width="' + thickness + '" stroke-linecap="round" opacity="0.8"/>';
+  if (animated) {
+    svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + VIS3D_COLORS.flowNormal + '" stroke-width="' + (thickness + 1) + '" stroke-dasharray="4,8" stroke-linecap="round" class="vis3d-flow" opacity="0.6"/>';
+  }
+  return svg;
+}
+
+function vis3dSocket(x, y, type) {
+  type = type || 'schuko';
+  var svg = '';
+  // LK FUGA style frame
+  svg += '<rect x="' + (x-8) + '" y="' + (y-10) + '" width="16" height="20" rx="2" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>';
+  // Socket holes
+  svg += '<circle cx="' + (x-3) + '" cy="' + y + '" r="1.5" fill="#334155"/>';
+  svg += '<circle cx="' + (x+3) + '" cy="' + y + '" r="1.5" fill="#334155"/>';
+  // Earth pin
+  svg += '<rect x="' + (x-1) + '" y="' + (y+4) + '" width="2" height="3" rx="0.5" fill="#22c55e"/>';
+  return svg;
+}
+
+function vis3dSwitch(x, y) {
+  var svg = '';
+  // LK FUGA switch
+  svg += '<rect x="' + (x-8) + '" y="' + (y-10) + '" width="16" height="20" rx="2" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>';
+  // Rocker
+  svg += '<rect x="' + (x-5) + '" y="' + (y-6) + '" width="10" height="12" rx="1.5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="0.5"/>';
+  // Indicator
+  svg += '<circle cx="' + x + '" cy="' + (y-3) + '" r="1" fill="#3b82f6"/>';
+  return svg;
+}
+
+function vis3dLight(x, y, type) {
+  type = type || 'ceiling';
+  var svg = '';
+  if (type === 'ceiling') {
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.6"/>';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="5" fill="#f59e0b" opacity="0.4" class="vis3d-glow"/>';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="2" fill="#fbbf24"/>';
+  } else {
+    svg += '<rect x="' + (x-6) + '" y="' + (y-3) + '" width="12" height="6" rx="1" fill="none" stroke="#f59e0b" stroke-width="1.5"/>';
+    svg += '<rect x="' + (x-3) + '" y="' + (y-1) + '" width="6" height="2" rx="0.5" fill="#f59e0b" opacity="0.6" class="vis3d-glow"/>';
+  }
+  return svg;
+}
+
+function vis3dEVCharger(x, y) {
+  var svg = '';
+  // Wall box
+  svg += '<rect x="' + (x-10) + '" y="' + (y-14) + '" width="20" height="28" rx="3" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>';
+  // Screen
+  svg += '<rect x="' + (x-6) + '" y="' + (y-10) + '" width="12" height="8" rx="1" fill="#0f172a" stroke="#10b981" stroke-width="0.5"/>';
+  // Charging indicator
+  svg += '<text x="' + x + '" y="' + (y-4) + '" text-anchor="middle" font-size="6" fill="#10b981" class="vis3d-glow">&#x26A1;</text>';
+  // Cable
+  svg += '<path d="M' + x + ',' + (y+10) + ' Q' + (x+5) + ',' + (y+18) + ' ' + x + ',' + (y+22) + '" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>';
+  return svg;
+}
+
+function vis3dSmokeDetector(x, y) {
+  var svg = '';
+  svg += '<circle cx="' + x + '" cy="' + y + '" r="7" fill="#f8fafc" stroke="#94a3b8" stroke-width="1"/>';
+  svg += '<circle cx="' + x + '" cy="' + y + '" r="3" fill="none" stroke="#94a3b8" stroke-width="0.5"/>';
+  svg += '<circle cx="' + x + '" cy="' + (y-2) + '" r="1" fill="#ef4444" class="vis3d-pulse"/>';
+  return svg;
+}
+
+
+// --- 3. Data Source: install3dGetComponents ---
 function install3dGetComponents() {
-  var tree = (typeof sldTree !== 'undefined') ? sldTree : { children: [] };
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
   var components = [];
-  if (tree.children) {
-    for (var i = 0; i < tree.children.length; i++) {
-      var c = tree.children[i];
-      components.push({
-        id: i,
-        name: c.name || ('Circuit ' + (i + 1)),
-        type: c.type || 'socket',
-        power: c.power || 0,
-        cable: c.cable || '2.5'
-      });
+  if (tree && tree.nodes && tree.rootId) {
+    var root = tree.nodes[tree.rootId];
+    if (root && root.childIds) {
+      for (var i = 0; i < root.childIds.length; i++) {
+        var cid = root.childIds[i];
+        var nd = tree.nodes[cid];
+        if (!nd) continue;
+        var circuitType = 'socket';
+        var nm = (nd.name_en || nd.name_da || '').toLowerCase();
+        if (nm.indexOf('light') >= 0 || nm.indexOf('belysning') >= 0 || nm.indexOf('lys') >= 0) circuitType = 'light';
+        else if (nm.indexOf('cooker') >= 0 || nm.indexOf('komfur') >= 0 || nm.indexOf('oven') >= 0) circuitType = 'cooker';
+        else if (nm.indexOf('ev') >= 0 || nm.indexOf('charger') >= 0 || nm.indexOf('lader') >= 0) circuitType = 'ev';
+        else if (nm.indexOf('heat') >= 0 || nm.indexOf('varme') >= 0 || nm.indexOf('pump') >= 0) circuitType = 'heatpump';
+        else if (nm.indexOf('motor') >= 0) circuitType = 'motor';
+        else if (nd.type === 'sub_board' || nd.type === 'main_board') circuitType = 'board';
+        components.push({
+          id: cid,
+          name: tx(nd.name_da || ('Kreds ' + (i+1)), nd.name_en || ('Circuit ' + (i+1))),
+          type: circuitType,
+          nodeType: nd.type,
+          power: nd.power_kW || 0,
+          cable: nd.cable ? nd.cable.mm2 : 0,
+          cableMaterial: nd.cable ? nd.cable.material : 'Cu',
+          protection: nd.protection ? (nd.protection.curve || '') + (nd.protection.rating || '') : '',
+          protectionRating: nd.protection ? nd.protection.rating : 0,
+          length: nd.length_m || 0,
+          phases: nd.phases || '1x230',
+          childIds: nd.childIds || []
+        });
+        // Recurse one level for sub-boards
+        if (nd.childIds && nd.childIds.length > 0) {
+          for (var j = 0; j < nd.childIds.length; j++) {
+            var subId = nd.childIds[j];
+            var subNd = tree.nodes[subId];
+            if (!subNd) continue;
+            var subType = 'socket';
+            var subNm = (subNd.name_en || subNd.name_da || '').toLowerCase();
+            if (subNm.indexOf('light') >= 0 || subNm.indexOf('belysning') >= 0) subType = 'light';
+            else if (subNm.indexOf('cooker') >= 0 || subNm.indexOf('komfur') >= 0) subType = 'cooker';
+            else if (subNm.indexOf('ev') >= 0 || subNm.indexOf('lader') >= 0) subType = 'ev';
+            else if (subNm.indexOf('motor') >= 0) subType = 'motor';
+            components.push({
+              id: subId,
+              name: tx(subNd.name_da || ('Kreds ' + (j+1)), subNd.name_en || ('Circuit ' + (j+1))),
+              type: subType,
+              nodeType: subNd.type,
+              power: subNd.power_kW || 0,
+              cable: subNd.cable ? subNd.cable.mm2 : 0,
+              cableMaterial: subNd.cable ? subNd.cable.material : 'Cu',
+              protection: subNd.protection ? (subNd.protection.curve || '') + (subNd.protection.rating || '') : '',
+              protectionRating: subNd.protection ? subNd.protection.rating : 0,
+              length: subNd.length_m || 0,
+              phases: subNd.phases || '1x230',
+              childIds: subNd.childIds || []
+            });
+          }
+        }
+      }
     }
   }
   if (components.length === 0) {
-    components.push({ id: 0, name: 'Main Board', type: 'board', power: 0, cable: '' });
-    components.push({ id: 1, name: 'Circuit 1', type: 'socket', power: 3.6, cable: '2.5' });
-    components.push({ id: 2, name: 'Circuit 2', type: 'light', power: 1.2, cable: '1.5' });
-    components.push({ id: 3, name: 'Circuit 3', type: 'oven', power: 7.2, cable: '6' });
+    components.push({ id: 'demo0', name: tx('Hovedafbryder','Main Switch'), type: 'board', nodeType: 'main_board', power: 0, cable: 10, cableMaterial: 'Cu', protection: 'C63', protectionRating: 63, length: 10, phases: '3x400', childIds: [] });
+    components.push({ id: 'demo1', name: tx('Stikkontakter Stue','Living Room Sockets'), type: 'socket', nodeType: 'final_circuit', power: 3.45, cable: 2.5, cableMaterial: 'Cu', protection: 'B16', protectionRating: 16, length: 25, phases: '1x230', childIds: [] });
+    components.push({ id: 'demo2', name: tx('Belysning','Lighting'), type: 'light', nodeType: 'final_circuit', power: 1.2, cable: 1.5, cableMaterial: 'Cu', protection: 'B10', protectionRating: 10, length: 18, phases: '1x230', childIds: [] });
+    components.push({ id: 'demo3', name: tx('Komfur','Cooker'), type: 'cooker', nodeType: 'final_circuit', power: 7.36, cable: 6, cableMaterial: 'Cu', protection: 'B32', protectionRating: 32, length: 12, phases: '1x230', childIds: [] });
+    components.push({ id: 'demo4', name: tx('EV Lader','EV Charger'), type: 'ev', nodeType: 'final_circuit', power: 11, cable: 6, cableMaterial: 'Cu', protection: 'C20', protectionRating: 20, length: 20, phases: '3x400', childIds: [] });
+    components.push({ id: 'demo5', name: tx('Badevarelse','Bathroom'), type: 'socket', nodeType: 'final_circuit', power: 2.0, cable: 2.5, cableMaterial: 'Cu', protection: 'B16', protectionRating: 16, length: 15, phases: '1x230', childIds: [] });
+    components.push({ id: 'demo6', name: tx('Udendors','Outdoor'), type: 'socket', nodeType: 'final_circuit', power: 3.0, cable: 2.5, cableMaterial: 'Cu', protection: 'B16', protectionRating: 16, length: 35, phases: '1x230', childIds: [] });
+    components.push({ id: 'demo7', name: tx('Belysning 2','Lighting 2'), type: 'light', nodeType: 'final_circuit', power: 0.8, cable: 1.5, cableMaterial: 'Cu', protection: 'B10', protectionRating: 10, length: 22, phases: '1x230', childIds: [] });
   }
   return components;
 }
 
-function install3dRenderSVG(components, viewMode) {
-  var w = 600, h = 400;
-  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 600 400" style="background:var(--bg-card);border-radius:8px">';
 
-  // Isometric grid
-  svg += '<defs><style>@keyframes flowParticle{0%{opacity:0.3}50%{opacity:1}100%{opacity:0.3}}.flow{animation:flowParticle 1.5s infinite}</style></defs>';
+// --- 4. Professional 3D Panel View ---
+function vis3dRenderPanel(components, viewMode) {
+  var w = 620, h = 460;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 620 460" style="background:#0a0f1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">';
+  svg += vis3dDefs();
 
-  // Floor
-  svg += '<polygon points="100,300 300,380 500,300 300,220" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>';
+  // Panel title
+  svg += '<text x="310" y="24" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">' + tx('Gruppetavle \u2014 Professionel 3D Visning', 'Distribution Board \u2014 Professional 3D View') + '</text>';
 
-  // Back wall
-  svg += '<polygon points="100,300 100,120 300,40 300,220" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" opacity="0.7"/>';
+  // Panel enclosure
+  var px = 40, py = 40, pw = 540, ph = 380;
+  svg += vis3dShadow(px, py + ph, pw, 12);
+  // Main enclosure body
+  svg += '<rect x="' + px + '" y="' + py + '" width="' + pw + '" height="' + ph + '" rx="6" fill="url(#vis3dPanelGrad)" stroke="#475569" stroke-width="2.5"/>';
+  // 3D depth effect
+  svg += '<polygon points="' + (px+pw) + ',' + py + ' ' + (px+pw+8) + ',' + (py+6) + ' ' + (px+pw+8) + ',' + (py+ph+6) + ' ' + (px+pw) + ',' + (py+ph) + '" fill="#0a0f1a" stroke="#334155" stroke-width="0.5" opacity="0.8"/>';
+  svg += '<polygon points="' + px + ',' + py + ' ' + (px+pw) + ',' + py + ' ' + (px+pw+8) + ',' + (py+6) + ' ' + (px+8) + ',' + (py+6) + '" fill="#1a2332" stroke="#334155" stroke-width="0.5" opacity="0.8"/>';
 
-  // Side wall
-  svg += '<polygon points="300,40 500,120 500,300 300,220" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" opacity="0.5"/>';
-
-  // Distribution board
-  svg += '<rect x="130" y="140" width="60" height="90" rx="3" fill="#334155" stroke="#64748b" stroke-width="2"/>';
-  svg += '<text x="160" y="130" text-anchor="middle" font-size="9" fill="var(--text-muted)">' + tx('Tavle', 'Board') + '</text>';
-
-  // DIN rail components
-  for (var d = 0; d < Math.min(components.length, 6); d++) {
-    var dy = 150 + d * 12;
-    var col = components[d].type === 'socket' ? '#3b82f6' : components[d].type === 'light' ? '#eab308' : '#ef4444';
-    svg += '<rect x="135" y="' + dy + '" width="50" height="10" rx="1" fill="' + col + '" opacity="0.8"/>';
+  // Busbars (L1, L2, L3) at top
+  var busY = py + 20;
+  var busLabels = ['L1', 'L2', 'L3'];
+  var busColors = ['#ef4444', '#f59e0b', '#8b5cf6'];
+  for (var bi = 0; bi < 3; bi++) {
+    svg += '<rect x="' + (px + 30) + '" y="' + (busY + bi*8) + '" width="' + (pw - 60) + '" height="4" rx="1" fill="' + busColors[bi] + '" opacity="0.85"/>';
+    svg += '<text x="' + (px + 22) + '" y="' + (busY + bi*8 + 4) + '" font-size="5" fill="' + busColors[bi] + '" font-weight="bold">' + busLabels[bi] + '</text>';
   }
 
-  // Cable routes
-  var cableColors = { socket: '#3b82f6', light: '#eab308', oven: '#ef4444', board: '#64748b' };
-  for (var ci = 0; ci < Math.min(components.length, 5); ci++) {
-    var comp = components[ci];
-    var color = cableColors[comp.type] || '#3b82f6';
-    var endX = 250 + ci * 50;
-    var endY = 250 - ci * 15;
-    svg += '<line x1="190" y1="' + (155 + ci * 12) + '" x2="' + endX + '" y2="' + endY + '" stroke="' + color + '" stroke-width="2" opacity="0.7"/>';
+  // Main switch at top center
+  svg += '<rect x="' + (px + pw/2 - 14) + '" y="' + (busY + 28) + '" width="28" height="35" rx="2" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>';
+  svg += '<rect x="' + (px + pw/2 - 8) + '" y="' + (busY + 32) + '" width="16" height="14" rx="1" fill="#22c55e"/>';
+  svg += '<text x="' + (px + pw/2) + '" y="' + (busY + 58) + '" text-anchor="middle" font-size="5" fill="#94a3b8" font-weight="bold">' + tx('Hovedafbryder', 'Main Switch') + '</text>';
 
-    // Animated current flow particle
-    svg += '<circle cx="' + (190 + (endX - 190) * 0.5) + '" cy="' + (155 + ci * 12 + (endY - 155 - ci * 12) * 0.5) + '" r="3" fill="' + color + '" class="flow" style="animation-delay:' + (ci * 0.3) + 's"/>';
+  // DIN Rails (3 rows)
+  var railStartY = busY + 75;
+  var railSpacing = 55;
+  var railCount = 3;
+  var moduleWidth = 10;
+  var moduleGap = 2;
+  var maxModulesPerRail = Math.floor((pw - 40) / (moduleWidth + moduleGap));
 
-    // Component icon at end
-    if (comp.type === 'socket') {
-      svg += '<circle cx="' + endX + '" cy="' + endY + '" r="8" fill="none" stroke="' + color + '" stroke-width="2"/>';
-      svg += '<line x1="' + (endX - 3) + '" y1="' + (endY - 2) + '" x2="' + (endX - 3) + '" y2="' + (endY + 2) + '" stroke="' + color + '" stroke-width="2"/>';
-      svg += '<line x1="' + (endX + 3) + '" y1="' + (endY - 2) + '" x2="' + (endX + 3) + '" y2="' + (endY + 2) + '" stroke="' + color + '" stroke-width="2"/>';
-    } else if (comp.type === 'light') {
-      svg += '<circle cx="' + endX + '" cy="' + endY + '" r="8" fill="' + color + '" opacity="0.3"/>';
-      svg += '<line x1="' + (endX - 4) + '" y1="' + endY + '" x2="' + (endX + 4) + '" y2="' + endY + '" stroke="' + color + '" stroke-width="2"/>';
-    } else {
-      svg += '<rect x="' + (endX - 7) + '" y="' + (endY - 7) + '" width="14" height="14" rx="2" fill="none" stroke="' + color + '" stroke-width="2"/>';
-    }
-
-    // Labels (electrician mode only)
+  for (var rail = 0; rail < railCount; rail++) {
+    var ry = railStartY + rail * railSpacing;
+    // DIN rail
+    svg += '<rect x="' + (px + 15) + '" y="' + (ry + 15) + '" width="' + (pw - 30) + '" height="4" rx="1" fill="url(#vis3dMetalGrad)" opacity="0.7"/>';
     if (viewMode === 'electrician') {
-      svg += '<text x="' + endX + '" y="' + (endY + 18) + '" text-anchor="middle" font-size="8" fill="var(--text-muted)">' + comp.name + '</text>';
-      if (comp.cable) svg += '<text x="' + endX + '" y="' + (endY + 27) + '" text-anchor="middle" font-size="7" fill="var(--text-muted)">' + comp.cable + 'mm\u00B2</text>';
+      svg += '<text x="' + (px + 10) + '" y="' + (ry - 2) + '" font-size="4.5" fill="#64748b">' + tx('Skinne','Rail') + ' ' + (rail+1) + '</text>';
     }
   }
 
-  // Legend
-  svg += '<text x="420" y="30" font-size="10" fill="var(--text-muted)">' + (viewMode === 'electrician' ? tx('Teknisk visning', 'Technical view') : tx('Kundevisning', 'Customer view')) + '</text>';
+  // Place components on rails
+  var currentRail = 0, xPos = px + 25;
+  var circuitTypeColors = { socket: '#3b82f6', light: '#f59e0b', cooker: '#ef4444', ev: '#10b981', heatpump: '#8b5cf6', motor: '#f97316', board: '#64748b' };
+
+  for (var ci = 0; ci < Math.min(components.length, maxModulesPerRail * railCount); ci++) {
+    var comp = components[ci];
+    if (comp.nodeType === 'main_board') continue; // Skip main board (already shown as main switch)
+    var col = circuitTypeColors[comp.type] || '#64748b';
+    var ry2 = railStartY + currentRail * railSpacing;
+
+    // Check if we need to move to next rail
+    if (xPos > px + pw - 40) {
+      currentRail++;
+      if (currentRail >= railCount) break;
+      xPos = px + 25;
+      ry2 = railStartY + currentRail * railSpacing;
+    }
+
+    // Draw RCD before every 2-3 MCBs (simplified: every 3rd component gets an RCD)
+    if (ci > 0 && ci % 3 === 0 && xPos + 22 < px + pw - 40) {
+      svg += vis3dRCD(xPos, ry2 - 6, 'A', 30, 'on');
+      xPos += 22;
+    }
+
+    // Draw MCB
+    var mcbCurve = comp.protection ? comp.protection.charAt(0) : 'B';
+    var mcbRating = comp.protectionRating || 16;
+    if (mcbCurve !== 'B' && mcbCurve !== 'C' && mcbCurve !== 'D') mcbCurve = 'B';
+    var mcbState = (install3dState.faultLocation === comp.id) ? 'tripped' : 'on';
+    svg += vis3dMCB(xPos, ry2 - 6, mcbCurve, mcbRating, mcbState);
+
+    // Circuit label below
+    if (viewMode === 'electrician') {
+      svg += '<text x="' + (xPos + 4.5) + '" y="' + (ry2 + 28) + '" text-anchor="middle" font-size="3.5" fill="' + col + '" transform="rotate(-45,' + (xPos+4.5) + ',' + (ry2+28) + ')">' + comp.name.substring(0,12) + '</text>';
+      svg += '<text x="' + (xPos + 4.5) + '" y="' + (ry2 + 34) + '" text-anchor="middle" font-size="3" fill="#64748b">' + comp.cable + 'mm\u00B2</text>';
+    } else {
+      // Customer view: simpler labels
+      var custIcon = comp.type === 'socket' ? '\uD83D\uDD0C' : comp.type === 'light' ? '\uD83D\uDCA1' : comp.type === 'cooker' ? '\uD83C\uDF73' : comp.type === 'ev' ? '\uD83D\uDE97' : '\u26A1';
+      svg += '<text x="' + (xPos + 4.5) + '" y="' + (ry2 + 28) + '" text-anchor="middle" font-size="6">' + custIcon + '</text>';
+    }
+
+    // Color indicator dot
+    svg += '<rect x="' + xPos + '" y="' + (ry2 + 22) + '" width="9" height="2" rx="1" fill="' + col + '" opacity="0.7"/>';
+
+    xPos += moduleWidth + moduleGap + 2;
+  }
+
+  // N bar at bottom
+  svg += '<rect x="' + (px + 15) + '" y="' + (py + ph - 35) + '" width="' + (pw - 30) + '" height="5" rx="1.5" fill="url(#vis3dNbarGrad)"/>';
+  svg += '<text x="' + (px + 10) + '" y="' + (py + ph - 32) + '" font-size="5" fill="#3b82f6" font-weight="bold">N</text>';
+  // PE bar (green/yellow striped)
+  svg += '<rect x="' + (px + 15) + '" y="' + (py + ph - 22) + '" width="' + (pw - 30) + '" height="5" rx="1.5" fill="url(#vis3dPEstripe)"/>';
+  svg += '<text x="' + (px + 10) + '" y="' + (py + ph - 19) + '" font-size="5" fill="#22c55e" font-weight="bold">PE</text>';
+
+  // N connections dots
+  for (var ni = 0; ni < Math.min(components.length, 12); ni++) {
+    svg += '<circle cx="' + (px + 30 + ni * 40) + '" cy="' + (py + ph - 33) + '" r="2" fill="#60a5fa"/>';
+    svg += '<circle cx="' + (px + 30 + ni * 40) + '" cy="' + (py + ph - 20) + '" r="2" fill="#4ade80"/>';
+  }
+
+  // View indicator
+  svg += '<text x="' + (px + pw - 5) + '" y="' + (py + ph + 18) + '" text-anchor="end" font-size="8" fill="#475569">' + (viewMode === 'electrician' ? tx('Teknisk visning', 'Technical view') : tx('Kundevisning', 'Customer view')) + '</text>';
 
   svg += '</svg>';
   return svg;
 }
 
+
+// --- 5. Residential Installation 3D View (isometric room) ---
+function vis3dRenderRoom(components, viewMode) {
+  var w = 620, h = 460;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 620 460" style="background:#0a0f1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">';
+  svg += vis3dDefs();
+
+  svg += '<text x="310" y="22" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">' + tx('Isometrisk Installation \u2014 Bolig', 'Isometric Installation \u2014 Residential') + '</text>';
+
+  // Isometric room
+  var ox = 310, oy = 380; // Origin (front corner)
+  var roomW = 240, roomD = 160, roomH = 200;
+
+  // Floor with grid
+  var floorPts = ox + ',' + oy + ' ' + (ox + roomW*0.7) + ',' + (oy - roomW*0.35) + ' ' + (ox + roomW*0.7 - roomD*0.7) + ',' + (oy - roomW*0.35 - roomD*0.35) + ' ' + (ox - roomD*0.7) + ',' + (oy - roomD*0.35);
+  svg += '<polygon points="' + floorPts + '" fill="url(#vis3dFloorGrad)" stroke="#334155" stroke-width="1"/>';
+  // Floor grid
+  for (var gi = 1; gi < 6; gi++) {
+    var gFrac = gi / 6;
+    var gx1 = ox + gFrac * roomW * 0.7, gy1 = oy - gFrac * roomW * 0.35;
+    var gx2 = gx1 - roomD * 0.7, gy2 = gy1 - roomD * 0.35;
+    svg += '<line x1="' + gx1 + '" y1="' + gy1 + '" x2="' + gx2 + '" y2="' + gy2 + '" stroke="#1e293b" stroke-width="0.5"/>';
+    var gx3 = ox - gFrac * roomD * 0.7, gy3 = oy - gFrac * roomD * 0.35;
+    var gx4 = gx3 + roomW * 0.7, gy4 = gy3 - roomW * 0.35;
+    svg += '<line x1="' + gx3 + '" y1="' + gy3 + '" x2="' + gx4 + '" y2="' + gy4 + '" stroke="#1e293b" stroke-width="0.5"/>';
+  }
+
+  // Left wall
+  var lwPts = (ox - roomD*0.7) + ',' + (oy - roomD*0.35) + ' ' + (ox - roomD*0.7) + ',' + (oy - roomD*0.35 - roomH) + ' ' + ox + ',' + (oy - roomH) + ' ' + ox + ',' + oy;
+  svg += '<polygon points="' + lwPts + '" fill="url(#vis3dWallGrad)" stroke="#475569" stroke-width="1" opacity="0.8"/>';
+
+  // Back wall
+  var bwPts = (ox - roomD*0.7) + ',' + (oy - roomD*0.35) + ' ' + (ox - roomD*0.7) + ',' + (oy - roomD*0.35 - roomH) + ' ' + (ox + roomW*0.7 - roomD*0.7) + ',' + (oy - roomW*0.35 - roomD*0.35 - roomH) + ' ' + (ox + roomW*0.7 - roomD*0.7) + ',' + (oy - roomW*0.35 - roomD*0.35);
+  svg += '<polygon points="' + bwPts + '" fill="url(#vis3dWallGrad)" stroke="#475569" stroke-width="1" opacity="0.65"/>';
+
+  // Distribution board on left wall
+  var boardX = ox - roomD*0.5, boardY = oy - roomD*0.25 - roomH*0.6;
+  svg += '<rect x="' + (boardX-18) + '" y="' + (boardY-20) + '" width="36" height="50" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>';
+  // DIN rail components in mini panel
+  var panelComps = components.filter(function(c){ return c.nodeType === 'final_circuit'; });
+  for (var pi = 0; pi < Math.min(panelComps.length, 6); pi++) {
+    var pCol = circuitTypeColorGet(panelComps[pi].type);
+    svg += '<rect x="' + (boardX - 14 + pi*5) + '" y="' + (boardY - 12) + '" width="4" height="12" rx="0.5" fill="' + pCol + '" opacity="0.8"/>';
+  }
+  if (viewMode === 'electrician') {
+    svg += '<text x="' + boardX + '" y="' + (boardY + 35) + '" text-anchor="middle" font-size="6" fill="#94a3b8">' + tx('Tavle','Board') + '</text>';
+  }
+
+  // Cable routes (dashed lines in walls)
+  var socketPositions = [];
+  var lightPositions = [];
+  var switchPositions = [];
+
+  // Place sockets along right wall at 30cm height (Danish standard)
+  var socketCount = 0, lightCount = 0;
+  for (var si = 0; si < components.length; si++) {
+    if (components[si].type === 'socket' || components[si].type === 'cooker' || components[si].type === 'ev') {
+      var sxFrac = 0.2 + socketCount * 0.25;
+      var sx = ox + sxFrac * roomW * 0.7;
+      var sy = oy - sxFrac * roomW * 0.35 - roomH * 0.15; // 30cm from floor
+      socketPositions.push({x: sx, y: sy, comp: components[si]});
+      socketCount++;
+      if (socketCount >= 4) break;
+    }
+  }
+  for (var li = 0; li < components.length; li++) {
+    if (components[li].type === 'light') {
+      var lxFrac = 0.3 + lightCount * 0.35;
+      var lx = ox + lxFrac * roomW * 0.5 - roomD * 0.3;
+      var ly = oy - lxFrac * roomW * 0.25 - roomD * 0.15 - roomH * 0.92;
+      lightPositions.push({x: lx, y: ly, comp: components[li]});
+      lightCount++;
+      if (lightCount >= 3) break;
+    }
+  }
+
+  // Draw cable routes
+  for (var cri = 0; cri < socketPositions.length; cri++) {
+    var sp = socketPositions[cri];
+    var cCol = circuitTypeColorGet(sp.comp.type);
+    svg += '<line x1="' + boardX + '" y1="' + boardY + '" x2="' + sp.x + '" y2="' + sp.y + '" stroke="' + cCol + '" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>';
+    if (install3dState.displayMode === 'flow') {
+      svg += '<line x1="' + boardX + '" y1="' + boardY + '" x2="' + sp.x + '" y2="' + sp.y + '" stroke="' + VIS3D_COLORS.flowNormal + '" stroke-width="2" stroke-dasharray="3,9" class="vis3d-flow" opacity="0.7"/>';
+    }
+  }
+  for (var cli = 0; cli < lightPositions.length; cli++) {
+    var lp = lightPositions[cli];
+    svg += '<line x1="' + boardX + '" y1="' + boardY + '" x2="' + lp.x + '" y2="' + lp.y + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>';
+    if (install3dState.displayMode === 'flow') {
+      svg += '<line x1="' + boardX + '" y1="' + boardY + '" x2="' + lp.x + '" y2="' + lp.y + '" stroke="' + VIS3D_COLORS.flowNormal + '" stroke-width="2" stroke-dasharray="3,9" class="vis3d-flow" opacity="0.7"/>';
+    }
+  }
+
+  // Draw sockets
+  for (var sdi = 0; sdi < socketPositions.length; sdi++) {
+    var sdp = socketPositions[sdi];
+    if (sdp.comp.type === 'ev') {
+      svg += vis3dEVCharger(sdp.x, sdp.y);
+    } else {
+      svg += vis3dSocket(sdp.x, sdp.y, 'schuko');
+    }
+    if (viewMode === 'electrician') {
+      svg += '<text x="' + sdp.x + '" y="' + (sdp.y + 16) + '" text-anchor="middle" font-size="5" fill="#94a3b8">' + sdp.comp.name.substring(0,10) + '</text>';
+      svg += '<text x="' + sdp.x + '" y="' + (sdp.y + 22) + '" text-anchor="middle" font-size="4" fill="#64748b">' + sdp.comp.cable + 'mm\u00B2 ' + sdp.comp.protection + '</text>';
+    }
+  }
+
+  // Draw lights on ceiling
+  for (var ldi = 0; ldi < lightPositions.length; ldi++) {
+    var ldp = lightPositions[ldi];
+    svg += vis3dLight(ldp.x, ldp.y, 'ceiling');
+    if (viewMode === 'electrician') {
+      svg += '<text x="' + ldp.x + '" y="' + (ldp.y + 16) + '" text-anchor="middle" font-size="5" fill="#94a3b8">' + ldp.comp.name.substring(0,10) + '</text>';
+    }
+  }
+
+  // Switches on left wall at 105cm
+  svg += vis3dSwitch(ox - roomD*0.35, oy - roomD*0.18 - roomH*0.52);
+  if (viewMode === 'electrician') {
+    svg += '<text x="' + (ox - roomD*0.35) + '" y="' + (oy - roomD*0.18 - roomH*0.52 + 16) + '" text-anchor="middle" font-size="4" fill="#64748b">105cm</text>';
+  }
+
+  // Smoke detector on ceiling
+  var sdX = ox + roomW*0.25 - roomD*0.25, sdY = oy - roomW*0.12 - roomD*0.12 - roomH*0.95;
+  svg += vis3dSmokeDetector(sdX, sdY);
+
+  // Legend
+  if (viewMode === 'electrician') {
+    svg += '<text x="20" y="450" font-size="7" fill="#64748b">' + tx('Standardhojder: Stik 30cm | Afbryder 105cm | Tavle 150cm', 'Standard heights: Socket 30cm | Switch 105cm | Board 150cm') + '</text>';
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function circuitTypeColorGet(type) {
+  return VIS3D_COLORS[type] || VIS3D_COLORS.general;
+}
+
+
+// --- 6. Animated Current Flow View ---
+function vis3dRenderFlow(components, viewMode) {
+  var w = 620, h = 460;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 620 460" style="background:#0a0f1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">';
+  svg += vis3dDefs();
+
+  svg += '<text x="310" y="24" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">' + tx('Stromflow Visualisering', 'Current Flow Visualization') + '</text>';
+
+  // Transformer symbol at top
+  svg += '<circle cx="310" cy="60" r="18" fill="none" stroke="#f59e0b" stroke-width="2"/>';
+  svg += '<circle cx="310" cy="60" r="12" fill="none" stroke="#f59e0b" stroke-width="2"/>';
+  svg += '<text x="310" y="64" text-anchor="middle" font-size="8" fill="#f59e0b">T</text>';
+
+  // Main cable from transformer to board
+  svg += vis3dCable(310, 78, 310, 130, 50, 'Cu', true);
+
+  // Board representation
+  svg += '<rect x="260" y="130" width="100" height="50" rx="4" fill="url(#vis3dPanelGrad)" stroke="#475569" stroke-width="1.5"/>';
+  svg += '<text x="310" y="158" text-anchor="middle" font-size="8" fill="#94a3b8">' + tx('Gruppetavle', 'Distribution Board') + '</text>';
+
+  // Branches to circuits
+  var circuits = components.filter(function(c) { return c.nodeType === 'final_circuit'; });
+  var branchCount = Math.min(circuits.length, 8);
+  var startX = 310 - (branchCount - 1) * 35;
+
+  for (var fi = 0; fi < branchCount; fi++) {
+    var fx = startX + fi * 70;
+    var fy = 350;
+    var comp = circuits[fi];
+    var col = circuitTypeColorGet(comp.type);
+    var isFlowing = install3dState.animating || install3dState.displayMode === 'flow';
+
+    // Cable from board to device
+    svg += vis3dCable(310, 180, fx, fy - 50, comp.cable, comp.cableMaterial, isFlowing);
+
+    // Flow particles
+    if (isFlowing) {
+      var midX = (310 + fx) / 2, midY = (180 + fy - 50) / 2;
+      svg += '<circle cx="' + midX + '" cy="' + midY + '" r="3" fill="' + VIS3D_COLORS.flowNormal + '" class="vis3d-pulse" style="animation-delay:' + (fi * 0.2) + 's"/>';
+    }
+
+    // Circuit endpoint symbol
+    if (comp.type === 'light') {
+      svg += vis3dLight(fx, fy - 40, 'ceiling');
+    } else if (comp.type === 'ev') {
+      svg += '<rect x="' + (fx-8) + '" y="' + (fy-55) + '" width="16" height="20" rx="2" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>';
+      svg += '<text x="' + fx + '" y="' + (fy-42) + '" text-anchor="middle" font-size="7" fill="#10b981">\u26A1</text>';
+    } else {
+      svg += vis3dSocket(fx, fy - 40, 'schuko');
+    }
+
+    // Labels
+    svg += '<text x="' + fx + '" y="' + (fy - 15) + '" text-anchor="middle" font-size="5.5" fill="' + col + '">' + comp.name.substring(0,10) + '</text>';
+    if (viewMode === 'electrician') {
+      svg += '<text x="' + fx + '" y="' + (fy - 7) + '" text-anchor="middle" font-size="4.5" fill="#64748b">' + comp.protection + ' / ' + comp.cable + 'mm\u00B2</text>';
+      svg += '<text x="' + fx + '" y="' + fy + '" text-anchor="middle" font-size="4" fill="#64748b">' + comp.power + ' kW / ' + comp.length + 'm</text>';
+    }
+  }
+
+  // Flow legend
+  svg += '<rect x="20" y="420" width="8" height="8" rx="4" fill="' + VIS3D_COLORS.flowNormal + '" class="vis3d-pulse"/>';
+  svg += '<text x="34" y="428" font-size="7" fill="#94a3b8">' + tx('Normal strom','Normal current') + '</text>';
+  svg += '<rect x="150" y="420" width="8" height="8" rx="4" fill="' + VIS3D_COLORS.flowOverload + '" class="vis3d-pulse"/>';
+  svg += '<text x="164" y="428" font-size="7" fill="#94a3b8">' + tx('Overbelastning','Overload') + '</text>';
+  svg += '<rect x="290" y="420" width="8" height="8" rx="4" fill="' + VIS3D_COLORS.flowFault + '" class="vis3d-pulse"/>';
+  svg += '<text x="304" y="428" font-size="7" fill="#94a3b8">' + tx('Fejlstrom','Fault current') + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+
+// --- 7. Fault Simulation Mode ---
+function vis3dRenderFault(components, viewMode) {
+  var w = 620, h = 460;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 620 460" style="background:#0a0f1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">';
+  svg += vis3dDefs();
+
+  svg += '<text x="310" y="24" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">' + tx('Fejlsimulering \u2014 Klik pa en kreds', 'Fault Simulation \u2014 Click on a circuit') + '</text>';
+
+  // Schematic layout
+  var circuits = components.filter(function(c) { return c.nodeType === 'final_circuit'; });
+  var cCount = Math.min(circuits.length, 8);
+  var colWidth = 560 / cCount;
+
+  // Busbar at top
+  svg += '<rect x="30" y="60" width="560" height="6" rx="2" fill="url(#vis3dBusbarGrad)"/>';
+  svg += '<text x="20" y="66" font-size="6" fill="#ef4444" font-weight="bold">L</text>';
+
+  for (var fci = 0; fci < cCount; fci++) {
+    var comp = circuits[fci];
+    var cx = 60 + fci * colWidth;
+    var col = circuitTypeColorGet(comp.type);
+    var isFaulted = install3dState.faultLocation === comp.id;
+
+    // Vertical cable from busbar down
+    svg += '<line x1="' + cx + '" y1="66" x2="' + cx + '" y2="120" stroke="' + col + '" stroke-width="2"/>';
+
+    // Protection device
+    var protY = 120;
+    svg += '<rect x="' + (cx-6) + '" y="' + protY + '" width="12" height="20" rx="1.5" fill="' + (isFaulted ? '#7f1d1d' : '#1e293b') + '" stroke="' + (isFaulted ? '#ef4444' : col) + '" stroke-width="1.5"/>';
+    svg += '<circle cx="' + cx + '" cy="' + (protY + 5) + '" r="3" fill="' + (isFaulted ? '#ef4444' : '#22c55e') + '"' + (isFaulted ? ' class="vis3d-blink"' : '') + '/>';
+    svg += '<text x="' + cx + '" y="' + (protY + 16) + '" text-anchor="middle" font-size="4" fill="' + col + '">' + comp.protection + '</text>';
+
+    // Cable to load
+    var cableEndY = 280;
+    svg += '<line x1="' + cx + '" y1="' + (protY + 20) + '" x2="' + cx + '" y2="' + cableEndY + '" stroke="' + col + '" stroke-width="' + Math.max(1, Math.sqrt(comp.cable)*0.6) + '"' + (isFaulted ? ' stroke-dasharray="3,2"' : '') + '/>';
+
+    // Animated fault particles
+    if (isFaulted) {
+      svg += '<circle cx="' + cx + '" cy="' + (cableEndY - 20) + '" r="6" fill="' + VIS3D_COLORS.faultSpark + '" class="vis3d-fault" filter="url(#vis3dGlow)"/>';
+      svg += '<circle cx="' + cx + '" cy="' + (cableEndY - 20) + '" r="10" fill="none" stroke="' + VIS3D_COLORS.faultSpark + '" stroke-width="2" class="vis3d-fault" style="animation-delay:0.1s"/>';
+    }
+
+    // Load symbol
+    svg += '<circle cx="' + cx + '" cy="' + (cableEndY + 10) + '" r="12" fill="' + (isFaulted ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.1)') + '" stroke="' + col + '" stroke-width="1.5"/>';
+    var loadIcon = comp.type === 'light' ? '\uD83D\uDCA1' : comp.type === 'cooker' ? '\uD83C\uDF73' : comp.type === 'ev' ? '\uD83D\uDE97' : '\uD83D\uDD0C';
+    svg += '<text x="' + cx + '" y="' + (cableEndY + 14) + '" text-anchor="middle" font-size="8">' + loadIcon + '</text>';
+
+    // Clickable overlay
+    svg += '<rect x="' + (cx - colWidth/2 + 5) + '" y="60" width="' + (colWidth - 10) + '" height="260" fill="transparent" style="cursor:pointer" onclick="install3dState.faultLocation=\'' + comp.id + '\';renderModule(\'install3d\')"/>';
+
+    // Labels
+    svg += '<text x="' + cx + '" y="' + (cableEndY + 32) + '" text-anchor="middle" font-size="5" fill="' + col + '">' + comp.name.substring(0,10) + '</text>';
+
+    // Fault data display
+    if (isFaulted && viewMode === 'electrician') {
+      var Zs = (0.3 + comp.length * 0.02).toFixed(2);
+      var Ik = (230 / parseFloat(Zs)).toFixed(0);
+      var tripTime = comp.protectionRating <= 16 ? '< 0.1s' : '< 0.4s';
+      svg += '<rect x="' + (cx - 35) + '" y="330" width="70" height="55" rx="4" fill="rgba(127,29,29,0.3)" stroke="#ef4444" stroke-width="1"/>';
+      svg += '<text x="' + cx + '" y="343" text-anchor="middle" font-size="5" fill="#fca5a5">' + tx('Fejlstrom','Fault current') + '</text>';
+      svg += '<text x="' + cx + '" y="354" text-anchor="middle" font-size="6" fill="#ef4444" font-weight="bold">Ik = ' + Ik + ' A</text>';
+      svg += '<text x="' + cx + '" y="365" text-anchor="middle" font-size="5" fill="#fca5a5">Zs = ' + Zs + ' \u03A9</text>';
+      svg += '<text x="' + cx + '" y="376" text-anchor="middle" font-size="5" fill="#fca5a5">' + tx('Udkoblings tid','Trip time') + ': ' + tripTime + '</text>';
+    }
+  }
+
+  // Instruction
+  if (!install3dState.faultLocation) {
+    svg += '<text x="310" y="420" text-anchor="middle" font-size="9" fill="#64748b">' + tx('Klik pa en kreds for at simulere en fejl', 'Click on a circuit to simulate a fault') + '</text>';
+  } else {
+    svg += '<text x="310" y="420" text-anchor="middle" font-size="8" fill="#f87171">\u26A0\uFE0F ' + tx('Fejl simuleret \u2014 Beskyttelse udlost', 'Fault simulated \u2014 Protection operated') + '</text>';
+    svg += '<rect x="200" y="432" width="220" height="22" rx="4" fill="transparent" stroke="#475569" stroke-width="1" style="cursor:pointer" onclick="install3dState.faultLocation=null;renderModule(\'install3d\')"/>';
+    svg += '<text x="310" y="447" text-anchor="middle" font-size="7" fill="#94a3b8">' + tx('Klik her for at nulstille', 'Click here to reset') + '</text>';
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+
+// --- 8. Enhanced renderInstall3d() ---
 function renderInstall3d() {
   var s = install3dState;
   var components = install3dGetComponents();
-  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFD7\uFE0F ' + tx('3D Installationsvisning', '3D Installation Viewer') + '</div>';
-  html += '<p class="info-text">' + tx('Isometrisk visualisering af installationen. Klik p\u00E5 komponenter for detaljer.', 'Isometric visualization of the installation. Click components for details.') + '</p>';
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFD7\uFE0F ' + tx('3D Installationsvisning \u2014 Professionel Visualisering', '3D Installation Viewer \u2014 Professional Visualization') + '</div>';
+  html += '<p class="info-text">' + tx('Avanceret isometrisk visualisering med fejlsimulering, stromflow-animation og professionel tavlevisning.', 'Advanced isometric visualization with fault simulation, current flow animation, and professional panel view.') + '</p>';
 
-  // View mode toggle
-  html += '<div class="btn-group">';
-  html += '<button class="sel-btn ' + (s.viewMode === 'electrician' ? 'selected' : '') + '" onclick="install3dState.viewMode=\'electrician\';renderModule(\'install3d\')">' + tx('Elektrikervisning', 'Electrician View') + '</button>';
-  html += '<button class="sel-btn ' + (s.viewMode === 'customer' ? 'selected' : '') + '" onclick="install3dState.viewMode=\'customer\';renderModule(\'install3d\')">' + tx('Kundevisning', 'Customer View') + '</button>';
+  // Display mode selector
+  html += '<div class="param-group"><div class="param-label">' + tx('Visningstilstand', 'Display Mode') + '</div><div class="btn-group">';
+  var modes = [
+    { id: 'panel', da: 'Tavle 3D', en: 'Panel 3D', icon: '\uD83D\uDDC4\uFE0F' },
+    { id: 'room', da: 'Rum 3D', en: 'Room 3D', icon: '\uD83C\uDFE0' },
+    { id: 'fault', da: 'Fejlsim.', en: 'Fault Sim.', icon: '\u26A1' },
+    { id: 'flow', da: 'Stromflow', en: 'Current Flow', icon: '\uD83D\uDD0B' }
+  ];
+  for (var mi = 0; mi < modes.length; mi++) {
+    var m = modes[mi];
+    html += '<button class="sel-btn ' + (s.displayMode === m.id ? 'selected' : '') + '" onclick="install3dState.displayMode=\'' + m.id + '\';install3dState.faultLocation=null;renderModule(\'install3d\')">' + m.icon + ' ' + tx(m.da, m.en) + '</button>';
+  }
   html += '</div></div>';
 
-  // SVG view
-  html += '<div class="card fade-in"><div class="card-title">' + tx('Isometrisk bygningssnit', 'Isometric Building Section') + '</div>';
-  html += '<div class="result-box">' + install3dRenderSVG(components, s.viewMode) + '</div></div>';
+  // View mode toggle
+  html += '<div class="param-group"><div class="param-label">' + tx('Perspektiv', 'Perspective') + '</div><div class="btn-group">';
+  html += '<button class="sel-btn ' + (s.viewMode === 'electrician' ? 'selected' : '') + '" onclick="install3dState.viewMode=\'electrician\';renderModule(\'install3d\')">\uD83D\uDD27 ' + tx('Elektriker', 'Electrician') + '</button>';
+  html += '<button class="sel-btn ' + (s.viewMode === 'customer' ? 'selected' : '') + '" onclick="install3dState.viewMode=\'customer\';renderModule(\'install3d\')">\uD83D\uDC64 ' + tx('Kunde', 'Customer') + '</button>';
+  html += '</div></div></div>';
 
-  // Component list
-  html += '<div class="card fade-in"><div class="card-title">' + tx('Komponenter', 'Components') + ' (' + components.length + ')</div>';
+  // Main visualization
+  html += '<div class="card fade-in">';
+  if (s.displayMode === 'panel') {
+    html += '<div class="card-title">' + tx('Professionel Tavlevisning', 'Professional Panel View') + '</div>';
+    html += '<div class="result-box" style="overflow-x:auto">' + vis3dRenderPanel(components, s.viewMode) + '</div>';
+  } else if (s.displayMode === 'room') {
+    html += '<div class="card-title">' + tx('Isometrisk Boliginstallation', 'Isometric Residential Installation') + '</div>';
+    html += '<div class="result-box" style="overflow-x:auto">' + vis3dRenderRoom(components, s.viewMode) + '</div>';
+  } else if (s.displayMode === 'fault') {
+    html += '<div class="card-title">' + tx('Fejlsimulering', 'Fault Simulation') + '</div>';
+    html += '<div class="result-box" style="overflow-x:auto">' + vis3dRenderFault(components, s.viewMode) + '</div>';
+  } else {
+    html += '<div class="card-title">' + tx('Animeret Stromflow', 'Animated Current Flow') + '</div>';
+    html += '<div class="result-box" style="overflow-x:auto">' + vis3dRenderFlow(components, s.viewMode) + '</div>';
+  }
+  html += '</div>';
+
+  // Component details table
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Komponentoversigt', 'Component Overview') + ' (' + components.length + ')</div>';
   html += '<div class="result-box">';
   for (var i = 0; i < components.length; i++) {
     var c = components[i];
-    var icon = c.type === 'socket' ? '\uD83D\uDD0C' : c.type === 'light' ? '\uD83D\uDCA1' : c.type === 'board' ? '\uD83D\uDDC4\uFE0F' : '\u26A1';
-    html += '<div class="result-row"><span class="label">' + icon + ' ' + c.name + '</span><span class="value">' + c.power + ' kW / ' + c.cable + 'mm\u00B2</span></div>';
+    var icon = c.type === 'socket' ? '\uD83D\uDD0C' : c.type === 'light' ? '\uD83D\uDCA1' : c.type === 'board' ? '\uD83D\uDDC4\uFE0F' : c.type === 'cooker' ? '\uD83C\uDF73' : c.type === 'ev' ? '\uD83D\uDE97' : c.type === 'heatpump' ? '\u2744\uFE0F' : c.type === 'motor' ? '\u2699\uFE0F' : '\u26A1';
+    var faultBtn = (s.displayMode === 'fault' && c.nodeType === 'final_circuit') ? ' <button class="sel-btn" style="font-size:10px;padding:2px 6px" onclick="install3dState.faultLocation=\'' + c.id + '\';renderModule(\'install3d\')">' + tx('Simuler fejl','Simulate fault') + '</button>' : '';
+    html += '<div class="result-row"><span class="label">' + icon + ' ' + c.name + '</span><span class="value">';
+    if (s.viewMode === 'electrician') {
+      html += c.power + ' kW | ' + c.cable + 'mm\u00B2 ' + c.cableMaterial + ' | ' + c.protection + ' | ' + c.length + 'm';
+    } else {
+      html += c.power + ' kW';
+    }
+    html += faultBtn + '</span></div>';
   }
   html += '</div></div>';
 
   return html;
 }
+
 
 
 // ===== KUNDEVIS MODULE =====
@@ -44051,6 +44725,56 @@ function kundevisGetSafetyBenefits() {
     { icon: '\u26A1', da: 'Beskytter elektronik mod overspaending', en: 'Protects electronics from surges' },
     { icon: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', da: 'Sikrer hele familien \u2014 ogs\u00E5 b\u00F8rn', en: 'Keeps the whole family safe \u2014 including children' }
   ];
+}
+
+function kundevisRenderSafetyScore() {
+  // Circular progress indicator showing safety score
+  var score = 92; // Based on having modern protection
+  var radius = 45, circumference = 2 * Math.PI * radius;
+  var offset = circumference - (score / 100) * circumference;
+  var svg = '<svg width="140" height="140" viewBox="0 0 140 140">';
+  svg += '<circle cx="70" cy="70" r="' + radius + '" fill="none" stroke="#1e293b" stroke-width="8"/>';
+  svg += '<circle cx="70" cy="70" r="' + radius + '" fill="none" stroke="#22c55e" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '" transform="rotate(-90 70 70)"/>';
+  svg += '<text x="70" y="65" text-anchor="middle" font-size="22" fill="#22c55e" font-weight="bold">' + score + '</text>';
+  svg += '<text x="70" y="82" text-anchor="middle" font-size="8" fill="#94a3b8">' + tx('Sikkerhed', 'Safety') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function kundevisRenderBeforeAfter() {
+  // Before/After panel comparison
+  var svg = '<svg width="500" height="180" viewBox="0 0 500 180" style="background:#0a0f1a;border-radius:8px">';
+  svg += '<defs><style>.vis3d-glow-k{animation:vis3dGlowPulse 2s ease-in-out infinite}@keyframes vis3dGlowPulse{0%{opacity:0.3}50%{opacity:0.8}100%{opacity:0.3}}</style></defs>';
+  // Before (old panel)
+  svg += '<text x="125" y="20" text-anchor="middle" font-size="9" fill="#ef4444">' + tx('For (gammelt)', 'Before (old)') + '</text>';
+  svg += '<rect x="50" y="30" width="150" height="120" rx="4" fill="#1e293b" stroke="#64748b" stroke-width="1" opacity="0.6"/>';
+  // Old fuses
+  for (var oi = 0; oi < 4; oi++) {
+    svg += '<circle cx="' + (80 + oi*30) + '" cy="75" r="8" fill="#78350f" stroke="#92400e" stroke-width="1"/>';
+    svg += '<text x="' + (80 + oi*30) + '" y="78" text-anchor="middle" font-size="6" fill="#d97706">' + [16,20,10,35][oi] + '</text>';
+  }
+  svg += '<text x="125" y="110" text-anchor="middle" font-size="7" fill="#94a3b8">' + tx('Sikringstavle fra 1980', '1980s fuse board') + '</text>';
+  svg += '<text x="125" y="135" text-anchor="middle" font-size="6" fill="#ef4444">\u26A0\uFE0F ' + tx('Ingen fejlstromsbeskyttelse', 'No RCD protection') + '</text>';
+
+  // Arrow
+  svg += '<text x="250" y="90" text-anchor="middle" font-size="20" fill="#22c55e">\u2192</text>';
+
+  // After (new panel)
+  svg += '<text x="375" y="20" text-anchor="middle" font-size="9" fill="#22c55e">' + tx('Efter (nyt)', 'After (new)') + '</text>';
+  svg += '<rect x="300" y="30" width="150" height="120" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>';
+  // New MCBs
+  for (var ni = 0; ni < 6; ni++) {
+    svg += '<rect x="' + (315 + ni*20) + '" y="50" width="10" height="24" rx="1" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>';
+    svg += '<rect x="' + (317 + ni*20) + '" y="53" width="6" height="8" rx="0.5" fill="#22c55e"/>';
+  }
+  // RCD
+  svg += '<rect x="330" y="85" width="20" height="24" rx="1" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>';
+  svg += '<rect x="360" y="85" width="20" height="24" rx="1" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>';
+  svg += '<text x="375" y="125" text-anchor="middle" font-size="7" fill="#94a3b8">' + tx('Moderne gruppetavle', 'Modern distribution board') + '</text>';
+  svg += '<text x="375" y="140" text-anchor="middle" font-size="6" fill="#22c55e">\u2713 ' + tx('Fuld RCD beskyttelse', 'Full RCD protection') + '</text>';
+
+  svg += '</svg>';
+  return svg;
 }
 
 function kundevisRenderInfographic() {
@@ -44090,6 +44814,13 @@ function renderKundevis() {
   html += '<div class="btn-group"><button class="sel-btn ' + (s.showCosts ? 'selected' : '') + '" onclick="kundevisState.showCosts=!' + s.showCosts + ';renderModule(\'kundevis\')">' + tx('Vis omkostninger', 'Show costs') + '</button></div>';
   html += '</div>';
 
+  // Safety Score + Before/After
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Sikkerhedsopgradering', 'Safety Upgrade') + '</div>';
+  html += '<div class="result-box" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center">';
+  html += '<div style="text-align:center">' + kundevisRenderSafetyScore() + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + tx('Sikkerhedsscore', 'Safety Score') + '</div></div>';
+  html += '<div>' + kundevisRenderBeforeAfter() + '</div>';
+  html += '</div></div>';
+
   // Infographic
   html += '<div class="card fade-in"><div class="card-title">' + tx('Sikkerhedsfordele', 'Safety Benefits') + '</div>';
   html += '<div class="result-box">' + kundevisRenderInfographic() + '</div></div>';
@@ -44126,92 +44857,112 @@ function renderKundevis() {
 }
 
 
+
 // ===== FILM MODULE =====
 let filmState = { frame: 0, playing: false, speed: 1 };
 
 const FILM_FRAMES = [
-  { da: 'Tom bygning \u2014 v\u00E6gge og gulve', en: 'Empty building \u2014 walls and floors' },
-  { da: 'Hovedkabel og tavle monteret', en: 'Main cable and distribution board mounted' },
-  { da: 'Kabelf\u00F8ringsveje etableret', en: 'Cable routes established' },
-  { da: 'Stikkontakter og afbrydere installeret', en: 'Sockets and switches installed' },
+  { da: 'Tomt rum \u2014 vaegge og gulve', en: 'Empty room \u2014 walls and floors' },
+  { da: 'Kabelfoeringsveje tegnes', en: 'Cable routes drawn' },
+  { da: 'Gruppetavle monteret pa vaeg', en: 'Distribution board mounted on wall' },
+  { da: 'Beskyttelsesenheder installeret', en: 'Protection devices installed' },
+  { da: 'Stikkontakter og afbrydere monteret', en: 'Sockets and switches installed' },
+  { da: 'Forbindelser etableret', en: 'Connections made' },
   { da: 'Test og verifikation', en: 'Testing and verification' },
-  { da: 'F\u00E6rdig installation med str\u00F8mflow', en: 'Final result with current flow' }
+  { da: 'Faerdig installation med stromflow', en: 'Final installation with current flow' }
 ];
 
 function filmRenderFrame(frameIdx) {
-  var w = 560, h = 320;
-  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 560 320" style="background:var(--bg-secondary);border-radius:8px">';
-  svg += '<defs><style>@keyframes pulse{0%{opacity:0.4}50%{opacity:1}100%{opacity:0.4}}.pulse-anim{animation:pulse 2s infinite}</style></defs>';
+  var w = 620, h = 380;
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 620 380" style="background:#0a0f1a;border-radius:12px">';
+  svg += vis3dDefs();
 
-  // Base building (always visible)
+  // Isometric room base
+  var ox = 310, oy = 330;
+  var rw = 200, rd = 130, rh = 180;
+
+  // Floor (always visible)
   if (frameIdx >= 0) {
-    // Floor
-    svg += '<rect x="50" y="250" width="460" height="20" fill="#94a3b8" rx="2"/>';
-    // Walls
-    svg += '<rect x="50" y="60" width="15" height="190" fill="#64748b"/>';
-    svg += '<rect x="495" y="60" width="15" height="190" fill="#64748b"/>';
-    // Ceiling
-    svg += '<rect x="50" y="50" width="460" height="15" fill="#64748b"/>';
-  }
-
-  // Frame 1: Main cable + board
-  if (frameIdx >= 1) {
-    // Main cable coming in
-    svg += '<line x1="50" y1="100" x2="100" y2="100" stroke="#ef4444" stroke-width="4"/>';
-    // Distribution board
-    svg += '<rect x="90" y="80" width="50" height="80" rx="3" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>';
-    // DIN rails
-    for (var d = 0; d < 5; d++) {
-      svg += '<rect x="95" y="' + (88 + d * 14) + '" width="40" height="10" rx="1" fill="#3b82f6" opacity="0.6"/>';
+    var floorPts = ox + ',' + oy + ' ' + (ox + rw*0.7) + ',' + (oy - rw*0.35) + ' ' + (ox + rw*0.7 - rd*0.7) + ',' + (oy - rw*0.35 - rd*0.35) + ' ' + (ox - rd*0.7) + ',' + (oy - rd*0.35);
+    svg += '<polygon points="' + floorPts + '" fill="url(#vis3dFloorGrad)" stroke="#334155" stroke-width="1"/>';
+    // Floor grid
+    for (var gi = 1; gi < 5; gi++) {
+      var gf = gi / 5;
+      svg += '<line x1="' + (ox + gf*rw*0.7) + '" y1="' + (oy - gf*rw*0.35) + '" x2="' + (ox + gf*rw*0.7 - rd*0.7) + '" y2="' + (oy - gf*rw*0.35 - rd*0.35) + '" stroke="#1e293b" stroke-width="0.5"/>';
+      svg += '<line x1="' + (ox - gf*rd*0.7) + '" y1="' + (oy - gf*rd*0.35) + '" x2="' + (ox - gf*rd*0.7 + rw*0.7) + '" y2="' + (oy - gf*rd*0.35 - rw*0.35) + '" stroke="#1e293b" stroke-width="0.5"/>';
     }
-    svg += '<text x="115" y="175" text-anchor="middle" font-size="9" fill="var(--text-muted)">' + tx('Tavle', 'Board') + '</text>';
+    // Walls
+    var lwPts = (ox - rd*0.7) + ',' + (oy - rd*0.35) + ' ' + (ox - rd*0.7) + ',' + (oy - rd*0.35 - rh) + ' ' + ox + ',' + (oy - rh) + ' ' + ox + ',' + oy;
+    svg += '<polygon points="' + lwPts + '" fill="url(#vis3dWallGrad)" stroke="#475569" stroke-width="1" opacity="0.8"/>';
+    var bwPts = (ox - rd*0.7) + ',' + (oy - rd*0.35) + ' ' + (ox - rd*0.7) + ',' + (oy - rd*0.35 - rh) + ' ' + (ox + rw*0.7 - rd*0.7) + ',' + (oy - rw*0.35 - rd*0.35 - rh) + ' ' + (ox + rw*0.7 - rd*0.7) + ',' + (oy - rw*0.35 - rd*0.35);
+    svg += '<polygon points="' + bwPts + '" fill="url(#vis3dWallGrad)" stroke="#475569" stroke-width="1" opacity="0.6"/>';
   }
 
-  // Frame 2: Cable routes
+  // Frame 1: Cable routes (dashed, appearing)
+  if (frameIdx >= 1) {
+    var bx = ox - rd*0.4, by = oy - rd*0.2 - rh*0.55;
+    svg += '<line x1="' + bx + '" y1="' + by + '" x2="' + (ox + rw*0.3) + '" y2="' + (oy - rw*0.15 - rh*0.1) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6"/>';
+    svg += '<line x1="' + bx + '" y1="' + by + '" x2="' + (ox + rw*0.5) + '" y2="' + (oy - rw*0.25 - rh*0.1) + '" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6"/>';
+    svg += '<line x1="' + bx + '" y1="' + by + '" x2="' + (ox + rw*0.15 - rd*0.3) + '" y2="' + (oy - rw*0.07 - rd*0.15 - rh*0.85) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6"/>';
+  }
+
+  // Frame 2: Distribution board
   if (frameIdx >= 2) {
-    svg += '<line x1="140" y1="90" x2="450" y2="90" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,2"/>';
-    svg += '<line x1="140" y1="110" x2="350" y2="110" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>';
-    svg += '<line x1="140" y1="130" x2="250" y2="130" stroke="#22c55e" stroke-width="2" stroke-dasharray="4,2"/>';
-    svg += '<line x1="450" y1="90" x2="450" y2="220" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,2"/>';
-    svg += '<line x1="350" y1="110" x2="350" y2="220" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2"/>';
-    svg += '<line x1="250" y1="130" x2="250" y2="220" stroke="#22c55e" stroke-width="2" stroke-dasharray="4,2"/>';
+    var bx2 = ox - rd*0.4, by2 = oy - rd*0.2 - rh*0.55;
+    svg += '<rect x="' + (bx2-15) + '" y="' + (by2-18) + '" width="30" height="40" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>';
+    svg += '<text x="' + bx2 + '" y="' + (by2+28) + '" text-anchor="middle" font-size="6" fill="#94a3b8">' + tx('Tavle','Board') + '</text>';
   }
 
-  // Frame 3: Sockets and switches
+  // Frame 3: Devices in panel
   if (frameIdx >= 3) {
-    // Sockets
-    svg += '<rect x="340" y="200" width="20" height="25" rx="3" fill="none" stroke="#3b82f6" stroke-width="2"/>';
-    svg += '<circle cx="347" cy="210" r="2" fill="#3b82f6"/><circle cx="353" cy="210" r="2" fill="#3b82f6"/>';
-    svg += '<rect x="440" y="200" width="20" height="25" rx="3" fill="none" stroke="#f59e0b" stroke-width="2"/>';
-    // Light switch
-    svg += '<rect x="240" y="180" width="20" height="30" rx="3" fill="none" stroke="#22c55e" stroke-width="2"/>';
-    svg += '<circle cx="250" cy="195" r="5" fill="#22c55e" opacity="0.5"/>';
-    // Light fixture on ceiling
-    svg += '<circle cx="300" cy="70" r="12" fill="#eab308" opacity="0.3" stroke="#eab308"/>';
+    var bx3 = ox - rd*0.4, by3 = oy - rd*0.2 - rh*0.55;
+    for (var di = 0; di < 5; di++) {
+      var dCols = ['#3b82f6','#3b82f6','#f59e0b','#ef4444','#10b981'];
+      svg += '<rect x="' + (bx3 - 11 + di*5) + '" y="' + (by3 - 12) + '" width="4" height="10" rx="0.5" fill="' + dCols[di] + '" opacity="0.85"/>';
+    }
   }
 
-  // Frame 4: Test symbols
+  // Frame 4: Sockets and switches
   if (frameIdx >= 4) {
-    svg += '<text x="300" y="280" text-anchor="middle" font-size="12" fill="#22c55e">\u2705 ' + tx('Testet & verificeret', 'Tested & verified') + '</text>';
-    // Checkmarks
-    svg += '<circle cx="200" cy="240" r="8" fill="#22c55e" opacity="0.2"/>';
-    svg += '<text x="200" y="244" text-anchor="middle" font-size="10" fill="#22c55e">\u2713</text>';
-    svg += '<circle cx="350" cy="240" r="8" fill="#22c55e" opacity="0.2"/>';
-    svg += '<text x="350" y="244" text-anchor="middle" font-size="10" fill="#22c55e">\u2713</text>';
+    // Sockets on right wall
+    svg += vis3dSocket(ox + rw*0.3, oy - rw*0.15 - rh*0.1);
+    svg += vis3dSocket(ox + rw*0.5, oy - rw*0.25 - rh*0.1);
+    // Switch on left wall
+    svg += vis3dSwitch(ox - rd*0.25, oy - rd*0.12 - rh*0.45);
   }
 
-  // Frame 5: Current flow animation
+  // Frame 5: Solid cable connections replace dashed
   if (frameIdx >= 5) {
-    svg += '<circle cx="170" cy="90" r="4" fill="#f59e0b" class="pulse-anim"/>';
-    svg += '<circle cx="250" cy="90" r="4" fill="#f59e0b" class="pulse-anim" style="animation-delay:0.3s"/>';
-    svg += '<circle cx="350" cy="90" r="4" fill="#f59e0b" class="pulse-anim" style="animation-delay:0.6s"/>';
-    svg += '<circle cx="170" cy="110" r="4" fill="#3b82f6" class="pulse-anim" style="animation-delay:0.2s"/>';
-    svg += '<circle cx="250" cy="110" r="4" fill="#3b82f6" class="pulse-anim" style="animation-delay:0.5s"/>';
-    svg += '<text x="300" y="305" text-anchor="middle" font-size="11" fill="#22c55e" font-weight="bold">\u26A1 ' + tx('Installation aktiv', 'Installation active') + '</text>';
+    var bx5 = ox - rd*0.4, by5 = oy - rd*0.2 - rh*0.55;
+    svg += '<line x1="' + bx5 + '" y1="' + by5 + '" x2="' + (ox + rw*0.3) + '" y2="' + (oy - rw*0.15 - rh*0.1) + '" stroke="#3b82f6" stroke-width="2" opacity="0.8"/>';
+    svg += '<line x1="' + bx5 + '" y1="' + by5 + '" x2="' + (ox + rw*0.5) + '" y2="' + (oy - rw*0.25 - rh*0.1) + '" stroke="#3b82f6" stroke-width="2" opacity="0.8"/>';
+    svg += '<line x1="' + bx5 + '" y1="' + by5 + '" x2="' + (ox + rw*0.15 - rd*0.3) + '" y2="' + (oy - rw*0.07 - rd*0.15 - rh*0.85) + '" stroke="#f59e0b" stroke-width="2" opacity="0.8"/>';
+  }
+
+  // Frame 6: Test + verification
+  if (frameIdx >= 6) {
+    svg += '<circle cx="' + (ox + rw*0.3) + '" cy="' + (oy - rw*0.15 - rh*0.1 - 15) + '" r="6" fill="rgba(34,197,94,0.2)" stroke="#22c55e" stroke-width="1"/>';
+    svg += '<text x="' + (ox + rw*0.3) + '" y="' + (oy - rw*0.15 - rh*0.1 - 12) + '" text-anchor="middle" font-size="7" fill="#22c55e">\u2713</text>';
+    svg += '<circle cx="' + (ox + rw*0.5) + '" cy="' + (oy - rw*0.25 - rh*0.1 - 15) + '" r="6" fill="rgba(34,197,94,0.2)" stroke="#22c55e" stroke-width="1"/>';
+    svg += '<text x="' + (ox + rw*0.5) + '" y="' + (oy - rw*0.25 - rh*0.1 - 12) + '" text-anchor="middle" font-size="7" fill="#22c55e">\u2713</text>';
+    svg += '<text x="310" y="365" text-anchor="middle" font-size="8" fill="#22c55e">\u2705 ' + tx('Alle kredse verificeret', 'All circuits verified') + '</text>';
+  }
+
+  // Frame 7: Animated current flow
+  if (frameIdx >= 7) {
+    var bx7 = ox - rd*0.4, by7 = oy - rd*0.2 - rh*0.55;
+    // Animated flow particles on cables
+    svg += '<line x1="' + bx7 + '" y1="' + by7 + '" x2="' + (ox + rw*0.3) + '" y2="' + (oy - rw*0.15 - rh*0.1) + '" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="4,8" class="vis3d-flow" opacity="0.7"/>';
+    svg += '<line x1="' + bx7 + '" y1="' + by7 + '" x2="' + (ox + rw*0.5) + '" y2="' + (oy - rw*0.25 - rh*0.1) + '" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="4,8" class="vis3d-flow" opacity="0.7" style="animation-delay:0.3s"/>';
+    // Ceiling light glow
+    svg += vis3dLight(ox + rw*0.15 - rd*0.3, oy - rw*0.07 - rd*0.15 - rh*0.85, 'ceiling');
+    svg += '<text x="310" y="365" text-anchor="middle" font-size="9" fill="#22c55e" font-weight="bold">\u26A1 ' + tx('Installation aktiv \u2014 Sikker drift', 'Installation active \u2014 Safe operation') + '</text>';
   }
 
   // Frame counter
-  svg += '<text x="530" y="25" text-anchor="end" font-size="10" fill="var(--text-muted)">' + (frameIdx + 1) + '/' + FILM_FRAMES.length + '</text>';
+  svg += '<text x="590" y="20" text-anchor="end" font-size="9" fill="#475569">' + (frameIdx + 1) + '/' + FILM_FRAMES.length + '</text>';
+  // Frame title
+  svg += '<text x="310" y="20" text-anchor="middle" font-size="9" fill="#94a3b8">' + tx(FILM_FRAMES[frameIdx].da, FILM_FRAMES[frameIdx].en) + '</text>';
 
   svg += '</svg>';
   return svg;
@@ -44247,8 +44998,8 @@ function filmReset() {
 
 function renderFilm() {
   var s = filmState;
-  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFAC ' + tx('Installations-Film \u2014 Se byggeforl\u00F8bet', 'Installation Movie \u2014 Watch the build sequence') + '</div>';
-  html += '<p class="info-text">' + tx('Animeret trin-for-trin visualisering af installationsprocessen.', 'Animated step-by-step visualization of the installation process.') + '</p>';
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFAC ' + tx('Installations-Film \u2014 Se byggeforlobet', 'Installation Movie \u2014 Watch the build sequence') + '</div>';
+  html += '<p class="info-text">' + tx('Animeret trin-for-trin visualisering af installationsprocessen med isometrisk 3D.', 'Animated step-by-step visualization of the installation process with isometric 3D.') + '</p>';
 
   // Speed control
   html += '<div class="param-group"><div class="param-label">' + tx('Hastighed', 'Speed') + '</div><div class="btn-group">';
@@ -44260,7 +45011,7 @@ function renderFilm() {
 
   // Frame display
   html += '<div class="card fade-in"><div class="card-title">' + tx('Trin', 'Step') + ' ' + (s.frame + 1) + ': ' + tx(FILM_FRAMES[s.frame].da, FILM_FRAMES[s.frame].en) + '</div>';
-  html += '<div class="result-box">' + filmRenderFrame(s.frame) + '</div>';
+  html += '<div class="result-box" style="overflow-x:auto">' + filmRenderFrame(s.frame) + '</div>';
 
   // Controls
   html += '<div class="btn-group" style="margin-top:12px;justify-content:center">';
@@ -44272,7 +45023,6 @@ function renderFilm() {
 
   return html;
 }
-
 
 // ===== VEDLIGEHOLD MODULE =====
 let vedlikeholdState = { installAge: 10, components: [] };

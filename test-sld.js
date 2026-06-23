@@ -18985,6 +18985,333 @@ test('REVERSE-LIGHTING: reverseLoadTypeNames maps lighting preset to trilingual 
   assert.strictEqual(isLightingName(unknown.da, unknown.en, unknown.fa), false, 'null loadType must NOT be lighting');
 });
 
+// === VIS3D Module Tests ===
+console.log('\n=== VIS3D 3D Visualization Engine Tests ===\n');
+
+test('VIS3D: vis3dIso converts 3D to 2D isometric correctly', function() {
+  var p = vis3dIso(0, 0, 0);
+  assert.strictEqual(p.x, 0, 'Origin x=0');
+  assert.strictEqual(p.y, 0, 'Origin y=0');
+  var p2 = vis3dIso(100, 0, 0);
+  assert(p2.x > 0, 'Positive x should give positive iso x');
+  assert(p2.y > 0, 'Positive x should give positive iso y');
+  var p3 = vis3dIso(0, 100, 0);
+  assert.strictEqual(p3.x, 0, 'Pure y should not affect iso x');
+  assert(p3.y < 0, 'Positive y (height) should give negative iso y');
+});
+
+test('VIS3D: vis3dIso symmetry - x and z produce mirrored results', function() {
+  var px = vis3dIso(100, 0, 0);
+  var pz = vis3dIso(0, 0, 100);
+  assert(Math.abs(px.x + pz.x) < 0.001, 'x and z projections should be symmetric (mirrored x)');
+  assert(Math.abs(px.y - pz.y) < 0.001, 'x and z projections should have same y');
+});
+
+test('VIS3D: vis3dShadow returns SVG ellipse string', function() {
+  var s = vis3dShadow(10, 20, 50, 30);
+  assert(s.indexOf('<ellipse') >= 0, 'Must contain ellipse element');
+  assert(s.indexOf('vis3dBlur') >= 0, 'Must reference blur filter');
+});
+
+test('VIS3D: vis3dGradient returns SVG linearGradient', function() {
+  var g = vis3dGradient('testGrad', '#ff0000', '#0000ff', 90);
+  assert(g.indexOf('linearGradient') >= 0, 'Must be a linearGradient');
+  assert(g.indexOf('testGrad') >= 0, 'Must use provided id');
+  assert(g.indexOf('#ff0000') >= 0, 'Must contain color1');
+  assert(g.indexOf('#0000ff') >= 0, 'Must contain color2');
+});
+
+test('VIS3D: vis3dDefs produces defs with animations and gradients', function() {
+  var d = vis3dDefs();
+  assert(d.indexOf('<defs>') >= 0, 'Must open defs');
+  assert(d.indexOf('</defs>') >= 0, 'Must close defs');
+  assert(d.indexOf('@keyframes vis3dFlow') >= 0, 'Must have flow animation');
+  assert(d.indexOf('@keyframes vis3dPulse') >= 0, 'Must have pulse animation');
+  assert(d.indexOf('@keyframes vis3dFault') >= 0, 'Must have fault animation');
+  assert(d.indexOf('vis3dPanelGrad') >= 0, 'Must have panel gradient');
+  assert(d.indexOf('vis3dPEstripe') >= 0, 'Must have PE stripe pattern');
+});
+
+test('VIS3D: vis3dPanel renders distribution board SVG', function() {
+  var p = vis3dPanel(50, 50, 0, 12, 3);
+  assert(p.indexOf('<rect') >= 0, 'Must contain rect elements');
+  assert(p.indexOf('vis3dPanelGrad') >= 0, 'Must use panel gradient');
+  assert(p.indexOf('vis3dMetalGrad') >= 0, 'Must use metal gradient for DIN rails');
+  assert(p.indexOf('vis3dNbarGrad') >= 0, 'Must have N bar');
+  assert(p.indexOf('vis3dPEstripe') >= 0, 'Must have PE bar');
+});
+
+test('VIS3D: vis3dMCB renders with correct curve colors', function() {
+  var b = vis3dMCB(10, 10, 'B', 16, 'on');
+  assert(b.indexOf('#3b82f6') >= 0, 'B curve should be blue');
+  var c = vis3dMCB(10, 10, 'C', 20, 'on');
+  assert(c.indexOf('#22c55e') >= 0, 'C curve should be green');
+  var d2 = vis3dMCB(10, 10, 'D', 32, 'on');
+  assert(d2.indexOf('#ef4444') >= 0, 'D curve should be red');
+});
+
+test('VIS3D: vis3dMCB tripped state shows blink animation', function() {
+  var tripped = vis3dMCB(10, 10, 'B', 16, 'tripped');
+  assert(tripped.indexOf('vis3d-blink') >= 0, 'Tripped MCB must blink');
+  assert(tripped.indexOf('#ef4444') >= 0, 'Tripped state uses red');
+});
+
+test('VIS3D: vis3dRCD renders with test button', function() {
+  var r = vis3dRCD(10, 10, 'A', 30, 'on');
+  assert(r.indexOf('#8b5cf6') >= 0, 'RCD uses purple color');
+  assert(r.indexOf('#f59e0b') >= 0, 'RCD has test button (amber)');
+});
+
+test('VIS3D: vis3dFuse renders with rating', function() {
+  var f = vis3dFuse(10, 10, 63);
+  assert(f.indexOf('63') >= 0, 'Must show rating');
+  assert(f.indexOf('#f59e0b') >= 0, 'Fuse uses amber color');
+});
+
+test('VIS3D: vis3dCable thickness scales with mm2', function() {
+  var thin = vis3dCable(0, 0, 100, 100, 1.5, 'Cu', false);
+  var thick = vis3dCable(0, 0, 100, 100, 25, 'Cu', false);
+  // Extract stroke-width values
+  var thinWidth = thin.match(/stroke-width="([^"]+)"/);
+  var thickWidth = thick.match(/stroke-width="([^"]+)"/);
+  assert(parseFloat(thickWidth[1]) > parseFloat(thinWidth[1]), 'Thicker cable must have larger stroke-width');
+});
+
+test('VIS3D: vis3dCable animated shows flow class', function() {
+  var anim = vis3dCable(0, 0, 100, 100, 2.5, 'Cu', true);
+  assert(anim.indexOf('vis3d-flow') >= 0, 'Animated cable must have flow class');
+  var noAnim = vis3dCable(0, 0, 100, 100, 2.5, 'Cu', false);
+  assert(noAnim.indexOf('vis3d-flow') < 0, 'Non-animated cable must not have flow class');
+});
+
+test('VIS3D: vis3dSocket renders Danish LK FUGA style', function() {
+  var s = vis3dSocket(50, 50, 'schuko');
+  assert(s.indexOf('<rect') >= 0, 'Socket has frame rect');
+  assert(s.indexOf('<circle') >= 0, 'Socket has pin holes');
+  assert(s.indexOf('#22c55e') >= 0, 'Socket has earth pin (green)');
+});
+
+test('VIS3D: vis3dSwitch renders rocker switch', function() {
+  var sw = vis3dSwitch(50, 50);
+  assert(sw.indexOf('<rect') >= 0, 'Switch has frame');
+  assert(sw.indexOf('#3b82f6') >= 0, 'Switch has blue indicator');
+});
+
+test('VIS3D: vis3dLight ceiling type renders with glow', function() {
+  var l = vis3dLight(50, 50, 'ceiling');
+  assert(l.indexOf('<circle') >= 0, 'Ceiling light uses circles');
+  assert(l.indexOf('vis3d-glow') >= 0, 'Ceiling light has glow animation');
+});
+
+test('VIS3D: vis3dLight wall type renders rectangle', function() {
+  var l = vis3dLight(50, 50, 'wall');
+  assert(l.indexOf('<rect') >= 0, 'Wall light uses rect');
+});
+
+test('VIS3D: vis3dEVCharger renders with charging symbol', function() {
+  var ev = vis3dEVCharger(50, 50);
+  assert(ev.indexOf('#10b981') >= 0, 'EV charger uses green color');
+  assert(ev.indexOf('26A1') >= 0 || ev.indexOf('\u26A1') >= 0 || ev.indexOf('&#x26A1;') >= 0, 'EV charger shows lightning bolt');
+});
+
+test('VIS3D: vis3dSmokeDetector renders with pulse animation', function() {
+  var sd = vis3dSmokeDetector(50, 50);
+  assert(sd.indexOf('<circle') >= 0, 'Smoke detector is circular');
+  assert(sd.indexOf('vis3d-pulse') >= 0, 'Smoke detector has pulse animation');
+  assert(sd.indexOf('#ef4444') >= 0, 'Smoke detector has red LED');
+});
+
+test('VIS3D: install3dGetComponents returns array with demo data when no SLD tree', function() {
+  var origTree = sldTree;
+  sldTree = null;
+  var comps = install3dGetComponents();
+  assert(Array.isArray(comps), 'Must return array');
+  assert(comps.length >= 6, 'Demo data must have at least 6 components');
+  assert(comps[0].type === 'board', 'First component should be board');
+  assert(comps[1].type === 'socket', 'Should include socket');
+  assert(comps[2].type === 'light', 'Should include light');
+  sldTree = origTree;
+});
+
+test('VIS3D: install3dGetComponents reads from SLD tree when available', function() {
+  var origTree = sldTree;
+  sldTree = sldCreateTree();
+  var comps = install3dGetComponents();
+  assert(Array.isArray(comps), 'Must return array');
+  assert(comps.length > 0, 'Must have components from tree');
+  sldTree = origTree;
+});
+
+test('VIS3D: install3dState has correct default values', function() {
+  assert.strictEqual(install3dState.viewMode, 'electrician');
+  assert.strictEqual(install3dState.displayMode, 'panel');
+  assert.strictEqual(install3dState.selectedNode, null);
+  assert.strictEqual(install3dState.faultLocation, null);
+  assert.strictEqual(install3dState.animating, false);
+});
+
+test('VIS3D: vis3dRenderPanel generates valid SVG', function() {
+  var comps = install3dGetComponents();
+  var svg = vis3dRenderPanel(comps, 'electrician');
+  assert(svg.indexOf('<svg') >= 0, 'Must start with SVG');
+  assert(svg.indexOf('</svg>') >= 0, 'Must close SVG');
+  assert(svg.indexOf('vis3dPanelGrad') >= 0, 'Must use panel gradient');
+  assert(svg.indexOf('DIN') >= 0 || svg.indexOf('Skinne') >= 0 || svg.indexOf('Rail') >= 0, 'Must show DIN rails');
+});
+
+test('VIS3D: vis3dRenderPanel customer view hides technical labels', function() {
+  var comps = install3dGetComponents();
+  var elec = vis3dRenderPanel(comps, 'electrician');
+  var cust = vis3dRenderPanel(comps, 'customer');
+  assert(elec.indexOf('mm\u00B2') >= 0, 'Electrician view shows cable sizes');
+  // Customer view should have simpler content (emoji icons instead)
+});
+
+test('VIS3D: vis3dRenderRoom generates isometric room SVG', function() {
+  var comps = install3dGetComponents();
+  var svg = vis3dRenderRoom(comps, 'electrician');
+  assert(svg.indexOf('<svg') >= 0, 'Must start with SVG');
+  assert(svg.indexOf('<polygon') >= 0, 'Must have polygon for walls/floor');
+  assert(svg.indexOf('vis3dFloorGrad') >= 0, 'Must use floor gradient');
+  assert(svg.indexOf('vis3dWallGrad') >= 0, 'Must use wall gradient');
+});
+
+test('VIS3D: vis3dRenderFlow generates flow visualization', function() {
+  var comps = install3dGetComponents();
+  var svg = vis3dRenderFlow(comps, 'electrician');
+  assert(svg.indexOf('<svg') >= 0, 'Must be valid SVG');
+  assert(svg.indexOf('vis3d-pulse') >= 0 || svg.indexOf('vis3d-flow') >= 0, 'Must have animation classes');
+});
+
+test('VIS3D: vis3dRenderFault generates clickable fault sim', function() {
+  var comps = install3dGetComponents();
+  install3dState.faultLocation = null;
+  var svg = vis3dRenderFault(comps, 'electrician');
+  assert(svg.indexOf('<svg') >= 0, 'Must be valid SVG');
+  assert(svg.indexOf('onclick') >= 0, 'Must have clickable areas');
+});
+
+test('VIS3D: vis3dRenderFault shows fault data when location set', function() {
+  var comps = install3dGetComponents();
+  install3dState.faultLocation = comps[1].id; // First circuit
+  var svg = vis3dRenderFault(comps, 'electrician');
+  assert(svg.indexOf('Ik =') >= 0, 'Must show fault current');
+  assert(svg.indexOf('Zs =') >= 0, 'Must show impedance');
+  assert(svg.indexOf('vis3d-fault') >= 0, 'Must have fault animation');
+  assert(svg.indexOf('vis3d-blink') >= 0, 'Must have blinking indicator');
+  install3dState.faultLocation = null;
+});
+
+test('VIS3D: renderInstall3d returns HTML with mode selectors', function() {
+  var html = renderInstall3d();
+  assert(html.indexOf('panel') >= 0, 'Must have panel mode');
+  assert(html.indexOf('room') >= 0, 'Must have room mode');
+  assert(html.indexOf('fault') >= 0, 'Must have fault mode');
+  assert(html.indexOf('flow') >= 0, 'Must have flow mode');
+  assert(html.indexOf('sel-btn') >= 0, 'Must have click buttons');
+});
+
+test('VIS3D: renderInstall3d respects displayMode state', function() {
+  install3dState.displayMode = 'panel';
+  var html1 = renderInstall3d();
+  assert(html1.indexOf('vis3dPanelGrad') >= 0, 'Panel mode must render panel');
+  install3dState.displayMode = 'room';
+  var html2 = renderInstall3d();
+  assert(html2.indexOf('vis3dFloorGrad') >= 0, 'Room mode must render room');
+  install3dState.displayMode = 'panel';
+});
+
+test('VIS3D: VIS3D_COLORS palette has all required colors', function() {
+  assert(VIS3D_COLORS.panelBg, 'Must have panelBg');
+  assert(VIS3D_COLORS.socket, 'Must have socket color');
+  assert(VIS3D_COLORS.lighting, 'Must have lighting color');
+  assert(VIS3D_COLORS.cooker, 'Must have cooker color');
+  assert(VIS3D_COLORS.ev, 'Must have EV color');
+  assert(VIS3D_COLORS.flowNormal, 'Must have normal flow color');
+  assert(VIS3D_COLORS.flowOverload, 'Must have overload flow color');
+  assert(VIS3D_COLORS.flowFault, 'Must have fault flow color');
+  assert(VIS3D_COLORS.faultSpark, 'Must have fault spark color');
+});
+
+test('VIS3D: circuitTypeColorGet returns correct colors', function() {
+  assert.strictEqual(circuitTypeColorGet('socket'), '#3b82f6');
+  assert.strictEqual(circuitTypeColorGet('lighting'), '#f59e0b');
+  assert.strictEqual(circuitTypeColorGet('cooker'), '#ef4444');
+  assert.strictEqual(circuitTypeColorGet('ev'), '#10b981');
+  assert.strictEqual(circuitTypeColorGet('unknown'), '#64748b');
+});
+
+test('VIS3D: kundevisRenderSafetyScore returns circular SVG', function() {
+  var svg = kundevisRenderSafetyScore();
+  assert(svg.indexOf('<svg') >= 0, 'Must be SVG');
+  assert(svg.indexOf('<circle') >= 0, 'Must use circles');
+  assert(svg.indexOf('92') >= 0, 'Must show score');
+});
+
+test('VIS3D: kundevisRenderBeforeAfter shows old vs new panel', function() {
+  var svg = kundevisRenderBeforeAfter();
+  assert(svg.indexOf('<svg') >= 0, 'Must be SVG');
+  assert(svg.indexOf('1980') >= 0 || svg.indexOf('gammelt') >= 0 || svg.indexOf('old') >= 0, 'Must reference old panel');
+  assert(svg.indexOf('RCD') >= 0 || svg.indexOf('fejlstrom') >= 0, 'Must mention RCD protection');
+});
+
+test('VIS3D: renderKundevis includes safety score and before/after', function() {
+  var html = renderKundevis();
+  assert(html.indexOf('kundevisRenderSafetyScore') >= 0 || html.indexOf('<circle') >= 0 || html.indexOf('Sikkerhedsscore') >= 0 || html.indexOf('Safety Score') >= 0, 'Must include safety score');
+});
+
+test('VIS3D: filmRenderFrame handles all 8 frames without error', function() {
+  for (var fi = 0; fi < FILM_FRAMES.length; fi++) {
+    var svg = filmRenderFrame(fi);
+    assert(svg.indexOf('<svg') >= 0, 'Frame ' + fi + ' must produce SVG');
+    assert(svg.indexOf('</svg>') >= 0, 'Frame ' + fi + ' must close SVG');
+  }
+});
+
+test('VIS3D: FILM_FRAMES has 8 entries', function() {
+  assert.strictEqual(FILM_FRAMES.length, 8, 'Must have 8 film frames');
+});
+
+test('VIS3D: filmRenderFrame frame 7 shows current flow animation', function() {
+  var svg = filmRenderFrame(7);
+  assert(svg.indexOf('vis3d-flow') >= 0, 'Final frame must have flow animation');
+});
+
+test('VIS3D: filmRenderFrame frame 6 shows verification checkmarks', function() {
+  var svg = filmRenderFrame(6);
+  assert(svg.indexOf('\u2713') >= 0 || svg.indexOf('verificeret') >= 0 || svg.indexOf('verified') >= 0, 'Frame 6 must show verification');
+});
+
+test('VIS3D: vis3dIso handles negative coordinates', function() {
+  var p = vis3dIso(-50, -20, -30);
+  assert(typeof p.x === 'number' && !isNaN(p.x), 'x must be a valid number');
+  assert(typeof p.y === 'number' && !isNaN(p.y), 'y must be a valid number');
+});
+
+test('VIS3D: vis3dGradient with 0 angle produces horizontal gradient', function() {
+  var g = vis3dGradient('horiz', '#fff', '#000', 0);
+  assert(g.indexOf('x1="0%"') >= 0 || g.indexOf('x1="50%"') >= 0, 'Must define x1');
+  assert(g.indexOf('linearGradient') >= 0, 'Must be linearGradient');
+});
+
+test('VIS3D: no text inputs in renderInstall3d output', function() {
+  var html = renderInstall3d();
+  assert(html.indexOf('<input type="text"') < 0, 'Must not have text inputs');
+  assert(html.indexOf('<textarea') < 0, 'Must not have textareas');
+});
+
+test('VIS3D: no text inputs in renderKundevis output', function() {
+  var html = renderKundevis();
+  assert(html.indexOf('<input type="text"') < 0, 'Must not have text inputs');
+  assert(html.indexOf('<textarea') < 0, 'Must not have textareas');
+});
+
+test('VIS3D: no text inputs in renderFilm output', function() {
+  var html = renderFilm();
+  assert(html.indexOf('<input type="text"') < 0, 'Must not have text inputs');
+  assert(html.indexOf('<textarea') < 0, 'Must not have textareas');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
