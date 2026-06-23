@@ -38013,14 +38013,19 @@ function analyzerInflate(compressed) {
   // RFC 1951 DEFLATE decompression
   // Input: Uint8Array of raw deflate data (no zlib header)
   // Output: Uint8Array of inflated data
+  // BULLETPROOF: end-of-input guard + output cap + iteration limits so a
+  // malformed/unsupported stream can NEVER hang the browser.
   var src = compressed;
   var srcLen = src.length;
   var bitBuf = 0, bitCnt = 0, pos = 0;
   var out = [], outPos = 0;
+  var eof = false;                          // set when input is exhausted
+  var MAX_OUT = 24 * 1024 * 1024;           // hard cap: 24 MB inflated output
+  var MAX_BLOCKS = 100000;                  // hard cap on number of DEFLATE blocks
 
   function readBits(n) {
     while (bitCnt < n) {
-      if (pos >= srcLen) return 0;
+      if (pos >= srcLen) { eof = true; return 0; } // exhausted -> signal eof
       bitBuf |= src[pos++] << bitCnt;
       bitCnt += 8;
     }
@@ -38050,6 +38055,7 @@ function analyzerInflate(compressed) {
     var code = 0, first = 0, idx = 0;
     for (var len = 1; len < 16; len++) {
       code |= readBits(1);
+      if (eof) return -1;                  // input exhausted -> stop
       var count = counts[len];
       if (code < first + count) {
         return symbols[idx + (code - first)];
@@ -38085,6 +38091,7 @@ function analyzerInflate(compressed) {
 
   function inflateBlock(litTree, distTree) {
     while (true) {
+      if (eof || outPos >= MAX_OUT) return; // guard: eof or output cap reached
       var sym = decode(litTree);
       if (sym < 0) return;
       if (sym < 256) {
@@ -38093,10 +38100,14 @@ function analyzerInflate(compressed) {
         return;
       } else {
         sym -= 257;
+        if (sym < 0 || sym >= lenBase.length) return; // invalid length symbol
         var length = lenBase[sym] + readBits(lenExtra[sym]);
         var distSym = decode(distTree);
+        if (distSym < 0 || distSym >= distBase.length) return; // invalid distance
         var dist = distBase[distSym] + readBits(distExtra[distSym]);
+        if (eof || dist <= 0 || dist > outPos) return; // invalid back-reference
         for (var i = 0; i < length; i++) {
+          if (outPos >= MAX_OUT) return;
           out[outPos] = out[outPos - dist];
           outPos++;
         }
@@ -38105,16 +38116,25 @@ function analyzerInflate(compressed) {
   }
 
   var bfinal = 0;
+  var blockCount = 0;
   while (!bfinal) {
+    if (eof || outPos >= MAX_OUT || ++blockCount > MAX_BLOCKS) break; // bulletproof guards
     bfinal = readBits(1);
+    if (eof) break;
     var btype = readBits(2);
 
     if (btype === 0) {
       // Stored block
       bitBuf = 0; bitCnt = 0;
+      if (pos + 4 > srcLen) break;          // not enough bytes for len/nlen
       var len = src[pos] | (src[pos + 1] << 8); pos += 2;
       pos += 2; // skip nlen
-      for (var i = 0; i < len; i++) out[outPos++] = src[pos++];
+      if (len < 0 || pos + len > srcLen) { // length overruns input -> stop
+        len = Math.max(0, srcLen - pos);
+        for (var i = 0; i < len && outPos < MAX_OUT; i++) out[outPos++] = src[pos++];
+        break;
+      }
+      for (var i = 0; i < len && outPos < MAX_OUT; i++) out[outPos++] = src[pos++];
     } else if (btype === 1) {
       // Fixed Huffman
       var fixed = getFixedTrees();
@@ -38133,21 +38153,24 @@ function analyzerInflate(compressed) {
       var codeLens = new Array(hlit + hdist);
       var cli = 0;
       while (cli < hlit + hdist) {
+        if (eof) break;                     // guard: input exhausted
         var csym = decode(clTree);
+        if (csym < 0) { eof = true; break; } // invalid -> stop
         if (csym < 16) {
           codeLens[cli++] = csym;
         } else if (csym === 16) {
           var rep = readBits(2) + 3;
-          var prev = codeLens[cli - 1];
-          for (var r = 0; r < rep; r++) codeLens[cli++] = prev;
+          var prev = cli > 0 ? codeLens[cli - 1] : 0;
+          for (var r = 0; r < rep && cli < hlit + hdist; r++) codeLens[cli++] = prev;
         } else if (csym === 17) {
           var rep = readBits(3) + 3;
-          for (var r = 0; r < rep; r++) codeLens[cli++] = 0;
+          for (var r = 0; r < rep && cli < hlit + hdist; r++) codeLens[cli++] = 0;
         } else { // 18
           var rep = readBits(7) + 11;
-          for (var r = 0; r < rep; r++) codeLens[cli++] = 0;
+          for (var r = 0; r < rep && cli < hlit + hdist; r++) codeLens[cli++] = 0;
         }
       }
+      if (eof) break;
       var litLens = codeLens.slice(0, hlit);
       var dstLens = codeLens.slice(hlit);
       var dynLitTree = buildTree(litLens, hlit);
@@ -38209,22 +38232,27 @@ function analyzerParseZip(arrayBuffer) {
     off += 46 + nameLen + extraLen + commentLen;
   }
 
-  // Extract file data from local headers
+  // Extract file data from local headers.
+  // Only inflate the XML parts we actually need (word/document.xml etc.) — never
+  // waste time inflating embedded images/media, which froze large DOCX files.
   var result = [];
   for (var ei = 0; ei < entries.length; ei++) {
     var ent = entries[ei];
+    var isXml = /\.xml$/i.test(ent.name) || /\.rels$/i.test(ent.name);
+    if (!isXml) { result.push({ name: ent.name, data: null }); continue; }
     var lh = ent.localOff;
     if (lh + 30 > len) continue;
     if (!(data[lh] === 0x50 && data[lh+1] === 0x4B && data[lh+2] === 0x03 && data[lh+3] === 0x04)) continue;
     var lNameLen = readU16(lh + 26);
     var lExtraLen = readU16(lh + 28);
     var dataStart = lh + 30 + lNameLen + lExtraLen;
-    var raw = data.subarray(dataStart, dataStart + ent.compSize);
+    var safeEnd = Math.min(dataStart + ent.compSize, len);
+    var raw = data.subarray(dataStart, safeEnd);
     var fileData;
     if (ent.compMethod === 0) {
       fileData = raw;
     } else if (ent.compMethod === 8) {
-      fileData = analyzerInflate(raw);
+      try { fileData = analyzerInflate(raw); } catch (e) { fileData = null; }
     } else {
       fileData = null;
     }
@@ -38246,10 +38274,8 @@ function analyzerExtractDocx(arrayBuffer) {
     }
   }
   if (!docEntry) return null;
-  // Convert to string
-  var xml = '';
-  var d = docEntry.data;
-  for (var i = 0; i < d.length; i++) xml += String.fromCharCode(d[i]);
+  // Convert to string (O(n) — was O(n^2) char-by-char concatenation)
+  var xml = analyzerBytesToLatin1(docEntry.data);
   // Parse XML to extract text
   var text = '';
   var inBody = false;
@@ -38276,18 +38302,40 @@ function analyzerExtractDocx(arrayBuffer) {
 }
 
 // Extract text from PDF content streams
+// Fast O(n) bytes -> Latin-1 string (avoids O(n^2) string concatenation that
+// froze the browser on large PDFs). Uses TextDecoder when available, else chunks.
+function analyzerBytesToLatin1(bytes) {
+  if (!bytes) return '';
+  try {
+    if (typeof TextDecoder !== 'undefined') {
+      return new TextDecoder('latin1').decode(bytes);
+    }
+  } catch (e) { /* fall through to chunked */ }
+  var s = '';
+  var CH = 0x8000; // 32k chunk
+  for (var i = 0; i < bytes.length; i += CH) {
+    var end = Math.min(i + CH, bytes.length);
+    s += String.fromCharCode.apply(null, bytes.subarray ? bytes.subarray(i, end) : Array.prototype.slice.call(bytes, i, end));
+  }
+  return s;
+}
+
 function analyzerExtractPdf(arrayBuffer) {
   var data = new Uint8Array(arrayBuffer);
   var len = data.length;
-  // Convert to Latin-1 string for parsing
-  var str = '';
-  for (var i = 0; i < len; i++) str += String.fromCharCode(data[i]);
+  // O(n) conversion (was O(n^2) char-by-char concatenation -> browser freeze)
+  var str = analyzerBytesToLatin1(data);
 
-  // Find all stream...endstream blocks
+  // Find all stream...endstream blocks (bounded: caps on count and total text)
   var texts = [];
+  var MAX_STREAMS = 4000;       // never scan more streams than this
+  var MAX_TOTAL_TEXT = 5000000; // stop once we have 5M chars of extracted text
+  var totalLen = 0;
+  var streamCount = 0;
   var streamRe = /stream\r?\n/g;
   var match;
   while ((match = streamRe.exec(str)) !== null) {
+    if (++streamCount > MAX_STREAMS || totalLen > MAX_TOTAL_TEXT) break;
     var startIdx = match.index + match[0].length;
     var endIdx = str.indexOf('endstream', startIdx);
     if (endIdx < 0) continue;
@@ -38302,10 +38350,9 @@ function analyzerExtractPdf(arrayBuffer) {
       decoded = streamData;
     }
     if (decoded && decoded.length > 0) {
-      var content = '';
-      for (var ci = 0; ci < decoded.length; ci++) content += String.fromCharCode(decoded[ci]);
+      var content = analyzerBytesToLatin1(decoded); // O(n)
       var extracted = analyzerParsePdfContent(content);
-      if (extracted) texts.push(extracted);
+      if (extracted) { texts.push(extracted); totalLen += extracted.length; }
     }
   }
   return texts.length > 0 ? texts.join('\n') : null;
@@ -38423,7 +38470,25 @@ function analyzerPdfQualityGate(text) {
 function analyzerHandleFile(input) {
   if (!input || !input.files || !input.files[0]) return;
   var file = input.files[0];
+  analyzerHandleFileObject(file);
+}
+
+// Shared ingestion path used by BOTH the file picker and drag-and-drop.
+function analyzerHandleFileObject(file) {
+  if (!file) return;
   var name = (file.name || '').toLowerCase();
+
+  // Hard size guard: very large files would block the main thread. Reject early
+  // with a clear, friendly message instead of freezing the browser.
+  var MAX_BYTES = 30 * 1024 * 1024; // 30 MB
+  if (file.size && file.size > MAX_BYTES) {
+    analyzerState.ingestionProgress = null;
+    analyzerState.ingestionNotice = tx(
+      'Filen er for stor (' + Math.round(file.size / 1048576) + ' MB, maks 30 MB). Kopier den relevante tekst i stedet, eller del filen op.',
+      'File too large (' + Math.round(file.size / 1048576) + ' MB, max 30 MB). Paste the relevant text instead, or split the file.');
+    renderModule('analyzer');
+    return;
+  }
 
   // Show progress indicator
   analyzerState.ingestionProgress = tx('Læser fil...', 'Reading file...');
@@ -38433,58 +38498,98 @@ function analyzerHandleFile(input) {
   if (name.endsWith('.pdf') || name.endsWith('.docx')) {
     // Binary format — read as ArrayBuffer
     var reader = new FileReader();
+    reader.onerror = function() {
+      analyzerState.ingestionProgress = null;
+      analyzerState.ingestionNotice = tx('Kunne ikke læse filen.', 'Could not read the file.');
+      renderModule('analyzer');
+    };
     reader.onload = function(e) {
       var buffer = e.target.result;
-      var text = null;
-      var error = null;
-
-      try {
-        if (name.endsWith('.docx')) {
-          analyzerState.ingestionProgress = tx('Udpakker DOCX...', 'Extracting DOCX...');
-          renderModule('analyzer');
-          text = analyzerExtractDocx(buffer);
-          if (!text) error = tx('Kunne ikke udpakke DOCX-indhold.', 'Could not extract DOCX content.');
-        } else {
-          analyzerState.ingestionProgress = tx('Udpakker PDF-tekst...', 'Extracting PDF text...');
-          renderModule('analyzer');
-          text = analyzerExtractPdf(buffer);
-          if (text) {
-            text = analyzerCleanPdfText(text);
-            var gate = analyzerPdfQualityGate(text);
-            if (!gate.ok) {
-              if (gate.reason === 'too_short') error = tx('PDF indeholder ingen læsbar tekst — muligvis scannet/billede-PDF.', 'PDF contains no readable text — possibly scanned/image PDF.');
-              else if (gate.reason === 'binary_garbage') error = tx('PDF-tekst er ulæselig (binær/krypteret). Prøv en anden fil.', 'PDF text is unreadable (binary/encrypted). Try another file.');
-              else if (gate.reason === 'cid_noise') error = tx('PDF bruger indlejrede skrifttyper der ikke kan afkodes offline. Kopier teksten manuelt.', 'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.');
-              text = null;
-            }
+      // Defer the heavy parse one tick so the "Extracting..." UI paints first
+      // and the browser stays responsive (no "Page Unresponsive" dialog).
+      analyzerState.ingestionProgress = name.endsWith('.docx')
+        ? tx('Udpakker DOCX...', 'Extracting DOCX...')
+        : tx('Udpakker PDF-tekst...', 'Extracting PDF text...');
+      renderModule('analyzer');
+      setTimeout(function() {
+        var text = null;
+        var error = null;
+        try {
+          if (name.endsWith('.docx')) {
+            text = analyzerExtractDocx(buffer);
+            if (!text) error = tx('Kunne ikke udpakke DOCX-indhold.', 'Could not extract DOCX content.');
           } else {
-            error = tx('Kunne ikke udpakke tekst fra PDF.', 'Could not extract text from PDF.');
+            text = analyzerExtractPdf(buffer);
+            if (text) {
+              text = analyzerCleanPdfText(text);
+              var gate = analyzerPdfQualityGate(text);
+              if (!gate.ok) {
+                if (gate.reason === 'too_short') error = tx('PDF indeholder ingen læsbar tekst — muligvis scannet/billede-PDF.', 'PDF contains no readable text — possibly scanned/image PDF.');
+                else if (gate.reason === 'binary_garbage') error = tx('PDF-tekst er ulæselig (binær/krypteret). Prøv en anden fil.', 'PDF text is unreadable (binary/encrypted). Try another file.');
+                else if (gate.reason === 'cid_noise') error = tx('PDF bruger indlejrede skrifttyper der ikke kan afkodes offline. Kopier teksten manuelt.', 'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.');
+                text = null;
+              }
+            } else {
+              error = tx('Kunne ikke udpakke tekst fra PDF.', 'Could not extract text from PDF.');
+            }
           }
+        } catch(ex) {
+          error = tx('Fejl ved filbehandling: ', 'File processing error: ') + (ex.message || ex);
+          text = null;
         }
-      } catch(ex) {
-        error = tx('Fejl ved filbehandling: ', 'File processing error: ') + (ex.message || ex);
-        text = null;
-      }
-
-      analyzerState.ingestionProgress = null;
-      if (text && text.trim().length > 0) {
-        analyzerRun(text);
-      } else {
-        // Show error notice
-        analyzerState.ingestionNotice = error || tx('Ingen tekst fundet i filen.', 'No text found in file.');
-        renderModule('analyzer');
-      }
+        analyzerState.ingestionProgress = null;
+        if (text && text.trim().length > 0) {
+          analyzerRun(text);
+        } else {
+          analyzerState.ingestionNotice = error || tx('Ingen tekst fundet i filen.', 'No text found in file.');
+          renderModule('analyzer');
+        }
+      }, 30);
     };
     reader.readAsArrayBuffer(file);
-  } else {
-    // Text format (.txt, .md) — existing behavior
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      analyzerState.ingestionProgress = null;
-      analyzerRun(e.target.result);
-    };
-    reader.readAsText(file);
+    return;
   }
+
+  // Text format (.txt, .md) — read as text
+  var treader = new FileReader();
+  treader.onerror = function() {
+    analyzerState.ingestionProgress = null;
+    analyzerState.ingestionNotice = tx('Kunne ikke læse filen.', 'Could not read the file.');
+    renderModule('analyzer');
+  };
+  treader.onload = function(e) {
+    analyzerState.ingestionProgress = null;
+    analyzerRun(e.target.result);
+  };
+  treader.readAsText(file);
+}
+
+// Drag-and-drop handlers for the analyzer dropzone.
+function analyzerDragOver(ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  var dz = document.getElementById('analyzerDropzone');
+  if (dz) dz.classList.add('dragover');
+}
+function analyzerDragLeave(ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  var dz = document.getElementById('analyzerDropzone');
+  if (dz) dz.classList.remove('dragover');
+}
+function analyzerDrop(ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  var dz = document.getElementById('analyzerDropzone');
+  if (dz) dz.classList.remove('dragover');
+  var dt = ev.dataTransfer;
+  if (dt && dt.files && dt.files.length > 0) {
+    analyzerHandleFileObject(dt.files[0]);
+  }
+}
+
+function _analyzerHandleFile_OLD(input) {
+  if (!input || !input.files || !input.files[0]) return;
 }
 // Paste handler
 function analyzerHandlePaste() {
@@ -38496,7 +38601,7 @@ function analyzerHandlePaste() {
 
 // Reset
 function analyzerReset() {
-  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload', ingestionProgress: null, ingestionNotice: null };
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload', ingestionProgress: null, ingestionNotice: null, autorisationDetected: null };
   renderModule('analyzer');
 }
 
@@ -38520,15 +38625,22 @@ function renderAnalyzer() {
   html += '</div></div>';
 
   if (analyzerState.mode === 'upload') {
-    html += '<div style="margin:12px 0;text-align:center">';
-    html += '<label style="display:inline-block;padding:12px 24px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">';
+    // Drag-and-drop dropzone + file picker
+    html += '<div id="analyzerDropzone" ondragover="analyzerDragOver(event)" ondragleave="analyzerDragLeave(event)" ondrop="analyzerDrop(event)" style="margin:12px 0;padding:32px 16px;text-align:center;border:2px dashed var(--border);border-radius:12px;transition:border-color 0.2s,background 0.2s">';
+    html += '<div style="font-size:2rem;margin-bottom:8px">\uD83D\uDCC4</div>';
+    html += '<div style="font-weight:600;margin-bottom:6px">' + tx('Tr\u00e6k en fil hertil', 'Drag a file here') + '</div>';
+    html += '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">' + tx('eller', 'or') + '</div>';
+    html += '<label style="display:inline-block;padding:10px 22px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">';
     html += tx('V\u00e6lg fil', 'Choose file');
     html += '<input type="file" accept=".txt,.md,.pdf,.docx" style="display:none" onchange="analyzerHandleFile(this)">';
     html += '</label>';
-    html += '<div style="margin-top:6px;font-size:0.8rem;color:var(--text-muted)">' + tx('Understøttede formater: .txt, .md, .pdf, .docx', 'Supported formats: .txt, .md, .pdf, .docx') + '</div>';
+    html += '<div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">' + tx('Underst\u00f8ttede formater: .txt, .md, .pdf, .docx (maks 30 MB)', 'Supported formats: .txt, .md, .pdf, .docx (max 30 MB)') + '</div>';
+    html += '</div>';
+    // Dropzone hover style (injected once)
+    html += '<style>#analyzerDropzone.dragover{border-color:var(--primary)!important;background:rgba(0,200,255,0.05)!important}</style>';
     // Progress indicator
     if (analyzerState.ingestionProgress) {
-      html += '<div style="margin-top:12px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.9rem">';
+      html += '<div style="margin-top:12px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.9rem;text-align:center">';
       html += '<span class="pulse-anim">\u23F3</span> ' + analyzerState.ingestionProgress;
       html += '</div>';
     }
@@ -38539,7 +38651,6 @@ function renderAnalyzer() {
       html += '<div style="margin-top:6px"><button class="sel-btn" onclick="analyzerState.ingestionNotice=null;renderModule(\'analyzer\')">' + tx('Luk', 'Dismiss') + '</button></div>';
       html += '</div>';
     }
-    html += '</div>';
   } else {
     html += '<div style="margin:12px 0">';
     html += '<textarea id="analyzerPasteArea" style="width:100%;min-height:150px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:monospace;font-size:0.85rem;background:var(--bg-card);color:var(--text);resize:vertical" placeholder="' + tx('Inds\u00e6t opgavetekst her...', 'Paste exam/project text here...') + '"></textarea>';
