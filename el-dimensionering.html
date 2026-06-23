@@ -17313,8 +17313,19 @@ function renderVFD() {
   var app = VFD_APPLICATIONS[vfdState.application];
   var emc = VFD_EMC_CATEGORIES[vfdState.emcCategory];
 
-  // Results
-  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+  // ═══ MATHCAD PRIME SUMMARY ═══
+  html += '</div><div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:16px 20px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 VFD ' + vfdState.motorKW + ' kW</div>';
+  html += mcPrimeLine('I<sub>FL</sub>', ':= IEC 60947 =', '', sizing.motorFLC, 'A', '');
+  html += mcPrimeLine('I<sub>VFD</sub>', ':= ' + sizing.sizingFactor + ' \u00B7 I<sub>FL</sub> =', sizing.sizingFactor + ' \u00B7 ' + sizing.motorFLC, sizing.vfdCurrent, 'A', '');
+  html += mcPrimeResult('I<sub>VFD</sub>', sizing.vfdCurrent, 'A');
+  html += '<div style="margin:8px 0;font-size:0.95rem">L \u2264 L<sub>max</sub> : ' + vfdState.cableLength + ' \u2264 ' + outputCable.maxLength + ' m ' + (outputCable.lengthOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div style="font-family:sans-serif">' + mcPrimeRef('IEC 61800') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
+  html += '</div>';
+
+  // Results (detailed)
+  html += '<details class="eng-advanced"><summary>\uD83D\uDCE6 ' + tx('Detaljeret komponentvalg', 'Detailed components') + '</summary><div class="eng-advanced-body">';
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
   // VFD Sizing
   html += '<div class="result-box">';
@@ -17368,6 +17379,7 @@ function renderVFD() {
     html += '<div class="result-row"><span class="label">' + tx('Linje-reaktor', 'Line Reactor') + '</span><span class="value">' + tx(reactor.reason_da, reactor.reason_en) + ' (' + reactor.clause + ')</span></div>';
   }
   html += '</div>';
+  html += '</div></details>'; // close eng-advanced details
 
   // Simulator
   html += renderVFDSim(vfdState.motorKW, sizing.vfdCurrent, 50, Math.round(1500 * (1 - 0.03)));
