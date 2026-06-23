@@ -33271,6 +33271,64 @@ function analyzerSolve(data) {
   }
   total++;
 
+  // === KB-KONTROL (Viggo method: I²t ≤ k²S² per DS/HD 60364-4-43 §434.5.2) ===
+  if (data.cableMm2 && data.cableLength) {
+    var _cProd = findCableProduct(data.cableMm2, data.cableType);
+    if (_cProd) {
+      // Estimate Ik,max at this point (reuse values if already computed)
+      var _ikForKB = 0;
+      var _zNet_m = 1, _zTrafo_m = 5;
+      if (data.trafoKVA && data.trafoUk) _zTrafo_m = (data.trafoUk / 100) * (Un * Un / (data.trafoKVA * 1000)) * 1000;
+      var _zCable_m = (_cProd.r + _cProd.x) * (data.cableLength / 1000) * 1000;
+      _ikForKB = (1.05 * Un) / (Math.sqrt(3) * (_zNet_m + _zTrafo_m) / 1000);
+
+      // Determine insulation type and clearing time (assume 0.4s for gG fuse at Ik)
+      var _insul = /NOIKLX|NOIKX|NOIK-AL|NOSP|XLPE|PEX/i.test(data.cableType || 'NOIKLX') ? 'XLPE' : 'PVC';
+      var _mat = /Al/i.test(data.cableType || '') ? 'Al' : 'Cu';
+      var _tSik = 0.4; // conservative: assume fuse clears in 0.4s at Ik,max
+      if (data.deviceIn && data.deviceIn >= 100) _tSik = 0.1; // MCCB with instantaneous
+
+      var kbResult = cxKBKontrol(_ikForKB, _tSik, data.cableMm2, _mat, _insul);
+      results.push({
+        type: 'kb',
+        label: tx('KB-kontrol (k²S² ≥ I²t)', 'SC protection check (k²S² ≥ I²t)'),
+        value: kbResult.ok ? '\u2705 OK' : '\u274C FEJL',
+        html: cxRenderSteps(kbResult.steps, tx('KB-kontrol (DS/HD 60364-4-43 §434.5.2)', 'SC protection (DS/HD 60364-4-43 §434.5.2)')),
+        status: kbResult.ok ? 'ok' : 'fail',
+        asked: hasQuestion(data, 'thermal')
+      });
+      solved++; total++;
+    }
+  }
+
+  // === FB-KONTROL (Viggo method: Ik,min ≥ Ia per DS/HD 60364-4-41 §411.3.2) ===
+  if (data.deviceIn && data.cableMm2 && data.cableLength) {
+    var _cProdFB = findCableProduct(data.cableMm2, data.cableType);
+    if (_cProdFB) {
+      // Estimate Ik,min at far end of cable (TN fault loop: Zs = Znet+Ztrafo+2*Zkabel)
+      var _zNetFB = 1, _zTrafoFB = 5;
+      if (data.trafoKVA && data.trafoUk) _zTrafoFB = (data.trafoUk / 100) * (Un * Un / (data.trafoKVA * 1000)) * 1000;
+      var _zCableFB = 2 * (_cProdFB.r + _cProdFB.x) * (data.cableLength / 1000) * 1000; // factor 2 for go+return
+      var _zsFB = (_zNetFB + _zTrafoFB + _zCableFB) / 1000; // total Zs in Ohm
+      var _ikMinFB = (0.95 * 230) / _zsFB; // Ik,min phase-earth
+
+      var _devType = data.deviceCurve ? 'MCB' : (data.deviceIn >= 100 ? 'MCCB' : 'MCB');
+      var _earth = data.earthSystem || 'TN';
+      var _circType = (data.deviceIn <= 32) ? 'final' : 'distribution';
+
+      var fbResult = cxFBKontrol(_ikMinFB, data.deviceIn, _devType, data.deviceCurve || 'B', _earth, _circType);
+      results.push({
+        type: 'fb',
+        label: tx('FB-kontrol (Ik,min ≥ Ia)', 'Fault protection (Ik,min ≥ Ia)'),
+        value: fbResult.ok ? '\u2705 OK (margin: ' + fbResult.margin.toFixed(1) + 'x)' : '\u274C FEJL',
+        html: cxRenderSteps(fbResult.steps, tx('FB-kontrol (DS/HD 60364-4-41 §411.3.2)', 'Fault protection (DS/HD 60364-4-41 §411.3.2)')),
+        status: fbResult.ok ? 'ok' : 'fail',
+        asked: hasQuestion(data, 'fault')
+      });
+      solved++; total++;
+    }
+  }
+
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
   if (ib && data.deviceIn && izCorrected) {
     var coordOk = (ib <= data.deviceIn) && (data.deviceIn <= izCorrected);
