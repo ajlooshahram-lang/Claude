@@ -1679,6 +1679,17 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== TCC cable-damage / I2t let-through overlays (DS/HD 60364-4-43 cl.434.5.2) =====
+  'Cable damage curve t=(k\u00B7S/I)\u00B2 and I\u00B2t let-through per DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu, 143 XLPE/Cu, 76 PVC/Al, 94 XLPE/Al.': '\u0645\u0646\u062D\u0646\u06CC \u0622\u0633\u06CC\u0628 \u06A9\u0627\u0628\u0644 t=(k\u00B7S/I)\u00B2 \u0648 \u0639\u0628\u0648\u0631 I\u00B2t \u0637\u0628\u0642 DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu\u060C 143 XLPE/Cu\u060C 76 PVC/Al\u060C 94 XLPE/Al.',
+  'Cable cross-section (damage curve)': '\u0645\u0642\u0637\u0639 \u06A9\u0627\u0628\u0644 (\u0645\u0646\u062D\u0646\u06CC \u0622\u0633\u06CC\u0628)',
+  'Cable damage': '\u0622\u0633\u06CC\u0628 \u06A9\u0627\u0628\u0644',
+  'Cable unprotected': '\u06A9\u0627\u0628\u0644 \u0628\u062F\u0648\u0646 \u062D\u0641\u0627\u0638\u062A',
+  'Cable protection (I\u00B2t)': '\u062D\u0641\u0627\u0638\u062A \u06A9\u0627\u0628\u0644 (I\u00B2t)',
+  'cable withstand': '\u062A\u062D\u0645\u0644 \u06A9\u0627\u0628\u0644',
+  'let-through @ cursor': '\u0639\u0628\u0648\u0631 @ \u0645\u06A9\u0627\u0646\u200C\u0646\u0645\u0627',
+  'Cable protected (I\u00B2t \u2264 k\u00B2S\u00B2)': '\u06A9\u0627\u0628\u0644 \u0645\u062D\u0627\u0641\u0638\u062A\u200C\u0634\u062F\u0647 (I\u00B2t \u2264 k\u00B2S\u00B2)',
+  'DANGER: I\u00B2t > k\u00B2S\u00B2 - cable not short-circuit protected': '\u062E\u0637\u0631: I\u00B2t > k\u00B2S\u00B2 - \u06A9\u0627\u0628\u0644 \u062F\u0631 \u0628\u0631\u0627\u0628\u0631 \u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647 \u0645\u062D\u0627\u0641\u0638\u062A \u0646\u0634\u062F\u0647',
+
   // ===== Kalkulation (estimating / tender engine; EG Sigma GC / Calcia GC competitor) =====
   'Calculation / Tender': '\u0645\u062D\u0627\u0633\u0628\u0647 / \u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0642\u06CC\u0645\u062A',
   'Automatic material take-off straight from your single-line diagram (sldTree = single source of truth). Materials, labour (akkord), overhead, margin and 25% VAT are computed from the dimensioned installation \u2014 no re-typing.': '\u0628\u0631\u0622\u0648\u0631\u062F \u062E\u0648\u062F\u06A9\u0627\u0631 \u0645\u0635\u0627\u0644\u062D \u0645\u0633\u062A\u0642\u06CC\u0645\u0627\u064B \u0627\u0632 \u062F\u06CC\u0627\u06AF\u0631\u0627\u0645 \u062A\u06A9\u200C\u062E\u0637\u06CC \u0634\u0645\u0627 (\u0645\u0646\u0628\u0639 \u0648\u0627\u062D\u062F \u062D\u0642\u06CC\u0642\u062A). \u0645\u0635\u0627\u0644\u062D\u060C \u062F\u0633\u062A\u0645\u0632\u062F (\u0622\u06A9\u0648\u0631\u062F)\u060C \u0633\u0631\u0628\u0627\u0631\u060C \u0633\u0648\u062F \u0648 \u0645\u0627\u0644\u06CC\u0627\u062A \u06F2\u06F5\u066A \u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A \u0637\u0631\u0627\u062D\u06CC\u200C\u0634\u062F\u0647 \u0645\u062D\u0627\u0633\u0628\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u2014 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E \u0645\u062C\u062F\u062F.',
@@ -10008,17 +10019,50 @@ function tccCalcI2t(device, In, current) {
   return { prearcing: prearcing, total: total };
 }
 
-function tccCableDamageCurve(cable) {
-  // Returns array of {i, t} points for the adiabatic limit curve
-  // Formula: t = k^2 * S^2 / I^2 (DS/HD 60364-4-43 cl.434.5.2)
-  // k values: 115 (PVC/Cu), 143 (XLPE/Cu), 76 (PVC/Al), 94 (XLPE/Al)
-  if (!cable || !cable.mm2) return [];
-  var k;
-  if (cable.material === 'Cu') {
-    k = 143; // XLPE/Cu (NKT NOIKLX is XLPE insulated)
-  } else {
-    k = 94;  // XLPE/Al
+function tccCableInsulation(cable) {
+  // Determine conductor insulation (PVC vs XLPE/PEX) for the adiabatic k factor.
+  // Explicit cable.insulation wins; otherwise infer from the product model/id.
+  // NKT NOIKLX 90 / NOIK-AL-M are 90 degC XLPE cables.
+  // Truly-unknown insulation falls back to PVC (lower k = conservative withstand).
+  if (!cable) return 'PVC';
+  if (cable.insulation) {
+    var s = String(cable.insulation).toUpperCase();
+    if (s.indexOf('XLPE') >= 0 || s.indexOf('PEX') >= 0 || s.indexOf('EPR') >= 0) return 'XLPE';
+    if (s.indexOf('PVC') >= 0) return 'PVC';
   }
+  var m = ((cable.model || '') + ' ' + (cable.id || '')).toUpperCase();
+  if (m.indexOf('NOIKLX') >= 0 || m.indexOf('XLPE') >= 0 || m.indexOf('PEX') >= 0 ||
+      m.indexOf('NOIK-AL') >= 0 || /(^|[^0-9])90([^0-9]|$)/.test(m)) return 'XLPE';
+  return 'PVC';
+}
+
+function tccCableKFactor(material, insulation, mm2) {
+  // Adiabatic k factor per DS/HD 60364-4-43 cl.434.5.2 (values from 60364-5-54 Table 54.x):
+  //   Cu/PVC=115, Cu/XLPE=143, Al/PVC=76, Al/XLPE=94. Large sections (S>300mm2) use the
+  //   reduced kLarge values. Sourced from the shared FAULT_K_FACTORS table (single source of truth).
+  var mat = (material === 'Al') ? 'al' : 'cu';
+  var ins = (insulation === 'XLPE') ? 'XLPE' : 'PVC';
+  var key = mat + ins; // cuPVC | cuXLPE | alPVC | alXLPE
+  if (typeof FAULT_K_FACTORS !== 'undefined' && FAULT_K_FACTORS[key]) {
+    var ref = FAULT_K_FACTORS[key];
+    return (mm2 && mm2 > 300 && ref.kLarge) ? ref.kLarge : ref.k;
+  }
+  var lit = { cuPVC: 115, cuXLPE: 143, alPVC: 76, alXLPE: 94 };
+  return lit[key] || 115;
+}
+
+function tccGetCableK(cable) {
+  // Return the insulation-aware k factor for a cable per DS/HD 60364-4-43 cl.434.5.2.
+  if (!cable) return 143;
+  return tccCableKFactor(cable.material, tccCableInsulation(cable), cable.mm2);
+}
+
+function tccCableDamageCurve(cable) {
+  // Returns array of {i, t} points for the adiabatic cable-damage limit curve.
+  // Formula: t = (k*S / I)^2 = k^2*S^2 / I^2  (DS/HD 60364-4-43 cl.434.5.2 / 60364-5-54).
+  // k is insulation/material aware (115 PVC/Cu, 143 XLPE/Cu, 76 PVC/Al, 94 XLPE/Al).
+  if (!cable || !cable.mm2) return [];
+  var k = tccGetCableK(cable);
   var S = cable.mm2;
   var k2S2 = k * k * S * S;
   var points = [];
@@ -10037,11 +10081,41 @@ function tccCableDamageCurve(cable) {
   return points;
 }
 
-function tccGetCableK(cable) {
-  // Return k factor for cable material/insulation per DS/HD 60364-4-43 cl.434.5.2
-  if (!cable) return 143;
-  if (cable.material === 'Cu') return 143; // XLPE/Cu
-  return 94; // XLPE/Al
+function tccCableDamageEval(curve, cable, uptoCurrent) {
+  // Check whether the protective-device curve clears BELOW the cable adiabatic damage
+  // limit t=(k*S/I)^2 for every current up to uptoCurrent (the prospective fault current).
+  // Returns {protected, crossCurrent}: crossCurrent is the first current at which the
+  // device trip time rises ABOVE the cable damage time (cable can burn before the device
+  // trips). DS/HD 60364-4-43 cl.434.5.2.
+  if (!cable || !cable.mm2 || !curve || curve.length === 0) return { protected: true, crossCurrent: null };
+  var k = tccGetCableK(cable);
+  var k2S2 = k * k * cable.mm2 * cable.mm2;
+  var sorted = curve.slice().sort(function(a, b) { return a.i - b.i; });
+  var lim = (uptoCurrent && uptoCurrent > 0) ? uptoCurrent : Infinity;
+  for (var i = 0; i < sorted.length; i++) {
+    var pt = sorted[i];
+    if (!pt || pt.i <= 0 || pt.tMax == null) continue;
+    if (pt.i > lim) break;
+    var tCable = k2S2 / (pt.i * pt.i);
+    if (pt.tMax > tCable) return { protected: false, crossCurrent: pt.i };
+  }
+  return { protected: true, crossCurrent: null };
+}
+
+function tccI2tProtection(device, In, current, cable) {
+  // Compare device let-through energy I2t against the cable short-circuit withstand k2S2.
+  // Conductor is protected against short circuit only when I2t <= k2S2 (DS/HD 60364-4-43 cl.434.5.2).
+  var lt = tccCalcI2t(device, In, current);
+  var k = cable ? tccGetCableK(cable) : 143;
+  var S = (cable && cable.mm2) ? cable.mm2 : 0;
+  var k2s2 = k * k * S * S;
+  var protectedOk = (k2s2 > 0) ? (lt.total <= k2s2) : true;
+  var util = (k2s2 > 0) ? (lt.total / k2s2 * 100) : 0;
+  return {
+    letThrough: lt.total, prearcing: lt.prearcing,
+    k: k, k2s2: k2s2, protected: protectedOk, utilizationPct: util,
+    clause: 'DS/HD 60364-4-43 cl.434.5.2'
+  };
 }
 
 // ===== DEVICE TCC (per-module time-current curve) =====
@@ -10053,7 +10127,15 @@ function deviceTccSetCursor(mod, current) {
   else { renderModule(mod); }
 }
 
-function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey) {
+function deviceTccSetCable(mod, field, val) {
+  // Click-only cable selection for the per-device cable-damage / I2t overlay.
+  // field is one of 'CableS' (cross-section mm2, 0 = off), 'CableMat' (Cu|Al), 'CableIns' (PVC|XLPE).
+  deviceTccState[mod + field] = val;
+  if (mod === 'rcd') { renderModule('standards'); }
+  else { renderModule(mod); }
+}
+
+function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey, cable) {
   if (!device || !In) return '';
   var curve = sldDeviceCurve(device, In, settings);
   if (!curve || curve.length === 0) return '';
@@ -10106,6 +10188,37 @@ function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey
       lowerPath += 'L' + lx.toFixed(1) + ',' + ly.toFixed(1);
     }
     svg += '<path d="' + upperPath + lowerPath + 'Z" fill="rgba(37,99,235,0.18)" stroke="#2563eb" stroke-width="1.5"/>';
+  }
+
+  // Cable adiabatic damage curve (overlay) - DS/HD 60364-4-43 cl.434.5.2 / 60364-5-54.
+  // t = (k*S/I)^2. The device curve must stay BELOW this limit up to the prospective fault
+  // current; any region where the device curve crosses ABOVE means the cable can be destroyed
+  // before the device trips, so it is shaded red.
+  var deviceCableProtected = true;
+  if (cable && cable.mm2) {
+    var dmgPts = tccCableDamageCurve(cable);
+    var dmgPath = '';
+    for (var dci = 0; dci < dmgPts.length; dci++) {
+      var dpp = dmgPts[dci];
+      if (dpp.i < 1 || dpp.t < 0.001 || dpp.t > 10000) continue;
+      dmgPath += (dmgPath === '' ? 'M' : 'L') + xPos(dpp.i).toFixed(1) + ',' + yPos(dpp.t).toFixed(1);
+    }
+    if (dmgPath) {
+      svg += '<path d="' + dmgPath + '" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="8,4" opacity="0.85"/>';
+      var dmgKlbl = tccGetCableK(cable);
+      svg += '<text x="' + (w - marginR - 2) + '" y="' + (marginT + 36) + '" text-anchor="end" font-size="8" fill="#dc2626">' + tx('Kabelskade', 'Cable damage') + ' k=' + dmgKlbl + ' ' + cable.material + ' ' + cable.mm2 + 'mm\u00B2</text>';
+    }
+    var evalUpto = (faultCurrent && faultCurrent > 0) ? faultCurrent : (validPts.length ? validPts[validPts.length - 1].i : 0);
+    var dmgEvalPts = [];
+    for (var dvi = 0; dvi < validPts.length; dvi++) { dmgEvalPts.push({ i: validPts[dvi].i, tMax: validPts[dvi].tMax }); }
+    var dmgEval = tccCableDamageEval(dmgEvalPts, cable, evalUpto);
+    deviceCableProtected = dmgEval.protected;
+    if (!dmgEval.protected && dmgEval.crossCurrent) {
+      var cxX = xPos(dmgEval.crossCurrent);
+      svg += '<rect x="' + cxX.toFixed(1) + '" y="' + marginT + '" width="' + Math.max(0, (w - marginR) - cxX).toFixed(1) + '" height="' + plotH + '" fill="rgba(220,38,38,0.13)"/>';
+      svg += '<line x1="' + cxX.toFixed(1) + '" y1="' + marginT + '" x2="' + cxX.toFixed(1) + '" y2="' + (h - marginB) + '" stroke="#dc2626" stroke-width="1" stroke-dasharray="2,2"/>';
+      svg += '<text x="' + (cxX + 3).toFixed(1) + '" y="' + (marginT + 48) + '" font-size="8" fill="#dc2626" font-weight="bold">' + tx('Kabel usikret', 'Cable unprotected') + '</text>';
+    }
   }
 
   // Load current marker (IB) - green dashed line
@@ -10173,11 +10286,20 @@ function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey
 }
 
 function renderDeviceTCCCard(device, In, settings, loadCurrent, faultCurrent, modKey, title) {
-  var chart = renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey);
+  // Click-only cable selection for the adiabatic damage-curve / I2t let-through overlay.
+  var cableS = deviceTccState[modKey + 'CableS'] || 0;
+  var cableMat = deviceTccState[modKey + 'CableMat'] || 'Cu';
+  var cableIns = deviceTccState[modKey + 'CableIns'] || 'XLPE';
+  var tccCable = (cableS > 0) ? { mm2: cableS, material: cableMat, insulation: cableIns, model: '' } : null;
+  var chart = renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey, tccCable);
   if (!chart) return '';
   var cursorCurrent = deviceTccState[modKey + 'Cursor'] || 500;
   var html = '<div class="card fade-in"><div class="card-title">' + title + '</div>';
   html += '<div class="info-row">' + tx('Tidsstroemkarakteristik iht. IEC 60898 / IEC 60269 / IEC 60947-2', 'Time-current characteristic per IEC 60898 / IEC 60269 / IEC 60947-2') + '</div>';
+  html += '<div class="info-row" style="font-size:0.85em;opacity:0.85">' + tx(
+    'Kabelskadeskurve t=(k\u00B7S/I)\u00B2 og I\u00B2t-gennemslip iht. DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu, 143 XLPE/Cu, 76 PVC/Al, 94 XLPE/Al.',
+    'Cable damage curve t=(k\u00B7S/I)\u00B2 and I\u00B2t let-through per DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu, 143 XLPE/Cu, 76 PVC/Al, 94 XLPE/Al.'
+  ) + '</div>';
   // Cursor buttons
   var cursors = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
   html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem-cursor', 'Fault Current Cursor') + '</div><div class="select-grid">';
@@ -10187,16 +10309,53 @@ function renderDeviceTCCCard(device, In, settings, loadCurrent, faultCurrent, mo
     html += '<button class="sel-btn' + csel + '" onclick="deviceTccSetCursor(\'' + modKey + '\',' + cursors[ci] + ')">' + clbl + '</button>';
   }
   html += '</div></div>';
+  // Cable cross-section selector (click-only) for the damage curve overlay
+  var sections = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltvaersnit (skadeskurve)', 'Cable cross-section (damage curve)') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (cableS === 0 ? ' selected' : '') + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableS\',0)">' + tx('Ingen', 'None') + '</button>';
+  for (var si = 0; si < sections.length; si++) {
+    var ssel = (cableS === sections[si]) ? ' selected' : '';
+    html += '<button class="sel-btn' + ssel + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableS\',' + sections[si] + ')">' + sections[si] + 'mm\u00B2</button>';
+  }
+  html += '</div></div>';
+  if (cableS > 0) {
+    // Material + insulation toggles
+    html += '<div class="select-group"><div class="select-label">' + tx('Leder / isolering', 'Conductor / insulation') + '</div><div class="select-grid">';
+    html += '<button class="sel-btn' + (cableMat === 'Cu' ? ' selected' : '') + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableMat\',\'Cu\')">Cu</button>';
+    html += '<button class="sel-btn' + (cableMat === 'Al' ? ' selected' : '') + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableMat\',\'Al\')">Al</button>';
+    html += '<button class="sel-btn' + (cableIns === 'PVC' ? ' selected' : '') + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableIns\',\'PVC\')">PVC</button>';
+    html += '<button class="sel-btn' + (cableIns === 'XLPE' ? ' selected' : '') + '" onclick="deviceTccSetCable(\'' + modKey + '\',\'CableIns\',\'XLPE\')">XLPE</button>';
+    html += '</div></div>';
+  }
   html += chart;
   // Legend
   html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:0.82em">';
   html += '<span style="color:#2563eb">\u2588 ' + tx('Udloesningsbaand', 'Trip band') + '</span>';
   if (loadCurrent && loadCurrent > 0) html += '<span style="color:#16a34a">--- IB (' + tx('belastning', 'load') + ')</span>';
   if (faultCurrent && faultCurrent > 0) html += '<span style="color:#dc2626">--- Ik (' + tx('kortslutning', 'fault') + ')</span>';
+  if (tccCable) html += '<span style="color:#dc2626">- - ' + tx('Kabelskade', 'Cable damage') + ' k\u00B2S\u00B2/I\u00B2</span>';
   html += '<span style="color:#f59e0b">--- ' + tx('Cursor', 'Cursor') + '</span>';
-  html += '</div></div>';
+  html += '</div>';
+  // I2t let-through vs cable withstand verdict (DS/HD 60364-4-43 cl.434.5.2)
+  if (tccCable) {
+    var prot = tccI2tProtection(device, In, cursorCurrent, tccCable);
+    html += '<div class="result-box" style="margin-top:10px"><div class="result-title">' + tx('Kabelbeskyttelse (I\u00B2t)', 'Cable protection (I\u00B2t)') + ' - DS/HD 60364-4-43 cl.434.5.2</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cableMat + ' ' + cableS + 'mm\u00B2 ' + cableIns + ' (k=' + prot.k + ')</span></div>';
+    html += '<div class="result-row"><span class="label">k\u00B2S\u00B2 (' + tx('kabel-modstand', 'cable withstand') + ')</span><span class="value">' + tccFormatI2t(prot.k2s2) + '</span></div>';
+    html += '<div class="result-row"><span class="label">I\u00B2t ' + tx('gennemslip @ cursor', 'let-through @ cursor') + ' (' + (cursorCurrent >= 1000 ? (cursorCurrent / 1000) + 'kA' : cursorCurrent + 'A') + ')</span><span class="value">' + tccFormatI2t(prot.letThrough) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Udnyttelse', 'Utilization') + '</span><span class="value">' + prot.utilizationPct.toFixed(1) + '%</span></div>';
+    if (prot.protected) {
+      html += '<div class="result-row" style="color:#16a34a;font-weight:bold"><span class="label">\u2705 ' + tx('Kabel beskyttet (I\u00B2t \u2264 k\u00B2S\u00B2)', 'Cable protected (I\u00B2t \u2264 k\u00B2S\u00B2)') + '</span><span class="value">cl.434.5.2</span></div>';
+    } else {
+      html += '<div class="result-row" style="color:#dc2626;font-weight:bold"><span class="label">\u26A0\uFE0F ' + tx('FARE: I\u00B2t > k\u00B2S\u00B2 - kabel ikke kortslutningsbeskyttet', 'DANGER: I\u00B2t > k\u00B2S\u00B2 - cable not short-circuit protected') + '</span><span class="value">cl.434.5.2</span></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
   return html;
 }
+
+
 
 function renderRelayTCC(I1N, relState) {
   if (!I1N || I1N <= 0) return '';
@@ -10687,7 +10846,7 @@ function renderCascadeTCC() {
       html += '<div class="result-row"><span class="label">' + tx('Kabel','Cable') + '</span><span class="value">' + cable.material + ' ' + cable.mm2 + ' mm\u00B2 (' + (cable.model || '') + ')</span></div>';
       var kFactor = tccGetCableK(cable);
       var k2s2 = kFactor * kFactor * cable.mm2 * cable.mm2;
-      html += '<div class="result-row"><span class="label">k</span><span class="value">' + kFactor + ' (' + (cable.material === 'Cu' ? 'XLPE/Cu' : 'XLPE/Al') + ')</span></div>';
+      html += '<div class="result-row"><span class="label">k</span><span class="value">' + kFactor + ' (' + tccCableInsulation(cable) + '/' + cable.material + ')</span></div>';
       html += '<div class="result-row"><span class="label">k\u00B2S\u00B2</span><span class="value">' + tccFormatI2t(k2s2) + '</span></div>';
       html += '</div>';
     }
