@@ -17563,35 +17563,37 @@ function renderLighting() {
   });
   html += '</div></div>';
 
-  // Results
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Beregningsresultat', 'Calculation Results') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Maal-belysningsstyrke', 'Target Illuminance') + '</span><span class="value">' + calc.targetLux + ' lux (DS/EN 12464-1)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Rumareal', 'Room Area') + '</span><span class="value">' + calc.area + ' m\u00B2</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Rumindeks k', 'Room Index k') + '</span><span class="value">' + calc.roomIndex + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Udnyttelsesfaktor (UF)', 'Utilization Factor (UF)') + '</span><span class="value">' + calc.uf + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Armaturlumen', 'Luminaire Lumens') + '</span><span class="value">' + calc.lumens + ' lm</span></div>';
+  // Results — Mathcad Prime math style
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Belysningsberegning', 'Lighting Calculation') + '</div>';
+
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'E<sub>m</sub>', val: calc.targetLux, unit: 'lux' },
+    { sym: 'A', val: calc.area, unit: 'm\u00B2' },
+    { sym: 'MF', val: lightingState.maintenanceFactor, unit: '' }
+  ]);
+  html += mcPrimeDefLine([
+    { sym: 'L', val: lightingState.length, unit: 'm' },
+    { sym: 'W', val: lightingState.width, unit: 'm' },
+    { sym: 'H', val: lightingState.height, unit: 'm' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+  html += mcPrimeLine('k', ':= ' + mcPrimeFrac('L \u00B7 W', 'H \u00B7 (L + W)') + ' =', mcPrimeFrac(lightingState.length + ' \u00B7 ' + lightingState.width, lightingState.height + ' \u00B7 (' + lightingState.length + ' + ' + lightingState.width + ')'), calc.roomIndex, '', tx('Rumindeks','Room index'));
+  html += mcPrimeLine('UF', ':= f(k, ' + tx('reflektanser','reflectances') + ') =', '', calc.uf, '', mcPrimeRef('DS/EN 12464-1'));
+  html += mcPrimeLine('n', ':= ' + mcPrimeFrac('E<sub>m</sub> \u00B7 A', '\u03A6<sub>arm</sub> \u00B7 UF \u00B7 MF') + ' =', mcPrimeFrac(calc.targetLux + ' \u00B7 ' + calc.area, calc.lumens + ' \u00B7 ' + calc.uf + ' \u00B7 ' + lightingState.maintenanceFactor), calc.count, tx('stk','pcs'), tx('Antal armaturer','Luminaire count'));
+
+  html += mcPrimeResult('n', calc.count + ' ' + tx('armaturer','luminaires') + ' (' + calc.rows + ' \u00D7 ' + calc.cols + ')', '');
+
+  html += mcPrimeHeader(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.95rem;line-height:2.2">';
+  html += '<div>S/H \u2264 1,5 : ' + calc.spacingRatio + (calc.uniformityOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>LENI \u2264 ' + calc.leniMax + ' W/m\u00B2 : ' + calc.powerDensity + ' W/m\u00B2' + (calc.leniOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>' + tx('Kredse','Circuits') + ': ' + calc.circuitsNeeded + ' \u00D7 B10 MCB (' + calc.totalWattage + ' W ' + tx('total','total') + ')</div>';
   html += '</div>';
 
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Armaturantal og layout', 'Luminaire Count & Layout') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Antal armaturer', 'Luminaire Count') + '</span><span class="value">' + calc.count + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Grid layout', 'Grid Layout') + '</span><span class="value">' + calc.rows + ' x ' + calc.cols + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Armaturafstand X', 'Spacing X') + '</span><span class="value">' + calc.spacingX + ' m</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Armaturafstand Y', 'Spacing Y') + '</span><span class="value">' + calc.spacingY + ' m</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Afstand/Hoejde ratio', 'Spacing/Height Ratio') + '</span><span class="value">' + calc.spacingRatio + (calc.uniformityOk ? ' \u2264 1.5 \u2705' : ' > 1.5 \u274C') + '</span></div>';
-  html += '</div>';
-
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Kredsloeb og energi', 'Circuits & Energy') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Samlet effekt', 'Total Power') + '</span><span class="value">' + calc.totalWattage + ' W</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Kredse (maks 2000W/kreds)', 'Circuits (max 2000W/circuit)') + '</span><span class="value">' + calc.circuitsNeeded + ' x 10A MCB kurve B</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Effektdensitet', 'Power Density') + '</span><span class="value">' + calc.powerDensity + ' W/m\u00B2' + (calc.leniOk ? ' \u2705' : ' \u274C') + ' (LENI maks ' + calc.leniMax + ' W/m\u00B2, DS/EN 15193)</span></div>';
-  html += '</div>';
-
-  // Emergency lighting note
-  html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Noedbelysning', 'Emergency Lighting') + '</span><span class="value">' + tx('Se noedbelysningsmodulet for DS/EN 1838 krav', 'See Emergency Lighting module for DS/EN 1838 requirements') + '</span></div>';
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/EN 12464-1') + ' ' + mcPrimeRef('DS/EN 15193') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
   html += '</div>';
 
   html += renderLightingSim(calc.count, calc.targetLux, lightingState.width, lightingState.length, lightingState.height, calc.spacingRatio <= 1.5 ? 0.7 : 0.4);
@@ -17773,43 +17775,46 @@ function renderHeatPump() {
 
   var calc = heatpumpCalcInstallation(heatpumpState.type, heatpumpState.heatingKW, heatpumpState.cop, heatpumpState.inrushFactor, heatpumpState.cableLength);
 
-  // Results - Electrical
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Elektrisk dimensionering', 'Electrical Sizing') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Elektrisk indgangseffekt', 'Electrical Input Power') + '</span><span class="value">' + calc.electricalKW + ' kW (= ' + heatpumpState.heatingKW + '/' + heatpumpState.cop + ')</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Faser', 'Phase') + '</span><span class="value">' + calc.phase + '-' + tx('faset', 'phase') + (calc.phase === 1 ? ' (230V)' : ' (400V)') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Driftsstroem (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + calc.flc + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Startstroem', 'Starting Current') + '</span><span class="value">' + calc.startCurrent + ' A (' + heatpumpState.inrushFactor + 'x FLC)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Afrimningslast (x1.15)', 'Defrost Load (x1.15)') + '</span><span class="value">' + calc.defrostLoad + ' kW / ' + calc.defrostFLC + ' A</span></div>';
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Varmepumpe \u2014 dimensionering', 'Heat Pump \u2014 sizing') + '</div>';
+
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'P<sub>varme</sub>', val: heatpumpState.heatingKW, unit: 'kW' },
+    { sym: 'COP', val: heatpumpState.cop, unit: '' },
+    { sym: 'LRA', val: heatpumpState.inrushFactor + '\u00D7', unit: '' },
+    { sym: 'L', val: heatpumpState.cableLength, unit: 'm' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+  html += mcPrimeLine('P<sub>el</sub>', ':= ' + mcPrimeFrac('P<sub>varme</sub>', 'COP') + ' =', mcPrimeFrac(heatpumpState.heatingKW, heatpumpState.cop), calc.electricalKW, 'kW', tx('Elektrisk indgangseffekt','Electrical input'));
+  html += mcPrimeLine(tx('Fase','Phase'), ':=', '', calc.phase + '\u223C' + (calc.phase === 1 ? ' (230V)' : ' (400V)'), '', calc.electricalKW + ' kW ' + (calc.phase === 3 ? '> 5 kW \u2192 3\u223C' : '\u2264 5 kW \u2192 1\u223C'));
+  html += mcPrimeLine('I<sub>FL</sub>', ':= ' + (calc.phase === 3 ? mcPrimeFrac('P<sub>el</sub>', '\u221A3 \u00B7 U \u00B7 cos\u03C6') : mcPrimeFrac('P<sub>el</sub>', 'U \u00B7 cos\u03C6')) + ' =', '', calc.flc, 'A', '');
+  html += mcPrimeLine('I<sub>start</sub>', ':= LRA \u00B7 I<sub>FL</sub> =', heatpumpState.inrushFactor + ' \u00B7 ' + calc.flc, calc.startCurrent, 'A', '');
+  html += mcPrimeLine('P<sub>afrimning</sub>', ':= 1,15 \u00B7 P<sub>el</sub> =', '1,15 \u00B7 ' + calc.electricalKW, calc.defrostLoad, 'kW', tx('Afrimningslast','Defrost load'));
+  html += mcPrimeLine('\u0394U%', '=', '', calc.vdrop.percent, '%', calc.vdrop.ok ? '' : '<strong style="color:var(--danger)">' + tx('Over 3%!','Over 3%!') + '</strong>');
+
+  // Result
+  html += mcPrimeResult('I<sub>FL</sub>', calc.flc, 'A');
+
+  // Component selection
+  html += mcPrimeHeader(tx('KOMPONENTVALG', 'COMPONENT SELECTION'), 'green');
+  if (calc.cable) html += mcPrimeDecision(tx('Kabel','Cable') + ': ' + calc.cable.brand + ' ' + calc.cable.model + ' ' + calc.cable.mm2 + ' mm\u00B2 (I<sub>z</sub>=' + calc.cable.iz + ' A)');
+  if (calc.mcb) html += mcPrimeDecision('MCB: ' + calc.mcb.brand + ' C' + calc.mcb.rating + ' (' + tx('kurve C \u2014 kompressor','curve C \u2014 compressor') + ')');
+  if (calc.rcd) html += mcPrimeDecision('RCD: ' + calc.rcd.brand + ' ' + calc.rcd.rating + 'A / 30mA Type A');
+
+  // Verification
+  html += mcPrimeHeader(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.95rem;line-height:2.2">';
+  html += '<div>\u0394U% \u2264 3% : ' + calc.vdrop.percent + '% ' + (calc.vdrop.ok ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>z</sub> ' + mcPrimeOk() + '</div>';
+  html += '<div>\u2705 ' + tx('Lastafbryder (l\u00E5sbar, udend\u00F8rs)','Disconnect switch (lockable, outdoor)') + '</div>';
+  html += '<div>\u2705 ' + tx('Udligningsforbindelse til PE','Bonding to PE') + '</div>';
+  html += '<div>\u2705 SPD Type 2 ' + mcPrimeRef('DS/HD 60364-5-534') + '</div>';
   html += '</div>';
 
-  // Cable & Protection
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Kabel og beskyttelse', 'Cable & Protection') + '</div>';
-  if (calc.cable) {
-    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + calc.cable.brand + ' ' + calc.cable.model + ' ' + calc.cable.mm2 + 'mm\u00B2 (Iz=' + calc.cable.iz + 'A)</span></div>';
-  }
-  if (calc.mcb) {
-    html += '<div class="result-row"><span class="label">' + tx('MCB (kurve C - kompressor)', 'MCB (curve C - compressor)') + '</span><span class="value">' + calc.mcb.brand + ' ' + calc.mcb.model + ' ' + calc.mcb.rating + 'A kurve C</span></div>';
-  }
-  if (calc.rcd) {
-    html += '<div class="result-row"><span class="label">' + tx('RCD (30mA Type A - obligatorisk)', 'RCD (30mA Type A - mandatory)') + '</span><span class="value">' + calc.rcd.brand + ' ' + calc.rcd.model + ' ' + calc.rcd.rating + 'A / 30mA Type A</span></div>';
-  }
-  html += '</div>';
-
-  // Voltage Drop
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Spaendingsfald', 'Voltage Drop') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage Drop') + '</span><span class="value">' + calc.vdrop.percent + '% (' + calc.vdrop.vdrop + 'V)' + (calc.vdrop.ok ? ' \u2705 \u2264 3%' : ' \u274C > 3%') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + calc.vdrop.clause + '</span></div>';
-  html += '</div>';
-
-  // Installation Requirements
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Installationskrav', 'Installation Requirements') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Lastafbryder (udendoers)', 'Disconnect Switch (outdoor)') + '</span><span class="value">\u2705 ' + tx('Obligatorisk laasbar nær udedel', 'Mandatory lockable near outdoor unit') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Supplerende udligningsforbindelse', 'Supplementary Bonding') + '</span><span class="value">\u2705 ' + tx('Udedel metalvaerk til PE', 'Outdoor unit metalwork to PE') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('SPD Type 2 (cl.534)', 'SPD Type 2 (cl.534)') + '</span><span class="value">\u2705 ' + tx('Anbefalet for udendoers installation', 'Recommended for outdoor installation') + '</span></div>';
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/HD 60364') + ' ' + mcPrimeRef('Installationsbekendtg\u00F8relsen') + '</div>';
   html += '</div>';
 
   html += renderHeatPumpSim(heatpumpState.heatingKW, heatpumpState.cop, calc.electricalKW, calc.flc, calc.phase);
