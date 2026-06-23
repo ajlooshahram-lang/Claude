@@ -18700,6 +18700,118 @@ test('BOUNDARY: MCCB I2=1.3*In vs 1.45*Iz (cl.433.1) - ok and fail cases', funct
   assert.strictEqual(failC.status, 'fail', 'I2=130 > 1.45*Iz=116 must fail. Got: ' + failC.detail);
 });
 
+// =====================================================================
+// VDROP LIGHTING-LIMIT VERDICT TESTS (DS/HD 60364-5-52 cl. 525)
+// Proves the circuit-type-aware 3% lighting limit in sldVerifyNode.
+// Mirrors the _advNode adversarial pattern: trafo -> final_circuit fixture,
+// forcing node._vdrop to exercise the verdict thresholds directly.
+// =====================================================================
+function _vdCheck(results) { return results.find(function(r){ return r.rule.indexOf('Vdrop') === 0; }); }
+
+// --- L1. Lighting final circuit at EXACTLY 3.0% -> ok (inclusive limit) ---
+test('VDROP-LIGHTING: lighting circuit at exactly 3.0% passes (cl.525, 3% inclusive)', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Lighting', name_da: 'Belysning', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.0;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'Vdrop check must be present');
+  assert.strictEqual(c.status, 'ok', 'lighting at 3.0% must pass (<= 3% inclusive). Got: ' + c.detail);
+  assert(c.rule.indexOf('3%') >= 0, 'rule must show the 3% lighting limit. Got rule: ' + c.rule);
+});
+
+// --- L2. Lighting at 3.5% -> fail (THE BUG: previously reported ok under general 4% limit) ---
+test('VDROP-LIGHTING: lighting circuit at 3.5% FAILS (regression of non-conservative 4% bug)', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Lighting', name_da: 'Belysning', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.5;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'Vdrop check present');
+  assert.strictEqual(c.status, 'fail', 'lighting at 3.5% must FAIL (was wrongly ok under 4% general). Got: ' + c.detail);
+  assert(c.rule.indexOf('3%') >= 0, 'rule must show 3% limit, not 4%. Got rule: ' + c.rule);
+});
+
+// --- L2b. Lighting at 3.01% -> fail (just above the 3% limit, no tolerance) ---
+test('VDROP-LIGHTING: lighting circuit at 3.01% FAILS (no tolerance above 3%)', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Lighting', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.01;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'fail', 'lighting at 3.01% must FAIL. Got: ' + c.detail);
+});
+
+// --- L3. Lighting just under 3% -> ok ---
+test('VDROP-LIGHTING: lighting circuit just under 3% (2.99%) passes', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Lighting', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 2.99;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'ok', 'lighting at 2.99% must pass. Got: ' + c.detail);
+});
+
+// --- L4. NON-lighting final circuit at 3.5% -> still ok (general 4% limit, regression guard) ---
+test('VDROP-LIGHTING: non-lighting circuit (Sockets) at 3.5% stays ok (general 4% unchanged)', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Sockets', name_da: 'Stikkontakter', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.5;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'ok', 'non-lighting at 3.5% must stay ok under 4% general limit. Got: ' + c.detail);
+  assert(c.rule.indexOf('4%') >= 0, 'non-lighting rule must show the 4% general limit. Got rule: ' + c.rule);
+});
+
+// --- L5. Non-lighting bands preserved: 4.5% -> warning, 5.01% -> fail ---
+test('VDROP-LIGHTING: non-lighting bands preserved (4.5% warning, 5.01% fail)', function() {
+  var warn = _advNode({ type: 'final_circuit', name_en: 'Sockets', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  warn.node._vdrop = 4.5;
+  var cw = _vdCheck(sldVerifyNode(warn.tree, warn.node.id));
+  assert.strictEqual(cw.status, 'warning', 'non-lighting 4.5% must be warning (4-5% band). Got: ' + cw.detail);
+
+  var fail = _advNode({ type: 'final_circuit', name_en: 'Sockets', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  fail.node._vdrop = 5.01;
+  var cf = _vdCheck(sldVerifyNode(fail.tree, fail.node.id));
+  assert.strictEqual(cf.status, 'fail', 'non-lighting 5.01% must fail (> 5%). Got: ' + cf.detail);
+});
+
+// --- L6. Lighting detected via DANISH name 'Belysning' (not just English) -> 3% applied ---
+test('VDROP-LIGHTING: Danish name "Belysning" triggers 3% limit (trilingual name detection)', function() {
+  var f = _advNode({ type: 'final_circuit', name_da: 'Belysning', name_en: '', name_fa: '', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.5;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'fail', 'Danish "Belysning" at 3.5% must FAIL under 3% limit. Got: ' + c.detail);
+  assert(c.rule.indexOf('3%') >= 0, 'rule must show 3% limit. Got rule: ' + c.rule);
+});
+
+// --- L6b. Lighting detected via FARSI name 'روشنایی' -> 3% applied ---
+test('VDROP-LIGHTING: Farsi name triggers 3% limit (trilingual name detection)', function() {
+  var f = _advNode({ type: 'final_circuit', name_da: '', name_en: '', name_fa: '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 3.5;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'fail', 'Farsi lighting name at 3.5% must FAIL under 3% limit. Got: ' + c.detail);
+});
+
+// --- L6c. A LIGHTING-named board/non-final node keeps the general limit (only final_circuit affected) ---
+test('VDROP-LIGHTING: lighting-named NON-final node (sub_board) keeps general 4% limit', function() {
+  var f = _advNode({ type: 'sub_board', name_en: 'Lighting', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 40, protection: { rating: 40, curve: 'C' } });
+  f.node._vdrop = 3.5;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.status, 'ok', 'lighting-named sub_board at 3.5% must stay ok (general limit). Got: ' + c.detail);
+  assert(c.rule.indexOf('4%') >= 0, 'non-final node must use 4% general limit. Got rule: ' + c.rule);
+});
+
+// --- L7. Lighting Vdrop rule still cites clause DS/HD 60364-5-52 cl. 525 ---
+test('VDROP-LIGHTING: lighting Vdrop rule cites clause DS/HD 60364-5-52 cl. 525', function() {
+  var f = _advNode({ type: 'final_circuit', name_en: 'Lighting', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+  f.node._vdrop = 2.0;
+  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
+  assert.strictEqual(c.clause, 'DS/HD 60364-5-52 cl. 525', 'lighting rule must keep cl.525. Got: ' + c.clause);
+});
+
+// --- L8. New user-visible string is trilingual: Farsi entry present in _FA + tx routes all 3 langs ---
+test('VDROP-LIGHTING: "lighting limit" qualifier is trilingual (_FA Farsi entry + tx routing)', function() {
+  assert(typeof _FA['lighting limit'] === 'string' && _FA['lighting limit'].length > 0, 'Farsi entry for "lighting limit" must exist in _FA');
+  assert.notStrictEqual(_FA['lighting limit'], 'lighting limit', 'Farsi entry must not be the English fallback');
+  var prev = lang;
+  try {
+    lang = 'da'; assert.strictEqual(tx('belysningsgr\u00E6nse', 'lighting limit'), 'belysningsgr\u00E6nse', 'da must route to Danish');
+    lang = 'en'; assert.strictEqual(tx('belysningsgr\u00E6nse', 'lighting limit'), 'lighting limit', 'en must route to English');
+    lang = 'fa'; assert.strictEqual(tx('belysningsgr\u00E6nse', 'lighting limit'), _FA['lighting limit'], 'fa must route to the _FA Farsi entry');
+  } finally { lang = prev; }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

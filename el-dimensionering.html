@@ -1681,6 +1681,8 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Voltage-drop verdict — lighting-specific limit qualifier (DS/HD 60364-5-52 cl. 525) =====
+  'lighting limit': '\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0631\u0648\u0634\u0646\u0627\u06CC\u06CC',
   // ===== Live Installation Twin — IEC 60617 component-symbol legend =====
   'IEC 60617 symbols': '\u0646\u0645\u0627\u062F\u0647\u0627\u06CC IEC 60617',
   'Circuit breaker (MCB/MCCB)': '\u06A9\u0644\u06CC\u062F \u0645\u062F\u0627\u0631 (MCB/MCCB)',
@@ -8831,13 +8833,34 @@ function sldVerifyNode(tree, nodeId) {
   }
 
   if (vdrop > 0) {
-    const limit = DK_STANDARDS.vdropGeneral;
-    if (vdrop <= limit) {
-      results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'ok', detail: vdrop.toFixed(2) + '% <= ' + limit + '%' });
-    } else if (vdrop <= 5) {
-      results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'warning', detail: vdrop.toFixed(2) + '% > ' + limit + '% (marginal)' });
+    // Circuit-type-aware voltage-drop verdict (DS/HD 60364-5-52 cl. 525).
+    // Lighting final circuits are held to the stricter 3% limit (vdropLighting);
+    // all other loads/boards keep the general 4% limit with a 4-5% marginal band.
+    // There is no structured loadType on sldTree nodes, so lighting is detected by
+    // name: Danish "Belysning", English "Lighting", Farsi "روشنایی" (case-insensitive).
+    var _vdNames = ((node.name_da || '') + '\u0000' + (node.name_en || '') + '\u0000' + (node.name_fa || '')).toLowerCase();
+    var _isLighting = node.type === 'final_circuit' && (
+      _vdNames.indexOf('belysning') >= 0 ||
+      _vdNames.indexOf('lighting') >= 0 ||
+      _vdNames.indexOf('\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC') >= 0
+    );
+    if (_isLighting) {
+      var litLimit = DK_STANDARDS.vdropLighting;
+      var litQual = ' (' + tx('belysningsgr\u00E6nse', 'lighting limit') + ')';
+      if (vdrop <= litLimit) {
+        results.push({ rule: 'Vdrop <= ' + litLimit + '%' + litQual, clause: 'DS/HD 60364-5-52 cl. 525', status: 'ok', detail: vdrop.toFixed(2) + '% <= ' + litLimit + '%' + litQual });
+      } else {
+        results.push({ rule: 'Vdrop <= ' + litLimit + '%' + litQual, clause: 'DS/HD 60364-5-52 cl. 525', status: 'fail', detail: vdrop.toFixed(2) + '% > ' + litLimit + '%' + litQual });
+      }
     } else {
-      results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'fail', detail: vdrop.toFixed(2) + '% > ' + limit + '%' });
+      const limit = DK_STANDARDS.vdropGeneral;
+      if (vdrop <= limit) {
+        results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'ok', detail: vdrop.toFixed(2) + '% <= ' + limit + '%' });
+      } else if (vdrop <= DK_STANDARDS.vdropOther) {
+        results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'warning', detail: vdrop.toFixed(2) + '% > ' + limit + '% (marginal)' });
+      } else {
+        results.push({ rule: 'Vdrop <= ' + limit + '%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'fail', detail: vdrop.toFixed(2) + '% > ' + limit + '%' });
+      }
     }
   }
 
