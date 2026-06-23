@@ -16698,55 +16698,42 @@ function motorCalcI2t(kW, poles, startType) {
 function renderMotor() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Motorstart-analyse', 'Motor Start Analysis') + '</div>';
-  html += '<div class="info-row">' + tx('Beregning iht. IEC 60947 + DS/HD 60364-5-52', 'Calculation per IEC 60947 + DS/HD 60364-5-52') + '</div>';
+  html += '<div style="margin-bottom:10px;font-family:sans-serif">' + mcPrimeRef('IEC 60947') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + ' ' + mcPrimeRef('IEC 60034-1') + '</div>';
 
   // Motor Power
-  html += '<div class="select-group"><div class="select-label">' + tx('Motoreffekt [kW]', 'Motor Power [kW]') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">P<sub>N</sub> [kW]</div><div class="select-grid">';
   [0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110].forEach(function(kw) {
     html += '<button class="sel-btn' + (motorState.kW === kw ? ' selected' : '') + '" onclick="motorState.kW=' + kw + ';renderModule(\'motor\')">' + kw + '</button>';
   });
   html += '</div></div>';
 
   // Motor Poles
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal poler', 'Motor Poles') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + tx('Poler', 'Poles') + '</div><div class="select-grid">';
   [2, 4, 6, 8].forEach(function(p) {
     var rpm = Math.round(3000 / (p / 2));
-    html += '<button class="sel-btn' + (motorState.poles === p ? ' selected' : '') + '" onclick="motorState.poles=' + p + ';renderModule(\'motor\')">' + p + 'P (' + rpm + ' rpm)</button>';
+    html += '<button class="sel-btn' + (motorState.poles === p ? ' selected' : '') + '" onclick="motorState.poles=' + p + ';renderModule(\'motor\')">' + p + 'P (' + rpm + ')</button>';
   });
   html += '</div></div>';
 
   // Starting Method
-  html += '<div class="select-group"><div class="select-label">' + tx('Startmetode', 'Starting Method') + '</div><div class="select-grid">';
-  var methods = [
-    { key: 'dol', da: 'DOL (Direkte)', en: 'DOL (Direct-On-Line)' },
-    { key: 'starDelta', da: 'Stjerne-Trekant', en: 'Star-Delta' },
-    { key: 'soft', da: 'Soft Starter', en: 'Soft Starter' },
-    { key: 'vfd', da: 'Frekvensomformer', en: 'VFD' }
-  ];
-  methods.forEach(function(m) {
+  html += '<div class="select-group"><div class="select-label">' + tx('Startmetode', 'Start method') + '</div><div class="select-grid">';
+  [{key:'dol',da:'DOL',en:'DOL'},{key:'starDelta',da:'Y/\u0394',en:'Y/\u0394'},{key:'soft',da:'Soft',en:'Soft'},{key:'vfd',da:'VFD',en:'VFD'}].forEach(function(m) {
     html += '<button class="sel-btn' + (motorState.startType === m.key ? ' selected' : '') + '" onclick="motorState.startType=\'' + m.key + '\';renderModule(\'motor\')">' + tx(m.da, m.en) + '</button>';
   });
   html += '</div></div>';
 
-  // Duty Cycle
-  html += '<div class="select-group"><div class="select-label">' + tx('Driftsart (IEC 60034-1)', 'Duty Cycle (IEC 60034-1)') + '</div><div class="select-grid">';
-  [{ key: 'S1', da: 'S1 Kontinuerlig', en: 'S1 Continuous' },
-   { key: 'S2', da: 'S2 Kortvarig', en: 'S2 Short-time' },
-   { key: 'S3', da: 'S3 Intermitterende', en: 'S3 Intermittent' }].forEach(function(d) {
-    html += '<button class="sel-btn' + (motorState.duty === d.key ? ' selected' : '') + '" onclick="motorState.duty=\'' + d.key + '\';renderModule(\'motor\')">' + tx(d.da, d.en) + '</button>';
-  });
+  // Duty + Cable (collapsed)
+  html += '<details class="eng-advanced depth-2"><summary>' + tx('Driftsart + kabel', 'Duty + cable') + '</summary><div class="eng-advanced-body">';
+  html += '<div class="select-group"><div class="select-label">' + tx('Driftsart', 'Duty') + '</div><div class="select-grid">';
+  [{key:'S1',t:'S1'},{key:'S2',t:'S2'},{key:'S3',t:'S3'}].forEach(function(d) { html += '<button class="sel-btn' + (motorState.duty===d.key?' selected':'') + '" onclick="motorState.duty=\'' + d.key + '\';renderModule(\'motor\')">' + d.t + '</button>'; });
   html += '</div></div>';
-
-  // Cable Length
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
-  [10, 15, 20, 25, 30, 40, 50, 75, 100].forEach(function(len) {
-    html += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
-  });
+  html += '<div class="select-group"><div class="select-label">L [m]</div><div class="select-grid">';
+  [10,15,20,25,30,40,50,75,100].forEach(function(l) { html += '<button class="sel-btn' + (motorState.cableLength===l?' selected':'') + '" onclick="motorState.cableLength=' + l + ';renderModule(\'motor\')">' + l + '</button>'; });
   html += '</div></div>';
+  html += '</div></details>';
+  html += '</div>';
 
-  // Null guard: skip results if essential state is not yet selected
   if (motorState.kW == null || motorState.poles == null || motorState.startType == null || motorState.duty == null || motorState.cableLength == null) {
-    html += '</div>';
     return html;
   }
 
@@ -16763,50 +16750,39 @@ function renderMotor() {
   var vdipOk = vdip <= 3.0;
   var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
 
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Motorberegning', 'Motor Calculation') + '</div>';
+
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'P<sub>N</sub>', val: motorState.kW, unit: 'kW' },
+    { sym: tx('Poler','Poles'), val: motorState.poles, unit: '' },
+    { sym: tx('Start','Start'), val: motorState.startType.toUpperCase(), unit: '' },
+    { sym: tx('Drift','Duty'), val: motorState.duty, unit: '' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+  html += mcPrimeLine('I<sub>FL</sub>', ':= ' + tx('Tabel IEC 60947','Table IEC 60947') + ' =', '', flc, 'A', tx('Fuldlaststr\u00F8m','Full-load current'));
+  html += mcPrimeLine('I<sub>start</sub>', ':= ' + mult.typical + ' \u00B7 I<sub>FL</sub> =', mult.typical + ' \u00B7 ' + flc, iStart, 'A', tx('Startstr\u00F8m','Starting current'));
+  html += mcPrimeLine('t<sub>start</sub>', ':=', '', startTime.typical, 's', '');
+  html += mcPrimeLine('I\u00B2t', ':= I\u00B2<sub>start</sub> \u00B7 t<sub>start</sub> =', iStart + '\u00B2 \u00B7 ' + startTime.typical, i2t, 'A\u00B2s', tx('Termisk belastning','Thermal stress'));
+
+  // Voltage dip
+  html += mcPrimeLine('\u0394U<sub>start</sub>', ':= ' + mcPrimeFrac('I<sub>start</sub> \u00B7 \u221A3 \u00B7 Z<sub>kabel</sub>', 'U<sub>n</sub>') + ' \u00B7 100 =', '', vdip.toFixed(2), '%', vdipOk ? mcPrimeRef('DS/HD 60364-5-52 \u00A7525') : '');
+  html += '<div style="margin:6px 0;font-size:1.0rem">\u0394U \u2264 3% : ' + vdip.toFixed(2) + '% ' + (vdipOk ? mcPrimeOk() : mcPrimeFail(tx('FOR H\u00D8JT','TOO HIGH'))) + '</div>';
+
   // Results
-  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+  html += mcPrimeResult('I<sub>FL</sub>', flc, 'A');
 
-  // Motor Data
-  html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststrøm (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + flc + ' A (IEC 60947)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Startstrøm', 'Starting Current') + '</span><span class="value">' + iStart + ' A (' + mult.typical + 'x FLC)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Starttid', 'Starting Time') + '</span><span class="value">' + startTime.typical + ' s</span></div>';
-  html += '<div class="result-row"><span class="label">I\u00B2t (' + tx('termisk belastning', 'thermal stress') + ')</span><span class="value">' + i2t + ' A\u00B2s</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Driftsart reduktion', 'Duty derating') + '</span><span class="value">' + derating + ' (IEC 60034-1)</span></div>';
-  html += '</div>';
+  // Component selection
+  html += mcPrimeHeader(tx('KOMPONENTVALG', 'COMPONENT SELECTION'), 'green');
+  if (mpcb) html += mcPrimeDecision('MPCB: ' + mpcb.brand + ' ' + mpcb.model + ' (' + mpcb.rangeMin + '\u2013' + mpcb.rangeMax + ' A)');
+  if (contactor) html += mcPrimeDecision(tx('Kontaktor','Contactor') + ': ' + contactor.brand + ' ' + contactor.model + ' (AC-3: ' + contactor.ac3_kW + ' kW)');
+  if (overload) html += mcPrimeDecision(tx('Overl.rel\u00E6','OL relay') + ': ' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '\u2013' + overload.rangeMax + ' A)');
+  if (cable) html += mcPrimeDecision(tx('Kabel','Cable') + ': ' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + ' mm\u00B2 (I<sub>z</sub>=' + cable.iz + ' A)');
 
-  // Voltage Dip
-  html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">' + tx('Spændingsdyk ved start', 'Voltage Dip') + '</span><span class="value">' + vdip.toFixed(2) + '% ' + (vdipOk ? '\u2705' : '\u274C') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Grænse (DS/HD 60364-5-52 cl.525)', 'Limit (DS/HD 60364-5-52 cl.525)') + '</span><span class="value">max 3%</span></div>';
-  html += '</div>';
-
-  // Protection Coordination
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Beskyttelseskoordinering (IEC 60947)', 'Protection Coordination (IEC 60947)') + '</div>';
-  if (mpcb) {
-    html += '<div class="result-row"><span class="label">MPCB</span><span class="value">' + mpcb.brand + ' ' + mpcb.model + ' (' + mpcb.rangeMin + '-' + mpcb.rangeMax + 'A)</span></div>';
-  }
-  if (contactor) {
-    html += '<div class="result-row"><span class="label">' + tx('Kontaktor', 'Contactor') + '</span><span class="value">' + contactor.brand + ' ' + contactor.model + ' (AC-3: ' + contactor.ac3_A + 'A / ' + contactor.ac3_kW + 'kW)</span></div>';
-  }
-  if (overload) {
-    html += '<div class="result-row"><span class="label">' + tx('Overbelastningsrelæ', 'Overload Relay') + '</span><span class="value">' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '-' + overload.rangeMax + 'A)</span></div>';
-  }
-  html += '</div>';
-
-  // Cable
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
-  if (cable) {
-    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A (DS/HD 60364-5-52)</span></div>';
-  }
-  html += '</div>';
-
-  // Verdict
-  html += renderVerdict(vdipOk, vdipOk ? tx('Spændingsdyk OK - starter opfylder DS/HD 60364-5-52 cl.525', 'Voltage dip OK - starter complies with DS/HD 60364-5-52 cl.525') : tx('Spændingsdyk for højt - brug blødere startmetode eller kortere kabel', 'Voltage dip exceeded - use softer starting method or shorter cable'));
-
+  html += '<div style="margin-top:12px;font-family:sans-serif">' + mcPrimeRef('IEC 60947') + ' ' + mcPrimeRef('IEC 60034-1') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
   html += '</div>';
   return html;
 }
