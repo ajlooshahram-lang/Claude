@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnp/
+# Build output
+dist/
+.next/
+out/
+build/
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+# Env
+.env
+.env.local
+.env.*.local
+# Logs
+*.log
+npm-debug.log*
+# OS
+.DS_Store
+# IDE
+.vscode/
+.idea/
+# Test coverage
+coverage/
+.turbo/
