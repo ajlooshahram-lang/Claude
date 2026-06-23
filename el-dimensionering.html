@@ -8446,122 +8446,139 @@ function applyLoadPreset(key) {
   renderModule('load');
 }
 
-// ===== FUSE MODULE =====
+// ===== FUSE MODULE (Mathcad Prime Math Style) =====
 function renderFuse() {
   const holder = FUSE_HOLDERS[fuseState.holder];
   const sizes = holder.sizes;
+  const ib = calcIB();
+  const i5s = FUSE_5S[fuseState.size] || 0;
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('fuseTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Smeltesikring (gG)', 'Fuse (gG)') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('fuseHolder')}</div>
-        <div class="select-grid">
-          ${Object.keys(FUSE_HOLDERS).map(h =>
-            `<button class="sel-btn ${fuseState.holder === h ? 'selected' : ''}" onclick="fuseState.holder='${h}';fuseState.size=null;renderModule('fuse')">${h}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Holder selection
+  html += '<div class="select-group"><div class="select-label">' + tx('Sikringsholder', 'Fuse holder') + '</div><div class="select-grid">';
+  Object.keys(FUSE_HOLDERS).forEach(function(h) {
+    html += '<button class="sel-btn' + (fuseState.holder===h?' selected':'') + '" onclick="fuseState.holder=\'' + h + '\';fuseState.size=null;renderModule(\'fuse\')">' + h + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('fuseSize')} [A]</div>
-        <div class="select-grid">
-          ${sizes.map(s =>
-            `<button class="sel-btn ${fuseState.size === s ? 'selected' : ''}" onclick="fuseState.size=${s};renderModule('fuse')">${s} A</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  // Size selection
+  html += '<div class="select-group"><div class="select-label">I<sub>n</sub> [A]</div><div class="select-grid">';
+  sizes.forEach(function(s) {
+    html += '<button class="sel-btn' + (fuseState.size===s?' selected':'') + '" onclick="fuseState.size=' + s + ';renderModule(\'fuse\')">' + s + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>';
 
-    ${fuseState.size ? `
-    <div class="card fade-in">
-      <div class="card-title">${t('fuseResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('fuseHolder')}</span><span class="value">${fuseState.holder}</span></div>
-        <div class="result-row"><span class="label">${t('fuseSize')}</span><span class="value">${fuseState.size} A</span></div>
-        <div class="result-row"><span class="label">${t('fuseIkmax')}</span><span class="value">${holder.ikMax} kA</span></div>
-        <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '—'} A</span></div>
-        <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
-        <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
-      </div>
-    </div>
-    ${renderDeviceTCCCard({i5s: FUSE_5S[fuseState.size], rating: fuseState.size}, fuseState.size, null, fuseState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'fuse', tx('Sikring TCC - gG Karakteristik', 'Fuse TCC - gG Characteristic'))}
-    ` : ''}
-  `;
+  // Mathcad worksheet
+  if (fuseState.size) {
+    html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+    html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Sikringsdata', 'Fuse Data') + '</div>';
+
+    html += mcPrimeDefLine([
+      { sym: 'I<sub>n</sub>', val: fuseState.size, unit: 'A' },
+      { sym: tx('Holder','Holder'), val: fuseState.holder, unit: '' },
+      { sym: 'I<sub>cu</sub>', val: holder.ikMax, unit: 'kA' }
+    ]);
+
+    html += mcPrimeLine('I<sub>5s</sub>', ':=', '', i5s || '\u2014', 'A', tx('Str\u00F8m ved 5 s smeltetid (gG)', 'Current at 5 s melting time (gG)'));
+    html += mcPrimeLine('I<sub>B</sub>', '=', '', ib.toFixed(1), 'A', tx('Belastningsstr\u00F8m (fra lastmodul)', 'Load current (from load module)'));
+
+    // Verification: IB ≤ In
+    var fuseOk = ib <= fuseState.size;
+    html += '<div style="margin-top:12px;font-size:1.0rem;line-height:2.2">';
+    html += '<div>I<sub>B</sub> \u2264 I<sub>n</sub> : ' + ib.toFixed(1) + ' \u2264 ' + fuseState.size;
+    html += fuseOk ? mcPrimeOk() : mcPrimeFail();
+    html += '</div>';
+    html += '<div style="font-size:0.82rem;color:var(--text-muted)">' + mcPrimeRef('DS/HD 60364-4-43 \u00A7433.1') + ' ' + mcPrimeRef('IEC 60269') + '</div>';
+    html += '</div>';
+
+    html += mcPrimeResult('I<sub>n,sikring</sub>', fuseState.size, 'A');
+    html += '</div>';
+
+    // TCC card (existing)
+    html += renderDeviceTCCCard({i5s: i5s, rating: fuseState.size}, fuseState.size, null, fuseState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'fuse', tx('Sikring TCC - gG Karakteristik', 'Fuse TCC - gG Characteristic'));
+  }
+
+  return html;
 }
 
-// ===== MCB MODULE =====
+// ===== MCB MODULE (Mathcad Prime Math Style) =====
 function renderMCB() {
   const mcb = MCB_TYPES[mcbState.type];
   const curve = MCB_CURVES[mcbState.curve];
   const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
-  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
-  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
+  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : 0;
+  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : 0;
+  const ib = calcIB();
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('mcbTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Automatsikring (MCB)', 'Miniature Circuit Breaker (MCB)') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mcbType')}</div>
-        <div class="select-grid">
-          ${Object.keys(MCB_TYPES).map(tp =>
-            `<button class="sel-btn ${mcbState.type === tp ? 'selected' : ''}" onclick="mcbState.type='${tp}';mcbState.rating=null;renderModule('mcb')">${tp}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Type','Type') + '</div><div class="select-grid">';
+  Object.keys(MCB_TYPES).forEach(function(tp) {
+    html += '<button class="sel-btn' + (mcbState.type===tp?' selected':'') + '" onclick="mcbState.type=\'' + tp + '\';mcbState.rating=null;renderModule(\'mcb\')">' + tp + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mcbCurve')}</div>
-        <div class="select-grid">
-          ${Object.keys(MCB_CURVES).map(c =>
-            `<button class="sel-btn ${mcbState.curve === c ? 'selected' : ''}" onclick="mcbState.curve='${c}';renderModule('mcb')">${c}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Curve
+  html += '<div class="select-group"><div class="select-label">' + tx('Kurve','Curve') + '</div><div class="select-grid">';
+  Object.keys(MCB_CURVES).forEach(function(c) {
+    html += '<button class="sel-btn' + (mcbState.curve===c?' selected':'') + '" onclick="mcbState.curve=\'' + c + '\';renderModule(\'mcb\')">' + c + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mcbPoles')}</div>
-        <div class="select-grid">
-          <button class="sel-btn ${mcbState.poles === '1p' ? 'selected' : ''}" onclick="mcbState.poles='1p';renderModule('mcb')">1P</button>
-          <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
-        </div>
-      </div>
+  // Poles
+  html += '<div class="select-group depth-2"><div class="select-label">' + tx('Poler','Poles') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (mcbState.poles==='1p'?' selected':'') + '" onclick="mcbState.poles=\'1p\';renderModule(\'mcb\')">1P</button>';
+  html += '<button class="sel-btn' + (mcbState.poles==='multi'?' selected':'') + '" onclick="mcbState.poles=\'multi\';renderModule(\'mcb\')">2P/3P/4P</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mcbRating')}</div>
-        <div class="select-grid">
-          ${mcb.ratings.map(r =>
-            `<button class="sel-btn ${mcbState.rating === r ? 'selected' : ''}" onclick="mcbState.rating=${r};renderModule('mcb')">${r}</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  // Rating
+  html += '<div class="select-group"><div class="select-label">I<sub>n</sub> [A]</div><div class="select-grid">';
+  mcb.ratings.forEach(function(r) {
+    html += '<button class="sel-btn' + (mcbState.rating===r?' selected':'') + '" onclick="mcbState.rating=' + r + ';renderModule(\'mcb\')">' + r + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>';
 
-    ${mcbState.rating ? `
-    <div class="card fade-in">
-      <div class="card-title">${t('mcbResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('mcbType')}</span><span class="value">${mcbState.type} ${mcbState.curve}${mcbState.rating}</span></div>
-        <div class="result-row"><span class="label">${t('mcbStandard')}</span><span class="value">${mcb.standard}</span></div>
-        <div class="result-row"><span class="label">${t('mcbRating')}</span><span class="value">${mcbState.rating} A</span></div>
-        <div class="result-row"><span class="label">${t('mcbIcu')}</span><span class="value">${icu} kA</span></div>
-        <div class="result-row"><span class="label">Ics</span><span class="value">${(icu * mcb.ics).toFixed(1)} kA</span></div>
-        <div class="result-row"><span class="label">${t('mcbIsd')}</span><span class="value">${isdMin} - ${isdMax} A</span></div>
-        <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
-      </div>
-    </div>
-    ${renderDeviceTCCCard({curve: mcbState.curve, rating: mcbState.rating}, mcbState.rating, null, mcbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mcb', tx('MCB TCC - Kurve ' + mcbState.curve, 'MCB TCC - Curve ' + mcbState.curve))}
-    ` : ''}
-  `;
+  // Mathcad worksheet
+  if (mcbState.rating) {
+    html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+    html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 MCB ' + mcbState.type + ' ' + mcbState.curve + mcbState.rating + '</div>';
+
+    html += mcPrimeDefLine([
+      { sym: 'I<sub>n</sub>', val: mcbState.rating, unit: 'A' },
+      { sym: tx('Kurve','Curve'), val: mcbState.curve, unit: '' },
+      { sym: 'I<sub>cu</sub>', val: icu, unit: 'kA' }
+    ]);
+
+    html += mcPrimeLine('I<sub>sd,min</sub>', '= ' + curve.isdMin + ' \u00B7 I<sub>n</sub> =', curve.isdMin + ' \u00B7 ' + mcbState.rating, isdMin, 'A', tx('Magnetisk udl\u00F8sning (min)','Magnetic trip (min)'));
+    html += mcPrimeLine('I<sub>sd,max</sub>', '= ' + curve.isdMax + ' \u00B7 I<sub>n</sub> =', curve.isdMax + ' \u00B7 ' + mcbState.rating, isdMax, 'A', tx('Magnetisk udl\u00F8sning (max)','Magnetic trip (max)'));
+    html += mcPrimeLine('I<sub>cs</sub>', '= I<sub>cu</sub> \u00B7 ' + mcb.ics + ' =', icu + ' \u00B7 ' + mcb.ics, (icu * mcb.ics).toFixed(1), 'kA', '');
+
+    // Verification
+    var coordOk = ib <= mcbState.rating;
+    html += '<div style="margin-top:14px;font-size:1.0rem;line-height:2.2">';
+    html += '<div>I<sub>B</sub> \u2264 I<sub>n</sub> : ' + ib.toFixed(1) + ' \u2264 ' + mcbState.rating;
+    html += coordOk ? mcPrimeOk() : mcPrimeFail();
+    html += '</div></div>';
+
+    html += mcPrimeResult(mcbState.curve + mcbState.rating, mcbState.rating + ' A, I<sub>cu</sub>=' + icu + ' kA', '');
+
+    html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('IEC 60898-1') + ' ' + mcPrimeRef('DS/HD 60364-4-43') + '</div>';
+    html += '</div>';
+
+    // TCC card
+    html += renderDeviceTCCCard({curve: mcbState.curve, rating: mcbState.rating}, mcbState.rating, null, mcbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mcb', tx('MCB TCC - Kurve ' + mcbState.curve, 'MCB TCC - Curve ' + mcbState.curve));
+  }
+
+  return html;
 }
 
-// ===== MCCB MODULE =====
+// ===== MCCB MODULE (Mathcad Prime Math Style) =====
 function renderMCCB() {
   const frame = MCCB_FRAMES[mccbState.frame];
   const icu = MCCB_TRIPS[mccbState.trip];
@@ -8569,74 +8586,77 @@ function renderMCCB() {
   const isdCalc = io * mccbState.isdMult;
   const isdMin = isdCalc * 0.9;
   const isdMax = isdCalc * 1.1;
-  const ii = mccbState.inVal * 12; // Ii typically 12x In for Micrologic
+  const ii = mccbState.inVal * 12;
+  const ib = calcIB();
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('mccbTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Maksimalafbryder (MCCB) \u2014 Micrologic 2.2', 'MCCB \u2014 Micrologic 2.2') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbFrame')}</div>
-        <div class="select-grid">
-          ${Object.keys(MCCB_FRAMES).map(f =>
-            `<button class="sel-btn ${mccbState.frame === f ? 'selected' : ''}" onclick="mccbState.frame='${f}';mccbState.inVal=MCCB_FRAMES['${f}'].inOptions[0];renderModule('mccb')">${f}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Frame
+  html += '<div class="select-group"><div class="select-label">' + tx('Ramme','Frame') + '</div><div class="select-grid">';
+  Object.keys(MCCB_FRAMES).forEach(function(f) {
+    html += '<button class="sel-btn' + (mccbState.frame===f?' selected':'') + '" onclick="mccbState.frame=\'' + f + '\';mccbState.inVal=MCCB_FRAMES[\'' + f + '\'].inOptions[0];renderModule(\'mccb\')">' + f + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbTrip')} (Icu)</div>
-        <div class="select-grid">
-          ${Object.entries(MCCB_TRIPS).map(([k,v]) =>
-            `<button class="sel-btn ${mccbState.trip === k ? 'selected' : ''}" onclick="mccbState.trip='${k}';renderModule('mccb')">${k} (${v} kA)</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Trip curve (Icu)
+  html += '<div class="select-group"><div class="select-label">I<sub>cu</sub></div><div class="select-grid">';
+  Object.entries(MCCB_TRIPS).forEach(function(e) {
+    html += '<button class="sel-btn' + (mccbState.trip===e[0]?' selected':'') + '" onclick="mccbState.trip=\'' + e[0] + '\';renderModule(\'mccb\')">' + e[0] + ' (' + e[1] + ' kA)</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbIn')}</div>
-        <div class="select-grid">
-          ${frame.inOptions.map(i =>
-            `<button class="sel-btn ${mccbState.inVal === i ? 'selected' : ''}" onclick="mccbState.inVal=${i};renderModule('mccb')">${i}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // In
+  html += '<div class="select-group"><div class="select-label">I<sub>n</sub> [A]</div><div class="select-grid">';
+  frame.inOptions.forEach(function(i) {
+    html += '<button class="sel-btn' + (mccbState.inVal===i?' selected':'') + '" onclick="mccbState.inVal=' + i + ';renderModule(\'mccb\')">' + i + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbIo')} (Io = x \u00D7 In)</div>
-        <div class="select-grid">
-          ${MCCB_IO_RANGE.map(m =>
-            `<button class="sel-btn ${mccbState.ioMult === m ? 'selected' : ''}" onclick="mccbState.ioMult=${m};renderModule('mccb')">${m}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Io multiplier
+  html += '<div class="select-group"><div class="select-label">I<sub>o</sub> = x \u00D7 I<sub>n</sub></div><div class="select-grid">';
+  MCCB_IO_RANGE.forEach(function(m) {
+    html += '<button class="sel-btn' + (mccbState.ioMult===m?' selected':'') + '" onclick="mccbState.ioMult=' + m + ';renderModule(\'mccb\')">' + m + '</button>';
+  });
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbIsd2')} (Isd = x \u00D7 Io)</div>
-        <div class="select-grid">
-          ${MCCB_ISD_MULT.map(m =>
-            `<button class="sel-btn ${mccbState.isdMult === m ? 'selected' : ''}" onclick="mccbState.isdMult=${m};renderModule('mccb')">${m}</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  // Isd multiplier
+  html += '<div class="select-group"><div class="select-label">I<sub>sd</sub> = x \u00D7 I<sub>o</sub></div><div class="select-grid">';
+  MCCB_ISD_MULT.forEach(function(m) {
+    html += '<button class="sel-btn' + (mccbState.isdMult===m?' selected':'') + '" onclick="mccbState.isdMult=' + m + ';renderModule(\'mccb\')">' + m + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>';
 
-    <div class="card fade-in">
-      <div class="card-title">${t('mccbResult')} — Micrologic 2.2</div>
-      <div class="result-box">
-        <div class="result-title">${mccbState.frame} ${mccbState.trip}</div>
-        <div class="result-row"><span class="label">In</span><span class="value">${mccbState.inVal} A</span></div>
-        <div class="result-row"><span class="label">${t('mccbIcu2')}</span><span class="value">${icu} kA</span></div>
-        <div class="result-row"><span class="label">Io</span><span class="value">${io.toFixed(0)} A</span></div>
-        <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
-        <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
-        <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
-      </div>
-    </div>
+  // Mathcad worksheet
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 Micrologic 2.2 \u2014 ' + mccbState.frame + '</div>';
 
-    ${renderDeviceTCCCard({frame: mccbState.frame, inOptions: frame.inOptions}, mccbState.inVal, {io: mccbState.ioMult, isd: mccbState.isdMult}, mccbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mccb', tx('MCCB TCC - Micrologic 2.2', 'MCCB TCC - Micrologic 2.2'))}
-  `;
+  html += mcPrimeDefLine([
+    { sym: 'I<sub>n</sub>', val: mccbState.inVal, unit: 'A' },
+    { sym: 'I<sub>cu</sub>', val: icu, unit: 'kA' },
+    { sym: 'I<sub>o,mult</sub>', val: mccbState.ioMult, unit: '' }
+  ]);
+
+  html += mcPrimeLine('I<sub>r</sub>', '= I<sub>o</sub> \u00B7 I<sub>n</sub> =', mccbState.ioMult + ' \u00B7 ' + mccbState.inVal, io.toFixed(0), 'A', tx('Overlastudl\u00F8sning (langsom)','Overload trip (long-time)'));
+  html += mcPrimeLine('I<sub>sd</sub>', '= I<sub>sd,mult</sub> \u00B7 I<sub>r</sub> =', mccbState.isdMult + ' \u00B7 ' + io.toFixed(0), isdCalc.toFixed(0), 'A (\u00B110%: ' + isdMin.toFixed(0) + '\u2013' + isdMax.toFixed(0) + ')', tx('Kort tidsforsinket','Short-time delay'));
+  html += mcPrimeLine('I<sub>i</sub>', '= 12 \u00B7 I<sub>n</sub> =', '12 \u00B7 ' + mccbState.inVal, ii, 'A', tx('Momentanudl\u00F8sning (fast)','Instantaneous trip (fixed)'));
+
+  // Coordination
+  var coordOk = ib <= io;
+  html += '<div style="margin-top:14px;font-size:1.0rem;line-height:2.2">';
+  html += '<div>I<sub>B</sub> \u2264 I<sub>r</sub> : ' + ib.toFixed(1) + ' \u2264 ' + io.toFixed(0) + coordOk + (coordOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '</div>';
+
+  html += mcPrimeResult(mccbState.frame + ' ' + mccbState.trip, 'I<sub>r</sub>=' + io.toFixed(0) + 'A, I<sub>sd</sub>=' + isdCalc.toFixed(0) + 'A, I<sub>i</sub>=' + ii + 'A', '');
+
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('IEC 60947-2') + ' ' + mcPrimeRef('DS/HD 60364-4-43') + '</div>';
+  html += '</div>';
+
+  // TCC
+  html += renderDeviceTCCCard({frame: mccbState.frame, inOptions: frame.inOptions}, mccbState.inVal, {io: mccbState.ioMult, isd: mccbState.isdMult}, mccbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mccb', tx('MCCB TCC - Micrologic 2.2', 'MCCB TCC - Micrologic 2.2'));
+
+  return html;
 }
 
 // ===== CABLE MODULE (Mathcad Prime Style) =====
