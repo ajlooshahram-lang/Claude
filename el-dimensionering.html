@@ -9443,34 +9443,72 @@ function renderTrafoSizing() {
   var loadFactor = trafoState.loadPercent / 100;
   var Ifl = (S * 1000) / (Math.sqrt(3) * 400);
   var Iload = Ifl * loadFactor;
-  var Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000;
+  var Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000; // mΩ
   var Ik = (S * 1000) / (Math.sqrt(3) * 400 * (uk / 100));
   var Ploss = losses.p0 + losses.pk * loadFactor * loadFactor;
   var voltageOptions = ['10/0.4', '20/0.4', '50/10', '30/10'];
   var loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+  var primKV = parseFloat((trafoState.voltage || '10/0.4').split('/')[0]) || 10;
+  var I1fl = (S * 1000) / (Math.sqrt(3) * primKV * 1000);
+  var Iinrush = 12 * I1fl;
+
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Trafodimensionering', 'Transformer Sizing') + '</div>';
-  html += '<div class="select-group"><div class="select-label">' + tx('Trafostoerrelse [kVA]', 'Transformer Size [kVA]') + '</div><div class="select-grid">';
+  // Selectors
+  html += '<div class="select-group"><div class="select-label">S<sub>N</sub> [kVA]</div><div class="select-grid">';
   TRAFO_SIZES.forEach(function(s) { html += '<button class="sel-btn' + (trafoState.size === s ? ' selected' : '') + '" onclick="trafoState.size=' + s + ';renderModule(\'trafo\')">' + s + '</button>'; });
   html += '</div></div>';
-  html += '<div class="select-group"><div class="select-label">' + tx('Omsaetningsforhold [kV]', 'Voltage Ratio [kV]') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + tx('Oms\u00E6tning [kV]', 'Ratio [kV]') + '</div><div class="select-grid">';
   voltageOptions.forEach(function(v) { html += '<button class="sel-btn' + (trafoState.voltage === v ? ' selected' : '') + '" onclick="trafoState.voltage=\'' + v + '\';renderModule(\'trafo\')">' + v + '</button>'; });
   html += '</div></div>';
-  html += '<div class="select-group"><div class="select-label">' + tx('Belastningsgrad [%]', 'Load Level [%]') + '</div><div class="select-grid">';
-  loadSteps.forEach(function(l) { html += '<button class="sel-btn' + (trafoState.loadPercent === l ? ' selected' : '') + '" onclick="trafoState.loadPercent=' + l + ';renderModule(\'trafo\')">' + l + '%</button>'; });
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastning [%]', 'Load [%]') + '</div><div class="select-grid">';
+  loadSteps.forEach(function(l) { html += '<button class="sel-btn' + (trafoState.loadPercent === l ? ' selected' : '') + '" onclick="trafoState.loadPercent=' + l + ';renderModule(\'trafo\')">' + l + '</button>'; });
   html += '</div></div>';
-  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Stoerrelse', 'Size') + '</span><span class="value">' + S + ' kVA</span></div>';
-  html += '<div class="result-row"><span class="label">uk%</span><span class="value">' + uk + ' %</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststroem (sek.)', 'Full-load current (sec.)') + '</span><span class="value">' + Ifl.toFixed(1) + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Aktuel belastning', 'Actual load') + '</span><span class="value">' + Iload.toFixed(1) + ' A (' + trafoState.loadPercent + '%)</span></div>';
-  html += '<div class="result-row"><span class="label">Z trafo</span><span class="value">' + Ztrafo.toFixed(2) + ' m\u03A9</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Ik (sekundaer skinne)', 'Ik (secondary busbar)') + '</span><span class="value">' + (Ik/1000).toFixed(2) + ' kA</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + Ploss.toFixed(0) + ' W</span></div>';
   html += '</div>';
-  html += calcDetail({ name: tx('Fuldlaststroem', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U2', value: 400, unit: 'V', source: tx('Sekundaer', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
-  html += calcDetail({ name: tx('Kortslutningsstroem', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
+
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Transformer \u2014 Mathcad Prime', 'Transformer \u2014 Mathcad Prime') + '</div>';
+
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'S<sub>N</sub>', val: S, unit: 'kVA' },
+    { sym: 'u<sub>k</sub>', val: uk, unit: '%' },
+    { sym: 'U<sub>1N</sub>', val: primKV, unit: 'kV' },
+    { sym: 'U<sub>2N</sub>', val: '0,4', unit: 'kV' }
+  ]);
+  html += mcPrimeDefLine([
+    { sym: 'P<sub>0</sub>', val: losses.p0, unit: 'W' },
+    { sym: 'P<sub>k</sub>', val: losses.pk, unit: 'W' },
+    { sym: tx('Belastning','Load'), val: trafoState.loadPercent, unit: '%' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+
+  // Full-load currents
+  html += mcPrimeLine('I<sub>2,fl</sub>', ':= ' + mcPrimeFrac('S<sub>N</sub>', '\u221A3 \u00B7 U<sub>2N</sub>') + ' =', mcPrimeFrac(S + '\u00B710\u00B3', '\u221A3 \u00B7 400'), Ifl.toFixed(1), 'A', tx('Fuldlast sekund\u00E6r','Full-load secondary'));
+  html += mcPrimeLine('I<sub>1,fl</sub>', ':= ' + mcPrimeFrac('S<sub>N</sub>', '\u221A3 \u00B7 U<sub>1N</sub>') + ' =', mcPrimeFrac(S + '\u00B710\u00B3', '\u221A3 \u00B7 ' + (primKV*1000)), I1fl.toFixed(2), 'A', tx('Fuldlast prim\u00E6r','Full-load primary'));
+  html += mcPrimeLine('I<sub>inrush</sub>', ':= 12 \u00B7 I<sub>1,fl</sub> =', '12 \u00B7 ' + I1fl.toFixed(2), Iinrush.toFixed(0), 'A', mcPrimeRef('Bog 5 s. 277'));
+
+  // Impedance
+  html += mcPrimeLine('Z<sub>T</sub>', ':= ' + mcPrimeFrac('u<sub>k</sub> \u00B7 U\u00B2<sub>2N</sub>', 'S<sub>N</sub>') + ' =', mcPrimeFrac((uk/100).toFixed(3) + ' \u00B7 400\u00B2', S + '\u00B710\u00B3'), Ztrafo.toFixed(2), 'm\u03A9', mcPrimeRef('IEC 60076-1'));
+
+  // Short-circuit
+  html += mcPrimeLine('I<sub>k,sek</sub>', ':= ' + mcPrimeFrac('S<sub>N</sub>', '\u221A3 \u00B7 U<sub>2N</sub> \u00B7 u<sub>k</sub>') + ' =', mcPrimeFrac(S + '\u00B710\u00B3', '\u221A3 \u00B7 400 \u00B7 ' + (uk/100).toFixed(2)), (Ik/1000).toFixed(2), 'kA', mcPrimeRef('IEC 60909-0'));
+
+  // Losses
+  html += mcPrimeLine('P<sub>tab</sub>', ':= P<sub>0</sub> + P<sub>k</sub> \u00B7 n\u00B2 =', losses.p0 + ' + ' + losses.pk + ' \u00B7 ' + loadFactor.toFixed(2) + '\u00B2', Ploss.toFixed(0), 'W', '');
+
+  // Results
+  html += mcPrimeResult('I<sub>2,fl</sub>', Ifl.toFixed(1), 'A');
+  html += mcPrimeResult('I<sub>k,sek</sub>', (Ik/1000).toFixed(2), 'kA');
+
+  // Decision
+  html += mcPrimeDecision(tx('Transformer','Transformer') + ': ' + S + ' kVA, ' + (trafoState.voltage || '10/0.4') + ' kV, Dy11');
+
+  html += '<div style="margin-top:12px;font-family:sans-serif">' + mcPrimeRef('IEC 60076-1') + ' ' + mcPrimeRef('DS/HD 60364-4-43') + ' ' + mcPrimeRef('IEC 60909-0') + '</div>';
+  html += '</div>';
+
   html += renderTrafoSim(S, uk, trafoState.loadPercent, trafoState.voltage);
-  html += '</div>';
   return html;
 }
 

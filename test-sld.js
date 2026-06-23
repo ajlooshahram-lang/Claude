@@ -10456,7 +10456,7 @@ test('Trafo: renderTrafo produces valid HTML', function() {
 test('Trafo: renderTrafo sizing mode shows calcDetail', function() {
   trafoState.calcType = 'sizing';
   var html = renderTrafo();
-  assert(html.indexOf('calc-detail') >= 0, 'has calcDetail');
+  assert(html.indexOf('eng-step') >= 0 || html.indexOf('calc-detail') >= 0, 'has Mathcad steps or calcDetail');
   assert(html.indexOf('IEC') >= 0, 'references standard');
 });
 
