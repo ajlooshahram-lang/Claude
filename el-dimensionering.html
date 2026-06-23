@@ -28507,10 +28507,13 @@ var _ANALYZER_CLORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
 
 function analyzerInflateRaw(input) {
   var data = input, bitPos = 0, dataLen = data.length;
-  var MAX_OUT = 64 * 1024 * 1024; // 64 MB safety ceiling
+  var MAX_OUT = 4 * 1024 * 1024; // 4 MB safety ceiling (content streams are small; fonts/images should never reach here)
+  var MAX_OPS = 8000000; // 8M operations budget — bail before browser freezes
+  var ops = 0;
   var out = new Uint8Array(Math.max(1024, dataLen * 4));
   var outPos = 0;
   function push(b) {
+    if (++ops > MAX_OPS) throw new Error('inflate: operation budget exceeded');
     if (outPos >= out.length) {
       if (out.length * 2 > MAX_OUT) throw new Error('inflate: output too large');
       var n = new Uint8Array(out.length * 2); n.set(out); out = n;
@@ -28750,6 +28753,10 @@ function analyzerExtractPdf(bytes) {
   if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
   var s = analyzerBytesToLatin1(bytes);
   var collected = [];
+  var MAX_STREAM_BYTES = 256 * 1024; // 256 KB: real content streams are small; fonts/images are huge
+  var MAX_INFLATED = 512 * 1024; // 512 KB: cap inflated output (real page content ≈ 2-20 KB)
+  var MAX_STREAMS = 200; // safety: stop after 200 streams (most exam PDFs have < 30)
+  var streamCount = 0;
   var re = /stream\r?\n?/g, m;
   while ((m = re.exec(s)) !== null) {
     var dictStart = Math.max(0, m.index - 500);
@@ -28758,6 +28765,10 @@ function analyzerExtractPdf(bytes) {
     var endIdx = s.indexOf('endstream', dataStart);
     if (endIdx < 0) break;
     re.lastIndex = endIdx + 9;
+    // Hard cap: skip streams that are obviously too large to be text content.
+    if (endIdx - dataStart > MAX_STREAM_BYTES) continue;
+    // Hard cap: stop processing after MAX_STREAMS to prevent runaway loops.
+    if (++streamCount > MAX_STREAMS) break;
     // Skip non-content streams: embedded fonts, images, colour profiles,
     // metadata, object/xref streams — scanning these yields binary garbage.
     if (/\/(FontFile\d?|Length1)\b/.test(dict) ||
@@ -28772,7 +28783,9 @@ function analyzerExtractPdf(bytes) {
       try {
         var raw = new Uint8Array(chunk.length);
         for (var i = 0; i < chunk.length; i++) raw[i] = chunk.charCodeAt(i) & 0xff;
-        content = analyzerBytesToLatin1(analyzerInflate(raw));
+        var inflated = analyzerInflate(raw);
+        if (inflated.length > MAX_INFLATED) continue; // inflated too large — not text
+        content = analyzerBytesToLatin1(inflated);
       } catch (e) { content = null; }
     } else if (!/\/Filter/.test(dict)) {
       content = chunk; // plain (uncompressed) content stream, no unknown filter
@@ -28827,6 +28840,8 @@ function analyzerPdfReadableRatio(text) {
 // without inserting spaces (kerning is usually intra-word); a space is added
 // only for large negative kerning, and positioning operators add line breaks.
 function analyzerPdfContentToText(content) {
+  // Guard: skip absurdly large content (real page content streams are 2-30 KB text).
+  if (!content || content.length > 512 * 1024) return '';
   var i = 0, n = content.length, result = '';
   function readLiteral(start) {
     var depth = 1, j = start, str = '';
