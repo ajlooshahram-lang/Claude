@@ -27793,8 +27793,48 @@ function renderImpedans() {
 
   html += '</div>'; // close config card
   // Results card
-  html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Impedance Results') + '</div>';
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px"><div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Impedans \u2014 Mathcad Prime', 'Impedance \u2014 Mathcad Prime') + '</div>';
 
+  var _hasR = impedansState.components.indexOf('r') >= 0;
+  var _hasL = impedansState.components.indexOf('l') >= 0;
+  var _hasC = impedansState.components.indexOf('c') >= 0;
+
+  // GIVEN DATA
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  var _defs = [];
+  if (_hasR) _defs.push({ sym: 'R', val: impedansState.R, unit: '\u03A9' });
+  if (_hasL) _defs.push({ sym: 'L', val: impedansFmtL(impedansState.L), unit: '' });
+  if (_hasC) _defs.push({ sym: 'C', val: impedansFmtC(impedansState.C), unit: '' });
+  _defs.push({ sym: 'f', val: impedansState.f, unit: 'Hz' });
+  _defs.push({ sym: 'U', val: impedansState.U, unit: 'V' });
+  html += mcPrimeDefLine(_defs);
+
+  // CALCULATION
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION') + ' \u2014 ' + (impedansState.connection === 'series' ? tx('serie','series') : tx('parallel','parallel')));
+  if (_hasL) html += mcPrimeLine('X<sub>L</sub>', ':= 2\u03C0fL =', '2\u03C0 \u00B7 ' + impedansState.f + ' \u00B7 ' + impedansState.L, res.XL.toFixed(3), '\u03A9', tx('Induktiv reaktans','Inductive reactance'));
+  if (_hasC) html += mcPrimeLine('X<sub>C</sub>', ':= ' + mcPrimeFrac('1', '2\u03C0fC') + ' =', mcPrimeFrac('1', '2\u03C0 \u00B7 ' + impedansState.f + ' \u00B7 ' + impedansState.C), res.XC.toFixed(3), '\u03A9', tx('Kapacitiv reaktans','Capacitive reactance'));
+
+  if (impedansState.connection === 'series') {
+    html += mcPrimeLine('|Z|', ':= \u221A(R\u00B2 + (X<sub>L</sub>\u2212X<sub>C</sub>)\u00B2) =', '\u221A(' + (_hasR?impedansState.R:0) + '\u00B2 + (' + res.XL.toFixed(2) + '\u2212' + res.XC.toFixed(2) + ')\u00B2)', res.Z.toFixed(3), '\u03A9', '');
+  } else {
+    html += mcPrimeLine('|Z|', ':= 1/\u221A(G\u00B2 + (B<sub>L</sub>\u2212B<sub>C</sub>)\u00B2) =', '', res.Z.toFixed(3), '\u03A9', tx('Parallel admittans','Parallel admittance'));
+  }
+  html += mcPrimeLine('\u03C6', ':= arctan((X<sub>L</sub>\u2212X<sub>C</sub>)/R) =', '', res.phiDeg.toFixed(2), '\u00B0', tx('Fasevinkel','Phase angle'));
+  html += mcPrimeLine('cos \u03C6', '=', '', res.cosPhi.toFixed(4), '', res.charType === 'inductive' ? tx('induktiv','inductive') : (res.charType === 'capacitive' ? tx('kapacitiv','capacitive') : tx('resistiv (resonans)','resistive (resonance)')));
+
+  // Current + power
+  html += mcPrimeLine('I', ':= U / |Z| =', impedansState.U + ' / ' + res.Z.toFixed(3), res.I.toFixed(4), 'A', tx('Str\u00F8m','Current'));
+  html += mcPrimeLine('P', ':= U\u00B7I\u00B7cos\u03C6 =', impedansState.U + ' \u00B7 ' + res.I.toFixed(3) + ' \u00B7 ' + res.cosPhi.toFixed(3), res.P.toFixed(2), 'W', tx('Aktiv effekt','Active power'));
+  html += mcPrimeLine('Q', ':= U\u00B7I\u00B7sin\u03C6 =', '', Math.abs(res.Q).toFixed(2), 'var', res.Q >= 0 ? tx('induktiv','inductive') : tx('kapacitiv','capacitive'));
+  html += mcPrimeLine('S', ':= U\u00B7I =', impedansState.U + ' \u00B7 ' + res.I.toFixed(3), res.S.toFixed(2), 'VA', 'S\u00B2 = P\u00B2 + Q\u00B2');
+
+  // Result
+  html += mcPrimeResult('|Z|', res.Z.toFixed(3), '\u03A9');
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('Elektroteknik Opgavesamling Kap. 6') + '</div>';
+  html += '</div>';
+
+  // Hidden legacy boxes start here (kept for resonance/time-constants which follow) — open a fresh card
+  html += '<div class="card fade-in" style="display:none">';
   // Reactances
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Reaktanser & Impedans', 'Reactances & Impedance') + '</div>';
@@ -27835,6 +27875,8 @@ function renderImpedans() {
   html += '</div>';
 
   // Resonance & Q-factor (only for LC or RLC)
+  html += '</div>'; // close hidden legacy card
+  html += '<div class="card fade-in">'; // visible card for resonance/time-constants/phasor
   if (impedansState.components.indexOf('l') >= 0 && impedansState.components.indexOf('c') >= 0) {
     html += '<div class="result-box">';
     html += '<div class="result-title">' + tx('Resonans & Q-faktor', 'Resonance & Quality Factor') + '</div>';
