@@ -8732,6 +8732,32 @@ function sldPropagateAll(tree) {
   }
 }
 
+// --- Lighting-circuit detection (DS/HD 60364-5-52 cl. 525) ---
+// Lighting final circuits are held to the stricter 3 % voltage-drop limit
+// (DK_STANDARDS.vdropLighting), every other load keeps the general 4 % limit.
+// Because sldTree nodes carry no structured loadType, lighting is detected by
+// trilingual name (case-insensitive substring): Danish "Belysning", English
+// "Lighting", Farsi "\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC". This is the
+// SINGLE source of truth, shared by the live auditor (sldVerifyNode) and the
+// reverse-engineering solver/optimizer so they can never disagree.
+function isLightingName(name_da, name_en, name_fa) {
+  var s = ((name_da || '') + '\u0000' + (name_en || '') + '\u0000' + (name_fa || '')).toLowerCase();
+  return s.indexOf('belysning') >= 0 ||
+         s.indexOf('lighting') >= 0 ||
+         s.indexOf('\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC') >= 0;
+}
+function isLightingNode(node) {
+  return !!node && node.type === 'final_circuit' &&
+         isLightingName(node.name_da, node.name_en, node.name_fa);
+}
+// Conservative voltage-drop ceiling (%) for a circuit: lighting -> 3 % (cl.525,
+// stricter), everything else -> the general 4 % limit. Used by the auditor and
+// the reverse-engineering downsize gate so neither ever sizes a lighting cable
+// against the looser 4 % band.
+function vdropLimitFor(isLighting) {
+  return isLighting ? DK_STANDARDS.vdropLighting : DK_STANDARDS.vdropGeneral;
+}
+
 // --- DS/HD 60364 Compliance Verification ---
 function sldVerifyNode(tree, nodeId) {
   const node = tree.nodes[nodeId];
@@ -8836,14 +8862,9 @@ function sldVerifyNode(tree, nodeId) {
     // Circuit-type-aware voltage-drop verdict (DS/HD 60364-5-52 cl. 525).
     // Lighting final circuits are held to the stricter 3% limit (vdropLighting);
     // all other loads/boards keep the general 4% limit with a 4-5% marginal band.
-    // There is no structured loadType on sldTree nodes, so lighting is detected by
-    // name: Danish "Belysning", English "Lighting", Farsi "روشنایی" (case-insensitive).
-    var _vdNames = ((node.name_da || '') + '\u0000' + (node.name_en || '') + '\u0000' + (node.name_fa || '')).toLowerCase();
-    var _isLighting = node.type === 'final_circuit' && (
-      _vdNames.indexOf('belysning') >= 0 ||
-      _vdNames.indexOf('lighting') >= 0 ||
-      _vdNames.indexOf('\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC') >= 0
-    );
+    // Lighting detection is single-sourced via isLightingNode() (trilingual name)
+    // so the live auditor and the reverse-engineering solver can never disagree.
+    var _isLighting = isLightingNode(node);
     if (_isLighting) {
       var litLimit = DK_STANDARDS.vdropLighting;
       var litQual = ' (' + tx('belysningsgr\u00E6nse', 'lighting limit') + ')';
@@ -39619,6 +39640,20 @@ function reverseSetParam(key, val) {
   renderModule('reverse');
 }
 
+// Map the single-mode loadType (a preset's English name, may be null) to the
+// trilingual name triple used for lighting detection in the verification tree.
+// Null/unknown -> the neutral default ("Final Circuit"), which is non-lighting
+// and therefore falls back to the general 4% voltage-drop limit.
+function reverseLoadTypeNames(loadType) {
+  if (!loadType) return { da: 'Slutkreds', en: 'Final Circuit', fa: '\u0645\u062F\u0627\u0631 \u0646\u0647\u0627\u06CC\u06CC' };
+  for (var i = 0; i < REVERSE_PRESETS.length; i++) {
+    if (REVERSE_PRESETS[i].name_en === loadType) {
+      return { da: REVERSE_PRESETS[i].name_da, en: REVERSE_PRESETS[i].name_en, fa: REVERSE_PRESETS[i].name_fa || loadType };
+    }
+  }
+  return { da: loadType, en: loadType, fa: loadType };
+}
+
 function reverseEngineerSolve() {
   var st = reverseState;
   var log = [];
@@ -39707,6 +39742,7 @@ function reverseEngineerSolve() {
   var vdrop = 0;
   var ikData = { ikmax: 0, ikmin: 0, zs: 0, z1: 0 };
   var tree = null;
+  var _fcNames = reverseLoadTypeNames(st.loadType);
 
   for (var iter = 0; iter < maxIter; iter++) {
     st.iterations = iter + 1;
@@ -39730,6 +39766,9 @@ function reverseEngineerSolve() {
       cosPhi: st.cosPhi,
       phases: st.phases,
       voltage: st.voltage,
+      name_da: _fcNames.da,
+      name_en: _fcNames.en,
+      name_fa: _fcNames.fa,
       cable: cable,
       protection: protDevice,
       protectionIn: protIn,
@@ -39881,6 +39920,7 @@ function reverseEngineerSolve() {
     IzRaw: cable.iz,
     kTotal: kTotal,
     vdrop: vdrop,
+    isLighting: isLightingName(_fcNames.da, _fcNames.en, _fcNames.fa),
     ikmax: ikData.ikmax,
     ikmin: ikData.ikmin,
     zs: ikData.zs,
@@ -40224,6 +40264,9 @@ function reverseMultiSolve() {
         cosPhi: ckt.cosPhi,
         phases: ckt.phases,
         voltage: ckt.voltage,
+        name_da: ckt.name_da,
+        name_en: ckt.name_en,
+        name_fa: ckt.name_fa,
         cable: cable,
         protection: protDevice,
         protectionIn: protIn,
@@ -40431,7 +40474,12 @@ function reverseMultiOptimize(tree, circuits, results) {
         } else {
           vdropSmaller = (2 * r.IB * (smaller.r / 1000) * ckt.cableLength_m * ckt.cosPhi) / 230 * 100;
         }
-        if (vdropSmaller <= DK_STANDARDS.vdropGeneral) {
+        // Only suggest a smaller cable if the smaller size still satisfies the
+        // circuit's own conservative voltage-drop ceiling. Lighting circuits are
+        // held to 3% (cl.525) via the shared vdropLimitFor() so we never suggest
+        // downsizing a lighting cable into the 3-4% band the auditor would reject.
+        var _vdLimit = vdropLimitFor(isLightingName(ckt.name_da, ckt.name_en, ckt.name_fa));
+        if (vdropSmaller <= _vdLimit) {
           suggestions.push({
             type: 'downsize',
             circuitIndex: i,
@@ -40679,7 +40727,7 @@ function renderReverse() {
       html += '<div class="result-row"><span class="label">IB (' + tx('driftstroemme', 'design current') + ')</span><span class="value">' + r.IB.toFixed(2) + ' A</span></div>';
       html += '<div class="result-row"><span class="label">In (' + tx('maerkestroemme', 'rated current') + ')</span><span class="value">' + r.In + ' A</span></div>';
       html += '<div class="result-row"><span class="label">Iz (' + tx('stroembaereevne, derated', 'current capacity, derated') + ')</span><span class="value">' + r.Iz.toFixed(1) + ' A (raw: ' + r.IzRaw + ' A, k=' + r.kTotal.toFixed(3) + ')</span></div>';
-      html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage drop') + '</span><span class="value">' + r.vdrop.toFixed(2) + ' % (max ' + DK_STANDARDS.vdropGeneral + '%)</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage drop') + '</span><span class="value">' + r.vdrop.toFixed(2) + ' % (max ' + (r.isLighting ? DK_STANDARDS.vdropLighting : DK_STANDARDS.vdropGeneral) + '%' + (r.isLighting ? ' \u2014 ' + tx('belysning', 'lighting') : '') + ')</span></div>';
       html += '<div class="result-row"><span class="label">Ik,max</span><span class="value">' + (r.ikmax / 1000).toFixed(2) + ' kA</span></div>';
       html += '<div class="result-row"><span class="label">Ik,min</span><span class="value">' + (r.ikmin / 1000).toFixed(2) + ' kA</span></div>';
       html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + r.zs.toFixed(4) + ' \u03A9</span></div>';

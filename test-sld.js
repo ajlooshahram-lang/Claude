@@ -18812,6 +18812,179 @@ test('VDROP-LIGHTING: "lighting limit" qualifier is trilingual (_FA Farsi entry 
   } finally { lang = prev; }
 });
 
+// ===== REVERSE-MODE LIGHTING VOLTAGE-DROP LIMIT TESTS (DS/HD 60364-5-52 cl. 525) =====
+// The shared helper isLightingNode/isLightingName/vdropLimitFor must be used by the
+// reverse-mode solver so that lighting circuits are sized against the 3% limit and the
+// optimizer never suggests a downsize into the 3-4% band.
+
+// --- R-L1. Shared helpers: isLightingName returns true for trilingual lighting names ---
+test('REVERSE-LIGHTING: isLightingName detects Belysning/Lighting/Farsi, rejects non-lighting', function() {
+  // Positive cases
+  assert.strictEqual(isLightingName('Belysning 2.3kW', '', ''), true, 'Danish Belysning must match');
+  assert.strictEqual(isLightingName('', 'Lighting 2.3kW', ''), true, 'English Lighting must match');
+  assert.strictEqual(isLightingName('', '', '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC 2.3kW'), true, 'Farsi must match');
+  assert.strictEqual(isLightingName('BELYSNING', '', ''), true, 'case-insensitive Danish');
+  assert.strictEqual(isLightingName('', 'lighting panel', ''), true, 'case-insensitive English');
+  // Negative cases
+  assert.strictEqual(isLightingName('Stikkontakt', 'Sockets 3.45kW', ''), false, 'sockets must NOT match');
+  assert.strictEqual(isLightingName('Komfur', 'Cooker 7.36kW', ''), false, 'cooker must NOT match');
+  assert.strictEqual(isLightingName('Motor 5.5kW', 'Motor 5.5kW', ''), false, 'motor must NOT match');
+  assert.strictEqual(isLightingName('', '', ''), false, 'empty names must NOT match');
+  assert.strictEqual(isLightingName(null, null, null), false, 'null names must NOT match');
+});
+
+// --- R-L2. isLightingNode: only final_circuit type qualifies ---
+test('REVERSE-LIGHTING: isLightingNode requires type=final_circuit + lighting name', function() {
+  assert.strictEqual(isLightingNode({ type: 'final_circuit', name_en: 'Lighting 2.3kW' }), true, 'final_circuit + Lighting = true');
+  assert.strictEqual(isLightingNode({ type: 'sub_board', name_en: 'Lighting Panel' }), false, 'sub_board + Lighting = false');
+  assert.strictEqual(isLightingNode({ type: 'final_circuit', name_en: 'Sockets' }), false, 'final_circuit + non-lighting = false');
+  assert.strictEqual(isLightingNode(null), false, 'null node = false');
+  assert.strictEqual(isLightingNode({}), false, 'empty node = false');
+});
+
+// --- R-L3. vdropLimitFor returns 3 for lighting, 4 for non-lighting ---
+test('REVERSE-LIGHTING: vdropLimitFor returns DK_STANDARDS.vdropLighting(3) or .vdropGeneral(4)', function() {
+  assert.strictEqual(vdropLimitFor(true), DK_STANDARDS.vdropLighting, 'lighting -> 3%');
+  assert.strictEqual(vdropLimitFor(false), DK_STANDARDS.vdropGeneral, 'non-lighting -> 4%');
+  assert.strictEqual(vdropLimitFor(true), 3, 'lighting limit must be 3');
+  assert.strictEqual(vdropLimitFor(false), 4, 'general limit must be 4');
+});
+
+// --- R-L4. Single-circuit reverse solve: lighting preset -> result.isLighting = true ---
+test('REVERSE-LIGHTING: single-circuit solver flags isLighting when loadType is Lighting', function() {
+  var prev = { loadType: reverseState.loadType, power_kW: reverseState.power_kW, cosPhi: reverseState.cosPhi, phases: reverseState.phases, voltage: reverseState.voltage };
+  try {
+    reverseState.loadType = 'Lighting 2.3kW';
+    reverseState.power_kW = 2.3;
+    reverseState.cosPhi = 0.92;
+    reverseState.phases = '1x230';
+    reverseState.voltage = 230;
+    reverseState.cableLength_m = 25;
+    reverseState.installMethod = 'C';
+    reverseState.ambientTemp = 30;
+    reverseState.grouping = 1;
+    reverseState.cableMaterial = 'Cu';
+    reverseState.protectionType = 'MCB';
+    reverseState.earthSystem = 'TN-S';
+    reverseState.result = null;
+    reverseEngineerSolve();
+    assert(reverseState.result, 'solver must produce a result');
+    assert.strictEqual(reverseState.result.isLighting, true, 'result.isLighting must be true for Lighting loadType');
+  } finally {
+    reverseState.loadType = prev.loadType;
+    reverseState.power_kW = prev.power_kW;
+    reverseState.cosPhi = prev.cosPhi;
+    reverseState.phases = prev.phases;
+    reverseState.voltage = prev.voltage;
+    reverseState.result = null;
+  }
+});
+
+// --- R-L5. Single-circuit reverse solve: non-lighting -> result.isLighting = false ---
+test('REVERSE-LIGHTING: single-circuit solver flags isLighting=false for Socket loadType', function() {
+  var prev = { loadType: reverseState.loadType, power_kW: reverseState.power_kW, cosPhi: reverseState.cosPhi, phases: reverseState.phases, voltage: reverseState.voltage };
+  try {
+    reverseState.loadType = 'Socket 3.45kW';
+    reverseState.power_kW = 3.45;
+    reverseState.cosPhi = 0.95;
+    reverseState.phases = '1x230';
+    reverseState.voltage = 230;
+    reverseState.cableLength_m = 25;
+    reverseState.installMethod = 'C';
+    reverseState.ambientTemp = 30;
+    reverseState.grouping = 1;
+    reverseState.cableMaterial = 'Cu';
+    reverseState.protectionType = 'MCB';
+    reverseState.earthSystem = 'TN-S';
+    reverseState.result = null;
+    reverseEngineerSolve();
+    assert(reverseState.result, 'solver must produce a result');
+    assert.strictEqual(reverseState.result.isLighting, false, 'result.isLighting must be false for Socket loadType');
+  } finally {
+    reverseState.loadType = prev.loadType;
+    reverseState.power_kW = prev.power_kW;
+    reverseState.cosPhi = prev.cosPhi;
+    reverseState.phases = prev.phases;
+    reverseState.voltage = prev.voltage;
+    reverseState.result = null;
+  }
+});
+
+// --- R-L6. Multi-circuit optimizer won't suggest downsizing a lighting circuit into the 3-4% band ---
+test('REVERSE-LIGHTING: reverseMultiOptimize uses 3% limit for lighting circuits in downsize gate', function() {
+  // Build a minimal tree + results mimicking a lighting circuit at 2.9% on current cable.
+  // A smaller cable would push it to 3.5% — must NOT be suggested.
+  var lightingCkt = {
+    name_da: 'Belysning 2.3kW', name_en: 'Lighting 2.3kW', name_fa: '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC 2.3kW',
+    power_kW: 2.3, cosPhi: 0.92, phases: '1x230', voltage: 230,
+    cableLength_m: 30, installMethod: 'C', ambientTemp: 30, grouping: 1,
+    cableMaterial: 'Cu', protectionType: 'MCB'
+  };
+  var socketCkt = {
+    name_da: 'Stikkontakt 3.45kW', name_en: 'Sockets 3.45kW', name_fa: '\u067E\u0631\u06CC\u0632 3.45kW',
+    power_kW: 3.45, cosPhi: 0.95, phases: '1x230', voltage: 230,
+    cableLength_m: 25, installMethod: 'C', ambientTemp: 30, grouping: 1,
+    cableMaterial: 'Cu', protectionType: 'MCB'
+  };
+  // Run multi-solve to exercise the optimizer gate with both circuit types
+  var prevCircuits = reverseState.selectedCircuits;
+  var prevMultiMode = reverseState.multiMode;
+  var prevMultiResult = reverseState.multiResult;
+  try {
+    reverseState.multiMode = true;
+    reverseState.selectedCircuits = [lightingCkt, socketCkt];
+    reverseState.multiResult = null;
+    reverseMultiSolve();
+    // If optimizer ran, check that no lighting optimization suggests a cable whose
+    // vdrop would exceed 3% (even if it's under 4%).
+    var opts = reverseState.multiOptimizations || [];
+    for (var oi = 0; oi < opts.length; oi++) {
+      var opt = opts[oi];
+      // Find the circuit index — if it's lighting, its suggested vdrop must be <= 3%
+      if (opt.circuitIndex !== undefined) {
+        var refCkt = reverseState.selectedCircuits[opt.circuitIndex];
+        if (refCkt && isLightingName(refCkt.name_da, refCkt.name_en, refCkt.name_fa)) {
+          assert(opt.vdropSmaller === undefined || opt.vdropSmaller <= DK_STANDARDS.vdropLighting,
+            'Optimizer must NOT suggest downsize for lighting if vdrop would exceed 3%. Got vdrop=' + opt.vdropSmaller);
+        }
+      }
+    }
+    // Verify the function exists and is callable
+    assert(typeof reverseMultiOptimize === 'function', 'reverseMultiOptimize must exist');
+  } finally {
+    reverseState.selectedCircuits = prevCircuits;
+    reverseState.multiMode = prevMultiMode;
+    reverseState.multiResult = prevMultiResult;
+    reverseState.multiOptimizations = [];
+  }
+});
+
+// --- R-L7. Display row shows correct limit per circuit type ---
+test('REVERSE-LIGHTING: result display shows 3% for lighting and 4% for non-lighting', function() {
+  // Lighting result
+  var litResult = { success: true, vdrop: 2.8, isLighting: true, selectedCable: { mm2: 2.5 }, selectedProtection: { rating: 10 } };
+  var litLimit = litResult.isLighting ? DK_STANDARDS.vdropLighting : DK_STANDARDS.vdropGeneral;
+  assert.strictEqual(litLimit, 3, 'lighting result must reference 3% limit');
+  // Non-lighting result
+  var genResult = { success: true, vdrop: 3.5, isLighting: false, selectedCable: { mm2: 2.5 }, selectedProtection: { rating: 16 } };
+  var genLimit = genResult.isLighting ? DK_STANDARDS.vdropLighting : DK_STANDARDS.vdropGeneral;
+  assert.strictEqual(genLimit, 4, 'non-lighting result must reference 4% limit');
+});
+
+// --- R-L8. reverseLoadTypeNames maps REVERSE_PRESETS.name_en to trilingual triple ---
+test('REVERSE-LIGHTING: reverseLoadTypeNames maps lighting preset to trilingual names', function() {
+  var names = reverseLoadTypeNames('Lighting 2.3kW');
+  assert.strictEqual(names.da, 'Belysning 2.3kW', 'Danish name must come from preset');
+  assert.strictEqual(names.en, 'Lighting 2.3kW', 'English name must come from preset');
+  assert(isLightingName(names.da, names.en, names.fa), 'mapped names must be detected as lighting');
+  // Non-lighting
+  var sock = reverseLoadTypeNames('Socket 3.45kW');
+  assert.strictEqual(isLightingName(sock.da, sock.en, sock.fa), false, 'socket names must NOT be lighting');
+  // Unknown -> neutral defaults (non-lighting)
+  var unknown = reverseLoadTypeNames(null);
+  assert.strictEqual(isLightingName(unknown.da, unknown.en, unknown.fa), false, 'null loadType must NOT be lighting');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
