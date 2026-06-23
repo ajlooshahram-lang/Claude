@@ -16005,60 +16005,49 @@ function renderEV() {
   });
   html += '</div></div>';
 
-  // Results
-  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
-  html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">' + tx('Enkeltstroem pr. lader', 'Single charger current') + '</span><span class="value">' + current + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Samtidighedsfaktor (722 Annex A)', 'Simultaneity factor (722 Annex A)') + '</span><span class="value">' + sf + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Dimensionerende stroem', 'Design current') + '</span><span class="value">' + designCurrent + ' A</span></div>';
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '</div><div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Elbil-lader \u2014 dimensionering', 'EV Charger \u2014 sizing') + '</div>';
+
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'P', val: evState.powerKW, unit: 'kW' },
+    { sym: tx('Fase','Phase'), val: evState.phases + '\u223C', unit: '' },
+    { sym: 'n<sub>ladere</sub>', val: evState.numChargers, unit: '' },
+    { sym: 'L', val: evState.cableLength, unit: 'm' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+  var evU = evState.phases === 3 ? 400 : 230;
+  var evDenom = evState.phases === 3 ? '\u221A3 \u00B7 400' : '230';
+  html += mcPrimeLine('I<sub>lader</sub>', ':= ' + mcPrimeFrac('P', evDenom) + ' =', mcPrimeFrac((evState.powerKW*1000), evDenom), current, 'A', tx('Str\u00F8m pr. lader','Current per charger'));
+  html += mcPrimeLine('S<sub>f</sub>', ':=', '', sf, '', mcPrimeRef('DS/HD 60364-7-722 Annex A'));
+  html += mcPrimeLine('I<sub>B</sub>', ':= I<sub>lader</sub> \u00B7 n \u00B7 S<sub>f</sub> =', current + ' \u00B7 ' + evState.numChargers + ' \u00B7 ' + sf, designCurrent, 'A', tx('Dimensionerende str\u00F8m','Design current'));
+  html += mcPrimeLine('\u0394U%', '=', '', vdrop.toFixed(2), '%', vdropOk ? '' : '<strong style="color:var(--danger)">' + tx('Over 3%!','Over 3%!') + '</strong>');
+
+  html += mcPrimeResult('I<sub>B</sub>', designCurrent, 'A');
+
+  // Component selection
+  html += mcPrimeHeader(tx('KOMPONENTVALG', 'COMPONENT SELECTION'), 'green');
+  if (cable) html += mcPrimeDecision(tx('Kabel','Cable') + ': ' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + ' mm\u00B2 (I<sub>z</sub>=' + cable.iz + ' A)');
+  if (mcb) html += mcPrimeDecision('MCB: ' + mcb.brand + ' C' + mcb.rating + ' ' + mcPrimeRef('722.531'));
+  if (rcd) html += mcPrimeDecision('RCD: ' + rcd.brand + ' Type ' + rcd.rcdType + ' ' + rcd.sensitivity + ' mA');
+
+  // Verification
+  html += mcPrimeHeader(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.95rem;line-height:2.2">';
+  html += '<div>\u0394U% \u2264 3% : ' + vdrop.toFixed(2) + '% ' + (vdropOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>' + tx('Type B RCD','Type B RCD') + ' (722.531.3.101) : ' + (rcdTypeB ? mcPrimeOk() : mcPrimeFail(tx('P\u00C5KR\u00C6VET','REQUIRED'))) + '</div>';
+  html += '<div>' + tx('Netkapacitet','Grid capacity') + ': ' + grid.usagePercent + '% ' + (grid.overloaded ? mcPrimeFail(tx('OVERBELASTET','OVERLOADED')) : mcPrimeOk()) + ' (' + tx('rest','remaining') + ' ' + grid.remainingA + ' A)</div>';
+  if (grid.needsLoadBalancing) html += '<div style="color:var(--warning)">\u26A0\uFE0F ' + tx('Lastbalancering anbefales (>80%)','Load balancing recommended (>80%)') + '</div>';
   html += '</div>';
 
-  // Cable recommendation
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
-  if (cable) {
-    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A</span></div>';
-  }
-  html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage drop') + '</span><span class="value">' + vdrop.toFixed(2) + ' % ' + (vdropOk ? '\u2705' : '\u274C') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Graense (Faellesregulativet)', 'Limit (Utility reg.)') + '</span><span class="value">max 3% (cl.722.525)</span></div>';
-  html += '</div>';
-
-  // Protection
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
-  if (mcb) {
-    html += '<div class="result-row"><span class="label">MCB</span><span class="value">' + mcb.brand + ' ' + mcb.model + ' C' + mcb.rating + 'A (cl.722.531)</span></div>';
-  }
-  if (rcd) {
-    html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + rcd.brand + ' ' + rcd.model + ' Type ' + rcd.rcdType + ' ' + rcd.sensitivity + 'mA</span></div>';
-  }
-  if (!rcdTypeB) {
-    html += '<div class="result-row" style="color:var(--danger)"><span class="label">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value">' + tx('Type B RCD paakraevet per cl.722.531.3.101 (DC fejlstroem)', 'Type B RCD required per cl.722.531.3.101 (DC fault current)') + '</span></div>';
-  } else {
-    html += '<div class="result-row" style="color:var(--success)"><span class="label">\u2705</span><span class="value">' + tx('Type B RCD korrekt per cl.722.531.3.101', 'Type B RCD correct per cl.722.531.3.101') + '</span></div>';
-  }
-  html += '</div>';
-
-  // Grid capacity
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Netkapacitet', 'Grid Capacity') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Hovedsikring', 'Main fuse') + '</span><span class="value">' + grid.mainFuseA + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Forbrug', 'Usage') + '</span><span class="value">' + grid.usagePercent + '% ' + (grid.overloaded ? '\u274C' : '\u2705') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Restkapacitet', 'Remaining') + '</span><span class="value">' + grid.remainingA + ' A</span></div>';
-  if (grid.needsLoadBalancing) {
-    html += '<div class="result-row" style="color:var(--warning)"><span class="label">\u26A0\uFE0F ' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + tx('Lastbalancering anbefales (>80% af hovedsikring)', 'Load balancing recommended (>80% of main fuse)') + '</span></div>';
-  }
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/HD 60364-7-722') + ' ' + mcPrimeRef('Faellesregulativet') + '</div>';
   html += '</div>';
 
   // Simulator
   html += renderEVSim(evState.powerKW, current, evState.phases, evState.numChargers, vdrop);
 
-  // Verdict
-  var safe = vdropOk && !grid.overloaded && rcdTypeB;
-  html += renderVerdict(safe, safe ? tx('Installation opfylder DS/HD 60364-7-722', 'Installation complies with DS/HD 60364-7-722') : tx('Krav IKKE opfyldt - se advarsler', 'Requirements NOT met - see warnings'));
-
-  html += '</div>';
   return html;
 }
 
@@ -16224,70 +16213,57 @@ function renderSolar() {
   });
   html += '</div></div>';
 
-  // Results
-  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '</div><div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Solcelle \u2014 dimensionering', 'Solar PV \u2014 sizing') + '</div>';
 
-  // System summary
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Systemoversigt', 'System Summary') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Total effekt', 'Total power') + '</span><span class="value">' + kWp.toFixed(1) + ' kWp</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Inverter anbefalet', 'Inverter recommended') + '</span><span class="value">' + inverter.recommended + ' kW (' + inverter.min + '-' + inverter.max + ' kW)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Aarlig produktion (DK gennemsnit)', 'Annual yield (DK average)') + '</span><span class="value">' + annualYield + ' kWh/year</span></div>';
-  if (hasBattery) {
-    html += '<div class="result-row"><span class="label">' + tx('Batteri', 'Battery') + '</span><span class="value">' + solarState.batteryKWh + ' kWh</span></div>';
-  }
+  html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcPrimeDefLine([
+    { sym: 'n<sub>panel</sub>', val: solarState.panelCount, unit: tx('stk','pcs') },
+    { sym: 'P<sub>panel</sub>', val: solarState.panelWp, unit: 'Wp' },
+    { sym: tx('Egetforbrug','Self-cons.'), val: solarState.selfConsumption, unit: '%' }
+  ]);
+
+  html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
+  html += mcPrimeLine('P<sub>STC</sub>', ':= n<sub>panel</sub> \u00B7 P<sub>panel</sub> =', solarState.panelCount + ' \u00B7 ' + solarState.panelWp, kWp.toFixed(2), 'kWp', tx('Installeret effekt','Installed power'));
+  html += mcPrimeLine('P<sub>inv</sub>', ':= 0,9 \u2013 1,0 \u00B7 P<sub>STC</sub> =', '', inverter.recommended, 'kW', tx('Inverter (' + inverter.min + '\u2013' + inverter.max + ' kW)','Inverter (' + inverter.min + '\u2013' + inverter.max + ' kW)'));
+  html += mcPrimeLine('E<sub>\u00E5r</sub>', ':= P<sub>STC</sub> \u00B7 950 kWh/kWp =', kWp.toFixed(2) + ' \u00B7 950', annualYield, 'kWh/' + tx('\u00E5r','yr'), tx('DK gennemsnit','DK average'));
+  html += mcPrimeLine('V<sub>oc,kold</sub>', ':= V<sub>oc</sub> \u00B7 1,10 =', stringCheck.voc + ' \u00B7 1,10', stringCheck.vocCold, 'V', tx('Voc ved kulde (+10%)','Voc at cold (+10%)'));
+
+  html += mcPrimeResult('P<sub>STC</sub>', kWp.toFixed(2), 'kWp');
+
+  // String voltage verification
+  html += mcPrimeHeader(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.95rem;line-height:2.2">';
+  html += '<div>V<sub>oc,kold</sub> \u2264 V<sub>dc,max</sub> : ' + stringCheck.vocCold + ' \u2264 ' + stringCheck.maxVdc + ' V ' + (stringCheck.ok ? mcPrimeOk() : mcPrimeFail(tx('OVERSKREDET','EXCEEDED'))) + '</div>';
   html += '</div>';
 
-  // Cable specs
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Kabler', 'Cables') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('DC kabel (panel til inverter)', 'DC cable (panel to inverter)') + '</span><span class="value">' + dcCable.mm2 + 'mm\u00B2 ' + dcCable.type + ' (' + dcCable.standard + ')</span></div>';
-  if (acResult.cable) {
-    html += '<div class="result-row"><span class="label">' + tx('AC kabel (inverter til maaler)', 'AC cable (inverter to meter)') + '</span><span class="value">' + acResult.cable.brand + ' ' + acResult.cable.mm2 + 'mm\u00B2 (Iz=' + acResult.cable.iz + 'A)</span></div>';
-  }
+  // Component selection
+  html += mcPrimeHeader(tx('KOMPONENTVALG', 'COMPONENT SELECTION'), 'green');
+  html += mcPrimeDecision(tx('DC kabel','DC cable') + ': ' + dcCable.mm2 + ' mm\u00B2 ' + dcCable.type);
+  if (acResult.cable) html += mcPrimeDecision(tx('AC kabel','AC cable') + ': ' + acResult.cable.brand + ' ' + acResult.cable.mm2 + ' mm\u00B2 (I<sub>z</sub>=' + acResult.cable.iz + ' A)');
+  if (mcb) html += mcPrimeDecision('MCB: ' + mcb.brand + ' C' + mcb.rating);
+  if (rcd) html += mcPrimeDecision('RCD: ' + rcd.brand + ' Type ' + rcd.rcdType + ' ' + mcPrimeRef('712.531'));
+
+  // Mandatory requirements
+  html += '<div style="margin-top:10px;font-size:0.88rem;line-height:1.9">';
+  html += '<div>\u2705 ' + tx('DC afbryder','DC switch-disconnector') + ' ' + mcPrimeRef('712.536.2.1') + '</div>';
+  html += '<div>\u2705 ' + tx('Anti-\u00F8dannelse','Anti-islanding') + ' ' + mcPrimeRef('712.536.2.2') + '</div>';
+  html += '<div>\u2705 SPD Type 2 (DC+AC) ' + mcPrimeRef('712.534') + '</div>';
+  html += '<div>\u2705 ' + tx('Hurtig nedlukning (brandsikkerhed)','Rapid shutdown (fire safety)') + '</div>';
   html += '</div>';
 
-  // String voltage check
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Strengspaending kontrol', 'String Voltage Check') + '</div>';
-  html += '<div class="result-row"><span class="label">Voc (STC)</span><span class="value">' + stringCheck.voc + ' V</span></div>';
-  html += '<div class="result-row"><span class="label">Voc (kulde +10%)</span><span class="value">' + stringCheck.vocCold + ' V</span></div>';
-  html += '<div class="result-row"><span class="label">Inverter max Vdc</span><span class="value">' + stringCheck.maxVdc + ' V</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + (stringCheck.ok ? '\u2705 OK' : '\u274C ' + tx('Overskrider maks Vdc!', 'Exceeds max Vdc!')) + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">' + stringCheck.clause + '</span></div>';
+  // Economics
+  html += '<div style="margin-top:10px;padding:8px 12px;background:rgba(0,180,255,0.04);border-radius:6px;font-size:0.85rem;font-family:sans-serif">';
+  html += '\uD83D\uDCB0 ' + tx('Tilbagebetaling','Payback') + ': ~' + payback.paybackYears + ' ' + tx('\u00E5r','yr') + ' (' + tx('besparelse','saving') + ' ' + payback.annualSaving + ' DKK/' + tx('\u00E5r','yr') + ', ' + tx('investering','cost') + ' ' + payback.systemCost + ' DKK)';
   html += '</div>';
 
-  // Protection
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
-  if (mcb) {
-    html += '<div class="result-row"><span class="label">MCB (AC)</span><span class="value">' + mcb.brand + ' ' + mcb.model + ' C' + mcb.rating + 'A</span></div>';
-  }
-  if (rcd) {
-    html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + rcd.brand + ' ' + rcd.model + ' Type ' + rcd.rcdType + ' (cl.712.531)</span></div>';
-  }
-  html += '<div class="result-row"><span class="label">' + tx('DC afbryder', 'DC switch-disconnector') + '</span><span class="value">' + tx('Paakraevet per cl.712.536.2.1', 'Mandatory per cl.712.536.2.1') + ' \u2705</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Anti-oedannelse', 'Anti-islanding') + '</span><span class="value">' + tx('Paakraevet per cl.712.536.2.2', 'Mandatory per cl.712.536.2.2') + ' \u2705</span></div>';
-  html += '<div class="result-row"><span class="label">SPD</span><span class="value">' + tx('Type 2 paa DC + AC side (cl.712.534)', 'Type 2 on DC + AC side (cl.712.534)') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Hurtig nedlukning', 'Rapid shutdown') + '</span><span class="value">' + tx('Krav for tagmontering (brandsikkerhed)', 'Required for rooftop (fire safety)') + '</span></div>';
-  html += '</div>';
-
-  // Payback
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Oekonomi', 'Economics') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Aarlig besparelse', 'Annual saving') + '</span><span class="value">' + payback.annualSaving + ' DKK</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Systemomkostning (estimat)', 'System cost (estimate)') + '</span><span class="value">' + payback.systemCost + ' DKK</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Tilbagebetalingstid', 'Payback period') + '</span><span class="value">~' + payback.paybackYears + ' ' + tx('aar', 'years') + '</span></div>';
+  html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/HD 60364-7-712') + ' ' + mcPrimeRef('DS/EN 62446') + '</div>';
   html += '</div>';
 
   // Simulator
   html += renderSolarSim(kWp, solarState.panelCount, inverter.recommended, annualYield);
 
-  // Verdict
-  var safe = stringCheck.ok;
-  html += renderVerdict(safe, safe ? tx('System opfylder DS/HD 60364-7-712 + DS/EN 62446', 'System complies with DS/HD 60364-7-712 + DS/EN 62446') : tx('Strengspaending overskrider inverter maks!', 'String voltage exceeds inverter maximum!'));
-
-  html += '</div>';
   return html;
 }
 

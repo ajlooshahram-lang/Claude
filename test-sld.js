@@ -2916,9 +2916,9 @@ test('renderSolar shows battery section for grid+battery system', function() {
 // Test 201: Solar includes mandatory protection requirements
 test('renderSolar shows mandatory protection devices', function() {
   var html = renderSolar();
-  assert.ok(html.indexOf('cl.712.536.2.1') >= 0, 'Must reference DC disconnect clause');
-  assert.ok(html.indexOf('cl.712.536.2.2') >= 0, 'Must reference anti-islanding clause');
-  assert.ok(html.indexOf('cl.712.534') >= 0, 'Must reference SPD clause');
+  assert.ok(html.indexOf('712.536.2.1') >= 0, 'Must reference DC disconnect clause');
+  assert.ok(html.indexOf('712.536.2.2') >= 0, 'Must reference anti-islanding clause');
+  assert.ok(html.indexOf('712.534') >= 0, 'Must reference SPD clause');
 });
 
 // Test 202: Solar module uses sel-btn class
