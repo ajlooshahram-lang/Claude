@@ -33217,8 +33217,19 @@ function analyzerSolve(data) {
     if (izBase) {
       izCorrected = izBase * kInstall * kTemp * kGroup;
       var cDesc = (data.cableType || 'NOIKLX') + ' ' + data.cableMm2 + ' mm\u00B2';
-      var izHtml = calcDetailIz(izBase, kInstall, kTemp, kGroup, izCorrected, cDesc, data.installMethod || 'C', data.temperature || 30, data.grouping || 1);
-      results.push({ type: 'iz', label: 'Str\u00f8mb\u00e6reevne Iz (derateret)', value: izCorrected.toFixed(1) + ' A', html: izHtml, asked: hasQuestion(data, 'iz') });
+      // Use Viggo-style cable sizing with full correction factor audit trail
+      var _insType = /NOIKLX|NOIKX|NOIK-AL|NOSP|XLPE|PEX/i.test(data.cableType || 'NOIKLX') ? 'XLPE' : 'PVC';
+      var _matType = /Al/i.test(data.cableType || '') ? 'Al' : 'Cu';
+      var cableSizeResult = cxCableSizing(data.deviceIn || ib, data.installMethod || 'C', data.temperature || 30, data.grouping || 1, data.cableMm2, _matType, _insType);
+      izCorrected = cableSizeResult.Iz_corr; // use the properly computed value
+      results.push({
+        type: 'iz',
+        label: tx('Kabeldimensionering (Viggo-metode)', 'Cable sizing (Viggo method)'),
+        value: izCorrected.toFixed(1) + ' A (' + cDesc + ')',
+        html: cxRenderSteps(cableSizeResult.steps, tx('Kabeldimensionering — DS/HD 60364-5-52', 'Cable sizing — DS/HD 60364-5-52')),
+        status: cableSizeResult.ok ? 'ok' : 'fail',
+        asked: hasQuestion(data, 'iz')
+      });
       solved++;
     }
   } else if (hasQuestion(data, 'iz')) {
