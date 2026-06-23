@@ -15472,7 +15472,7 @@ test('tccCableDamageCurve returns valid descending time values for Cu 2.5mm2', f
 
 // Test: tccCableDamageCurve uses correct k value for Cu (143)
 test('tccCableDamageCurve uses k=143 for XLPE/Cu per DS/HD 60364-4-43', function() {
-  var cable = { mm2: 10, material: 'Cu' };
+  var cable = { mm2: 10, material: 'Cu', insulation: 'XLPE' };
   var curve = tccCableDamageCurve(cable);
   // At 1000A: t = 143^2 * 10^2 / 1000^2 = 20449 * 100 / 1000000 = 2.0449s
   var point1kA = curve.find(function(p) { return Math.abs(p.i - 1000) < 50; });
@@ -15483,7 +15483,7 @@ test('tccCableDamageCurve uses k=143 for XLPE/Cu per DS/HD 60364-4-43', function
 
 // Test: tccCableDamageCurve uses correct k value for Al (94)
 test('tccCableDamageCurve uses k=94 for XLPE/Al per DS/HD 60364-4-43', function() {
-  var cable = { mm2: 50, material: 'Al' };
+  var cable = { mm2: 50, material: 'Al', insulation: 'XLPE' };
   var curve = tccCableDamageCurve(cable);
   assert(curve.length > 10, 'Should have points for Al cable');
   var point = curve[Math.floor(curve.length / 2)];
@@ -15498,6 +15498,144 @@ test('tccCableDamageCurve with null cable returns empty array', function() {
   var curve2 = tccCableDamageCurve({});
   assert(curve2.length === 0, 'Should return empty for cable without mm2');
 });
+
+// ===== Insulation-aware k-factor + per-device cable-damage / I2t overlay tests =====
+console.log('\n=== TCC insulation-aware k & per-device overlay tests ===\n');
+
+test('tccCableKFactor returns the 4 standard k values per DS/HD 60364-4-43 cl.434.5.2', function() {
+  assert.strictEqual(tccCableKFactor('Cu', 'PVC', 10), 115, 'Cu/PVC must be k=115');
+  assert.strictEqual(tccCableKFactor('Cu', 'XLPE', 10), 143, 'Cu/XLPE must be k=143');
+  assert.strictEqual(tccCableKFactor('Al', 'PVC', 10), 76, 'Al/PVC must be k=76');
+  assert.strictEqual(tccCableKFactor('Al', 'XLPE', 10), 94, 'Al/XLPE must be k=94');
+});
+
+test('tccCableKFactor uses reduced kLarge for S>300mm2 (conservative large-section)', function() {
+  // FAULT_K_FACTORS: cuPVC.kLarge=103, cuXLPE.kLarge=132, alPVC.kLarge=68, alXLPE.kLarge=87
+  assert.strictEqual(tccCableKFactor('Cu', 'PVC', 400), 103, 'Cu/PVC S>300 must drop to 103');
+  assert.strictEqual(tccCableKFactor('Cu', 'XLPE', 400), 132, 'Cu/XLPE S>300 must drop to 132');
+  // At exactly 300 the full k still applies
+  assert.strictEqual(tccCableKFactor('Cu', 'PVC', 300), 115, 'At S=300 full k=115 still applies');
+});
+
+test('tccCableInsulation infers XLPE for NKT NOIKLX 90 cables, PVC for unknown (conservative)', function() {
+  assert.strictEqual(tccCableInsulation({ model: 'NOIKLX 90 Dca', material: 'Cu' }), 'XLPE', 'NOIKLX must be XLPE');
+  assert.strictEqual(tccCableInsulation({ model: 'NOIK-AL-M', material: 'Al' }), 'XLPE', 'NOIK-AL-M must be XLPE');
+  assert.strictEqual(tccCableInsulation({ insulation: 'PVC', material: 'Cu' }), 'PVC', 'Explicit PVC respected');
+  assert.strictEqual(tccCableInsulation({ material: 'Cu', mm2: 10 }), 'PVC', 'Unknown defaults to PVC (conservative)');
+});
+
+test('tccGetCableK is insulation-aware: PVC default gives lower (more conservative) k than XLPE', function() {
+  var pvcK = tccGetCableK({ material: 'Cu', mm2: 16 });            // unknown -> PVC -> 115
+  var xlpeK = tccGetCableK({ material: 'Cu', mm2: 16, model: 'NOIKLX 90' }); // XLPE -> 143
+  assert.strictEqual(pvcK, 115, 'Unknown Cu cable must conservatively use PVC k=115');
+  assert.strictEqual(xlpeK, 143, 'NOIKLX Cu cable must use XLPE k=143');
+  assert(pvcK < xlpeK, 'Conservative default must not exceed XLPE withstand');
+});
+
+test('tccCableDamageCurve follows t=(k*S/I)^2 exactly for a known PVC/Cu point', function() {
+  // Cu 4mm2 PVC: k=115. At I=2000A: t = 115^2 * 4^2 / 2000^2 = 13225*16/4e6 = 0.0529s
+  var cable = { mm2: 4, material: 'Cu', insulation: 'PVC' };
+  var curve = tccCableDamageCurve(cable);
+  // pick the point closest to 2000A and verify against formula
+  var p = curve.reduce(function(best, q) {
+    return (Math.abs(q.i - 2000) < Math.abs(best.i - 2000)) ? q : best;
+  }, curve[0]);
+  var expected = 115 * 115 * 4 * 4 / (p.i * p.i);
+  assert(Math.abs(p.t - expected) < 1e-9, 'Adiabatic point must match (k*S/I)^2: got ' + p.t + ' exp ' + expected);
+});
+
+test('tccCableDamageEval flags region where device curve crosses ABOVE the cable damage limit', function() {
+  // Tiny cable (1.5mm2 PVC/Cu, k=115) -> k2S2 = 115^2*1.5^2 = 29756 A2s.
+  // Cable damage time at 3000A = 29756/9e6 = 0.003306s.
+  // A device that takes 0.05s at 3000A is far slower -> NOT protected.
+  var cable = { mm2: 1.5, material: 'Cu', insulation: 'PVC' };
+  var slowCurve = [{ i: 100, tMax: 5 }, { i: 1000, tMax: 0.5 }, { i: 3000, tMax: 0.05 }, { i: 6000, tMax: 0.02 }];
+  var slow = tccCableDamageEval(slowCurve, cable, 6000);
+  assert(slow.protected === false, 'Slow device must be flagged as NOT protecting the small cable');
+  assert(slow.crossCurrent != null && slow.crossCurrent > 0, 'Must report the crossover current');
+  // A fast device whose let-through always stays below the limit IS protected.
+  var fastCurve = [{ i: 100, tMax: 0.0005 }, { i: 1000, tMax: 0.0002 }, { i: 3000, tMax: 0.0001 }];
+  var fast = tccCableDamageEval(fastCurve, cable, 3000);
+  assert(fast.protected === true, 'Fast device staying below the adiabatic limit must be protected');
+  assert(fast.crossCurrent === null, 'No crossover for a protecting device');
+});
+
+test('tccCableDamageEval only checks up to the prospective fault current (uptoCurrent)', function() {
+  var cable = { mm2: 1.5, material: 'Cu', insulation: 'PVC' };
+  // Crossover only happens at the 3000A point; if we limit Ik to 1500A it is protected within range.
+  var curve = [{ i: 1000, tMax: 0.0005 }, { i: 3000, tMax: 0.05 }];
+  assert(tccCableDamageEval(curve, cable, 1500).protected === true, 'Protected within Ik=1500A window');
+  assert(tccCableDamageEval(curve, cable, 5000).protected === false, 'Not protected once Ik reaches 3000A point');
+});
+
+test('tccI2tProtection verdict: protected iff device let-through I2t <= cable k2S2 (cl.434.5.2)', function() {
+  // 100A gG fuse: i5s=100 -> total I2t = 100^2*5 = 50000 A2s (per tccCalcI2t for fuses).
+  var fuse = { i5s: 100, rating: 100 };
+  // Big cable: Cu 35mm2 XLPE k=143 -> k2S2 = 143^2*35^2 = 25,050,025 A2s >> 50000 -> protected.
+  var bigCable = { mm2: 35, material: 'Cu', model: 'NOIKLX 90' };
+  var rBig = tccI2tProtection(fuse, 100, 5000, bigCable);
+  assert(Math.abs(rBig.k2s2 - (143 * 143 * 35 * 35)) < 1, 'k2S2 must use XLPE k=143 for big cable');
+  assert(rBig.protected === true, 'Large cable must be protected against the fuse let-through');
+  assert(rBig.utilizationPct < 1, 'Utilization should be tiny for an oversized cable');
+  // Tiny cable: Cu 1.5mm2 PVC k=115 -> k2S2 = 29756 A2s < 50000 -> NOT protected.
+  var tinyCable = { mm2: 1.5, material: 'Cu', insulation: 'PVC' };
+  var rTiny = tccI2tProtection(fuse, 100, 5000, tinyCable);
+  assert.strictEqual(rTiny.k2s2, 115 * 115 * 1.5 * 1.5, 'k2S2 must use PVC k=115 for tiny cable');
+  assert(rTiny.protected === false, 'Tiny cable must NOT be protected (I2t > k2S2)');
+  assert(rTiny.utilizationPct > 100, 'Utilization must exceed 100% when unprotected');
+  assert(rTiny.clause.indexOf('434.5.2') >= 0, 'Must cite DS/HD 60364-4-43 cl.434.5.2');
+});
+
+test('renderDeviceTCC draws the cable damage overlay (red dashed) when a cable is passed', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.curve === 'B' && m.rating === 16; });
+  var cable = { mm2: 2.5, material: 'Cu', insulation: 'PVC' };
+  var svgNoCable = renderDeviceTCC(mcb, 16, {}, 10, 1000, 'mcb');
+  var svgCable = renderDeviceTCC(mcb, 16, {}, 10, 1000, 'mcb', cable);
+  assert(svgCable.indexOf('stroke-dasharray="8,4"') >= 0, 'Cable damage curve (8,4 dash) must be drawn');
+  assert(svgCable.indexOf('Cable damage') >= 0 || svgCable.indexOf('Kabelskade') >= 0, 'Must label the cable damage curve');
+  assert(svgNoCable.indexOf('stroke-dasharray="8,4"') < 0, 'No damage curve when no cable supplied');
+});
+
+test('renderDeviceTCC red-flags the unprotected region for an undersized cable', function() {
+  // A B16 MCB protecting a 1.5mm2 PVC/Cu cable up to a high Ik should leave an unprotected band.
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.curve === 'B' && m.rating === 16; });
+  var tiny = { mm2: 1.5, material: 'Cu', insulation: 'PVC' };
+  // Use a deliberately mismatched large cable+small? Instead test the helper path is wired:
+  var svg = renderDeviceTCC(mcb, 16, {}, 10, 50000, 'mcb', tiny);
+  // The unprotected shading uses rgba(220,38,38,0.13); only appears when crossover detected.
+  var ev = tccCableDamageEval(sldDeviceCurve(mcb, 16, null).map(function(p){return {i:p.i,tMax:p.tMax};}), tiny, 50000);
+  if (!ev.protected) {
+    assert(svg.indexOf('rgba(220,38,38,0.13)') >= 0, 'Unprotected region must be shaded red when crossover exists');
+    assert(svg.indexOf('Cable unprotected') >= 0 || svg.indexOf('Kabel usikret') >= 0, 'Must label unprotected region');
+  } else {
+    assert(true, 'No crossover within Ik range -> no red flag expected');
+  }
+});
+
+test('renderDeviceTCCCard is click-only and shows I2t verdict + clause when cable selected', function() {
+  deviceTccState.mcbCableS = 1.5;
+  deviceTccState.mcbCableMat = 'Cu';
+  deviceTccState.mcbCableIns = 'PVC';
+  deviceTccState.mcbCursor = 5000;
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.curve === 'B' && m.rating === 16; });
+  var html = renderDeviceTCCCard(mcb, 16, {}, 10, 5000, 'mcb', 'MCB TCC');
+  assert(html.indexOf('<input') < 0, 'Must NOT contain any text/number input (click-only)');
+  assert(html.indexOf('<textarea') < 0, 'Must NOT contain any textarea (click-only)');
+  assert(html.indexOf('deviceTccSetCable') >= 0, 'Must expose click-only cable selectors');
+  assert(html.indexOf('434.5.2') >= 0, 'Must cite DS/HD 60364-4-43 cl.434.5.2');
+  assert(html.indexOf('k\u00B2S\u00B2') >= 0, 'Must show the k2S2 withstand row');
+  // reset state for other tests
+  deviceTccState.mcbCableS = 0;
+});
+
+test('Farsi strings exist for new TCC cable-damage / I2t overlay UI', function() {
+  assert(_FA['Cable cross-section (damage curve)'], 'cross-section label has Farsi');
+  assert(_FA['Cable damage'], 'cable damage label has Farsi');
+  assert(_FA['Cable unprotected'], 'cable unprotected label has Farsi');
+  assert(_FA['Cable protection (I\u00B2t)'], 'I2t protection title has Farsi');
+  assert(_FA['DANGER: I\u00B2t > k\u00B2S\u00B2 - cable not short-circuit protected'], 'danger verdict has Farsi');
+});
+
 
 // Test: Cable damage curve present in cascade chart SVG
 test('tccRenderCascadeChart includes cable damage curve when cable provided', function() {
