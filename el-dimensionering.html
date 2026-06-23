@@ -740,10 +740,12 @@ body.motion-off .fade-in { will-change: auto; }
 .live-trip { animation: liveTrip 0.5s ease-in-out 3; }
 .live-node { transition: fill 0.5s ease, stroke 0.5s ease; }
 .live-disaster { animation: liveDisasterFlash 0.8s ease-in-out infinite; }
+@keyframes liveOverheatFlag { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.live-overheat-flag { animation: liveOverheatFlag 1s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .live-wire, .live-thermal, .live-fault, .live-trip, .live-disaster { animation: none !important; }
+  .live-wire, .live-thermal, .live-fault, .live-trip, .live-disaster, .live-overheat-flag { animation: none !important; }
 }
-body.motion-off .live-wire, body.motion-off .live-thermal, body.motion-off .live-fault, body.motion-off .live-trip, body.motion-off .live-disaster { animation: none !important; }
+body.motion-off .live-wire, body.motion-off .live-thermal, body.motion-off .live-fault, body.motion-off .live-trip, body.motion-off .live-disaster, body.motion-off .live-overheat-flag { animation: none !important; }
 
 /* Dark-mode simulator label and value neon styling */
 body.dark .sim-label { fill: #e0f4ff; }
@@ -4723,6 +4725,11 @@ const _FA = {
   'Motor M2': 'موتور M2',
   'Final Circuit': 'Final مدار',
   'Compliance (DS/HD 60364)': 'مطابقت (DS/HD 60364)',
+  'Near limit': 'نزدیک حد مجاز',
+  'Warm': 'گرم',
+  'Cold': 'سرد',
+  'No checks for this node': 'هیچ بررسی برای این گره موجود نیست',
+  'Compliant (warning)': 'منطبق (هشدار)',
   'Phases / Voltage': 'فازs / ولتاژ',
   'Power (kW)': 'توان (kW)',
   'Cable Material': 'کابل Material',
@@ -38650,6 +38657,59 @@ function liveThermalGradientColor(pct) {
   return '#f44336';
 }
 
+// liveThermalState: maps conductor/component loading (IB/Iz) to a thermal
+// visualisation state for Live mode. Pure + deterministic so it can be unit-tested
+// headlessly. Conservative per DS/HD 60364-4-43 cl.433.1 (IB <= In <= Iz): the
+// utilisation IB/Iz must stay at or below 1.0. This mapping NEVER reports a "safe"
+// (cold/normal) state once utilisation reaches or exceeds the limit, and it flags
+// the conductor visually as it approaches the limit so a danger is never understated.
+// Returns: { ratio, pct, heatIndex (0..6, monotonic non-decreasing as load rises),
+//            color (hotter as load rises), level, flagged, approaching, over, label }.
+function liveThermalState(ib, iz, derating) {
+  var effIz = (iz || 0) * (derating || 1.0);
+  var ratio = effIz > 0 ? (ib || 0) / effIz : 0;
+  if (!(ratio > 0)) ratio = 0;
+  // Heat index: ordinal "how hot" 0..6, strictly non-decreasing with rising utilisation.
+  var heatIndex;
+  if (ratio <= 0) heatIndex = 0;
+  else if (ratio < 0.3) heatIndex = 1;
+  else if (ratio < 0.5) heatIndex = 2;
+  else if (ratio < 0.65) heatIndex = 3;
+  else if (ratio < 0.8) heatIndex = 4;   // warm
+  else if (ratio < 1.0) heatIndex = 5;   // hot - approaching the IB/Iz limit
+  else heatIndex = 6;                    // at / over the limit (overloaded)
+  var color = liveThermalColor(ratio);   // reuse the established hot-as-load colour ramp
+  // Warning threshold: 0.8 (80% utilisation) is the conservative "approaching limit"
+  // trigger; 1.0 is the hard DS/HD 60364-4-43 cl.433.1 limit (overload).
+  var WARN = 0.8;
+  var approaching = ratio >= WARN && ratio < 1.0;
+  var over = ratio >= 1.0;
+  var flagged = approaching || over; // visually flagged whenever near or over the limit
+  var level;
+  if (over) level = 'overload';
+  else if (approaching) level = 'critical';
+  else if (heatIndex >= 4) level = 'warm';
+  else if (heatIndex >= 2) level = 'normal';
+  else level = 'cold';
+  var label;
+  if (over) label = tx('Overbelastet', 'Overloaded');
+  else if (approaching) label = tx('Naer graense', 'Near limit');
+  else if (level === 'warm') label = tx('Varm', 'Warm');
+  else if (level === 'normal') label = tx('Normal', 'Normal');
+  else label = tx('Kold', 'Cold');
+  return {
+    ratio: ratio,
+    pct: ratio * 100,
+    heatIndex: heatIndex,
+    color: color,
+    level: level,
+    flagged: flagged,
+    approaching: approaching,
+    over: over,
+    label: label
+  };
+}
+
 function liveVoltageColor(vdrop) {
   // vdrop in percent, green at 0, amber at high drop
   if (vdrop <= 1) return '#4caf50';
@@ -38784,73 +38844,121 @@ function liveSvgSymbols() {
   return d;
 }
 
-function liveTooltipHtml(nodeId, tree, mode) {
-  if (!tree || !tree.nodes[nodeId]) return '';
+// liveTooltipData: assembles the live engineering snapshot for a single node by
+// pulling straight from the SLD backbone (sldTree propagated values) and the
+// authoritative compliance engine (sldVerifyNode). Pure data only - no HTML - so the
+// assembly can be unit-tested headlessly. Degrades gracefully: missing fields come
+// back as 0 / null and the renderer shows an em-dash. The DS/HD 60364 verdict and the
+// per-rule clause citations come verbatim from sldVerifyNode (5-52 cable/Vdrop,
+// 4-43 overcurrent, 4-41 fault protection), so the tooltip never diverges from the
+// engine's own ruling.
+function liveTooltipData(nodeId, tree) {
+  if (!tree || !tree.nodes || !tree.nodes[nodeId]) return null;
   var node = tree.nodes[nodeId];
   var ib = node._ib || 0;
-  var iz = (node.cable) ? (node.cable.iz || 100) : 100;
-  var ratio = iz > 0 ? ib / iz : 0;
-  var vdrop = node._vdrop || 0;
-  var protIn = node.protectionIn || 0;
-  var ikMax = node._ikmax || 0;
-  var ikMin = node._ikmin || 0;
-  var zsVal = node._zs || 0;
-  var typeName = node.type === 'transformer' ? tx('Transformer', 'Transformer') :
-    (node.type === 'main_board' ? tx('Hovedtavle', 'Main Board') :
-    (node.type === 'sub_board' ? tx('Undertavle', 'Sub Board') :
-    tx('Slutkreds', 'Final Circuit')));
-  var html = '<div style="font-weight:bold;margin-bottom:4px">' + sldNodeName(node) + '</div>';
-  html += '<div>' + tx('Type', 'Type') + ': ' + typeName + '</div>';
-  html += '<div>IB: ' + ib.toFixed(1) + ' A</div>';
-  if (protIn > 0) html += '<div>In: ' + protIn + ' A</div>';
-  html += '<div>Iz: ' + iz.toFixed(0) + ' A</div>';
-  html += '<div>' + tx('Udnyttelse', 'Utilization') + ': ' + (ratio * 100).toFixed(0) + '%</div>';
-  html += '<div>Vdrop: ' + vdrop.toFixed(2) + '%</div>';
-  if (ikMax > 0) html += '<div>Ik(max): ' + (ikMax / 1000).toFixed(2) + ' kA</div>';
-  if (ikMin > 0) html += '<div>Ik(min): ' + (ikMin / 1000).toFixed(2) + ' kA</div>';
-  if (zsVal > 0) html += '<div>Zs: ' + zsVal.toFixed(3) + ' \u03A9</div>';
-  // Protection device info
-  if (node.protection) {
-    var pName = node.protection.model || node.protection.brand || node.protection.type || 'N/A';
-    html += '<div>' + tx('Beskyttelse', 'Protection') + ': ' + pName + ' ' + protIn + 'A</div>';
-  }
-  // Cable spec
+  var rawIz = node.cable ? (node.cable.iz || 0) : 0;
+  // Mirror the derating sldVerifyNode applies so the displayed Iz matches the verdict.
+  var kInstall = (typeof INSTALL_METHODS !== 'undefined' && INSTALL_METHODS[node.installMethod]) || 1.0;
+  var kTemp = (typeof TEMP_FACTORS !== 'undefined' && TEMP_FACTORS[node.temp]) || 1.0;
+  var kGroup = (typeof GROUP_FACTORS !== 'undefined' && GROUP_FACTORS[node.grouping]) || 1.0;
+  var deratedIz = rawIz * kInstall * kTemp * kGroup;
+  var displayIz = deratedIz > 0 ? deratedIz : rawIz;
+  var ratio = displayIz > 0 ? ib / displayIz : 0;
+  var protIn = node.protectionIn || (node.protection ? node.protection.rating : 0) || 0;
+  var thermal = liveThermalState(ib, displayIz, 1.0);
+  var checks = (typeof sldVerifyNode === 'function') ? sldVerifyNode(tree, nodeId) : [];
+  var verdict = 'ok';
+  if (checks.some(function(c) { return c.status === 'fail'; })) verdict = 'fail';
+  else if (checks.some(function(c) { return c.status === 'warning'; })) verdict = 'warning';
+  var designation = (typeof sldNodeName === 'function') ? sldNodeName(node) : (node.name_da || node.name_en || node.id);
+  var cable = null;
   if (node.cable) {
-    var insType = (node.cable.insulation || 'PVC');
-    html += '<div>' + tx('Kabel', 'Cable') + ': ' + (node.cable.model || '') + ' ' + (node.cable.mm2 || '') + 'mm\u00B2 ' + insType + '</div>';
+    cable = {
+      model: node.cable.model || node.cable.name || '',
+      mm2: (node.cable.mm2 || node.cable.cross || null),
+      insulation: node.cable.insulation || '',
+      iz: rawIz
+    };
   }
-  // DS/HD 60364 compliance checks with pass/fail indicators
-  html += '<div style="margin-top:4px;border-top:1px solid #eee;padding-top:4px;font-size:0.85em">';
-  html += '<div style="font-weight:600">' + tx('Overensstemmelse', 'Compliance') + ':</div>';
-  // Rule 1: IB <= In <= Iz (DS/HD 60364-4-43 cl.433.1)
-  var ruleIBIn = (protIn > 0) ? (ib <= protIn) : true;
-  var ruleInIz = (protIn > 0) ? (protIn <= iz) : true;
-  var ruleOverload = ruleIBIn && ruleInIz;
-  html += '<div>' + (ruleOverload ? '\u2705' : '\u274C') + ' IB\u2264In\u2264Iz (DS/HD 60364-4-43 \u00A7433.1)</div>';
-  // Rule 2: Voltage drop <= 4% (DS/HD 60364-5-52 cl.525)
-  var ruleVdrop = vdrop <= 4;
-  html += '<div>' + (ruleVdrop ? '\u2705' : '\u274C') + ' Vdrop\u22644% (DS/HD 60364-5-52 \u00A7525)</div>';
-  // Rule 3: Disconnection time (DS/HD 60364-4-41 cl.411.3)
-  var ruleDisconnect = true; // default pass unless we have data to check
-  if (node.type === 'final_circuit' && ikMin > 0 && node.protection) {
-    // Simplified check: sufficient fault current to trip
-    ruleDisconnect = ikMin > (protIn * 3); // MCB should trip at ~3-5x In
-  }
-  html += '<div>' + (ruleDisconnect ? '\u2705' : '\u274C') + ' ' + tx('Frakobling', 'Disconnection') + ' (DS/HD 60364-4-41 \u00A7411.3)</div>';
-  html += '</div>';
-  // Overall compliance
-  var compliant = ruleOverload && ruleVdrop && ruleDisconnect;
-  var compLabel = compliant ? tx('Overensstemmende', 'Compliant') : tx('Ikke overensstemmende', 'Non-compliant');
-  var compColor = compliant ? '#4caf50' : '#f44336';
-  html += '<div style="color:' + compColor + ';font-weight:bold;margin-top:2px">' + compLabel + '</div>';
-  // Clause reference based on node type
-  if (node.type === 'transformer') {
-    html += '<div style="font-size:0.8em;opacity:0.8">DS/HD 60364-4-41 \u00A7411.3</div>';
-  } else if (node.type === 'final_circuit') {
-    html += '<div style="font-size:0.8em;opacity:0.8">DS/HD 60364-5-52 \u00A7523, DS/HD 60364-4-43 \u00A7433.1</div>';
+  return {
+    nodeId: nodeId,
+    type: node.type,
+    designation: designation,
+    ib: ib,
+    inA: protIn,
+    iz: displayIz,
+    ratio: ratio,
+    utilisationPct: ratio * 100,
+    thermal: thermal,
+    vdrop: node._vdrop || 0,
+    ikMaxkA: (node._ikmax || 0) / 1000,
+    ikMinkA: (node._ikmin || 0) / 1000,
+    zs: node._zs || 0,
+    cable: cable,
+    protection: node.protection ? {
+      name: node.protection.model || node.protection.brand || node.protection.type || '',
+      rating: protIn,
+      curve: node.protection.curve || ''
+    } : null,
+    checks: checks,
+    verdict: verdict
+  };
+}
+
+function liveTooltipHtml(nodeId, tree, mode) {
+  var data = liveTooltipData(nodeId, tree);
+  if (!data) return '';
+  var dash = '\u2014';
+  var typeName = data.type === 'transformer' ? tx('Transformer', 'Transformer') :
+    (data.type === 'main_board' ? tx('Hovedtavle', 'Main Board') :
+    (data.type === 'sub_board' ? tx('Undertavle', 'Sub Board') :
+    tx('Slutkreds', 'Final Circuit')));
+  var html = '<div style="font-weight:bold;margin-bottom:4px">' + data.designation + '</div>';
+  html += '<div>' + tx('Type', 'Type') + ': ' + typeName + '</div>';
+  // Cable type & cross-section (graceful degradation when missing)
+  if (data.cable) {
+    var cableStr = ((data.cable.model ? data.cable.model + ' ' : '') +
+      (data.cable.mm2 ? data.cable.mm2 + 'mm\u00B2' : '') +
+      (data.cable.insulation ? ' ' + data.cable.insulation : '')).trim();
+    html += '<div>' + tx('Kabel', 'Cable') + ': ' + (cableStr || dash) + '</div>';
   } else {
-    html += '<div style="font-size:0.8em;opacity:0.8">DS/HD 60364-4-43 \u00A7432.1</div>';
+    html += '<div>' + tx('Kabel', 'Cable') + ': ' + dash + '</div>';
   }
+  html += '<div>IB: ' + (data.ib > 0 ? data.ib.toFixed(1) + ' A' : dash) + '</div>';
+  html += '<div>In: ' + (data.inA > 0 ? data.inA + ' A' : dash) + '</div>';
+  html += '<div>Iz: ' + (data.iz > 0 ? data.iz.toFixed(0) + ' A' : dash) + '</div>';
+  // Utilisation IB/Iz with thermal colour + conservative near/over-limit flag
+  html += '<div>' + tx('Udnyttelse', 'Utilization') + ' (IB/Iz): <span style="color:' + data.thermal.color + ';font-weight:bold">' + (data.iz > 0 ? data.utilisationPct.toFixed(0) + '%' : dash) + '</span>';
+  if (data.thermal.flagged) {
+    html += ' <span style="color:' + (data.thermal.over ? '#f44336' : '#ff9800') + ';font-weight:bold">\u26A0 ' + data.thermal.label + '</span>';
+  }
+  html += '</div>';
+  html += '<div>Vdrop: ' + (data.vdrop > 0 ? data.vdrop.toFixed(2) + '%' : dash) + '</div>';
+  html += '<div>Ik(max): ' + (data.ikMaxkA > 0 ? data.ikMaxkA.toFixed(2) + ' kA' : dash) + '</div>';
+  html += '<div>Ik(min): ' + (data.ikMinkA > 0 ? data.ikMinkA.toFixed(2) + ' kA' : dash) + '</div>';
+  html += '<div>Zs: ' + (data.zs > 0 ? data.zs.toFixed(3) + ' \u03A9' : dash) + '</div>';
+  if (data.protection && data.protection.name) {
+    html += '<div>' + tx('Beskyttelse', 'Protection') + ': ' + data.protection.name + (data.protection.curve ? ' ' + data.protection.curve : '') + ' ' + (data.protection.rating || 0) + 'A</div>';
+  }
+  // Live DS/HD 60364 compliance checks - pulled straight from sldVerifyNode so the
+  // tooltip always matches the engine verdict, with each rule's clause cited.
+  html += '<div style="margin-top:4px;border-top:1px solid #eee;padding-top:4px;font-size:0.85em">';
+  html += '<div style="font-weight:600">' + tx('Overensstemmelse (DS/HD 60364)', 'Compliance (DS/HD 60364)') + ':</div>';
+  if (!data.checks || data.checks.length === 0) {
+    // Graceful degradation: e.g. transformer source node has no per-circuit checks.
+    html += '<div style="opacity:0.7">' + tx('Ingen kontroller for denne node', 'No checks for this node') + ' (DS/HD 60364-4-41 \u00A7411.3)</div>';
+  } else {
+    data.checks.forEach(function(c) {
+      var icon = c.status === 'ok' ? '\u2705' : (c.status === 'warning' ? '\u26A0\uFE0F' : '\u274C');
+      html += '<div>' + icon + ' ' + c.rule + ' <span style="opacity:0.75">(' + c.clause + ')</span></div>';
+    });
+  }
+  html += '</div>';
+  // Overall verdict (engine-derived)
+  var compColor = data.verdict === 'fail' ? '#f44336' : (data.verdict === 'warning' ? '#ff9800' : '#4caf50');
+  var compLabel = data.verdict === 'fail' ? tx('Ikke overensstemmende', 'Non-compliant') :
+    (data.verdict === 'warning' ? tx('Overensstemmende (advarsel)', 'Compliant (warning)') : tx('Overensstemmende', 'Compliant'));
+  html += '<div style="color:' + compColor + ';font-weight:bold;margin-top:2px">' + compLabel + '</div>';
   // Pin instruction
   html += '<div style="font-size:0.75em;opacity:0.6;margin-top:3px">' + tx('Klik for at fastgoere', 'Click to pin') + '</div>';
   return html;
@@ -39062,6 +39170,19 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
     var extraClass = ' class="live-node"';
     var onclick = '';
 
+    // Live-mode richer thermal mapping: colour conductors/components by their IB/Iz
+    // loading and visually flag any that approach (>=80%) or exceed (>=100%) the
+    // DS/HD 60364-4-43 cl.433.1 overcurrent limit. Conservative: a flagged node is
+    // tinted warm/red and never left looking "safe" once utilisation reaches the limit.
+    var liveThermal = liveThermalState(ib, iz, 1.0);
+    if (mode === 'live') {
+      borderColor = liveThermal.color;
+      if (liveThermal.flagged) {
+        fillColor = liveThermal.over ? '#ffcdd2' : '#fff3e0';
+        extraClass = ' class="live-node live-thermal live-overheat"';
+      }
+    }
+
     // Fault mode highlights
     if (mode === 'fault' && faultPath.indexOf(id) >= 0) {
       extraClass = ' class="live-node live-thermal"';
@@ -39207,6 +39328,14 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
         svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="7" fill="#ffeb3b">\u26A1</text>';
         svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 22) + '" font-size="5" fill="#ff9800">SPD</text>';
       }
+    }
+
+    // Live-mode over-temperature flag: a clear, conservative danger marker whenever a
+    // conductor/component approaches or exceeds its IB/Iz thermal limit (cl.433.1).
+    if (mode === 'live' && liveThermal.flagged) {
+      var otColor = liveThermal.over ? '#f44336' : '#ff9800';
+      svg += '<text x="' + (pos.x + nodeW - 8) + '" y="' + (pos.y + 13) + '" font-size="10" fill="' + otColor + '" class="live-overheat-flag">\u26A0</text>';
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + nodeH) + '" font-size="5" fill="' + otColor + '" font-weight="bold">' + liveThermal.pct.toFixed(0) + '% Iz</text>';
     }
 
     svg += '</g>';

@@ -16535,6 +16535,184 @@ test('renderLiveInstallation in disasters mode shows description for lightning_s
   liveState.mode = 'live';
 });
 
+// === Live Installation Twin: tooltip data assembly + richer thermal mapping ===
+console.log('\n=== Live Installation Twin Polish Tests ===');
+
+test('liveTooltipData assembles key engineering fields from an sldTree node', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var fcId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !fcId) fcId = nid;
+  });
+  assert(fcId, 'Need a final circuit node');
+  var d = liveTooltipData(fcId, tree);
+  assert(d, 'Should return a data object');
+  assert(typeof d.designation === 'string' && d.designation.length > 0, 'Should include designation');
+  assert.strictEqual(d.type, 'final_circuit', 'Should report node type');
+  assert(typeof d.ib === 'number', 'Should include IB');
+  assert(typeof d.iz === 'number', 'Should include Iz');
+  assert(typeof d.inA === 'number', 'Should include In');
+  assert(typeof d.ikMaxkA === 'number' && typeof d.ikMinkA === 'number', 'Should include Ik in kA');
+  assert(typeof d.zs === 'number', 'Should include Zs');
+  assert(typeof d.vdrop === 'number', 'Should include voltage drop %');
+  assert(d.cable && typeof d.cable.mm2 !== 'undefined', 'Should include cable cross-section');
+  assert(Array.isArray(d.checks), 'Should include compliance checks array');
+  assert(['ok', 'warning', 'fail'].indexOf(d.verdict) >= 0, 'Should produce a pass/fail verdict');
+});
+
+test('liveTooltipData verdict + clauses come from sldVerifyNode (5-52/4-43/4-41)', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var fcId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !fcId) fcId = nid;
+  });
+  var d = liveTooltipData(fcId, tree);
+  var engine = sldVerifyNode(tree, fcId);
+  assert.strictEqual(d.checks.length, engine.length, 'Tooltip checks must mirror sldVerifyNode output');
+  var clauses = d.checks.map(function(c) { return c.clause; }).join(' ');
+  // The default final circuit exercises overcurrent (4-43) and cable Vdrop (5-52) clauses
+  assert(clauses.indexOf('60364-4-43') >= 0, 'Should cite the overcurrent clause family 4-43');
+  assert(clauses.indexOf('60364-5-52') >= 0, 'Should cite the cable sizing clause family 5-52');
+});
+
+test('liveTooltipData derives a fail verdict for an over-current circuit', function() {
+  var tree = sldCreateTree();
+  var mbId = tree.nodes[tree.rootId].childIds[0];
+  var fcId = tree.nodes[mbId].childIds[0];
+  // Force IB > In by over-powering the final circuit
+  tree.nodes[fcId].power_kW = 50;
+  tree.nodes[fcId].phases = '1x230';
+  tree.nodes[fcId].voltage = 230;
+  sldPropagateAll(tree);
+  var d = liveTooltipData(fcId, tree);
+  assert.strictEqual(d.verdict, 'fail', 'Overloaded circuit should produce a fail verdict, got ' + d.verdict);
+});
+
+test('liveTooltipData degrades gracefully for a transformer (no per-circuit checks)', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var d = liveTooltipData(tree.rootId, tree);
+  assert(d, 'Should still return data for the transformer');
+  assert.strictEqual(d.type, 'transformer', 'Should be the transformer');
+  assert.strictEqual(d.checks.length, 0, 'Transformer has no per-circuit checks');
+  assert.strictEqual(d.verdict, 'ok', 'No checks should default to ok verdict');
+});
+
+test('liveTooltipData returns null for an unknown node id', function() {
+  var tree = sldCreateTree();
+  assert.strictEqual(liveTooltipData('does-not-exist', tree), null, 'Unknown node should return null');
+});
+
+test('liveTooltipHtml shows cable cross-section, Ik(kA), Zs and the engine verdict', function() {
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var fcId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !fcId) fcId = nid;
+  });
+  var html = liveTooltipHtml(fcId, tree, 'live');
+  assert(html.indexOf('mm\u00B2') > 0, 'Should show cable cross-section in mm2');
+  assert(html.indexOf('Ik(max)') > 0, 'Should show Ik(max) in kA');
+  assert(html.indexOf('Zs:') > 0, 'Should show Zs');
+  assert(html.indexOf('Compliant') > 0 || html.indexOf('Non-compliant') > 0 ||
+         html.indexOf('Overensstemmende') > 0 || html.indexOf('Ikke overensstemmende') > 0,
+         'Should show engine-derived verdict');
+});
+
+test('liveTooltipHtml degrades gracefully (em-dash) when data is missing', function() {
+  var tree = { rootId: 'x', nodes: { x: { id: 'x', type: 'final_circuit', childIds: [] } } };
+  var html = liveTooltipHtml('x', tree, 'live');
+  assert(typeof html === 'string' && html.length > 0, 'Should still produce HTML');
+  assert(html.indexOf('\u2014') > 0, 'Missing values should render as an em-dash');
+  assert(html.indexOf('Cable') > 0 || html.indexOf('Kabel') > 0, 'Should still show the cable row');
+});
+
+test('liveThermalState maps hotter (higher heatIndex) as IB/Iz rises', function() {
+  var iz = 100;
+  var cold = liveThermalState(10, iz, 1.0);   // 10%
+  var normal = liveThermalState(45, iz, 1.0); // 45%
+  var warm = liveThermalState(70, iz, 1.0);   // 70%
+  var hot = liveThermalState(90, iz, 1.0);    // 90%
+  var over = liveThermalState(110, iz, 1.0);  // 110%
+  assert(cold.heatIndex < normal.heatIndex, 'cold < normal');
+  assert(normal.heatIndex < warm.heatIndex, 'normal < warm');
+  assert(warm.heatIndex < hot.heatIndex, 'warm < hot');
+  assert(hot.heatIndex < over.heatIndex, 'hot < over');
+  // Monotonic non-decreasing over a sweep
+  var prev = -1;
+  for (var r = 0; r <= 130; r += 5) {
+    var st = liveThermalState(r, iz, 1.0);
+    assert(st.heatIndex >= prev, 'heatIndex must be non-decreasing at ' + r + '%');
+    prev = st.heatIndex;
+  }
+});
+
+test('liveThermalState flags as utilisation approaches and exceeds the limit', function() {
+  var iz = 100;
+  assert.strictEqual(liveThermalState(50, iz, 1.0).flagged, false, '50% should not be flagged');
+  assert.strictEqual(liveThermalState(79, iz, 1.0).flagged, false, '79% should not be flagged');
+  var near = liveThermalState(85, iz, 1.0);
+  assert.strictEqual(near.flagged, true, '85% should be flagged (approaching)');
+  assert.strictEqual(near.approaching, true, '85% should be approaching');
+  assert.strictEqual(near.over, false, '85% is not over the limit yet');
+});
+
+test('liveThermalState NEVER reports safe at or over the IB/Iz limit (conservative)', function() {
+  var iz = 100;
+  var atLimit = liveThermalState(100, iz, 1.0); // exactly 100%
+  assert.strictEqual(atLimit.over, true, 'IB=Iz must be treated as over the limit');
+  assert.strictEqual(atLimit.flagged, true, 'IB=Iz must be flagged');
+  assert.strictEqual(atLimit.level, 'overload', 'IB=Iz must not be cold/normal/warm');
+  var overLimit = liveThermalState(140, iz, 1.0);
+  assert.strictEqual(overLimit.over, true, '140% must be over');
+  assert.strictEqual(overLimit.color, '#f44336', 'Over-limit colour must be red, never green/blue');
+  // Derating tightens the effective limit - flag should respect derated Iz
+  var derated = liveThermalState(85, iz, 0.82); // effective Iz = 82A -> >100%
+  assert.strictEqual(derated.over, true, 'IB above derated Iz must be over the limit');
+});
+
+test('liveRenderNodes in live mode emits an over-temperature flag for overloaded nodes', function() {
+  var tree = sldCreateTree();
+  var mbId = tree.nodes[tree.rootId].childIds[0];
+  var fcId = tree.nodes[mbId].childIds[0];
+  tree.nodes[fcId].power_kW = 40; // drive utilisation over the limit
+  tree.nodes[fcId].phases = '1x230';
+  tree.nodes[fcId].voltage = 230;
+  sldPropagateAll(tree);
+  liveState.disasterScenario = null;
+  var layout = liveRenderSvg(tree, 'live');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'live');
+  assert(svg.indexOf('live-overheat-flag') > 0, 'Should render the over-temperature flag class');
+  assert(svg.indexOf('% Iz') > 0, 'Should label the utilisation percentage');
+});
+
+test('Live Twin polish: trilingual strings have Farsi entries in _FA', function() {
+  ['Near limit', 'Warm', 'Cold', 'No checks for this node', 'Compliant (warning)',
+   'Compliance (DS/HD 60364)'].forEach(function(k) {
+    assert(typeof _FA[k] === 'string' && _FA[k].length > 0, 'Missing Farsi for: ' + k);
+  });
+});
+
+test('Live Twin polish: tooltip/thermal additions are click-only (no text inputs)', function() {
+  // The tooltip and thermal rendering must not introduce any text-entry fields.
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var fcId = null;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    if (tree.nodes[nid].type === 'final_circuit' && !fcId) fcId = nid;
+  });
+  var tip = liveTooltipHtml(fcId, tree, 'live');
+  var layout = liveRenderSvg(tree, 'live');
+  var nodes = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'live');
+  [tip, nodes].forEach(function(out) {
+    assert(out.indexOf('<input') < 0, 'No <input> allowed');
+    assert(out.indexOf('type="text"') < 0, 'No text input allowed');
+    assert(out.indexOf('<textarea') < 0, 'No <textarea> allowed');
+  });
+});
+
 // === Selective Coordination Analysis Tests ===
 console.log('\n=== Selective Coordination Analysis Tests ===');
 
