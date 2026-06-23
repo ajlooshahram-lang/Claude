@@ -1120,18 +1120,95 @@ math,
 .eng-chain[open] > summary::before { transform: rotate(90deg); }
 .eng-chain > .eng-chain-body { padding: 12px 14px; font-size: 0.82rem; }
 
-/* --- Calculation Step (Mathcad-style) --- */
+/* --- Calculation Step (Mathcad Prime) --- */
 .eng-step {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
   padding: 8px 0; border-bottom: 1px solid var(--border-light);
-  font-family: 'Times New Roman', serif; font-size: 1rem; line-height: 1.8;
+  font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 1.05rem; line-height: 2;
 }
 .eng-step:last-child { border-bottom: none; }
-.eng-step .eng-sym { min-width: 80px; font-style: italic; white-space: nowrap; color: var(--text); }
+.eng-step .eng-sym { min-width: 70px; font-style: italic; white-space: nowrap; color: var(--text); }
 .eng-step .eng-formula { color: var(--text-muted); }
 .eng-step .eng-subst { color: var(--text); }
-.eng-step .eng-result { font-weight: 700; color: var(--success); white-space: nowrap; }
-.eng-step .eng-note { width: 100%; font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding-left: 80px; font-family: sans-serif; }
+.eng-step .eng-result { font-weight: 700; color: #000; white-space: nowrap; }
+.eng-step .eng-unit { color: #1a5276; font-weight: 700; font-style: normal; margin-left: 3px; }
+.eng-step .eng-note { width: 100%; font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding-left: 70px; font-family: sans-serif; }
+
+/* Mathcad Prime: multiple definitions on one line */
+.mc-line-group {
+  display: flex; flex-wrap: wrap; gap: 24px; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px solid var(--border-light);
+  font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 1.05rem; line-height: 2;
+}
+.mc-line-group:last-child { border-bottom: none; }
+.mc-def { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.mc-def .mc-var { font-style: italic; color: var(--text); }
+.mc-def .mc-op { color: var(--text); font-weight: 400; }
+.mc-def .mc-val { font-weight: 400; color: var(--text); }
+.mc-def .mc-unit { color: #1a5276; font-weight: 700; font-style: normal; }
+
+/* Mathcad Prime: formula with fraction (stacked) */
+.mc-frac {
+  display: inline-flex; flex-direction: column; align-items: center;
+  vertical-align: middle; position: relative; padding: 0 4px;
+}
+.mc-frac .mc-num { border-bottom: 1.5px solid var(--text); padding: 0 4px 2px; font-size: 0.95em; text-align: center; }
+.mc-frac .mc-den { padding: 2px 4px 0; font-size: 0.95em; text-align: center; }
+
+/* Mathcad Prime: green commentary/assumption block */
+.mc-comment {
+  background: #c6f5d0; border: 1px solid #4caf50;
+  padding: 10px 14px; margin: 10px 0; border-radius: 4px;
+  font-family: sans-serif; font-size: 0.88rem; color: #b71c1c;
+  font-weight: 600; line-height: 1.5;
+}
+
+/* Mathcad Prime: yellow decision/selection box */
+.mc-decision {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #fff9c4; border: 2px solid #f9a825;
+  padding: 6px 14px; border-radius: 4px; margin: 4px 0;
+  font-family: 'Cambria Math', 'Times New Roman', serif;
+  font-size: 1.05rem; font-weight: 700; color: #1a237e;
+}
+
+/* Mathcad Prime: OK/FAIL verification badge */
+.mc-ok {
+  display: inline-block; background: #c8e6c9; border: 1.5px solid #388e3c;
+  padding: 2px 10px; border-radius: 3px; font-weight: 800;
+  font-family: sans-serif; font-size: 0.85rem; color: #1b5e20;
+  margin-left: 8px;
+}
+.mc-fail {
+  display: inline-block; background: #ffcdd2; border: 1.5px solid #d32f2f;
+  padding: 2px 10px; border-radius: 3px; font-weight: 800;
+  font-family: sans-serif; font-size: 0.85rem; color: #b71c1c;
+  margin-left: 8px;
+}
+
+/* Mathcad Prime: book/standard reference tag */
+.mc-ref {
+  display: inline-block; background: #fff9c4; border: 1px solid #f9a825;
+  padding: 2px 8px; border-radius: 3px; font-family: sans-serif;
+  font-size: 0.78rem; font-weight: 700; color: #e65100;
+  margin-left: 10px; vertical-align: baseline;
+}
+
+/* Mathcad Prime: section header (colored bar) */
+.mc-section-header {
+  background: linear-gradient(90deg, #f57f17, #ff8f00);
+  color: #fff; font-family: sans-serif; font-size: 0.88rem;
+  font-weight: 700; padding: 6px 14px; margin: 20px 0 12px;
+  border-radius: 3px;
+}
+
+/* Mathcad Prime: evaluation result highlight (blue box) */
+.mc-eval-box {
+  background: linear-gradient(135deg, rgba(13,71,161,0.06), rgba(21,101,192,0.03));
+  border: 2px solid #1565c0; border-radius: 8px;
+  padding: 12px 18px; margin: 10px 0;
+  font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 1.15rem;
+}
 
 /* --- Standards Reference (clickable) --- */
 .eng-ref {
