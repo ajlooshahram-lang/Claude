@@ -9969,7 +9969,7 @@ test('calcDetail integration: renderVdrop shows detail when cable present', func
   loadState.cosPhi = 0.9;
   loadState.voltage = '3x400';
   var html = renderVdrop();
-  assert(html.indexOf('calc-detail') >= 0, 'vdrop has calc-detail');
+  assert(html.indexOf('eng-step') >= 0 || html.indexOf('calc-detail') >= 0, 'vdrop has Mathcad steps or calc-detail');
   assert(html.indexOf('cos') >= 0, 'vdrop detail has cos phi');
   // Restore
   cableState.crossSection = null;

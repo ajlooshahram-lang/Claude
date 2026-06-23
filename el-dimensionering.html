@@ -8499,7 +8499,7 @@ function renderMCCB() {
   `;
 }
 
-// ===== CABLE MODULE =====
+// ===== CABLE MODULE (Mathcad Prime Style) =====
 function renderCable() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
   const types = Object.keys(cables);
@@ -8507,127 +8507,137 @@ function renderCable() {
   const cores = currentType ? Object.keys(currentType) : [];
   const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
   const crossSections = Object.keys(currentCores);
-
   const izTable = izTableFor();
   const selectedCable = currentCores[cableState.crossSection];
-
-  // Correction factors
   const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
   const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
   const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
   const kTotal = kInstall * kTemp * kGroup;
-
   const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
   const correctedIz = baseIz * kTotal;
+  const ib = calcIB();
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('cableTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+  // Mathcad helpers (reuse from renderLoad)
+  function mcLine(sym, op, expr, res, unit, note) {
+    var h = '<div class="eng-step">';
+    h += '<span class="eng-sym">' + sym + '</span>';
+    if (op) h += '<span class="eng-formula">' + op + ' ' + (expr || '') + '</span>';
+    if (res !== undefined && res !== null) h += '<span class="eng-result">= ' + res + (unit ? ' <span style="color:#1565c0;font-weight:700">' + unit + '</span>' : '') + '</span>';
+    if (note) h += '<span class="eng-note">' + note + '</span>';
+    h += '</div>';
+    return h;
+  }
+  function mcSection(title) {
+    return '<div style="color:var(--primary);font-size:0.82rem;text-transform:uppercase;letter-spacing:1.2px;margin:18px 0 8px;font-family:sans-serif;font-weight:800;border-bottom:2px solid var(--primary);padding-bottom:4px">' + title + '</div>';
+  }
 
-      <div class="select-group">
-        <div class="select-label">${t('cableMaterial')}</div>
-        <div class="select-grid">
-          <button class="sel-btn ${cableState.material === 'copper' ? 'selected' : ''}" onclick="cableState.material='copper';cableState.type=Object.keys(CABLES_COPPER)[0];cableState.cores=Object.keys(CABLES_COPPER[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableCopper')}</button>
-          <button class="sel-btn ${cableState.material === 'aluminium' ? 'selected' : ''}" onclick="cableState.material='aluminium';cableState.type=Object.keys(CABLES_ALU)[0];cableState.cores=Object.keys(CABLES_ALU[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableAluminium')}</button>
-        </div>
-      </div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Kabeldimensionering', 'Cable Sizing') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('cableType')}</div>
-        <div class="select-grid">
-          ${types.map(tp =>
-            `<button class="sel-btn ${cableState.type === tp ? 'selected' : ''}" onclick="cableState.type='${tp}';cableState.cores=Object.keys(${cableState.material === 'copper' ? 'CABLES_COPPER' : 'CABLES_ALU'}['${tp}'])[0];cableState.crossSection=null;renderModule('cable')">${tp}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Material + Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Materiale', 'Material') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (cableState.material==='copper'?' selected':'') + '" onclick="cableState.material=\'copper\';cableState.type=Object.keys(CABLES_COPPER)[0];cableState.cores=Object.keys(CABLES_COPPER[cableState.type])[0];cableState.crossSection=null;renderModule(\'cable\')">Cu</button>';
+  html += '<button class="sel-btn' + (cableState.material==='aluminium'?' selected':'') + '" onclick="cableState.material=\'aluminium\';cableState.type=Object.keys(CABLES_ALU)[0];cableState.cores=Object.keys(CABLES_ALU[cableState.type])[0];cableState.crossSection=null;renderModule(\'cable\')">Al</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('cableCores')}</div>
-        <div class="select-grid">
-          ${cores.map(c =>
-            `<button class="sel-btn ${cableState.cores === c ? 'selected' : ''}" onclick="cableState.cores='${c}';cableState.crossSection=null;renderModule('cable')">${c}</button>`
-          ).join('')}
-        </div>
-      </div>
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltype', 'Cable type') + '</div><div class="select-grid">';
+  for (var ti=0; ti<types.length; ti++) {
+    var tp = types[ti];
+    html += '<button class="sel-btn' + (cableState.type===tp?' selected':'') + '" onclick="cableState.type=\'' + tp + '\';cableState.cores=Object.keys(' + (cableState.material==='copper'?'CABLES_COPPER':'CABLES_ALU') + '[\'' + tp + '\'])[0];cableState.crossSection=null;renderModule(\'cable\')">' + tp + '</button>';
+  }
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('cableCrossSection')}</div>
-        <div class="select-grid">
-          ${crossSections.map(cs =>
-            `<button class="sel-btn ${cableState.crossSection === cs ? 'selected' : ''}" onclick="cableState.crossSection='${cs}';renderModule('cable')">${cs}</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  html += '<div class="select-group"><div class="select-label">' + tx('Ledere', 'Cores') + '</div><div class="select-grid">';
+  for (var ci2=0; ci2<cores.length; ci2++) html += '<button class="sel-btn' + (cableState.cores===cores[ci2]?' selected':'') + '" onclick="cableState.cores=\'' + cores[ci2] + '\';cableState.crossSection=null;renderModule(\'cable\')">' + cores[ci2] + '</button>';
+  html += '</div></div>';
 
-    <div class="card fade-in">
-      <div class="card-title">${tx('Korrektionsfaktorer', 'Correction Factors')}</div>
+  html += '<div class="select-group"><div class="select-label">S [mm\u00B2]</div><div class="select-grid">';
+  for (var si2=0; si2<crossSections.length; si2++) html += '<button class="sel-btn' + (cableState.crossSection===crossSections[si2]?' selected':'') + '" onclick="cableState.crossSection=\'' + crossSections[si2] + '\';renderModule(\'cable\')">' + crossSections[si2] + '</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${tx('Fremf\u00F8ringsmetode', 'Installation Method')}</div>
-        <div class="select-grid">
-          ${Object.entries(INSTALL_METHODS).map(([k,v]) =>
-            `<button class="sel-btn ${cableState.installMethod === k ? 'selected' : ''}" onclick="cableState.installMethod='${k}';renderModule('cable')">${k} (${v})</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Correction factors (collapsed in apprentice mode)
+  html += '<details class="eng-advanced depth-2"><summary>' + tx('Korrektionsfaktorer', 'Correction factors') + '</summary><div class="eng-advanced-body">';
+  html += '<div class="select-group"><div class="select-label">' + tx('Metode', 'Method') + '</div><div class="select-grid">';
+  var methods = Object.entries(INSTALL_METHODS);
+  for (var mi=0; mi<methods.length; mi++) html += '<button class="sel-btn' + (cableState.installMethod===methods[mi][0]?' selected':'') + '" onclick="cableState.installMethod=\'' + methods[mi][0] + '\';renderModule(\'cable\')">' + methods[mi][0] + ' (' + methods[mi][1] + ')</button>';
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">T [\u00B0C]</div><div class="select-grid">';
+  var temps = Object.entries(TEMP_FACTORS);
+  for (var ti2=0; ti2<temps.length; ti2++) html += '<button class="sel-btn' + (cableState.temp===parseInt(temps[ti2][0])?' selected':'') + '" onclick="cableState.temp=' + temps[ti2][0] + ';renderModule(\'cable\')">' + temps[ti2][0] + '\u00B0</button>';
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Gruppering', 'Grouping') + '</div><div class="select-grid">';
+  var groups = Object.entries(GROUP_FACTORS);
+  for (var gi=0; gi<groups.length; gi++) html += '<button class="sel-btn' + (cableState.grouping===parseInt(groups[gi][0])?' selected':'') + '" onclick="cableState.grouping=' + groups[gi][0] + ';renderModule(\'cable\')">' + groups[gi][0] + '</button>';
+  html += '</div></div>';
+  html += '</div></details>';
+  html += '</div>'; // close input card
 
-      <div class="select-group">
-        <div class="select-label">${tx('Temperatur [\u00B0C]', 'Temperature [\u00B0C]')}</div>
-        <div class="select-grid">
-          ${Object.entries(TEMP_FACTORS).map(([k,v]) =>
-            `<button class="sel-btn ${cableState.temp === parseInt(k) ? 'selected' : ''}" onclick="cableState.temp=${k};renderModule('cable')">${k}\u00B0 (${v})</button>`
-          ).join('')}
-        </div>
-      </div>
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  if (selectedCable) {
+    html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+    html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Str\u00F8mb\u00E6reevne I<sub>z</sub> \u2014 Mathcad Prime', 'Current capacity I<sub>z</sub> \u2014 Mathcad Prime') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${tx('Gruppering (antal kabler)', 'Grouping (number of cables)')}</div>
-        <div class="select-grid">
-          ${Object.entries(GROUP_FACTORS).map(([k,v]) =>
-            `<button class="sel-btn ${cableState.grouping === parseInt(k) ? 'selected' : ''}" onclick="cableState.grouping=${k};renderModule('cable')">${k} (${v})</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+    // GIVEN DATA
+    html += mcSection(tx('GIVNE DATA', 'GIVEN DATA'));
+    html += mcLine(tx('Kabel', 'Cable'), ':=', '', cableState.type + ' ' + cableState.cores + ' ' + cableState.crossSection + ' mm\u00B2', '', cableState.material==='copper'?'Cu':'Al');
+    html += mcLine('r', ':=', '', selectedCable.r, '\u03A9/km', 'NKT ' + tx('katalog', 'catalog'));
+    html += mcLine('x', ':=', '', selectedCable.x, '\u03A9/km', 'NKT ' + tx('katalog', 'catalog'));
+    html += mcLine('I<sub>z,tabel</sub>', ':=', '', baseIz, 'A', '<span class="eng-ref">DS/HD 60364-5-52 Tabel B.52.4</span>');
+    html += mcLine(tx('Metode', 'Method'), ':=', '', cableState.installMethod || 'C', '', 'DS/HD 60364-5-52 Tabel A.52.3');
 
-    ${cableState.crossSection && selectedCable ? `
-    <div class="card fade-in">
-      <div class="card-title">${t('cableResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
-        <div class="result-row"><span class="label">${t('cableMaterial')}</span><span class="value">${cableState.material === 'copper' ? t('cableCopper') : t('cableAluminium')}</span></div>
-        <div class="result-row"><span class="label">${t('cableR')}</span><span class="value">${selectedCable.r} \u03A9/km</span></div>
-        <div class="result-row"><span class="label">${t('cableX')}</span><span class="value">${selectedCable.x} \u03A9/km</span></div>
-        <div class="result-row"><span class="label">Iz (${tx('basis', 'base')})</span><span class="value">${baseIz} A</span></div>
-        <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
-        <div class="result-row"><span class="label">${t('cableIz')} (${tx('korrigeret', 'corrected')})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
-      </div>
-      ${calcDetailIz(baseIz, kInstall, kTemp, kGroup, correctedIz, cableState.type + ' ' + cableState.cores + ' ' + cableState.crossSection + ' mm\u00B2', cableState.installMethod, cableState.temp, cableState.grouping)}
-    </div>
-    ` : ''}
-  `;
+    // CORRECTION FACTORS
+    html += mcSection(tx('KORREKTIONSFAKTORER', 'CORRECTION FACTORS'));
+    html += mcLine('k<sub>t</sub>', ':=', '', kTemp.toFixed(3), '', tx('Temperatur', 'Temperature') + ' ' + (cableState.temp||30) + '\u00B0C \u2014 <span class="eng-ref">Tabel B.52.14</span>');
+    html += mcLine('k<sub>s</sub>', ':=', '', kGroup.toFixed(3), '', tx('Gruppering', 'Grouping') + ' ' + (cableState.grouping||1) + ' \u2014 <span class="eng-ref">Tabel B.52.17</span>');
+    html += mcLine('k<sub>inst</sub>', ':=', '', kInstall.toFixed(3), '', tx('Installation', 'Installation') + ' ' + (cableState.installMethod||'C') + ' \u2014 <span class="eng-ref">Tabel B.52.2</span>');
+
+    // CALCULATION
+    html += mcSection(tx('BEREGNING', 'CALCULATION'));
+    html += mcLine('I<sub>z</sub>', ':=', 'I<sub>z,tabel</sub> \u00B7 k<sub>t</sub> \u00B7 k<sub>s</sub> \u00B7 k<sub>inst</sub>', null, null, '<span class="eng-ref">DS/HD 60364-5-52 \u00A7523</span>');
+    html += mcLine('I<sub>z</sub>', '=', baseIz + ' \u00B7 ' + kTemp.toFixed(3) + ' \u00B7 ' + kGroup.toFixed(3) + ' \u00B7 ' + kInstall.toFixed(3), null, null, null);
+
+    // RESULT (Mathcad Prime blue evaluation box)
+    html += '<div style="background:linear-gradient(135deg,rgba(0,180,255,0.06),rgba(0,230,118,0.04));border:2px solid var(--primary);border-radius:10px;padding:12px 16px;margin:12px 0">';
+    html += '<div class="eng-step" style="border:none;padding:0"><span class="eng-sym" style="font-size:1.2em;font-weight:800">I<sub>z</sub></span>';
+    html += '<span class="eng-result" style="font-size:1.4em;color:var(--primary);font-weight:800">= ' + correctedIz.toFixed(1) + ' <span style="color:#1565c0">A</span></span></div></div>';
+
+    // VERIFICATION: IB ≤ In ≤ Iz
+    html += mcSection(tx('VERIFIKATION', 'VERIFICATION'));
+    var coordOk = ib <= correctedIz;
+    html += '<div style="font-size:1.0rem;line-height:2.2">';
+    html += '<div>' + (coordOk ? '\u2705' : '\u274C') + ' I<sub>B</sub> \u2264 I<sub>z</sub> : <strong>' + ib.toFixed(1) + ' A \u2264 ' + correctedIz.toFixed(1) + ' A</strong>';
+    html += ' \u2192 ' + (coordOk ? '<span style="color:var(--success);font-weight:700">OK</span>' : '<span style="color:var(--danger);font-weight:700">' + tx('KABEL FOR LILLE', 'CABLE TOO SMALL') + '</span>') + '</div>';
+    var margin = correctedIz > 0 ? ((correctedIz - ib) / correctedIz * 100).toFixed(0) : 0;
+    html += '<div>\u2139\uFE0F ' + tx('Belastningsmargin', 'Load margin') + ': ' + margin + '%</div>';
+    html += '</div>';
+
+    // References
+    html += '<div style="margin-top:14px;padding-top:8px;border-top:1px solid var(--border);font-family:sans-serif">';
+    html += '<span class="eng-ref">DS/HD 60364-5-52 \u00A7523</span> ';
+    html += '<span class="eng-ref">Tabel B.52.2\u2013B.52.17</span> ';
+    html += '<span class="eng-ref">IEC 60228</span>';
+    html += '</div>';
+    html += '</div>'; // close Mathcad card
+  }
+
+  return html;
 }
 
-// ===== VOLTAGE DROP MODULE =====
+// ===== VOLTAGE DROP MODULE (Mathcad Prime Style) =====
 function renderVdrop() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
   const currentType = cables[cableState.type];
   const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
   const selectedCable = currentCores[cableState.crossSection];
-
-  const lengthSteps = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300, 400, 500];
+  const lengthSteps = [5,10,15,20,25,30,40,50,60,70,80,100,125,150,200,250,300,400,500];
 
   let vdrop = 0, vdropPercent = 0, Un = 400;
+  const ib = calcIB();
   if (selectedCable) {
-    const ib = calcIB();
-    const L = vdropState.length / 1000; // km
+    const L = vdropState.length / 1000;
     const cosP = loadState.cosPhi;
-    const sinP = Math.sin(Math.acos(cosP));
+    const sinP = Math.sqrt(1 - cosP * cosP);
     Un = loadState.voltage === '3x400' ? 400 : 230;
-
     if (loadState.voltage === '3x400') {
       vdrop = Math.sqrt(3) * ib * L * (selectedCable.r * cosP + selectedCable.x * sinP);
     } else {
@@ -8635,55 +8645,98 @@ function renderVdrop() {
     }
     vdropPercent = (vdrop / Un) * 100;
   }
-
   const isOk = vdropPercent <= 4;
   const isLighting = vdropPercent <= 3;
-  const boxClass = !selectedCable ? '' : (isOk ? '' : 'error');
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('vdropTitle')}</div>
-      <div class="info-row">${tx('V\u00E6lg kabel under "Kabler" f\u00F8rst, derefter l\u00E6ngde her', 'Select cable under "Cables" first, then length here')}</div>
+  function mcLine(sym, op, expr, res, unit, note) {
+    var h = '<div class="eng-step">';
+    h += '<span class="eng-sym">' + sym + '</span>';
+    if (op) h += '<span class="eng-formula">' + op + ' ' + (expr || '') + '</span>';
+    if (res !== undefined && res !== null) h += '<span class="eng-result">= ' + res + (unit ? ' <span style="color:#1565c0;font-weight:700">' + unit + '</span>' : '') + '</span>';
+    if (note) h += '<span class="eng-note">' + note + '</span>';
+    h += '</div>';
+    return h;
+  }
+  function mcSection(title) {
+    return '<div style="color:var(--primary);font-size:0.82rem;text-transform:uppercase;letter-spacing:1.2px;margin:18px 0 8px;font-family:sans-serif;font-weight:800;border-bottom:2px solid var(--primary);padding-bottom:4px">' + title + '</div>';
+  }
 
-      ${!selectedCable ? `
-        <div class="result-box warning">
-          <div class="result-title">${tx('Advarsel', 'Warning')}</div>
-          <div class="result-row"><span class="label">${tx('V\u00E6lg kabel i "Kabler"-modulet f\u00F8rst', 'Select a cable in the "Cables" module first')}</span></div>
-        </div>
-      ` : `
-        <div class="result-box" style="margin-bottom:16px;background:var(--primary-glow);border-color:var(--primary-light)">
-          <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
-          <div class="result-row"><span class="label">IB</span><span class="value">${calcIB().toFixed(1)} A</span></div>
-        </div>
-      `}
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Sp\u00E6ndingsfald \u0394U', 'Voltage Drop \u0394U') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('cableLength')}</div>
-        <div class="select-grid">
-          ${lengthSteps.map(l =>
-            `<button class="sel-btn ${vdropState.length === l ? 'selected' : ''}" onclick="vdropState.length=${l};renderModule('vdrop')">${l}</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  if (!selectedCable) {
+    html += '<div class="eng-assumption">' + tx('V\u00E6lg kabel i "Kabler"-modulet f\u00F8rst.', 'Select a cable in the "Cables" module first.') + '</div>';
+  } else {
+    html += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:10px">' + tx('Kabel', 'Cable') + ': <strong>' + cableState.type + ' ' + cableState.cores + ' ' + cableState.crossSection + ' mm\u00B2</strong> \u00B7 I<sub>B</sub> = ' + ib.toFixed(1) + ' A</div>';
+  }
 
-    ${selectedCable ? `
-    <div class="card fade-in">
-      <div class="card-title">${t('vdropResult')}</div>
-      <div class="result-box ${boxClass}">
-        <div class="result-title">${t('result')} ${isOk ? '<span class="verify-badge ok">\u2713 OK</span>' : '<span class="verify-badge fail">\u2717 > 4%</span>'}</div>
-        <div class="result-row"><span class="label">${t('vdropVolts')}</span><span class="value">${vdrop.toFixed(2)} V</span></div>
-        <div class="result-row"><span class="label">${t('vdropPercent')}</span><span class="value">${vdropPercent.toFixed(2)} %</span></div>
-        <div class="result-row"><span class="label">${t('vdropRemaining')}</span><span class="value">${(Un - vdrop).toFixed(1)} V</span></div>
-        <div class="result-row"><span class="label">${t('vdropLimit')}</span><span class="value">${isOk ? '\u2713' : '\u2717'}</span></div>
-        <div class="result-row"><span class="label">${tx('Belysning \u22643%', 'Lighting \u22643%')}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (tx('OK', 'OK')) : (tx('Over 3%', 'Over 3%'))}</span></span></div>
-        <div class="result-row"><span class="label">${tx('Andre \u22645%', 'Other \u22645%')}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (tx('Over 5%', 'Over 5%'))}</span></span></div>
-      </div>
-      ${calcDetailVdrop(calcIB(), vdropState.length, selectedCable.r, selectedCable.x, loadState.cosPhi, loadState.voltage, vdrop, vdropPercent, cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m')}
-      ${renderVdropSim(Un, vdrop, vdropPercent, vdropState.length, cableState.crossSection)}
-    </div>
-    ` : ''}
-  `;
+  // Length selection
+  html += '<div class="select-group"><div class="select-label">L [m]</div><div class="select-grid">';
+  for (var li=0; li<lengthSteps.length; li++) html += '<button class="sel-btn' + (vdropState.length===lengthSteps[li]?' selected':'') + '" onclick="vdropState.length=' + lengthSteps[li] + ';renderModule(\'vdrop\')">' + lengthSteps[li] + '</button>';
+  html += '</div></div>';
+  html += '</div>';
+
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  if (selectedCable) {
+    var cosP = loadState.cosPhi;
+    var sinP = Math.sqrt(1 - cosP * cosP);
+    var L_km = vdropState.length / 1000;
+    var is3 = (loadState.voltage === '3x400');
+    var prefix = is3 ? '\u221A3' : '2';
+    var rCos = selectedCable.r * cosP;
+    var xSin = selectedCable.x * sinP;
+    var impedanceTerm = (rCos + xSin).toFixed(4);
+
+    html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+    html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Sp\u00E6ndingsfald \u2014 Mathcad Prime', 'Voltage Drop \u2014 Mathcad Prime') + '</div>';
+
+    html += mcSection(tx('GIVNE DATA', 'GIVEN DATA'));
+    html += mcLine('I<sub>B</sub>', ':=', '', ib.toFixed(2), 'A', tx('Fra belastningsberegning', 'From load calculation'));
+    html += mcLine('L', ':=', '', vdropState.length, 'm', tx('Kabellængde', 'Cable length'));
+    html += mcLine('r', ':=', '', selectedCable.r, '\u03A9/km', 'NKT ' + cableState.type + ' ' + cableState.crossSection + ' mm\u00B2');
+    html += mcLine('x', ':=', '', selectedCable.x, '\u03A9/km', 'NKT ' + cableState.type);
+    html += mcLine('cos \u03C6', ':=', '', cosP, '', '');
+    html += mcLine('U<sub>n</sub>', ':=', '', Un, 'V', is3 ? '3\u223C' : '1\u223C');
+
+    html += mcSection(tx('BEREGNING', 'CALCULATION'));
+    html += mcLine('sin \u03C6', '= \u221A(1 \u2212 cos\u00B2\u03C6) =', '', sinP.toFixed(4), '', '');
+    // Formula definition
+    var formulaStr = is3 ? '\u221A3 \u00B7 I<sub>B</sub> \u00B7 L \u00B7 (r\u00B7cos\u03C6 + x\u00B7sin\u03C6)' : '2 \u00B7 I<sub>B</sub> \u00B7 L \u00B7 (r\u00B7cos\u03C6 + x\u00B7sin\u03C6)';
+    html += mcLine('\u0394U', ':=', formulaStr, null, null, '<span class="eng-ref">DS/HD 60364-5-52 \u00A7525</span>');
+
+    // Substitution
+    html += '<div class="depth-3">';
+    html += mcLine('', '=', prefix + ' \u00B7 ' + ib.toFixed(2) + ' \u00B7 ' + L_km.toFixed(3) + ' \u00B7 (' + selectedCable.r + '\u00B7' + cosP + ' + ' + selectedCable.x + '\u00B7' + sinP.toFixed(4) + ')', null, null, null);
+    html += mcLine('', '=', prefix + ' \u00B7 ' + ib.toFixed(2) + ' \u00B7 ' + L_km.toFixed(3) + ' \u00B7 ' + impedanceTerm, null, null, null);
+    html += '</div>';
+
+    // RESULT
+    html += '<div style="background:linear-gradient(135deg,rgba(0,180,255,0.06),rgba(0,230,118,0.04));border:2px solid ' + (isOk ? 'var(--primary)' : 'var(--danger)') + ';border-radius:10px;padding:12px 16px;margin:12px 0">';
+    html += '<div class="eng-step" style="border:none;padding:0"><span class="eng-sym" style="font-size:1.2em;font-weight:800">\u0394U</span>';
+    html += '<span class="eng-result" style="font-size:1.4em;color:' + (isOk ? 'var(--primary)' : 'var(--danger)') + ';font-weight:800">= ' + vdrop.toFixed(2) + ' <span style="color:#1565c0">V</span></span></div>';
+    html += '<div class="eng-step" style="border:none;padding:0"><span class="eng-sym" style="font-size:1.2em;font-weight:800">\u0394U%</span>';
+    html += '<span class="eng-result" style="font-size:1.4em;color:' + (isOk ? 'var(--primary)' : 'var(--danger)') + ';font-weight:800">= ' + vdropPercent.toFixed(2) + ' <span style="color:#1565c0">%</span></span></div>';
+    html += '</div>';
+
+    // VERIFICATION
+    html += mcSection(tx('VERIFIKATION', 'VERIFICATION'));
+    html += '<div style="font-size:0.95rem;line-height:2.2">';
+    html += '<div>' + (isOk ? '\u2705' : '\u274C') + ' \u0394U% \u2264 4% : <strong>' + vdropPercent.toFixed(2) + '% ' + (isOk ? '\u2264' : '>') + ' 4%</strong> \u2192 ' + (isOk ? '<span style="color:var(--success);font-weight:700">OK</span>' : '<span style="color:var(--danger);font-weight:700">' + tx('OVERSKREDET','EXCEEDED') + '</span>') + '</div>';
+    html += '<div>' + (isLighting ? '\u2705' : '\u26A0\uFE0F') + ' ' + tx('Belysning','Lighting') + ' \u0394U% \u2264 3% : <strong>' + vdropPercent.toFixed(2) + '% ' + (isLighting ? '\u2264' : '>') + ' 3%</strong>' + (isLighting ? '' : ' \u2014 <em style="color:var(--danger)">' + tx('Ikke til belysningskredse!','Not for lighting circuits!') + '</em>') + '</div>';
+    html += '<div>\u2139\uFE0F U<sub>ende</sub> = ' + Un + ' \u2212 ' + vdrop.toFixed(2) + ' = <strong>' + (Un - vdrop).toFixed(1) + ' V</strong></div>';
+    html += '</div>';
+
+    html += '<div style="margin-top:14px;padding-top:8px;border-top:1px solid var(--border);font-family:sans-serif">';
+    html += '<span class="eng-ref">DS/HD 60364-5-52 \u00A7525</span> ';
+    html += '<span class="eng-ref depth-3">IEC 60364-5-52 Annex G</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Keep existing simulation if available
+    html += typeof renderVdropSim === 'function' ? renderVdropSim(Un, vdrop, vdropPercent, vdropState.length, cableState.crossSection) : '';
+  }
+
+  return html;
 }
 
 // ===== SHORT CIRCUIT MODULE =====
