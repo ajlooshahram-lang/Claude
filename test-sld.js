@@ -19188,6 +19188,128 @@ test('Authorization intelligence is non-invasive (core calc unchanged)', functio
   assert(Math.abs(ib - 15.79) < 0.1, 'sldCalcNodeIB must be unchanged: ' + ib);
 });
 
+// ===== Professional Complex Numbers Mathematics Engine Tests =====
+
+test('cxRect(3,4) creates complex number with re=3, im=4', function() {
+  var z = cxRect(3, 4);
+  assert.strictEqual(z.re, 3, 'real part should be 3');
+  assert.strictEqual(z.im, 4, 'imaginary part should be 4');
+});
+
+test('cxPolar(5, 53.13) creates complex ~(3, 4)', function() {
+  var z = cxPolar(5, 53.13);
+  assert(Math.abs(z.re - 3) < 0.01, 'real part should be ~3, got ' + z.re);
+  assert(Math.abs(z.im - 4) < 0.01, 'imag part should be ~4, got ' + z.im);
+});
+
+test('cxMag({re:3,im:4}) returns 5', function() {
+  assert.strictEqual(cxMag({re:3, im:4}), 5, 'magnitude of 3+4j should be 5');
+});
+
+test('cxAngleDeg({re:3,im:4}) returns ~53.13 degrees', function() {
+  var angle = cxAngleDeg({re:3, im:4});
+  assert(Math.abs(angle - 53.13) < 0.01, 'angle should be ~53.13, got ' + angle);
+});
+
+test('cxAdd({re:1,im:2},{re:3,im:4}) returns {re:4,im:6}', function() {
+  var r = cxAdd({re:1, im:2}, {re:3, im:4});
+  assert.strictEqual(r.re, 4, 'real part');
+  assert.strictEqual(r.im, 6, 'imag part');
+});
+
+test('cxSub({re:5,im:3},{re:2,im:1}) returns {re:3,im:2}', function() {
+  var r = cxSub({re:5, im:3}, {re:2, im:1});
+  assert.strictEqual(r.re, 3, 'real part');
+  assert.strictEqual(r.im, 2, 'imag part');
+});
+
+test('cxMul({re:3,im:4},{re:1,im:2}) returns {re:-5,im:10}', function() {
+  var r = cxMul({re:3, im:4}, {re:1, im:2});
+  assert.strictEqual(r.re, -5, 'real part should be -5');
+  assert.strictEqual(r.im, 10, 'imag part should be 10');
+});
+
+test('cxDiv({re:3,im:4},{re:1,im:2}) returns {re:2.2,im:-0.4}', function() {
+  var r = cxDiv({re:3, im:4}, {re:1, im:2});
+  assert(Math.abs(r.re - 2.2) < 0.0001, 'real part should be 2.2, got ' + r.re);
+  assert(Math.abs(r.im - (-0.4)) < 0.0001, 'imag part should be -0.4, got ' + r.im);
+});
+
+test('cxConj({re:3,im:4}) returns {re:3,im:-4}', function() {
+  var r = cxConj({re:3, im:4});
+  assert.strictEqual(r.re, 3, 'real part unchanged');
+  assert.strictEqual(r.im, -4, 'imag part negated');
+});
+
+test('cxInv of {re:0,im:1} returns {re:0,im:-1}', function() {
+  var r = cxInv({re:0, im:1});
+  assert(Math.abs(r.re - 0) < 0.0001, 'real part should be 0, got ' + r.re);
+  assert(Math.abs(r.im - (-1)) < 0.0001, 'imag part should be -1, got ' + r.im);
+});
+
+test('cxFmtRect({re:5,im:-3},1) returns "5 - j3"', function() {
+  var s = cxFmtRect({re:5, im:-3}, 1);
+  assert.strictEqual(s, '5 - j3', 'format should be "5 - j3", got "' + s + '"');
+});
+
+test('cxFmtPolar({re:3,im:4},2) returns "5.00∠53.1°"', function() {
+  var s = cxFmtPolar({re:3, im:4}, 2);
+  assert.strictEqual(s, '5.00\u222053.1\u00B0', 'format should be "5.00∠53.1°", got "' + s + '"');
+});
+
+test('cxStepImpedance(100, 0.1, 0, 50, series) returns steps with >=5 entries and correct Z', function() {
+  var result = cxStepImpedance(100, 0.1, 0, 50, 'series');
+  assert(result.steps.length >= 5, 'should have at least 5 steps, got ' + result.steps.length);
+  assert(result.Z !== undefined, 'should return Z');
+  // Z for R=100, XL=2*pi*50*0.1=31.416: |Z| = sqrt(100^2 + 31.416^2) = 104.82
+  assert(Math.abs(cxMag(result.Z) - 104.82) < 0.1, 'Z magnitude should be ~104.82, got ' + cxMag(result.Z));
+});
+
+test('cxStepPower returns steps with P, Q, S values', function() {
+  var Z = cxRect(100, 31.416);
+  var result = cxStepPower(Z, 230);
+  assert(result.steps.length >= 5, 'should have at least 5 steps');
+  assert(result.S !== undefined, 'should return S');
+  assert(result.I !== undefined, 'should return I');
+  // P = U^2 * R / |Z|^2
+  var Zmag = cxMag(Z);
+  var expectedP = 230 * 230 * 100 / (Zmag * Zmag);
+  assert(Math.abs(result.S.re - expectedP) < 1, 'P should be ~' + expectedP.toFixed(1) + ', got ' + result.S.re.toFixed(1));
+});
+
+test('cxRenderSteps returns non-empty HTML string', function() {
+  var steps = [{ label: 'Test', formula: 'a=b', substitution: 'a=1', result: '1', note: null }];
+  var html = cxRenderSteps(steps, 'Test Title');
+  assert(html.length > 50, 'should return substantial HTML');
+  assert(html.indexOf('Test Title') >= 0, 'should contain title');
+  assert(html.indexOf('a=b') >= 0, 'should contain formula');
+});
+
+test('cxRenderPhasorDiagram returns SVG string', function() {
+  var phasors = [
+    { label: 'Z', z: cxRect(3, 4), color: '#2196f3' },
+    { label: 'R', z: cxRect(3, 0), color: '#4caf50' }
+  ];
+  var svg = cxRenderPhasorDiagram(phasors, 'Test Phasors');
+  assert(svg.indexOf('<svg') >= 0, 'should contain SVG element');
+  assert(svg.indexOf('</svg>') >= 0, 'should be closed SVG');
+  assert(svg.indexOf('Test Phasors') >= 0, 'should contain title');
+});
+
+test('impedansState.showSteps field exists', function() {
+  assert('showSteps' in impedansState, 'impedansState should have showSteps field');
+  assert.strictEqual(impedansState.showSteps, false, 'default should be false');
+});
+
+test('Complex numbers engine is non-invasive (existing impedans calculations unchanged)', function() {
+  var testState = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'rlc' };
+  var res = impedansCalcAll(testState);
+  // XL = 2*pi*50*0.1 = 31.416
+  assert(Math.abs(res.XL - 31.416) < 0.01, 'XL unchanged: ' + res.XL);
+  // XC = 1/(2*pi*50*1e-7) = 31830.99
+  assert(Math.abs(res.XC - 31830.99) < 1, 'XC unchanged: ' + res.XC);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

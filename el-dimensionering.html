@@ -6455,6 +6455,28 @@ const _FA = {
   'Missing elements': 'عناصر مفقود',
   'Detected elements': 'عناصر شناسایی‌شده',
   'Regulatory framework': 'چارچوب مقرراتی',
+  // ===== Professional Complex Numbers Mathematics Engine =====
+  'Angular frequency': 'فرکانس زاویه‌ای',
+  'Inductive reactance': 'راکتانس سلفی',
+  'Capacitive reactance': 'راکتانس خازنی',
+  'Net reactance': 'راکتانس خالص',
+  'Complex impedance (rectangular)': 'امپدانس مختلط (مستطیلی)',
+  'Impedance magnitude': 'اندازه امپدانس',
+  'Phase angle': 'زاویه فاز',
+  'Impedance (polar form)': 'امپدانس (فرم قطبی)',
+  'Current from Ohm\'s law': 'جریان از قانون اهم',
+  'Current magnitude': 'اندازه جریان',
+  'Complex power': 'توان مختلط',
+  'Active power': 'توان اکتیو',
+  'Reactive power': 'توان راکتیو',
+  'Apparent power': 'توان ظاهری',
+  'Power factor': 'ضریب توان',
+  'Show all steps': 'نمایش تمام مراحل',
+  'Calculation Steps': 'مراحل محاسبه',
+  'Step': 'مرحله',
+  'inductive': 'سلفی',
+  'capacitive': 'خازنی',
+  'resonance': 'رزونانس',
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -30448,6 +30470,303 @@ function renderGuide() {
   return h;
 }
 
+// ============================================================================
+// ===== PROFESSIONAL COMPLEX NUMBERS MATHEMATICS ENGINE =====
+// ============================================================================
+// Complete complex arithmetic for Danish authorization-level electrical
+// engineering: impedance, power, phasors, fault calculations, transformers.
+// Every operation returns both the result AND the step-by-step derivation.
+
+// --- Core Complex Type ---
+// A complex number: { re: number, im: number }
+// All cx* functions accept and return this shape.
+
+function cxRect(re, im) { return { re: re || 0, im: im || 0 }; }
+function cxPolar(mag, angleDeg) {
+  var rad = angleDeg * Math.PI / 180;
+  return { re: mag * Math.cos(rad), im: mag * Math.sin(rad) };
+}
+
+// --- Accessors ---
+function cxMag(z) { return Math.sqrt(z.re * z.re + z.im * z.im); }
+function cxAngleRad(z) { return Math.atan2(z.im, z.re); }
+function cxAngleDeg(z) { return Math.atan2(z.im, z.re) * 180 / Math.PI; }
+function cxReal(z) { return z.re; }
+function cxImag(z) { return z.im; }
+function cxConj(z) { return { re: z.re, im: -z.im }; }
+
+// --- Arithmetic ---
+function cxAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+function cxSub(a, b) { return { re: a.re - b.re, im: a.im - b.im }; }
+function cxMul(a, b) {
+  return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
+}
+function cxDiv(a, b) {
+  var denom = b.re * b.re + b.im * b.im;
+  if (denom === 0) return { re: Infinity, im: Infinity };
+  return { re: (a.re * b.re + a.im * b.im) / denom, im: (a.im * b.re - a.re * b.im) / denom };
+}
+function cxScale(z, k) { return { re: z.re * k, im: z.im * k }; }
+function cxNeg(z) { return { re: -z.re, im: -z.im }; }
+function cxInv(z) { return cxDiv(cxRect(1, 0), z); } // 1/z
+
+// --- Advanced ---
+function cxPow(z, n) {
+  // z^n using polar form: |z|^n ∠ n*θ
+  var mag = Math.pow(cxMag(z), n);
+  var angle = cxAngleDeg(z) * n;
+  return cxPolar(mag, angle);
+}
+function cxSqrt(z) {
+  var mag = Math.sqrt(cxMag(z));
+  var angle = cxAngleDeg(z) / 2;
+  return cxPolar(mag, angle);
+}
+function cxAbs(z) { return cxMag(z); } // alias
+
+// --- Formatting ---
+// Format as rectangular: "R + jX" or "R - jX" (Danish engineering convention)
+function cxFmtRect(z, dp) {
+  dp = dp !== undefined ? dp : 3;
+  var r = +z.re.toFixed(dp);
+  var i = +z.im.toFixed(dp);
+  if (i === 0) return r + '';
+  if (r === 0) return (i === 1 ? 'j' : i === -1 ? '-j' : i + 'j');
+  return r + (i >= 0 ? ' + j' : ' - j') + Math.abs(i);
+}
+// Format as polar: "|Z|∠θ°"
+function cxFmtPolar(z, dp) {
+  dp = dp !== undefined ? dp : 2;
+  return cxMag(z).toFixed(dp) + '\u2220' + cxAngleDeg(z).toFixed(1) + '\u00B0';
+}
+// Format both forms: "R + jX = |Z|∠θ°"
+function cxFmtBoth(z, dp) {
+  return cxFmtRect(z, dp) + ' = ' + cxFmtPolar(z, dp);
+}
+
+// --- Step-by-Step Derivation Engine ---
+// A derivation step: { label, formula, substitution, result, note }
+
+// Build a complete derivation for impedance calculation
+function cxStepImpedance(R, L, C, f, connection) {
+  var steps = [];
+  var XL = 2 * Math.PI * f * L;
+  var XC = (C > 0) ? 1 / (2 * Math.PI * f * C) : 0;
+
+  // Step 1: Angular frequency
+  steps.push({
+    label: tx('Vinkelfrekvens', 'Angular frequency'),
+    formula: '\u03C9 = 2\u03C0f',
+    substitution: '\u03C9 = 2\u03C0 \u00D7 ' + f,
+    result: (2 * Math.PI * f).toFixed(2) + ' rad/s',
+    note: null
+  });
+
+  // Step 2: Inductive reactance (if L > 0)
+  if (L > 0) {
+    steps.push({
+      label: tx('Induktiv reaktans', 'Inductive reactance'),
+      formula: 'X_L = 2\u03C0fL = \u03C9L',
+      substitution: 'X_L = 2\u03C0 \u00D7 ' + f + ' \u00D7 ' + L,
+      result: XL.toFixed(3) + ' \u03A9',
+      note: tx('Positiv imagin\u00E6r del (+j) \u2014 str\u00F8mmen halter efter sp\u00E6ndingen', 'Positive imaginary (+j) \u2014 current lags voltage')
+    });
+  }
+
+  // Step 3: Capacitive reactance (if C > 0)
+  if (C > 0) {
+    steps.push({
+      label: tx('Kapacitiv reaktans', 'Capacitive reactance'),
+      formula: 'X_C = 1/(2\u03C0fC) = 1/(\u03C9C)',
+      substitution: 'X_C = 1/(2\u03C0 \u00D7 ' + f + ' \u00D7 ' + C + ')',
+      result: XC.toFixed(3) + ' \u03A9',
+      note: tx('Negativ imagin\u00E6r del (-j) \u2014 str\u00F8mmen f\u00F8rer sp\u00E6ndingen', 'Negative imaginary (-j) \u2014 current leads voltage')
+    });
+  }
+
+  // Step 4: Net reactance
+  var X = XL - XC;
+  steps.push({
+    label: tx('Nettoreaktans', 'Net reactance'),
+    formula: 'X = X_L - X_C',
+    substitution: 'X = ' + XL.toFixed(3) + ' - ' + XC.toFixed(3),
+    result: X.toFixed(3) + ' \u03A9' + (X > 0 ? ' (' + tx('induktiv', 'inductive') + ')' : X < 0 ? ' (' + tx('kapacitiv', 'capacitive') + ')' : ' (' + tx('resonans', 'resonance') + ')'),
+    note: null
+  });
+
+  if (connection === 'series') {
+    // Step 5: Complex impedance (rectangular)
+    var Z = cxRect(R, X);
+    steps.push({
+      label: tx('Kompleks impedans (rektangul\u00E6r)', 'Complex impedance (rectangular)'),
+      formula: 'Z = R + jX',
+      substitution: 'Z = ' + R + ' + j(' + X.toFixed(3) + ')',
+      result: cxFmtRect(Z, 2) + ' \u03A9',
+      note: tx('Reel del = resistans, imagin\u00E6r del = reaktans', 'Real part = resistance, imaginary part = reactance')
+    });
+
+    // Step 6: Magnitude
+    steps.push({
+      label: tx('Impedansens st\u00F8rrelse', 'Impedance magnitude'),
+      formula: '|Z| = \u221A(R\u00B2 + X\u00B2)',
+      substitution: '|Z| = \u221A(' + R + '\u00B2 + ' + X.toFixed(3) + '\u00B2)',
+      result: cxMag(Z).toFixed(3) + ' \u03A9',
+      note: null
+    });
+
+    // Step 7: Phase angle
+    var phi = cxAngleDeg(Z);
+    steps.push({
+      label: tx('Fasevinkel', 'Phase angle'),
+      formula: '\u03C6 = arctan(X/R)',
+      substitution: '\u03C6 = arctan(' + X.toFixed(3) + '/' + R + ')',
+      result: phi.toFixed(2) + '\u00B0',
+      note: phi > 0 ? tx('Induktiv: str\u00F8m halter', 'Inductive: current lags') : phi < 0 ? tx('Kapacitiv: str\u00F8m f\u00F8rer', 'Capacitive: current leads') : tx('Resistiv: i fase', 'Resistive: in phase')
+    });
+
+    // Step 8: Polar form
+    steps.push({
+      label: tx('Impedans (pol\u00E6r form)', 'Impedance (polar form)'),
+      formula: 'Z = |Z|\u2220\u03C6',
+      substitution: null,
+      result: cxFmtPolar(Z, 2) + ' \u03A9',
+      note: tx('Bruges til multiplikation og division af fasorer', 'Used for multiplication and division of phasors')
+    });
+
+    return { Z: Z, steps: steps };
+  }
+
+  // Parallel path
+  var G = R > 0 ? 1/R : 0;
+  var BL = XL > 0 ? 1/XL : 0;
+  var BC = XC > 0 ? 1/XC : 0;
+  var Y = cxRect(G, BC - BL);
+  steps.push({
+    label: tx('Admittans (parallel)', 'Admittance (parallel)'),
+    formula: 'Y = G + j(B_C - B_L) = 1/R + j(1/X_C - 1/X_L)',
+    substitution: 'Y = ' + G.toFixed(6) + ' + j(' + BC.toFixed(6) + ' - ' + BL.toFixed(6) + ')',
+    result: cxFmtRect(Y, 6) + ' S',
+    note: null
+  });
+  var Zp = cxInv(Y);
+  steps.push({
+    label: tx('Impedans Z = 1/Y', 'Impedance Z = 1/Y'),
+    formula: 'Z = 1/Y',
+    substitution: null,
+    result: cxFmtBoth(Zp, 2) + ' \u03A9',
+    note: null
+  });
+  return { Z: Zp, steps: steps };
+}
+
+// Step-by-step power triangle
+function cxStepPower(Z, U) {
+  var steps = [];
+  var I = cxDiv(cxRect(U, 0), Z); // I = U/Z (U as reference phasor)
+  var Imag = cxMag(I);
+  var S = cxMul(cxRect(U, 0), cxConj(I)); // S = U × I*
+
+  steps.push({
+    label: tx('Str\u00F8m fra Ohms lov', 'Current from Ohm\'s law'),
+    formula: 'I = U/Z',
+    substitution: 'I = ' + U + '\u22200\u00B0 / ' + cxFmtPolar(Z, 2),
+    result: cxFmtBoth(I, 3) + ' A',
+    note: null
+  });
+  steps.push({
+    label: tx('Str\u00F8mmens st\u00F8rrelse', 'Current magnitude'),
+    formula: '|I| = U/|Z|',
+    substitution: '|I| = ' + U + ' / ' + cxMag(Z).toFixed(3),
+    result: Imag.toFixed(3) + ' A',
+    note: null
+  });
+  steps.push({
+    label: tx('Kompleks effekt', 'Complex power'),
+    formula: 'S = U \u00D7 I* = P + jQ',
+    substitution: 'S = ' + U + ' \u00D7 ' + cxFmtRect(cxConj(I), 3),
+    result: cxFmtRect(S, 1) + ' VA',
+    note: null
+  });
+  steps.push({
+    label: tx('Aktiv effekt', 'Active power'),
+    formula: 'P = Re(S) = U\u00B7I\u00B7cos\u03C6',
+    substitution: 'P = ' + U + ' \u00D7 ' + Imag.toFixed(3) + ' \u00D7 cos(' + cxAngleDeg(Z).toFixed(1) + '\u00B0)',
+    result: S.re.toFixed(1) + ' W',
+    note: tx('Den nyttige effekt der udf\u00F8rer arbejde', 'The useful power doing work')
+  });
+  steps.push({
+    label: tx('Reaktiv effekt', 'Reactive power'),
+    formula: 'Q = Im(S) = U\u00B7I\u00B7sin\u03C6',
+    substitution: 'Q = ' + U + ' \u00D7 ' + Imag.toFixed(3) + ' \u00D7 sin(' + cxAngleDeg(Z).toFixed(1) + '\u00B0)',
+    result: S.im.toFixed(1) + ' var',
+    note: S.im > 0 ? tx('Induktiv (optager reaktiv effekt)', 'Inductive (absorbs reactive power)') : tx('Kapacitiv (leverer reaktiv effekt)', 'Capacitive (supplies reactive power)')
+  });
+  steps.push({
+    label: tx('Tilsyneladende effekt', 'Apparent power'),
+    formula: '|S| = U\u00B7I = \u221A(P\u00B2 + Q\u00B2)',
+    substitution: '|S| = \u221A(' + S.re.toFixed(1) + '\u00B2 + ' + S.im.toFixed(1) + '\u00B2)',
+    result: cxMag(S).toFixed(1) + ' VA',
+    note: null
+  });
+  steps.push({
+    label: tx('Effektfaktor', 'Power factor'),
+    formula: 'cos\u03C6 = P/|S| = R/|Z|',
+    substitution: 'cos\u03C6 = ' + S.re.toFixed(1) + ' / ' + cxMag(S).toFixed(1),
+    result: (cxMag(S) > 0 ? (Math.abs(S.re) / cxMag(S)).toFixed(4) : '1.0000'),
+    note: null
+  });
+  return { I: I, S: S, steps: steps };
+}
+
+// Render steps as HTML (card format, click-only)
+function cxRenderSteps(steps, title) {
+  var html = '<div class="card fade-in"><div class="card-title">' + (title || tx('Beregningsskridt', 'Calculation Steps')) + '</div>';
+  html += '<div class="result-box">';
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    html += '<div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<div style="font-weight:700;color:var(--primary);font-size:0.85rem">' + tx('Trin', 'Step') + ' ' + (i+1) + ': ' + s.label + '</div>';
+    if (s.formula) html += '<div style="font-family:monospace;margin:4px 0;font-size:0.9rem;color:var(--text)">' + s.formula + '</div>';
+    if (s.substitution) html += '<div style="font-family:monospace;margin:2px 0;font-size:0.85rem;color:var(--text-muted)">' + s.substitution + '</div>';
+    html += '<div style="font-weight:600;margin:4px 0;font-size:0.95rem;color:var(--success)">' + s.result + '</div>';
+    if (s.note) html += '<div style="font-size:0.78rem;color:var(--text-muted);font-style:italic">' + s.note + '</div>';
+    html += '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+// Render a phasor diagram (SVG) for Z, I, and/or power
+function cxRenderPhasorDiagram(phasors, title) {
+  // phasors: [{label, z, color}] — array of complex numbers to draw
+  var w = 400, h = 300, cx = w/2, cy = h/2;
+  var svg = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="background:var(--bg-card);border-radius:8px;display:block;margin:0 auto">';
+  // Axes
+  svg += '<line x1="20" y1="'+cy+'" x2="'+(w-20)+'" y2="'+cy+'" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<line x1="'+cx+'" y1="20" x2="'+cx+'" y2="'+(h-20)+'" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<text x="'+(w-15)+'" y="'+(cy-5)+'" font-size="10" fill="var(--text-muted)">Re</text>';
+  svg += '<text x="'+(cx+5)+'" y="25" font-size="10" fill="var(--text-muted)">+jIm</text>';
+
+  // Find scale
+  var maxMag = 1;
+  for (var i = 0; i < phasors.length; i++) maxMag = Math.max(maxMag, cxMag(phasors[i].z));
+  var scale = (Math.min(w, h) / 2 - 40) / maxMag;
+
+  // Draw phasors
+  for (var i = 0; i < phasors.length; i++) {
+    var p = phasors[i];
+    var ex = cx + p.z.re * scale;
+    var ey = cy - p.z.im * scale; // SVG y is inverted
+    svg += '<line x1="'+cx+'" y1="'+cy+'" x2="'+ex.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="'+p.color+'" stroke-width="2.5" marker-end="url(#cxarr-'+i+')"/>';
+    svg += '<defs><marker id="cxarr-'+i+'" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="'+p.color+'"/></marker></defs>';
+    svg += '<text x="'+(ex+5).toFixed(0)+'" y="'+(ey-5).toFixed(0)+'" font-size="10" fill="'+p.color+'" font-weight="bold">'+p.label+'</text>';
+  }
+
+  svg += '<text x="'+(w/2)+'" y="'+(h-5)+'" text-anchor="middle" font-size="10" fill="var(--text-muted)">'+(title||'')+'</text>';
+  svg += '</svg>';
+  return svg;
+}
+
 // ===== AC IMPEDANCE CALCULATOR MODULE (Elektroteknik Opgavesamling Ch.6) =====
 
 // State for the AC impedance calculator — all user selections.
@@ -30458,7 +30777,8 @@ var impedansState = {
   C: 0.0000001,          // Farad (100nF = 0.1uF)
   f: 50,                 // Hz
   U: 230,                // Volts (supply voltage for power triangle)
-  components: 'rlc'      // 'r', 'rl', 'rc', 'lc', 'rlc'
+  components: 'rlc',     // 'r', 'rl', 'rc', 'lc', 'rlc'
+  showSteps: false        // Toggle for step-by-step derivation display
 };
 
 // Preset values for click-only selection
@@ -30813,6 +31133,33 @@ function renderImpedans() {
   html += '<div class="result-title">' + tx('Fasevinkeldiagram (viserdiagram)', 'Phasor Diagram') + '</div>';
   html += impedansRenderPhasor(res);
   html += '</div>';
+
+  // --- Step-by-step derivation toggle (Professional Complex Numbers Engine) ---
+  html += '<div class="select-group"><div class="select-grid">';
+  html += '<button class="sel-btn ' + (impedansState.showSteps ? 'selected' : '') + '" onclick="impedansState.showSteps=!impedansState.showSteps;renderModule(\'impedans\')">' + tx('Vis alle trin', 'Show all steps') + '</button>';
+  html += '</div></div>';
+
+  if (impedansState.showSteps) {
+    var _cxR = (impedansState.components.indexOf('r') >= 0) ? impedansState.R : 0;
+    var _cxL = (impedansState.components.indexOf('l') >= 0) ? impedansState.L : 0;
+    var _cxC = (impedansState.components.indexOf('c') >= 0) ? impedansState.C : 0;
+    var _cxResult = cxStepImpedance(_cxR, _cxL, _cxC, impedansState.f, impedansState.connection);
+    html += cxRenderSteps(_cxResult.steps, tx('Impedansberegning \u2014 trin for trin', 'Impedance Calculation \u2014 Step by Step'));
+    if (impedansState.U > 0) {
+      var _cxPow = cxStepPower(_cxResult.Z, impedansState.U);
+      html += cxRenderSteps(_cxPow.steps, tx('Effektberegning \u2014 trin for trin', 'Power Calculation \u2014 Step by Step'));
+    }
+    // Phasor diagram via cx engine
+    var _cxPhasors = [];
+    if (_cxR > 0) _cxPhasors.push({ label: 'R', z: cxRect(_cxR, 0), color: '#4caf50' });
+    var _cxX = (2 * Math.PI * impedansState.f * _cxL) - (_cxC > 0 ? 1/(2 * Math.PI * impedansState.f * _cxC) : 0);
+    if (_cxX !== 0) _cxPhasors.push({ label: 'jX', z: cxRect(0, _cxX), color: '#f44336' });
+    _cxPhasors.push({ label: 'Z', z: _cxResult.Z, color: '#2196f3' });
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Fasordiagram (kompleks plan)', 'Phasor Diagram (complex plane)') + '</div>';
+    html += cxRenderPhasorDiagram(_cxPhasors, tx('Impedans-fasorer', 'Impedance Phasors'));
+    html += '</div>';
+  }
 
   // ===== Ch.6 single-phase AC fundamentals — typeset calcDetail cards =====
   // Appended (auto-typeset via mathml). Reuses the module's already-computed
