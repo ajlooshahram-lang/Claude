@@ -18057,6 +18057,159 @@ test('All 8 innovation render functions are defined', function() {
   });
 });
 
+// =====================================================================
+// Cascade TCC <-> module device reactivity (DS/HD 60364-5-53 cl.536.4)
+// =====================================================================
+console.log('\n=== Cascade TCC cross-module reactivity ===\n');
+
+test('tccProtectionSignature is a defined pure function', function() {
+  assert.strictEqual(typeof tccProtectionSignature, 'function', 'tccProtectionSignature must exist');
+  assert.strictEqual(typeof tccStandaloneDevices, 'function', 'tccStandaloneDevices must exist');
+  assert.strictEqual(typeof tccSyncDeviceSet, 'function', 'tccSyncDeviceSet must exist');
+});
+
+test('tccStandaloneDevices reflects a Fuse selection', function() {
+  fuseState.holder = null; fuseState.size = null;
+  assert.strictEqual(tccStandaloneDevices().filter(function(d){return d.source==='fuse';}).length, 0, 'no fuse before selection');
+  // Pick a real gG size that exists in FUSE_5S
+  var size = Object.keys(FUSE_5S).map(Number).filter(function(n){return n;})[0];
+  fuseState.size = size;
+  var fuses = tccStandaloneDevices().filter(function(d){ return d.source === 'fuse'; });
+  assert.strictEqual(fuses.length, 1, 'fuse appears after selection');
+  assert.strictEqual(fuses[0].In, size, 'fuse In matches selected size');
+  assert(fuses[0].device.i5s === FUSE_5S[size], 'fuse device uses real FUSE_5S 5s point');
+});
+
+test('tccStandaloneDevices reflects an MCB selection', function() {
+  mcbState.type = null; mcbState.curve = null; mcbState.rating = null;
+  assert.strictEqual(tccStandaloneDevices().filter(function(d){return d.source==='mcb';}).length, 0, 'no mcb before selection');
+  mcbState.curve = 'C'; mcbState.rating = 16;
+  var mcbs = tccStandaloneDevices().filter(function(d){ return d.source === 'mcb'; });
+  assert.strictEqual(mcbs.length, 1, 'mcb appears after selection');
+  assert.strictEqual(mcbs[0].In, 16, 'mcb In matches rating');
+  assert.strictEqual(mcbs[0].device.curve, 'C', 'mcb curve preserved');
+});
+
+test('tccProtectionSignature changes when a standalone device changes', function() {
+  fuseState.size = null; mcbState.curve = null; mcbState.rating = null;
+  sldTree = sldCreateTree();
+  var sig0 = tccProtectionSignature();
+  mcbState.curve = 'B'; mcbState.rating = 10;
+  var sig1 = tccProtectionSignature();
+  assert.notStrictEqual(sig0, sig1, 'signature must change after MCB selection');
+  mcbState.rating = 25;
+  var sig2 = tccProtectionSignature();
+  assert.notStrictEqual(sig1, sig2, 'signature must change when MCB rating changes');
+});
+
+test('tccProtectionSignature changes when an SLD node protection changes', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var sigBefore = tccProtectionSignature();
+  // Change the protection device on the first final circuit (SLD device picker path)
+  var finals = tccGetFinalCircuits(sldTree);
+  assert(finals.length > 0, 'tree has final circuits');
+  var nodeId = finals[0].id;
+  var newProt = PRODUCTS.mcbs.find(function(m){ return m.rating === 32 && m.curve === 'C'; }) || PRODUCTS.mcbs[PRODUCTS.mcbs.length - 1];
+  sldTree.nodes[nodeId].protection = newProt;
+  sldTree.nodes[nodeId].protectionIn = newProt.rating;
+  var sigAfter = tccProtectionSignature();
+  assert.notStrictEqual(sigBefore, sigAfter, 'signature must change after SLD device change');
+});
+
+test('syncSharedQuantities publishes protection_device_set onto the reactive bus', function() {
+  // Simulate a device change in the MCB module then the module re-render hook.
+  mcbState.curve = 'C'; mcbState.rating = 20;
+  sldTree = sldCreateTree();
+  syncSharedQuantities('mcb');
+  var busVal = SharedQuantities.get('protection_device_set');
+  assert(busVal !== null && busVal !== undefined, 'bus carries protection_device_set');
+  assert(busVal.indexOf('mcb:MCB C20') >= 0, 'bus value reflects the MCB selection, got: ' + busVal);
+  // Changing the device and re-syncing must update the bus value (reactive path)
+  var before = SharedQuantities.get('protection_device_set');
+  mcbState.rating = 40;
+  syncSharedQuantities('mcb');
+  var after = SharedQuantities.get('protection_device_set');
+  assert.notStrictEqual(before, after, 'bus value updates after device change');
+  assert(after.indexOf('mcb:MCB C40') >= 0, 'bus reflects new rating');
+});
+
+test('protection_device_set subscriber fires the reactive re-render path without error', function() {
+  // Exercise the explicit subscriber: when the cascade view is active, a device change
+  // must drive a re-render attempt. We assert the listener exists and runs safely.
+  var listeners = SharedQuantities._listeners['protection_device_set'] || [];
+  assert(listeners.length >= 1, 'a protection_device_set subscriber is registered');
+  var prevActive = activeModule;
+  activeModule = 'tcc';
+  // Should not throw even though the mocked DOM element has no tagName
+  mcbState.curve = 'C'; mcbState.rating = 16;
+  syncSharedQuantities('mcb');
+  activeModule = prevActive;
+  assert(true, 'reactive re-render path executed without throwing');
+});
+
+test('renderCascadeTCC output reflects an SLD device change (chart/data updates)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  // Neutralise standalone selections so we isolate the SLD-driven change
+  fuseState.size = null; mcbState.curve = null; mcbState.rating = null;
+  var out1 = renderCascadeTCC();
+  // Swap the device on the selected node via the same fields the SLD picker writes
+  var nodeId = tccState.selectedNodeId;
+  var bigProt = PRODUCTS.mcbs.find(function(m){ return m.rating === 63; }) ||
+                PRODUCTS.mccbs[0];
+  sldTree.nodes[nodeId].protection = bigProt;
+  sldTree.nodes[nodeId].protectionIn = bigProt.rating || (bigProt.inOptions ? bigProt.inOptions[0] : 63);
+  sldPropagateAll(sldTree);
+  var out2 = renderCascadeTCC();
+  assert(out1 !== out2, 'cascade output must change after an SLD device change');
+});
+
+test('renderCascadeTCC reflects standalone module device selections (live sync section)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  fuseState.size = null; mcbState.curve = null; mcbState.rating = null;
+  var baseline = renderCascadeTCC();
+  mcbState.curve = 'C'; mcbState.rating = 32;
+  var withMcb = renderCascadeTCC();
+  assert(withMcb !== baseline, 'cascade output must change when a standalone MCB is selected');
+  assert(withMcb.indexOf('MCB C32') >= 0, 'cascade live-sync section lists the selected MCB');
+  assert(withMcb.indexOf('cl.536.4') >= 0, 'cascade live-sync section cites DS/HD 60364-5-53 cl.536.4');
+});
+
+test('Cascade reactivity render functions are click-only (no text inputs / textareas)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  tccState.selectedNodeId = tccGetFinalCircuits(sldTree)[0].id;
+  fuseState.size = Object.keys(FUSE_5S).map(Number).filter(function(n){return n;})[0];
+  mcbState.curve = 'C'; mcbState.rating = 16;
+  mccbState.frame = null; mccbState.inVal = null;
+  var outs = [renderCascadeTCC(), tccRenderStandaloneSection(1000)];
+  outs.forEach(function(html){
+    assert(html.indexOf('<input type="text"') < 0, 'no double-quoted text input');
+    assert(html.indexOf("type='text'") < 0, 'no single-quoted text input');
+    assert(html.indexOf('<textarea') < 0, 'no textarea');
+  });
+});
+
+test('Cascade reactivity: trilingual strings have Farsi entries in _FA', function() {
+  assert(_FA['Module-selected devices (live sync)'] && _FA['Module-selected devices (live sync)'].length > 0, 'title has Farsi');
+  assert(_FA['Module'] && _FA['Module'].length > 0, 'Module has Farsi');
+  assert(_FA['No trip'] && _FA['No trip'].length > 0, 'No trip has Farsi');
+  assert(_FA['Relay'] && _FA['Relay'].length > 0, 'Relay has Farsi');
+  assert(_FA['Definite time'] && _FA['Definite time'].length > 0, 'Definite time has Farsi');
+  assert(_FA['Devices selected in the Fuse/MCB/MCCB/Relay/RCD modules are reflected here automatically via the reactive bus.'], 'info line has Farsi');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
