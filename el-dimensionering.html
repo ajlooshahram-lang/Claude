@@ -17045,6 +17045,12 @@ function renderHarmonic() {
   html += '<div class="result-row"><span class="label">' + tx('Diversitetsfaktor', 'Diversity Factor') + '</span><span class="value">' + thdResult.diversity + '</span></div>';
   html += '</div>';
 
+  // ═══ MATHCAD PRIME SUMMARY ═══
+  html += '<div style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:12px 0">';
+  html += mcPrimeLine('THD', ':= \u221A(\u2211 h\u2099\u00B2) =', '', thdResult.thd.toFixed(2), '%', thdOk ? mcPrimeRef('EN 50160 \u00A74.2.5') + ' <span class="mc-ok">OK.</span>' : '<span class="mc-fail">> 8%</span>');
+  html += mcPrimeLine('K', ':= \u2211(h\u00B2 \u00B7 I<sub>h</sub>\u00B2) / I<sub>1</sub>\u00B2 =', '', kResult.kFactor.toFixed(2), '', tx('Transformerbelastning','Transformer loading'));
+  html += '</div>';
+
   // Harmonic Spectrum SVG
   html += '<div class="result-box"><div class="result-title">' + tx('Harmonisk spektrum', 'Harmonic Spectrum') + '</div>';
   html += '<svg viewBox="0 0 300 120" style="width:100%;max-width:400px;height:auto">';
