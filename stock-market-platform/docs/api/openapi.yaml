@@ -1,0 +1,2137 @@
+openapi: 3.1.0
+info:
+  title: InvestorIQ API
+  version: 1.0.0
+  description: |
+    AI-native stock market platform API. Provides market data, portfolio management,
+    AI-powered analysis, screening, alerts, and backtesting capabilities.
+    
+    ## Authentication
+    All endpoints require a Bearer token (JWT) unless marked as public.
+    Obtain tokens via `/auth/login` or `/auth/oauth/{provider}`.
+    
+    ## Rate Limits
+    - Free tier: 60 requests/minute
+    - Pro tier: 600 requests/minute  
+    - Premium tier: 6000 requests/minute
+    
+    Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+    
+    ## Response Format
+    All responses follow: `{ "data": ..., "meta": {...}, "errors": [...] }`
+  contact:
+    name: InvestorIQ Engineering
+    email: api@investoriq.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.investoriq.com/v1
+    description: Production
+  - url: https://api.staging.investoriq.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local Development
+
+tags:
+  - name: Auth
+    description: Authentication and session management
+  - name: Users
+    description: User profiles and preferences
+  - name: Market Data
+    description: Quotes, historical data, fundamentals
+  - name: Portfolio
+    description: Portfolio management and tracking
+  - name: AI
+    description: AI chat, thesis generation, analysis
+  - name: Screener
+    description: Stock screening and filtering
+  - name: Alerts
+    description: Price and event alerts
+  - name: Backtest
+    description: Strategy backtesting
+  - name: News
+    description: News and sentiment feed
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================================
+  # AUTH ENDPOINTS
+  # ============================================================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      security: []
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+        '423':
+          description: Account locked (MFA required or too many attempts)
+
+  /auth/oauth/{provider}:
+    get:
+      tags: [Auth]
+      summary: Initiate OAuth flow
+      security: []
+      operationId: oauthRedirect
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, apple]
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke session
+      operationId: logout
+      responses:
+        '204':
+          description: Session revoked
+
+  # ============================================================
+  # USER ENDPOINTS
+  # ============================================================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+
+  /users/me/preferences:
+    put:
+      tags: [Users]
+      summary: Set investment preferences
+      operationId: setPreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestmentPreferences'
+      responses:
+        '200':
+          description: Preferences updated
+
+  # ============================================================
+  # MARKET DATA ENDPOINTS
+  # ============================================================
+  /market/search:
+    get:
+      tags: [Market Data]
+      summary: Search symbols by name or ticker
+      operationId: searchSymbols
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 50
+          description: Search query (ticker or company name)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [stock, etf, crypto, forex, index, all]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SymbolSearchResult'
+
+  /market/quotes/{symbol}:
+    get:
+      tags: [Market Data]
+      summary: Get real-time quote for a symbol
+      operationId: getQuote
+      parameters:
+        - $ref: '#/components/parameters/SymbolPath'
+      responses:
+        '200':
+          description: Current quote data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Quote'
+        '404':
+          description: Symbol not found
+
+  /market/quotes:
+    get:
+      tags: [Market Data]
+      summary: Get quotes for multiple symbols
+      operationId: getBatchQuotes
+      parameters:
+        - name: symbols
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated symbols (max 50)
+      responses:
+        '200':
+          description: Batch quotes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Quote'
+
+
+  /market/bars/{symbol}:
+    get:
+      tags: [Market Data]
+      summary: Get historical OHLCV bars
+      operationId: getHistoricalBars
+      parameters:
+        - $ref: '#/components/parameters/SymbolPath'
+        - name: timeframe
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ['1m', '5m', '15m', '1h', '1d', '1w', '1M']
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5000
+            default: 500
+      responses:
+        '200':
+          description: Historical bars
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bar'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /market/fundamentals/{symbol}:
+    get:
+      tags: [Market Data]
+      summary: Get fundamental data for a symbol
+      operationId: getFundamentals
+      parameters:
+        - $ref: '#/components/parameters/SymbolPath'
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [annual, quarterly, ttm]
+            default: ttm
+      responses:
+        '200':
+          description: Fundamental data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Fundamentals'
+
+  /market/indicators/{symbol}:
+    get:
+      tags: [Market Data]
+      summary: Get technical indicators for a symbol
+      operationId: getTechnicalIndicators
+      parameters:
+        - $ref: '#/components/parameters/SymbolPath'
+        - name: indicators
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Comma-separated indicators (e.g., RSI:14,SMA:50,MACD:12:26:9)"
+        - name: timeframe
+          in: query
+          schema:
+            type: string
+            enum: ['1h', '1d', '1w']
+            default: '1d'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Indicator values
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IndicatorResponse'
+
+  /market/news:
+    get:
+      tags: [News]
+      summary: Get news feed (optionally filtered by symbol)
+      operationId: getNews
+      parameters:
+        - name: symbols
+          in: query
+          schema:
+            type: string
+          description: Comma-separated symbols to filter
+        - name: sentiment
+          in: query
+          schema:
+            type: string
+            enum: [positive, negative, neutral, all]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor
+      responses:
+        '200':
+          description: News articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  meta:
+                    $ref: '#/components/schemas/CursorMeta'
+
+  # ============================================================
+  # PORTFOLIO ENDPOINTS
+  # ============================================================
+  /portfolios:
+    get:
+      tags: [Portfolio]
+      summary: List user's portfolios
+      operationId: listPortfolios
+      responses:
+        '200':
+          description: List of portfolios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortfolioSummary'
+    post:
+      tags: [Portfolio]
+      summary: Create a new portfolio
+      operationId: createPortfolio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePortfolioRequest'
+      responses:
+        '201':
+          description: Portfolio created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Portfolio'
+
+  /portfolios/{portfolioId}:
+    get:
+      tags: [Portfolio]
+      summary: Get portfolio details with holdings
+      operationId: getPortfolio
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      responses:
+        '200':
+          description: Portfolio with holdings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PortfolioDetail'
+    patch:
+      tags: [Portfolio]
+      summary: Update portfolio settings
+      operationId: updatePortfolio
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePortfolioRequest'
+      responses:
+        '200':
+          description: Updated portfolio
+    delete:
+      tags: [Portfolio]
+      summary: Delete a portfolio
+      operationId: deletePortfolio
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      responses:
+        '204':
+          description: Portfolio deleted
+
+  /portfolios/{portfolioId}/holdings:
+    post:
+      tags: [Portfolio]
+      summary: Add a holding to portfolio
+      operationId: addHolding
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddHoldingRequest'
+      responses:
+        '201':
+          description: Holding added
+
+  /portfolios/{portfolioId}/holdings/{holdingId}:
+    patch:
+      tags: [Portfolio]
+      summary: Update a holding
+      operationId: updateHolding
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+        - name: holdingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHoldingRequest'
+      responses:
+        '200':
+          description: Holding updated
+    delete:
+      tags: [Portfolio]
+      summary: Remove holding from portfolio
+      operationId: removeHolding
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+        - name: holdingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Holding removed
+
+  /portfolios/{portfolioId}/performance:
+    get:
+      tags: [Portfolio]
+      summary: Get portfolio performance over time
+      operationId: getPortfolioPerformance
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [1d, 1w, 1m, 3m, 6m, 1y, ytd, max]
+            default: 1y
+        - name: benchmark
+          in: query
+          schema:
+            type: string
+            default: SPY
+      responses:
+        '200':
+          description: Performance data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PerformanceData'
+
+  /portfolios/{portfolioId}/risk:
+    get:
+      tags: [Portfolio]
+      summary: Get portfolio risk analysis
+      operationId: getPortfolioRisk
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      responses:
+        '200':
+          description: Risk metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RiskAnalysis'
+
+  /portfolios/{portfolioId}/import:
+    post:
+      tags: [Portfolio]
+      summary: Import holdings from CSV
+      operationId: importCSV
+      parameters:
+        - $ref: '#/components/parameters/PortfolioId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+
+
+  # ============================================================
+  # AI ENDPOINTS
+  # ============================================================
+  /ai/chat:
+    post:
+      tags: [AI]
+      summary: Send a message to the AI assistant (streaming)
+      operationId: aiChat
+      description: |
+        Sends a natural language investment question. Response is streamed via SSE.
+        The AI routes to appropriate specialist agents and returns a unified response
+        with confidence scores, sources, and alternative viewpoints.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIChatRequest'
+      responses:
+        '200':
+          description: Streamed AI response (text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/AIStreamEvent'
+        '429':
+          description: AI query limit exceeded for tier
+
+  /ai/chat/{conversationId}:
+    get:
+      tags: [AI]
+      summary: Get conversation history
+      operationId: getConversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Conversation'
+
+  /ai/conversations:
+    get:
+      tags: [AI]
+      summary: List user's conversations
+      operationId: listConversations
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationSummary'
+
+  /ai/thesis/{symbol}:
+    post:
+      tags: [AI]
+      summary: Generate investment thesis for a symbol
+      operationId: generateThesis
+      parameters:
+        - $ref: '#/components/parameters/SymbolPath'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                depth:
+                  type: string
+                  enum: [summary, standard, deep]
+                  default: standard
+      responses:
+        '200':
+          description: Investment thesis (streamed)
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/AIStreamEvent'
+        '202':
+          description: Thesis generation queued (complex analysis)
+
+  /ai/compare:
+    post:
+      tags: [AI]
+      summary: Compare multiple stocks
+      operationId: compareStocks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbols]
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 2
+                  maxItems: 5
+                criteria:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional focus areas
+      responses:
+        '200':
+          description: Comparison analysis (streamed)
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/AIStreamEvent'
+
+  /ai/feedback:
+    post:
+      tags: [AI]
+      summary: Submit feedback on AI response
+      operationId: submitFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageId, rating]
+              properties:
+                messageId:
+                  type: string
+                  format: uuid
+                rating:
+                  type: integer
+                  enum: [-1, 1]
+                comment:
+                  type: string
+                  maxLength: 500
+      responses:
+        '204':
+          description: Feedback recorded
+
+  # ============================================================
+  # SCREENER ENDPOINTS
+  # ============================================================
+  /screener/scan:
+    post:
+      tags: [Screener]
+      summary: Run a stock screen with filters
+      operationId: runScreen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenerRequest'
+      responses:
+        '200':
+          description: Screener results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScreenerResult'
+                  meta:
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          totalMatches:
+                            type: integer
+
+  /screener/presets:
+    get:
+      tags: [Screener]
+      summary: Get built-in screener presets
+      operationId: getScreenerPresets
+      responses:
+        '200':
+          description: Available presets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScreenerPreset'
+
+  /screener/saved:
+    get:
+      tags: [Screener]
+      summary: Get user's saved screens
+      operationId: getSavedScreens
+      responses:
+        '200':
+          description: Saved screens
+    post:
+      tags: [Screener]
+      summary: Save a screen configuration
+      operationId: saveScreen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveScreenRequest'
+      responses:
+        '201':
+          description: Screen saved
+
+  # ============================================================
+  # ALERT ENDPOINTS
+  # ============================================================
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: List user's alert rules
+      operationId: listAlerts
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Alert rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AlertRule'
+    post:
+      tags: [Alerts]
+      summary: Create an alert rule
+      operationId: createAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AlertRule'
+
+  /alerts/{alertId}:
+    patch:
+      tags: [Alerts]
+      summary: Update an alert rule
+      operationId: updateAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlertRequest'
+      responses:
+        '200':
+          description: Alert updated
+    delete:
+      tags: [Alerts]
+      summary: Delete an alert rule
+      operationId: deleteAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Alert deleted
+
+  /alerts/history:
+    get:
+      tags: [Alerts]
+      summary: Get alert trigger history
+      operationId: getAlertHistory
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trigger history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AlertTrigger'
+
+  # ============================================================
+  # BACKTEST ENDPOINTS
+  # ============================================================
+  /backtest/strategies:
+    get:
+      tags: [Backtest]
+      summary: List user's strategies
+      operationId: listStrategies
+      responses:
+        '200':
+          description: Strategies
+    post:
+      tags: [Backtest]
+      summary: Create a strategy
+      operationId: createStrategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStrategyRequest'
+      responses:
+        '201':
+          description: Strategy created
+
+  /backtest/run:
+    post:
+      tags: [Backtest]
+      summary: Execute a backtest
+      operationId: runBacktest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRunRequest'
+      responses:
+        '202':
+          description: Backtest queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      runId:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum: [queued]
+                      estimatedDuration:
+                        type: integer
+                        description: Estimated seconds
+
+  /backtest/runs/{runId}:
+    get:
+      tags: [Backtest]
+      summary: Get backtest run status and results
+      operationId: getBacktestRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Run status/results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BacktestResult'
+
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SymbolPath:
+      name: symbol
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Z0-9.]{1,10}$'
+      description: Stock ticker symbol (e.g., AAPL, MSFT)
+
+    PortfolioId:
+      name: portfolioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 100
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        mfaCode:
+          type: string
+          pattern: '^\d{6}$'
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+            expiresIn:
+              type: integer
+              description: Seconds until access token expires
+            user:
+              $ref: '#/components/schemas/UserSummary'
+
+    # --- Users ---
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        displayName:
+          type: string
+        tier:
+          type: string
+          enum: [free, pro, premium, enterprise]
+        avatarUrl:
+          type: string
+          nullable: true
+
+    UserProfileResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/UserSummary'
+            - type: object
+              properties:
+                profile:
+                  $ref: '#/components/schemas/InvestmentPreferences'
+                mfaEnabled:
+                  type: boolean
+                createdAt:
+                  type: string
+                  format: date-time
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+        timezone:
+          type: string
+        locale:
+          type: string
+
+    InvestmentPreferences:
+      type: object
+      properties:
+        expertiseLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        riskTolerance:
+          type: string
+          enum: [conservative, balanced, aggressive]
+        investmentGoal:
+          type: string
+          enum: [growth, income, preservation, retirement, speculation]
+        investmentHorizon:
+          type: string
+          enum: [short, medium, long]
+        preferredSectors:
+          type: array
+          items:
+            type: string
+        preferredMarkets:
+          type: array
+          items:
+            type: string
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+
+    # --- Market Data ---
+    SymbolSearchResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [stock, etf, crypto, forex, index]
+        exchange:
+          type: string
+        sector:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+
+    Quote:
+      type: object
+      properties:
+        symbol:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        volume:
+          type: integer
+        dayHigh:
+          type: number
+        dayLow:
+          type: number
+        dayOpen:
+          type: number
+        prevClose:
+          type: number
+        week52High:
+          type: number
+        week52Low:
+          type: number
+        marketCap:
+          type: integer
+        avgVolume20d:
+          type: integer
+        marketStatus:
+          type: string
+          enum: [pre_market, open, post_market, closed]
+        lastTradeAt:
+          type: string
+          format: date-time
+
+    Bar:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: integer
+        vwap:
+          type: number
+          nullable: true
+
+    Fundamentals:
+      type: object
+      properties:
+        symbol:
+          type: string
+        period:
+          type: string
+        fiscalDate:
+          type: string
+          format: date
+        valuation:
+          type: object
+          properties:
+            peRatio: { type: number, nullable: true }
+            forwardPe: { type: number, nullable: true }
+            pegRatio: { type: number, nullable: true }
+            pbRatio: { type: number, nullable: true }
+            psRatio: { type: number, nullable: true }
+            evEbitda: { type: number, nullable: true }
+        growth:
+          type: object
+          properties:
+            revenueGrowth: { type: number, nullable: true }
+            epsGrowth: { type: number, nullable: true }
+            fcfGrowth: { type: number, nullable: true }
+        profitability:
+          type: object
+          properties:
+            roe: { type: number, nullable: true }
+            roic: { type: number, nullable: true }
+            grossMargin: { type: number, nullable: true }
+            operatingMargin: { type: number, nullable: true }
+            netMargin: { type: number, nullable: true }
+        financialHealth:
+          type: object
+          properties:
+            debtEquity: { type: number, nullable: true }
+            currentRatio: { type: number, nullable: true }
+            freeCashFlow: { type: integer, nullable: true }
+        dividends:
+          type: object
+          properties:
+            yield: { type: number, nullable: true }
+            payoutRatio: { type: number, nullable: true }
+            exDividendDate: { type: string, format: date, nullable: true }
+
+    IndicatorResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        timeframe:
+          type: string
+        indicators:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                timestamp:
+                  type: string
+                  format: date-time
+                value:
+                  type: number
+
+    NewsArticle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        source:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        symbols:
+          type: array
+          items:
+            type: string
+        sentimentScore:
+          type: number
+          nullable: true
+          description: "-1.0 (very negative) to +1.0 (very positive)"
+        impactLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          nullable: true
+        contentUrl:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+
+    # --- Portfolio ---
+    PortfolioSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        totalValue:
+          type: number
+        totalCost:
+          type: number
+        totalGainLoss:
+          type: number
+        totalGainLossPercent:
+          type: number
+        dayChange:
+          type: number
+        dayChangePercent:
+          type: number
+        holdingsCount:
+          type: integer
+        portfolioType:
+          type: string
+        currency:
+          type: string
+
+    Portfolio:
+      allOf:
+        - $ref: '#/components/schemas/PortfolioSummary'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            benchmarkSymbol:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    PortfolioDetail:
+      allOf:
+        - $ref: '#/components/schemas/Portfolio'
+        - type: object
+          properties:
+            holdings:
+              type: array
+              items:
+                $ref: '#/components/schemas/Holding'
+            allocation:
+              type: object
+              properties:
+                bySector:
+                  type: object
+                  additionalProperties:
+                    type: number
+                byGeography:
+                  type: object
+                  additionalProperties:
+                    type: number
+                byAssetType:
+                  type: object
+                  additionalProperties:
+                    type: number
+
+    Holding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: number
+        avgCostBasis:
+          type: number
+        currentPrice:
+          type: number
+        marketValue:
+          type: number
+        gainLoss:
+          type: number
+        gainLossPercent:
+          type: number
+        weight:
+          type: number
+          description: Percentage of portfolio
+        dayChange:
+          type: number
+        dayChangePercent:
+          type: number
+
+    CreatePortfolioRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        portfolioType:
+          type: string
+          enum: [investment, retirement, watchlist, paper_trade]
+          default: investment
+        currency:
+          type: string
+          default: USD
+        benchmarkSymbol:
+          type: string
+          default: SPY
+
+    UpdatePortfolioRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        benchmarkSymbol:
+          type: string
+
+    AddHoldingRequest:
+      type: object
+      required: [symbol, quantity, costBasis]
+      properties:
+        symbol:
+          type: string
+        quantity:
+          type: number
+          minimum: 0.00000001
+        costBasis:
+          type: number
+          minimum: 0
+          description: Cost per share
+        purchaseDate:
+          type: string
+          format: date
+        notes:
+          type: string
+
+    UpdateHoldingRequest:
+      type: object
+      properties:
+        quantity:
+          type: number
+        costBasis:
+          type: number
+        notes:
+          type: string
+
+    PerformanceData:
+      type: object
+      properties:
+        totalReturn:
+          type: number
+        annualizedReturn:
+          type: number
+        benchmarkReturn:
+          type: number
+        alpha:
+          type: number
+        timeSeries:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              portfolioValue:
+                type: number
+              benchmarkValue:
+                type: number
+              cumulativeReturn:
+                type: number
+
+    RiskAnalysis:
+      type: object
+      properties:
+        beta:
+          type: number
+        sharpeRatio:
+          type: number
+        sortinoRatio:
+          type: number
+        maxDrawdown:
+          type: number
+        volatility:
+          type: number
+        valueAtRisk95:
+          type: number
+        valueAtRisk99:
+          type: number
+        diversificationScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        correlationMatrix:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
+        concentrationRisk:
+          type: object
+          properties:
+            topHoldingWeight:
+              type: number
+            topSectorWeight:
+              type: number
+            herfindahlIndex:
+              type: number
+
+    ImportResult:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            imported:
+              type: integer
+            skipped:
+              type: integer
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  row:
+                    type: integer
+                  reason:
+                    type: string
+
+    # --- AI ---
+    AIChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          maxLength: 2000
+        conversationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Continue existing conversation
+        context:
+          type: object
+          properties:
+            symbols:
+              type: array
+              items:
+                type: string
+              description: Symbols to focus on
+            portfolioId:
+              type: string
+              format: uuid
+              description: Include portfolio context
+
+    AIStreamEvent:
+      description: Server-Sent Event format
+      type: object
+      properties:
+        event:
+          type: string
+          enum: [token, metadata, sources, done, error]
+        data:
+          type: string
+          description: JSON string with event payload
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        createdAt:
+          type: string
+          format: date-time
+
+    ConversationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        messageCount:
+          type: integer
+        lastMessageAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        confidence:
+          type: number
+          nullable: true
+        agentsUsed:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              reference:
+                type: string
+              freshness:
+                type: string
+                format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Screener ---
+    ScreenerRequest:
+      type: object
+      required: [filters]
+      properties:
+        filters:
+          type: array
+          items:
+            type: object
+            required: [column, operator, value]
+            properties:
+              column:
+                type: string
+              operator:
+                type: string
+                enum: [gt, gte, lt, lte, eq, neq, between]
+              value:
+                oneOf:
+                  - type: number
+                  - type: array
+                    items:
+                      type: number
+        sortBy:
+          type: string
+          default: market_cap
+        sortOrder:
+          type: string
+          enum: [asc, desc]
+          default: desc
+        assetTypes:
+          type: array
+          items:
+            type: string
+            enum: [stock, etf]
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+        offset:
+          type: integer
+          default: 0
+
+    ScreenerResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        sector:
+          type: string
+        price:
+          type: number
+        changePercent:
+          type: number
+        marketCap:
+          type: integer
+        peRatio:
+          type: number
+          nullable: true
+        dividendYield:
+          type: number
+          nullable: true
+        revenueGrowth:
+          type: number
+          nullable: true
+        roe:
+          type: number
+          nullable: true
+
+    ScreenerPreset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        filters:
+          type: array
+          items:
+            type: object
+
+    SaveScreenRequest:
+      type: object
+      required: [name, filters]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        filters:
+          type: array
+          items:
+            type: object
+
+    # --- Alerts ---
+    AlertRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertCondition'
+        conditionLogic:
+          type: string
+          enum: [AND, OR]
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [in_app, email, push]
+        isActive:
+          type: boolean
+        cooldownMinutes:
+          type: integer
+        lastTriggeredAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AlertCondition:
+      type: object
+      required: [type, symbol]
+      properties:
+        type:
+          type: string
+          enum: [PRICE_ABOVE, PRICE_BELOW, PRICE_CROSSES, PERCENT_CHANGE,
+                 RSI_ABOVE, RSI_BELOW, VOLUME_SPIKE, EARNINGS_WITHIN, PORTFOLIO_CHANGE]
+        symbol:
+          type: string
+        value:
+          type: number
+        direction:
+          type: string
+          enum: [up, down]
+        period:
+          type: string
+
+    CreateAlertRequest:
+      type: object
+      required: [name, conditions]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertCondition'
+          minItems: 1
+          maxItems: 5
+        conditionLogic:
+          type: string
+          enum: [AND, OR]
+          default: AND
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [in_app, email, push]
+          default: [in_app]
+        cooldownMinutes:
+          type: integer
+          minimum: 5
+          maximum: 1440
+          default: 60
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateAlertRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertCondition'
+        isActive:
+          type: boolean
+        channels:
+          type: array
+          items:
+            type: string
+        cooldownMinutes:
+          type: integer
+
+    AlertTrigger:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleId:
+          type: string
+          format: uuid
+        ruleName:
+          type: string
+        symbol:
+          type: string
+        conditionMet:
+          type: string
+        triggerValue:
+          type: number
+        acknowledged:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Backtest ---
+    CreateStrategyRequest:
+      type: object
+      required: [name, strategyType, definition, symbols]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        strategyType:
+          type: string
+          enum: [visual, code, template]
+        definition:
+          type: object
+          description: Strategy rules (visual builder JSON or code reference)
+        parameters:
+          type: object
+          additionalProperties: true
+        symbols:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        timeframe:
+          type: string
+          enum: ['1d', '1h']
+          default: '1d'
+
+    BacktestRunRequest:
+      type: object
+      required: [strategyId, startDate, endDate, initialCapital]
+      properties:
+        strategyId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        initialCapital:
+          type: number
+          minimum: 1000
+        commissionModel:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [per_trade, per_share, percentage]
+            value:
+              type: number
+          default:
+            type: per_trade
+            value: 0
+        slippageBps:
+          type: number
+          default: 5
+        benchmark:
+          type: string
+          default: SPY
+
+    BacktestResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        progress:
+          type: number
+        metrics:
+          type: object
+          nullable: true
+          properties:
+            totalReturn:
+              type: number
+            cagr:
+              type: number
+            sharpeRatio:
+              type: number
+            sortinoRatio:
+              type: number
+            maxDrawdown:
+              type: number
+            winRate:
+              type: number
+            profitFactor:
+              type: number
+            totalTrades:
+              type: integer
+            volatility:
+              type: number
+            calmarRatio:
+              type: number
+            alpha:
+              type: number
+            beta:
+              type: number
+        equityCurve:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              equity:
+                type: number
+              benchmark:
+                type: number
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- Common ---
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+              field:
+                type: string
+                nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    CursorMeta:
+      type: object
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+        hasMore:
+          type: boolean

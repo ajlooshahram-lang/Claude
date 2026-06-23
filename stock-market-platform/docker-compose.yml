@@ -1,0 +1,133 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------
+  postgres:
+    image: timescale/timescaledb-ha:pg16
+    container_name: investoriq-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: investoriq
+      POSTGRES_USER: investoriq
+      POSTGRES_PASSWORD: dev_password_change_me
+    volumes:
+      - postgres_data:/home/postgres/pgdata/data
+      - ./src/backend/shared/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U investoriq"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: investoriq-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: investoriq-elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: investoriq-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: --jetstream --store_dir /data
+    volumes:
+      - nats_data:/data
+
+  # ---------------------------------------------------------------
+  # Application Services
+  # ---------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./src/backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: investoriq-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      USER_SERVICE_URL: http://user-service:3001
+      MARKET_DATA_SERVICE_URL: http://market-data-service:3002
+      PORTFOLIO_SERVICE_URL: http://portfolio-service:3003
+      AI_ORCHESTRATOR_URL: http://ai-orchestrator:3004
+      CORS_ORIGINS: http://localhost:3100
+    depends_on:
+      redis:
+        condition: service_started
+
+  ai-orchestrator:
+    build:
+      context: ./src/backend/ai-orchestrator
+      dockerfile: Dockerfile
+    container_name: investoriq-ai-orchestrator
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      MARKET_DATA_SERVICE_URL: http://market-data-service:3002
+      FACTOR_MODEL_URL: http://factor-model:3010
+    depends_on:
+      - redis
+
+  # ---------------------------------------------------------------
+  # ML Services (Python)
+  # ---------------------------------------------------------------
+  factor-model:
+    build:
+      context: ./src/ml-services/factor-model
+      dockerfile: Dockerfile
+    container_name: investoriq-factor-model
+    ports:
+      - "3010:3010"
+    environment:
+      PORT: 3010
+
+  # ---------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile.dev
+    container_name: investoriq-frontend
+    ports:
+      - "3100:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:3000
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  redis_data:
+  es_data:
+  nats_data:
