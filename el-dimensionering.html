@@ -1679,6 +1679,13 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Cascade TCC cross-module device reactivity (DS/HD 60364-5-53 cl.536.4) =====
+  'Module-selected devices (live sync)': '\u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0631 \u0645\u0627\u0698\u0648\u0644 (\u0647\u0645\u200C\u0632\u0645\u0627\u0646\u200C\u0633\u0627\u0632\u06CC \u0632\u0646\u062F\u0647)',
+  'Devices selected in the Fuse/MCB/MCCB/Relay/RCD modules are reflected here automatically via the reactive bus.': '\u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0631 \u0645\u0627\u0698\u0648\u0644\u200C\u0647\u0627\u06CC \u0641\u06CC\u0648\u0632/MCB/MCCB/\u0631\u0644\u0647/RCD \u0628\u0647\u200C\u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0628\u0627\u0633 \u0648\u0627\u06A9\u0646\u0634\u06CC \u0627\u06CC\u0646\u062C\u0627 \u0646\u0645\u0627\u06CC\u0634 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.',
+  'Module': '\u0645\u0627\u0698\u0648\u0644',
+  'No trip': '\u0628\u062F\u0648\u0646 \u062A\u0631\u06CC\u067E',
+  'Relay': '\u0631\u0644\u0647',
+  'Definite time': '\u0632\u0645\u0627\u0646 \u0645\u0639\u06CC\u0646',
   // ===== TCC cable-damage / I2t let-through overlays (DS/HD 60364-4-43 cl.434.5.2) =====
   'Cable damage curve t=(k\u00B7S/I)\u00B2 and I\u00B2t let-through per DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu, 143 XLPE/Cu, 76 PVC/Al, 94 XLPE/Al.': '\u0645\u0646\u062D\u0646\u06CC \u0622\u0633\u06CC\u0628 \u06A9\u0627\u0628\u0644 t=(k\u00B7S/I)\u00B2 \u0648 \u0639\u0628\u0648\u0631 I\u00B2t \u0637\u0628\u0642 DS/HD 60364-4-43 cl.434.5.2 / DS/HD 60364-5-54. k: 115 PVC/Cu\u060C 143 XLPE/Cu\u060C 76 PVC/Al\u060C 94 XLPE/Al.',
   'Cable cross-section (damage curve)': '\u0645\u0642\u0637\u0639 \u06A9\u0627\u0628\u0644 (\u0645\u0646\u062D\u0646\u06CC \u0622\u0633\u06CC\u0628)',
@@ -7868,6 +7875,21 @@ SharedQuantities.subscribe('*', function(name, value, source) {
   }
 });
 
+// === Protection-device coordination link (DS/HD 60364-5-53 cl.536.4) ===
+// When the protection-device set changes in ANY module (Fuse/MCB/MCCB/Relay/RCD or the
+// SLD device pickers), the cascade time-current coordination view must reflect the new
+// device set automatically. The wildcard subscriber above already re-renders the active
+// module on any change; this explicit subscriber documents the safety-critical link and
+// guarantees the cascade view is refreshed even if it is the active module.
+SharedQuantities.subscribe('protection_device_set', function(sig, source) {
+  if (typeof activeModule !== 'undefined' && activeModule === 'tcc') {
+    if (typeof renderModule === 'function' && typeof document !== 'undefined') {
+      var el = document.getElementById('mainContent');
+      if (el && el.tagName) renderModule('tcc');
+    }
+  }
+});
+
 // === Bidirectional faktorState wiring: update faktorState.quantities from SharedQuantities ===
 SharedQuantities.subscribe('voltage_phase', function(v, source) {
   if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.voltage = v;
@@ -10936,6 +10958,112 @@ function renderCascadeTCC() {
     html += '<div class="result-row"><span class="label">' + tx('Margin','Margin') + '</span><span class="value">' + chartResult.marginMs.toFixed(0) + ' ms</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">DS/HD 60364-5-53 cl.536.4</span></div></div>';
   }
+  // Live readout of devices selected in the standalone modules (Fuse/MCB/MCCB/Relay/RCD).
+  // Kept in sync with this cascade view through the SharedQuantities reactive bus so a
+  // device change ANYWHERE is reflected here without re-opening the view. cl.536.4.
+  html += tccRenderStandaloneSection(tccState.cursorCurrent);
+  html += '</div>';
+  return html;
+}
+
+// ===== CASCADE TCC <-> MODULE DEVICE REACTIVITY =====
+// DS/HD 60364-5-53 cl.536.4 (selectivity/coordination): the cascade coordination view
+// must stay in sync with the protection devices selected in ANY module. We publish the
+// full protection-device set onto the SharedQuantities reactive bus, reusing the existing
+// debounced wildcard re-render so the active cascade view stays current without the user
+// re-opening or re-triggering it. The collect/signature helpers are pure (no DOM) and are
+// exercised directly by the headless test suite. Conservative: this only reflects the
+// real, already-selected devices - it never invents products or alters a safety verdict.
+
+function tccStandaloneDevices() {
+  // Chart-compatible {device, In, name, settings, source} entries for the fully-specified
+  // standalone selections. Each device object mirrors EXACTLY what the owning module feeds
+  // to sldDeviceCurve / renderDeviceTCCCard, so the curves/I2t are identical.
+  var out = [];
+  // Fuse (gG, IEC 60269) - requires a chosen size with a known 5 s point
+  if (typeof fuseState !== 'undefined' && fuseState.size && typeof FUSE_5S !== 'undefined' && FUSE_5S[fuseState.size]) {
+    out.push({ source: 'fuse', name: 'gG ' + fuseState.size + 'A', In: fuseState.size,
+      device: { i5s: FUSE_5S[fuseState.size], rating: fuseState.size }, settings: null });
+  }
+  // MCB (IEC 60898) - requires curve + rating
+  if (typeof mcbState !== 'undefined' && mcbState.curve && mcbState.rating) {
+    out.push({ source: 'mcb', name: 'MCB ' + mcbState.curve + mcbState.rating, In: mcbState.rating,
+      device: { curve: mcbState.curve, rating: mcbState.rating }, settings: null });
+  }
+  // MCCB (IEC 60947-2) - requires frame + In
+  if (typeof mccbState !== 'undefined' && mccbState.frame && mccbState.inVal && typeof MCCB_FRAMES !== 'undefined' && MCCB_FRAMES[mccbState.frame]) {
+    out.push({ source: 'mccb', name: 'MCCB ' + mccbState.frame + ' ' + mccbState.inVal + 'A', In: mccbState.inVal,
+      device: { frame: mccbState.frame, inOptions: MCCB_FRAMES[mccbState.frame].inOptions }, settings: { io: mccbState.ioMult, isd: mccbState.isdMult } });
+  }
+  return out;
+}
+
+function tccProtectionSignature() {
+  // Deterministic signature of the WHOLE protection configuration: the sldTree
+  // path/protection devices (the cascade's primary device set) plus the standalone module
+  // selections (Fuse/MCB/MCCB/Relay/RCD). Any device change anywhere flips the signature,
+  // which is what drives the reactive bus. Pure function (no DOM) - unit testable.
+  var parts = [];
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  if (tree && tree.nodes) {
+    var ids = Object.keys(tree.nodes).sort();
+    for (var i = 0; i < ids.length; i++) {
+      var n = tree.nodes[ids[i]];
+      if (!n || !n.protection) continue;
+      var pid = n.protection.id || n.protection.model || n.protection.curve || n.protection.frame || '?';
+      parts.push(ids[i] + ':' + pid + '@' + (n.protectionIn || (n.protection.rating || 0)));
+    }
+  }
+  var sa = tccStandaloneDevices();
+  for (var s = 0; s < sa.length; s++) {
+    parts.push(sa[s].source + ':' + sa[s].name + '@' + sa[s].In);
+  }
+  // Relay (IEC 60255) - definite/IDMT settings determine its curve
+  if (typeof relayState !== 'undefined') {
+    parts.push('relay:' + relayState.relayType + '/' + relayState.curveType + '/Igt' + relayState.Igt + '/tGt' + relayState.tGt + '/Igg' + relayState.Igg + '/tGg' + relayState.tGg + '/kVA' + relayState.trafoKVA);
+  }
+  // RCD (IEC 61008) - type + sensitivity
+  if (typeof rcdSelected !== 'undefined' && rcdSelected) {
+    parts.push('rcd:' + rcdSelected + '/' + (typeof rcdSensitivity !== 'undefined' ? rcdSensitivity : ''));
+  }
+  return parts.join('|');
+}
+
+function tccSyncDeviceSet(source) {
+  // Publish the protection-device set onto the reactive bus (established set() pattern).
+  if (typeof SharedQuantities === 'undefined') return;
+  SharedQuantities.set('protection_device_set', tccProtectionSignature(), source);
+}
+
+function tccRenderStandaloneSection(cursorCurrent) {
+  // Live coordination readout for devices selected in the standalone modules. This is what
+  // makes the cascade view reflect device picks made ANYWHERE; it is kept current through the
+  // reactive bus. DS/HD 60364-5-53 cl.536.4. Click-only / read-only (no inputs).
+  var sa = tccStandaloneDevices();
+  var hasRelay = (typeof relayState !== 'undefined');
+  var hasRcd = (typeof rcdSelected !== 'undefined' && rcdSelected);
+  if (sa.length === 0 && !hasRelay && !hasRcd) return '';
+  var cur = cursorCurrent || ((typeof tccState !== 'undefined' && tccState.cursorCurrent) ? tccState.cursorCurrent : 1000);
+  var curLbl = cur >= 1000 ? (cur / 1000) + 'kA' : cur + 'A';
+  var html = '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Modulvalgte enheder (live sync)', 'Module-selected devices (live sync)') + ' - DS/HD 60364-5-53 cl.536.4</div>';
+  html += '<div class="info-row" style="font-size:0.85em;opacity:0.85">' + tx('Enheder valgt i Sikring/MCB/MCCB/Relae/RCD-modulerne afspejles automatisk her via den reaktive bus.', 'Devices selected in the Fuse/MCB/MCCB/Relay/RCD modules are reflected here automatically via the reactive bus.') + '</div>';
+  if (sa.length > 0) {
+    html += '<table class="result-table"><tr><th>' + tx('Modul', 'Module') + '</th><th>' + tx('Enhed', 'Device') + '</th><th>In [A]</th><th>' + tx('Udloesningstid', 'Trip Time') + ' [s] @ ' + curLbl + '</th><th>I\u00B2t [A\u00B2s]</th></tr>';
+    for (var i = 0; i < sa.length; i++) {
+      var d = sa[i];
+      var t = sldGetTripTime(d.device, d.In, cur, d.settings || null);
+      var trips = (t !== Infinity && t < 99999);
+      var i2t = trips ? tccCalcI2t(d.device, d.In, cur) : null;
+      html += '<tr><td>' + d.source.toUpperCase() + '</td><td>' + d.name + '</td><td>' + d.In + '</td><td>' + (trips ? t.toFixed(3) : tx('Ingen udl.', 'No trip')) + '</td><td>' + (i2t ? tccFormatI2t(i2t.total) : '-') + '</td></tr>';
+    }
+    html += '</table>';
+  }
+  if (hasRelay) {
+    html += '<div class="result-row"><span class="label">' + tx('Relae', 'Relay') + ' (IEC 60255)</span><span class="value">' + (relayState.relayType === 'inverse' ? ('IDMT ' + relayState.curveType) : tx('Bestemt tid', 'Definite time')) + ', I>=' + relayState.Igt + '\u00B7In, t>=' + relayState.tGt + 's</span></div>';
+  }
+  if (hasRcd) {
+    html += '<div class="result-row"><span class="label">RCD (IEC 61008)</span><span class="value">' + rcdSelected + (typeof rcdSensitivity !== 'undefined' && rcdSensitivity ? ' / ' + rcdSensitivity + 'mA' : '') + '</span></div>';
+  }
   html += '</div>';
   return html;
 }
@@ -11534,6 +11662,13 @@ function syncSharedQuantities(mod) {
         }
       }
       break;
+  }
+  // Cross-module protection-device reactivity (DS/HD 60364-5-53 cl.536.4): whenever a
+  // protection module or the SLD device picker re-renders, republish the full device set
+  // so the cascade coordination view (renderCascadeTCC) stays in sync via the reactive bus.
+  if (mod === 'fuse' || mod === 'mcb' || mod === 'mccb' || mod === 'relay' ||
+      mod === 'standards' || mod === 'sld' || mod === 'tcc') {
+    if (typeof tccSyncDeviceSet === 'function') tccSyncDeviceSet(mod);
   }
 }
 
