@@ -26201,6 +26201,208 @@ function cxStepSupply(Un_kV, Sk_max_MVA, Sk_min_MVA, RX_max, RX_min, ek_pct, Sn_
   return { steps: steps, results: results };
 }
 
+// --- KB-kontrol (Short-circuit protection per DS/HD 60364-4-43 §434.5.2) ---
+// Adiabatic condition: k²S² ≥ I²t
+// k = 115 (Cu/PVC), 143 (Cu/XLPE), 76 (Al/PVC), 94 (Al/XLPE)
+// S = cable cross-section [mm²]
+// I = Ik,max [A] at the point
+// t = protection device clearing time [s]
+function cxKBKontrol(Ik_A, t_s, S_mm2, material, insulation) {
+  var k = 115; // default Cu/PVC
+  if (material === 'Cu' && insulation === 'XLPE') k = 143;
+  else if (material === 'Cu') k = 115;
+  else if (material === 'Al' && insulation === 'XLPE') k = 94;
+  else if (material === 'Al') k = 76;
+
+  var I2t = Ik_A * Ik_A * t_s;           // let-through energy [A²s]
+  var k2S2 = (k * S_mm2) * (k * S_mm2);  // cable withstand [A²s]
+  var ok = k2S2 >= I2t;
+
+  var steps = [];
+  steps.push(cxScalarStep('I\u00B2t', 'I<sub>K,max</sub>\u00B2 \u00D7 t<sub>sik</sub>',
+    Ik_A.toFixed(0) + '\u00B2 \u00D7 ' + t_s,
+    (I2t/1e6).toFixed(2) + ' \u00D7 10\u2076', 'A\u00B2s', null));
+  steps.push(cxScalarStep('k\u00B2S\u00B2', '(k \u00D7 S)\u00B2',
+    '(' + k + ' \u00D7 ' + S_mm2 + ')\u00B2',
+    (k2S2/1e6).toFixed(2) + ' \u00D7 10\u2076', 'A\u00B2s',
+    'k = ' + k + ' (' + material + '/' + insulation + ')'));
+  steps.push(cxScalarStep(tx('Kontrol', 'Check'), 'k\u00B2S\u00B2 \u2265 I\u00B2t',
+    (k2S2/1e6).toFixed(2) + ' \u2265 ' + (I2t/1e6).toFixed(2) + ' ?',
+    ok ? '\u2705 OK \u2014 ' + tx('Kablet er kortslutningsbeskyttet', 'Cable is SC protected') :
+         '\u274C FEJL \u2014 ' + tx('Kablet er IKKE beskyttet!', 'Cable is NOT protected!'),
+    '', tx('DS/HD 60364-4-43 \u00A7434.5.2', 'DS/HD 60364-4-43 \u00A7434.5.2')));
+
+  return { ok: ok, I2t: I2t, k2S2: k2S2, k: k, steps: steps };
+}
+
+// --- FB-kontrol (Fault protection per DS/HD 60364-4-41 §411.3.2) ---
+// Condition: Ik,min ≥ Ia (trip current of protection device)
+// For MCB: Ia = multiplier × In (B:5×, C:10×, D:20×)
+// For fuse: Ia = I_5s (current causing trip in 5s)
+// Disconnection times: TN final ≤32A → 0.4s; TN distribution → 5s; TT → 0.2s/1s
+function cxFBKontrol(Ik_min_A, deviceIn, deviceType, deviceCurve, earthSystem, circuitType) {
+  var Ia = 0;
+  var ta_required = 5; // default distribution
+
+  // Determine required disconnection time
+  if (earthSystem === 'TT') {
+    ta_required = (circuitType === 'final' && deviceIn <= 32) ? 0.2 : 1.0;
+  } else { // TN
+    ta_required = (circuitType === 'final' && deviceIn <= 32) ? 0.4 : 5.0;
+  }
+
+  // Determine Ia (trip current)
+  if (deviceType === 'MCB') {
+    var mult = deviceCurve === 'B' ? 5 : deviceCurve === 'C' ? 10 : deviceCurve === 'D' ? 20 : 10;
+    Ia = mult * deviceIn;
+  } else if (deviceType === 'fuse' || deviceType === 'gG') {
+    // For fuses, Ia at required time is approximately 2.5×In for 5s, 4×In for 0.4s
+    Ia = (ta_required <= 0.4) ? 4 * deviceIn : 2.5 * deviceIn;
+  } else if (deviceType === 'MCCB') {
+    // MCCB Isd setting
+    Ia = deviceIn * 8; // typical Isd = 8×Ir
+  } else {
+    Ia = 5 * deviceIn; // fallback
+  }
+
+  var ok = Ik_min_A >= Ia;
+  var margin = Ik_min_A / Ia;
+
+  var steps = [];
+  steps.push(cxScalarStep('I<sub>a</sub>', tx('Udloesestraem for beskyttelsen', 'Trip current for protection device'),
+    (deviceType || 'MCB') + ' ' + (deviceCurve || '') + deviceIn + 'A: ' + (deviceType === 'MCB' ? (deviceCurve||'C') + '\u00D7In' : 'I_5s'),
+    Ia.toFixed(0), 'A',
+    tx('Kravet: I<sub>K,min</sub> \u2265 I<sub>a</sub>', 'Requirement: I<sub>K,min</sub> \u2265 I<sub>a</sub>')));
+  steps.push(cxScalarStep('t<sub>a,krav</sub>', tx('Kraevet frakoblingstid', 'Required disconnection time'),
+    earthSystem + ', ' + circuitType + ', In=' + deviceIn + 'A',
+    ta_required, 's',
+    'DS/HD 60364-4-41 \u00A7411.3.2 Tabel 41.1'));
+  steps.push(cxScalarStep(tx('Kontrol', 'Check'), 'I<sub>K,min</sub> \u2265 I<sub>a</sub>',
+    Ik_min_A.toFixed(0) + ' \u2265 ' + Ia.toFixed(0) + ' ?',
+    ok ? '\u2705 OK \u2014 ' + tx('Fejlbeskyttelsen er effektiv (margin: ' + margin.toFixed(2) + ')', 'Fault protection effective (margin: ' + margin.toFixed(2) + ')') :
+         '\u274C FEJL \u2014 ' + tx('Fejlbeskyttelsen er IKKE effektiv! I<sub>K,min</sub> < I<sub>a</sub>', 'Fault protection NOT effective! I<sub>K,min</sub> < I<sub>a</sub>'),
+    '', null));
+
+  return { ok: ok, Ia: Ia, Ik_min: Ik_min_A, margin: margin, ta_required: ta_required, steps: steps };
+}
+
+// --- Cable sizing with full correction factor audit trail (Viggo method) ---
+// Returns: { Iz_tabel, kt, ks, kd, ktm, Iz_corrected, steps[], ok }
+// Each correction factor cites its specific table reference.
+function cxCableSizing(In_A, installMethod, temperature, grouping, cableMm2, material, insulation) {
+  material = material || 'Cu';
+  insulation = insulation || 'XLPE';
+  var steps = [];
+
+  // 1. Installation method → reference table
+  var methodRef = 'Tabel A.52.3';
+  var columnRef = 'Tabel B.52.1';
+  steps.push(cxScalarStep(tx('Installationsmetode', 'Installation method'), methodRef,
+    tx('Metode', 'Method') + ' ' + (installMethod || 'C'),
+    tx('Kolonne', 'Column') + ': ' + columnRef, '',
+    'DS/HD 60364-5-52'));
+
+  // 2. Look up Iz,tabel
+  var izTable;
+  if (material === 'Al') {
+    izTable = (insulation === 'XLPE' ? IZ_ALU_XLPE : IZ_ALU)[cableMm2] || 0;
+  } else {
+    izTable = (insulation === 'XLPE' ? IZ_COPPER_XLPE : IZ_COPPER)[cableMm2] || 0;
+  }
+  steps.push(cxScalarStep('I<sub>z,tabel</sub>', tx('Tabelvaerdi for', 'Table value for') + ' ' + cableMm2 + ' mm\u00B2 ' + material,
+    'Tabel B.52.4' + (insulation === 'XLPE' ? ' (90\u00B0C)' : ' (70\u00B0C)'),
+    izTable, 'A', null));
+
+  // 3. Temperature correction factor
+  var kt = TEMP_FACTORS[temperature] || 1.0;
+  steps.push(cxScalarStep('k<sub>t</sub>', tx('Temperaturkorrektion', 'Temperature correction'),
+    temperature + '\u00B0C, Tabel B.52.14',
+    kt.toFixed(2), '',
+    insulation === 'XLPE' ? '(ref. 30\u00B0C for kabler i luft)' : '(ref. 30\u00B0C)'));
+
+  // 4. Grouping correction factor
+  var ks = GROUP_FACTORS[grouping] || 1.0;
+  steps.push(cxScalarStep('k<sub>s</sub>', tx('Grupperingskorrektion', 'Grouping correction'),
+    grouping + ' ' + tx('belastede kredse', 'loaded circuits') + ', Tabel B.52.17',
+    ks.toFixed(2), '', null));
+
+  // 5. Corrected Iz
+  var Iz_corr = izTable * kt * ks;
+  steps.push(cxScalarStep('I<sub>z,korr</sub>', 'I<sub>z,tabel</sub> \u00D7 k<sub>t</sub> \u00D7 k<sub>s</sub>',
+    izTable + ' \u00D7 ' + kt.toFixed(2) + ' \u00D7 ' + ks.toFixed(2),
+    Iz_corr.toFixed(1), 'A', null));
+
+  // 6. Check IB ≤ In ≤ Iz
+  var ok = Iz_corr >= In_A;
+  steps.push(cxScalarStep(tx('OB-kontrol', 'OL check'), 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>z</sub>',
+    In_A.toFixed(1) + ' \u2264 ' + In_A.toFixed(0) + ' \u2264 ' + Iz_corr.toFixed(1) + ' ?',
+    ok ? '\u2705 OK' : '\u274C ' + tx('Kablet er for lille!', 'Cable too small!'),
+    '', 'DS/HD 60364-4-43 \u00A7433.1'));
+
+  return { izTable: izTable, kt: kt, ks: ks, Iz_corr: Iz_corr, ok: ok, steps: steps };
+}
+
+// --- Belastningsskema: vectorial current summation with angles ---
+// Each load: { name, P_kW, cosPhi, phases, Sf, assignedPhase }
+// Returns per-phase currents as complex (magnitude ∠ -arccos(cosφ))
+function cxBelastningsskema(loads, Un) {
+  Un = Un || 400;
+  var L1 = cxRect(0, 0), L2 = cxRect(0, 0), L3 = cxRect(0, 0);
+  var rows = [];
+
+  for (var i = 0; i < loads.length; i++) {
+    var ld = loads[i];
+    var P = ld.P_kW * 1000;
+    var cos = ld.cosPhi || 0.9;
+    var sf = ld.Sf || 1.0;
+    var angleDeg = -Math.acos(cos) * 180 / Math.PI; // negative = lagging
+
+    var I_mag;
+    if (ld.phases === 3 || ld.phases === '3x400') {
+      I_mag = P / (Math.sqrt(3) * Un * cos);
+    } else {
+      I_mag = P / (230 * cos);
+    }
+    I_mag *= sf; // apply simultaneity
+
+    var I_phasor = cxPolar(I_mag, angleDeg);
+
+    if (ld.phases === 3 || ld.phases === '3x400') {
+      // 3-phase: equal on all phases
+      L1 = cxAdd(L1, I_phasor);
+      L2 = cxAdd(L2, I_phasor);
+      L3 = cxAdd(L3, I_phasor);
+    } else {
+      // 1-phase: assigned to specific phase
+      var ph = ld.assignedPhase || 'L1';
+      if (ph === 'L1') L1 = cxAdd(L1, I_phasor);
+      else if (ph === 'L2') L2 = cxAdd(L2, I_phasor);
+      else L3 = cxAdd(L3, I_phasor);
+    }
+
+    rows.push({
+      name: ld.name || ('Last ' + (i+1)),
+      I_mag: I_mag,
+      angle: angleDeg,
+      phases: ld.phases,
+      cosPhi: cos,
+      Sf: sf,
+      P_kW: ld.P_kW
+    });
+  }
+
+  // The dimensioning current is the LARGEST phase (magnitude of vector sum)
+  var IB = Math.max(cxMag(L1), cxMag(L2), cxMag(L3));
+  var angleIB = cxAngleDeg(cxMag(L1) >= cxMag(L2) && cxMag(L1) >= cxMag(L3) ? L1 : cxMag(L2) >= cxMag(L3) ? L2 : L3);
+
+  return {
+    L1: L1, L2: L2, L3: L3,
+    IB: IB, angleIB: angleIB,
+    rows: rows,
+    cosPhi_total: Math.cos(Math.abs(angleIB) * Math.PI / 180)
+  };
+}
+
 var impedansState = {
   connection: 'series',   // 'series' or 'parallel'
   R: 100,                 // Ohm

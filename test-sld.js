@@ -18885,6 +18885,77 @@ test('Complex numbers engine is non-invasive (existing impedans calculations unc
   assert(Math.abs(res.XC - 31830.99) < 1, 'XC unchanged: ' + res.XC);
 });
 
+// === KB/FB-kontrol + Cable Sizing + Belastningsskema Tests ===
+test('cxKBKontrol: 10kA for 0.5s on 25mm² Cu/XLPE is protected (k=143)', function() {
+  var r = cxKBKontrol(10000, 0.5, 25, 'Cu', 'XLPE');
+  // k²S² = (143*25)² = 3575² = 12,780,625 A²s
+  // I²t = 10000² * 0.5 = 50,000,000 A²s → NOT ok
+  assert.strictEqual(r.ok, false, 'Should FAIL: 50M > 12.78M');
+  assert(r.steps.length >= 3, 'should have 3 steps');
+});
+
+test('cxKBKontrol: 5kA for 0.1s on 25mm² Cu/XLPE IS protected', function() {
+  var r = cxKBKontrol(5000, 0.1, 25, 'Cu', 'XLPE');
+  // I²t = 5000² * 0.1 = 2,500,000; k²S² = (143*25)² = 12,780,625 → OK
+  assert.strictEqual(r.ok, true, 'Should pass: 12.78M > 2.5M');
+});
+
+test('cxFBKontrol: Ik,min=2500A vs B16 MCB → effective (Ia=80A)', function() {
+  var r = cxFBKontrol(2500, 16, 'MCB', 'B', 'TN', 'final');
+  assert.strictEqual(r.ok, true, 'Should pass: 2500 > 80');
+  assert.strictEqual(r.Ia, 80, 'Ia for B16 = 5×16 = 80A');
+  assert.strictEqual(r.ta_required, 0.4, 'TN final ≤32A → 0.4s');
+});
+
+test('cxFBKontrol: Ik,min=50A vs C16 MCB → NOT effective (Ia=160A)', function() {
+  var r = cxFBKontrol(50, 16, 'MCB', 'C', 'TN', 'final');
+  assert.strictEqual(r.ok, false, 'Should FAIL: 50 < 160');
+  assert.strictEqual(r.Ia, 160, 'Ia for C16 = 10×16 = 160A');
+});
+
+test('cxFBKontrol: TT system uses 0.2s for final circuits', function() {
+  var r = cxFBKontrol(1000, 16, 'MCB', 'B', 'TT', 'final');
+  assert.strictEqual(r.ta_required, 0.2, 'TT final → 0.2s');
+});
+
+test('cxCableSizing: 2.5mm² Cu/XLPE at 30°C, 1 circuit → Iz=30A', function() {
+  var r = cxCableSizing(16, 'C', 30, 1, 2.5, 'Cu', 'XLPE');
+  assert.strictEqual(r.izTable, 30, 'Iz,tabel for 2.5mm² Cu XLPE = 30A');
+  assert.strictEqual(r.kt, 1.0, 'kt at 30°C = 1.0');
+  assert.strictEqual(r.ks, 1.0, 'ks for 1 circuit = 1.0');
+  assert.strictEqual(r.ok, true, 'Iz=30 ≥ In=16 → ok');
+  assert(r.steps.length >= 5, 'should have audit trail steps');
+});
+
+test('cxCableSizing: 1.5mm² Cu at 35°C, 3 circuits → Iz too low for 16A', function() {
+  var r = cxCableSizing(16, 'C', 35, 3, 1.5, 'Cu', 'XLPE');
+  // Iz,tabel=22, kt=0.94, ks=0.70 → Iz=22*0.94*0.70 = 14.5 < 16 → FAIL
+  assert.strictEqual(r.ok, false, 'Should fail: corrected Iz < In');
+});
+
+test('cxBelastningsskema: single 3-phase load returns correct IB', function() {
+  var r = cxBelastningsskema([{ name: 'Motor', P_kW: 11, cosPhi: 0.85, phases: 3, Sf: 1 }], 400);
+  // I = 11000/(√3·400·0.85) = 18.7A
+  assert(Math.abs(r.IB - 18.7) < 0.2, 'IB should be ~18.7A, got ' + r.IB.toFixed(1));
+  assert(r.rows.length === 1, 'should have 1 row');
+});
+
+test('cxBelastningsskema: mixed 1+3 phase loads sum vectorially', function() {
+  var r = cxBelastningsskema([
+    { name: 'Motor', P_kW: 11, cosPhi: 0.85, phases: 3, Sf: 1 },
+    { name: 'Lys L1', P_kW: 2.3, cosPhi: 1.0, phases: 1, Sf: 1, assignedPhase: 'L1' }
+  ], 400);
+  // L1 should be larger than L2/L3 because of the lighting load
+  assert(cxMag(r.L1) > cxMag(r.L2), 'L1 should be larger than L2');
+  assert(r.cosPhi_total > 0 && r.cosPhi_total <= 1, 'cosPhi should be valid');
+});
+
+test('cxBelastningsskema: simultaneity factor reduces current', function() {
+  var full = cxBelastningsskema([{ name: 'X', P_kW: 10, cosPhi: 0.9, phases: 3, Sf: 1 }], 400);
+  var half = cxBelastningsskema([{ name: 'X', P_kW: 10, cosPhi: 0.9, phases: 3, Sf: 0.5 }], 400);
+  assert(half.IB < full.IB * 0.6, 'Sf=0.5 should halve the current');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
