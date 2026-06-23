@@ -17399,6 +17399,324 @@ test('renderTjekAlt now shows installation type buttons', function() {
   assert(html.indexOf('EV') >= 0 || html.indexOf('Solar') >= 0, 'Should show EV/Solar buttons');
 });
 
+// ============================================================================
+// === Innovation Modules Tests (8 modules + dedupe + nav consistency) =======
+// ============================================================================
+console.log('\n=== Innovation Modules Tests ===');
+
+// Read the raw HTML once for translation/nav/case assertions.
+var _innovHtml = fs.readFileSync(__dirname + '/el-dimensionering.html', 'utf8');
+
+// ---- 1. Installation Time Machine (renderTidsrejse) ----
+test('renderTidsrejse returns non-empty HTML with timeline SVG', function() {
+  var html = renderTidsrejse();
+  assert(html.length > 200, 'Should return substantial HTML');
+  assert(html.indexOf('<svg') >= 0, 'Should contain a timeline SVG');
+});
+test('renderTidsrejse references thermal utilisation IB/Iz', function() {
+  var html = renderTidsrejse();
+  assert(html.indexOf('IB/Iz') >= 0, 'Should mention IB/Iz utilisation');
+});
+test('tidsrejsePredict returns a service window with severity', function() {
+  var p = tidsrejsePredict({ power_kW: 3.45, cosPhi: 0.95, phases: '1x230', voltage: 230, cable: { iz: 20 }, _ib: 16 });
+  assert(typeof p.firstService === 'number' && p.firstService > 0, 'firstService should be positive');
+  assert(['low', 'medium', 'high'].indexOf(p.severity) >= 0, 'severity should be valid');
+});
+test('tidsrejsePredict gives earlier service for high utilisation', function() {
+  var hi = tidsrejsePredict({ cable: { iz: 10 }, _ib: 9.5 });
+  var lo = tidsrejsePredict({ cable: { iz: 100 }, _ib: 10 });
+  assert(hi.firstService <= lo.firstService, 'Higher utilisation => earlier (smaller) service window');
+});
+test('renderTidsrejse selecting a circuit shows reasoning', function() {
+  var tree = simEnsureTree();
+  var c = simGetCircuits(tree)[0];
+  tidsrejseState.selectedId = c ? c.id : null;
+  var html = renderTidsrejse();
+  assert(html.indexOf('Design') >= 0 || html.indexOf('IB') >= 0, 'Should show reasoning detail');
+  tidsrejseState.selectedId = null;
+});
+test('renderTidsrejse is click-only (no text inputs)', function() {
+  var html = renderTidsrejse();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 2. Expansion DNA (renderUdvidelse) ----
+test('renderUdvidelse returns non-empty HTML with scenario buttons', function() {
+  var html = renderUdvidelse();
+  assert(html.length > 200);
+  assert(html.indexOf('udvidelseState.scenario') >= 0, 'Should have clickable scenarios');
+});
+test('UDVIDELSE_SCENARIOS has EV/solar/battery/heatpump/tenant entries', function() {
+  var ids = UDVIDELSE_SCENARIOS.map(function(s) { return s.id; });
+  ['ev11', 'ev22', 'solar10', 'battery', 'heatpump', 'tenant'].forEach(function(id) {
+    assert(ids.indexOf(id) >= 0, 'Should include scenario ' + id);
+  });
+});
+test('udvidelseAnalyze returns feasibility with spare capacity and cost', function() {
+  var r = udvidelseAnalyze('ev11');
+  assert(r !== null, 'Should return result');
+  assert(typeof r.feasible === 'boolean', 'feasible boolean');
+  assert(typeof r.spare === 'number', 'spare number');
+  assert(r.sc.readyCost > 0, 'future-ready cost in DKK');
+});
+test('udvidelseAnalyze flags bottleneck for large 22kW load', function() {
+  var r = udvidelseAnalyze('ev22');
+  if (!r.feasible) assert(r.bottleneckEn.length > 0, 'Should describe a bottleneck when not feasible');
+  else assert(r.upgradeEn.length > 0, 'Should describe an action when feasible');
+});
+test('renderUdvidelse selected scenario shows feasibility section', function() {
+  udvidelseState.scenario = 'heatpump';
+  var html = renderUdvidelse();
+  assert(html.indexOf('DKK') >= 0, 'Should show DKK cost');
+  udvidelseState.scenario = null;
+});
+test('renderUdvidelse is click-only', function() {
+  var html = renderUdvidelse();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 3. Friday Afternoon Detector (renderRisikotjek) ----
+test('renderRisikotjek returns non-empty HTML with risk gauge', function() {
+  var html = renderRisikotjek();
+  assert(html.length > 200);
+  assert(html.indexOf('<svg') >= 0, 'Should contain risk gauge SVG');
+});
+test('risikotjekAnalyze returns a bounded risk score and factors', function() {
+  var a = risikotjekAnalyze();
+  assert(a.risk >= 0 && a.risk <= 100, 'risk in 0..100');
+  assert(Array.isArray(a.factors) && a.factors.length > 0, 'has factors');
+});
+test('risikotjekAnalyze factors have da/en translations', function() {
+  var a = risikotjekAnalyze();
+  a.factors.forEach(function(f) { assert(f.da && f.en, 'factor needs da/en'); });
+});
+test('renderRisikotjek shows enhanced checklist when risk elevated', function() {
+  var html = renderRisikotjek();
+  var a = risikotjekAnalyze();
+  if (a.risk >= 40) {
+    assert(html.indexOf('60364') >= 0, 'Enhanced checklist should cite a standard clause');
+  } else {
+    assert(html.length > 200, 'Still returns content when risk low');
+  }
+});
+test('renderRisikotjek references risk-related conditions', function() {
+  var html = renderRisikotjek();
+  assert(html.toLowerCase().indexOf('risk') >= 0 || html.indexOf('risiko') >= 0);
+});
+test('renderRisikotjek is click-only', function() {
+  var html = renderRisikotjek();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 4. Customer Trust Engine (renderKundetillid) ----
+test('renderKundetillid returns non-empty HTML', function() {
+  var html = renderKundetillid();
+  assert(html.length > 200);
+});
+test('renderKundetillid is printable (window.print)', function() {
+  var html = renderKundetillid();
+  assert(html.indexOf('window.print()') >= 0, 'Should have a print button');
+});
+test('renderKundetillid shows documentation completeness', function() {
+  var html = renderKundetillid();
+  assert(html.indexOf('%') >= 0, 'Should show percentage metrics');
+});
+test('kundetillidDocCompleteness returns 0..100', function() {
+  var pct = kundetillidDocCompleteness();
+  assert(pct >= 0 && pct <= 100, 'percentage bounded');
+});
+test('renderKundetillid section switching works', function() {
+  kundetillidState.showSection = 'why';
+  var html = renderKundetillid();
+  assert(html.length > 200, 'Should render why section');
+  kundetillidState.showSection = 'done';
+});
+test('renderKundetillid is click-only', function() {
+  var html = renderKundetillid();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 5. Memory Vault (renderHukommelse) ----
+test('renderHukommelse returns non-empty HTML with category buttons', function() {
+  var html = renderHukommelse();
+  assert(html.length > 200);
+  assert(html.indexOf('hukommelseState.category') >= 0, 'Should have category buttons');
+});
+test('HUKOMMELSE_TEMPLATES has decision/deviation/lesson templates', function() {
+  ['decision', 'deviation', 'lesson'].forEach(function(c) {
+    assert(Array.isArray(HUKOMMELSE_TEMPLATES[c]) && HUKOMMELSE_TEMPLATES[c].length > 0, 'templates for ' + c);
+  });
+});
+test('hukommelseAdd appends a timestamped entry and persists', function() {
+  hukommelseState.entries = [];
+  hukommelseState.category = 'decision';
+  hukommelseState.template = 0;
+  hukommelseAdd();
+  assert(hukommelseState.entries.length === 1, 'one entry added');
+  assert(hukommelseState.entries[0].ts && hukommelseState.entries[0].ts.length > 0, 'entry has timestamp');
+  assert(localStorage.getItem('elMemoryVault'), 'persisted to localStorage');
+});
+test('hukommelseClear empties the vault', function() {
+  hukommelseClear();
+  assert(hukommelseState.entries.length === 0, 'entries cleared');
+});
+test('renderHukommelse uses a select dropdown (no free text)', function() {
+  var html = renderHukommelse();
+  assert(html.indexOf('<select') >= 0, 'Should use a select element');
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+test('renderHukommelse lists existing entries', function() {
+  hukommelseState.entries = [];
+  hukommelseState.category = 'lesson';
+  hukommelseState.template = 0;
+  hukommelseAdd();
+  var html = renderHukommelse();
+  assert(html.indexOf('1') >= 0, 'Should reflect entry count');
+  hukommelseClear();
+});
+
+// ---- 6. Regulation Assistant (renderRegassist) ----
+test('renderRegassist returns non-empty HTML with topic buttons', function() {
+  var html = renderRegassist();
+  assert(html.length > 200);
+  assert(html.indexOf('regassistState.topic') >= 0, 'Should have topic buttons');
+});
+test('REGASSIST_TOPICS covers required DS/HD 60364 sections', function() {
+  var clauses = REGASSIST_TOPICS.map(function(t) { return t.clause; }).join(' ');
+  ['4-41', '4-43', '5-52', '5-54', '5-53', '60364-6', '7-701', '7-722'].forEach(function(sec) {
+    assert(clauses.indexOf(sec) >= 0, 'Should reference ' + sec);
+  });
+});
+test('REGASSIST_CHANGELOG mentions 75% rule abolition and Type B RCD', function() {
+  var txt = REGASSIST_CHANGELOG.map(function(c) { return c.en; }).join(' ');
+  assert(txt.indexOf('75%') >= 0, 'Should mention 75% rule');
+  assert(txt.indexOf('Type B') >= 0, 'Should mention Type B RCD');
+  assert(txt.indexOf('SPD') >= 0, 'Should mention SPD requirement');
+});
+test('renderRegassist selecting a topic shows clause and affected modules', function() {
+  regassistState.topic = 'ev';
+  var html = renderRegassist();
+  assert(html.indexOf('7-722') >= 0, 'Should show EV clause');
+  assert(html.indexOf('ev') >= 0, 'Should list affected modules');
+  regassistState.topic = null;
+});
+test('renderRegassist shows compliance / future-readiness score panel', function() {
+  var html = renderRegassist();
+  assert(html.indexOf('%') >= 0, 'Should show score percentages');
+  var sc = regassistScore();
+  assert(sc.compliance >= 0 && sc.compliance <= 100 && sc.future >= 0 && sc.future <= 100, 'scores bounded');
+});
+test('renderRegassist references Danish law (Elsikkerhedsloven etc.)', function() {
+  var html = renderRegassist();
+  assert(html.indexOf('Elsikkerhedsloven') >= 0 || html.indexOf('Electrical Safety Act') >= 0);
+});
+test('renderRegassist is click-only', function() {
+  var html = renderRegassist();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 7. Inspection Simulator (renderInspeksim) ----
+test('renderInspeksim returns non-empty HTML with readiness gauge', function() {
+  inspeksimState.answers = {};
+  var html = renderInspeksim();
+  assert(html.length > 200);
+  assert(html.indexOf('<svg') >= 0, 'Should show readiness gauge SVG');
+});
+test('INSPEKSIM_QUESTIONS covers PE continuity, RCD, Zs and docs', function() {
+  var ids = INSPEKSIM_QUESTIONS.map(function(q) { return q.id; });
+  ['docs', 'verify', 'label', 'pe', 'rcd', 'zs'].forEach(function(id) {
+    assert(ids.indexOf(id) >= 0, 'Should include question ' + id);
+  });
+});
+test('inspeksimReadiness reflects answered yes count', function() {
+  inspeksimState.answers = {};
+  assert(inspeksimReadiness() === 0, 'no answers => 0%');
+  INSPEKSIM_QUESTIONS.forEach(function(q) { inspeksimState.answers[q.id] = 'yes'; });
+  assert(inspeksimReadiness() === 100, 'all yes => 100%');
+  inspeksimState.answers = {};
+});
+test('renderInspeksim references DS/HD 60364-6', function() {
+  var html = renderInspeksim();
+  assert(html.indexOf('60364-6') >= 0, 'Should reference DS/HD 60364-6');
+});
+test('renderInspeksim lists what is missing', function() {
+  inspeksimState.answers = {};
+  var html = renderInspeksim();
+  assert(html.indexOf('\u274C') >= 0, 'Should list missing items when unanswered');
+});
+test('renderInspeksim is click-only', function() {
+  var html = renderInspeksim();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- 8. Quality / Reputation Score (renderKvalitet) ----
+test('renderKvalitet returns non-empty HTML with radar SVG', function() {
+  var html = renderKvalitet();
+  assert(html.length > 200);
+  assert(html.indexOf('<svg') >= 0 && html.indexOf('polygon') >= 0, 'Should contain a radar SVG');
+});
+test('kvalitetMetrics returns 5 bounded metrics', function() {
+  var m = kvalitetMetrics();
+  assert(m.length === 5, 'five metrics');
+  m.forEach(function(x) { assert(x.val >= 0 && x.val <= 100, 'metric bounded'); assert(x.da && x.en, 'has da/en'); });
+});
+test('kvalitetMetrics includes documentation/selectivity/spare capacity', function() {
+  var ens = kvalitetMetrics().map(function(m) { return m.en; }).join(' ');
+  assert(ens.indexOf('Documentation') >= 0);
+  assert(ens.indexOf('Selectivity') >= 0);
+  assert(ens.indexOf('Spare capacity') >= 0);
+});
+test('renderKvalitet shows an overall quality score out of 100', function() {
+  var html = renderKvalitet();
+  assert(html.indexOf('/100') >= 0, 'Should show overall score /100');
+});
+test('kvalitetRadarSVG draws a data polygon', function() {
+  var svg = kvalitetRadarSVG(kvalitetMetrics());
+  assert(svg.indexOf('<polygon') >= 0, 'radar should have polygons');
+});
+test('renderKvalitet has a case in renderModule (nav reachable)', function() {
+  assert(_innovHtml.indexOf("case 'kvalitet': content = renderKvalitet();") >= 0, 'kvalitet must have a case');
+});
+test('renderKvalitet is click-only', function() {
+  var html = renderKvalitet();
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0);
+});
+
+// ---- Dedupe + nav consistency ----
+test('Duplicate module keys removed from translations and nav', function() {
+  // Check the key forms: translation entries ("key:") and nav/case literals ("'key'").
+  ['tidsmaskine', 'risikovagt', 'praesentation', 'dna', 'vault'].forEach(function(k) {
+    assert(_innovHtml.indexOf(k + ':') < 0, 'Removed key should not appear as a translation key: ' + k);
+    assert(_innovHtml.indexOf("'" + k + "'") < 0, 'Removed key should not appear as a nav/case literal: ' + k);
+  });
+});
+test('Kept module keys still present after dedupe', function() {
+  ['tidsrejse', 'udvidelse', 'risikotjek', 'hukommelse', 'kundevis'].forEach(function(k) {
+    assert(_innovHtml.indexOf(k + ':') >= 0, 'Kept key should still be in translations: ' + k);
+  });
+});
+test('Stray kalkulation duplicate of bid fully removed', function() {
+  assert(_innovHtml.indexOf('kalkulation') < 0, 'kalkulation should be removed everywhere');
+});
+test('Nav consistency: every nav key has a case mapping to a defined function', function() {
+  var navKeys = [].concat.apply([], [..._innovHtml.matchAll(/keys:\s*\[([^\]]+)\]/g)].map(function(m) {
+    return m[1].split(',').map(function(k) { return k.trim().replace(/'/g, ''); });
+  })).filter(Boolean);
+  var cases = {};
+  [..._innovHtml.matchAll(/case '([^']+)':\s*content\s*=\s*(\w+)\(/g)].forEach(function(c) { cases[c[1]] = c[2]; });
+  navKeys.forEach(function(k) {
+    var fn = cases[k];
+    assert(fn, 'nav key missing case: ' + k);
+    assert(_innovHtml.indexOf('function ' + fn + '(') >= 0, 'nav key ' + k + ' maps to undefined function ' + fn);
+  });
+});
+test('All 8 innovation render functions are defined', function() {
+  ['renderTidsrejse', 'renderUdvidelse', 'renderRisikotjek', 'renderKundetillid',
+   'renderHukommelse', 'renderRegassist', 'renderInspeksim', 'renderKvalitet'].forEach(function(fn) {
+    assert(typeof eval(fn) === 'function', fn + ' should be a function');
+  });
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
