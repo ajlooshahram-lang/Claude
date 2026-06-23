@@ -26502,6 +26502,96 @@ function sibaFuseMeltTime(curveData, current_A) {
   return curveData[curveData.length-1].t;
 }
 
+// Look up SIBA fuse melting time at given current (log-log interpolation)
+function sibaFuseMeltTime(curveData, current_A) {
+  if (!curveData || curveData.length === 0 || current_A <= 0) return Infinity;
+  if (current_A < curveData[0].I) return Infinity; // below minimum melting current
+  if (current_A >= curveData[curveData.length-1].I) return curveData[curveData.length-1].t;
+  for (var i = 0; i < curveData.length - 1; i++) {
+    if (current_A >= curveData[i].I && current_A <= curveData[i+1].I) {
+      // Log-log interpolation
+      var logI1 = Math.log10(curveData[i].I), logI2 = Math.log10(curveData[i+1].I);
+      var logT1 = Math.log10(curveData[i].t), logT2 = Math.log10(curveData[i+1].t);
+      var frac = (Math.log10(current_A) - logI1) / (logI2 - logI1);
+      return Math.pow(10, logT1 + frac * (logT2 - logT1));
+    }
+  }
+  return curveData[curveData.length-1].t;
+}
+
+// SVG Log-Log Selektivitetsdiagram (Time-Current Characteristic)
+// Renders fuse curves + relay settings + reference currents on a professional log-log chart
+// Matches the format from Viggo Bisch's exam solutions (Figur 3, Figur 4 in his VBs)
+function svgSelektivitetsDiagram(curves, markers, title) {
+  // curves: [{label, color, data:[{I,t}]}]
+  // markers: [{label, color, I, style:'vertical'|'horizontal'}]
+  var w = 560, h = 400;
+  var padL = 60, padR = 20, padT = 40, padB = 50;
+  var plotW = w - padL - padR, plotH = h - padT - padB;
+
+  // Log scales: current 10-10000A, time 0.001-10000s
+  var logImin = 1, logImax = 5;   // 10^1 to 10^5 (10A to 100kA)
+  var logTmin = -3, logTmax = 4;  // 10^-3 to 10^4 (0.001s to 10000s)
+
+  function xPos(logI) { return padL + (logI - logImin) / (logImax - logImin) * plotW; }
+  function yPos(logT) { return padT + (logTmax - logT) / (logTmax - logTmin) * plotH; }
+
+  var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="background:var(--bg-card);border-radius:8px;font-family:\'Times New Roman\',serif">';
+
+  // Grid lines
+  for (var gi = logImin; gi <= logImax; gi++) {
+    var gx = xPos(gi);
+    svg += '<line x1="' + gx + '" y1="' + padT + '" x2="' + gx + '" y2="' + (h-padB) + '" stroke="var(--border)" stroke-width="0.5"/>';
+    svg += '<text x="' + gx + '" y="' + (h-padB+15) + '" text-anchor="middle" font-size="9" fill="var(--text-muted)">10' + (gi > 1 ? '<tspan font-size="7" dy="-4">' + gi + '</tspan>' : '') + '</text>';
+  }
+  for (var gt = logTmin; gt <= logTmax; gt++) {
+    var gy = yPos(gt);
+    svg += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (w-padR) + '" y2="' + gy + '" stroke="var(--border)" stroke-width="0.5"/>';
+    var tLabel = gt >= 0 ? Math.pow(10, gt) + 's' : '0.' + '0'.repeat(-gt-1) + '1s';
+    svg += '<text x="' + (padL-5) + '" y="' + (gy+3) + '" text-anchor="end" font-size="8" fill="var(--text-muted)">' + tLabel + '</text>';
+  }
+
+  // Axis labels
+  svg += '<text x="' + (padL + plotW/2) + '" y="' + (h-5) + '" text-anchor="middle" font-size="10" fill="var(--text-muted)">' + tx('Strøm [A]', 'Current [A]') + '</text>';
+  svg += '<text x="12" y="' + (padT + plotH/2) + '" text-anchor="middle" font-size="10" fill="var(--text-muted)" transform="rotate(-90,12,' + (padT + plotH/2) + ')">' + tx('Tid [s]', 'Time [s]') + '</text>';
+
+  // Draw curves
+  for (var ci = 0; ci < curves.length; ci++) {
+    var c = curves[ci];
+    if (!c.data || c.data.length < 2) continue;
+    var path = 'M';
+    for (var di = 0; di < c.data.length; di++) {
+      var logI = Math.log10(c.data[di].I);
+      var logT = Math.log10(c.data[di].t);
+      if (logI < logImin || logI > logImax || logT < logTmin || logT > logTmax) continue;
+      path += (di === 0 ? '' : ' L') + xPos(logI).toFixed(1) + ',' + yPos(logT).toFixed(1);
+    }
+    svg += '<path d="' + path + '" fill="none" stroke="' + c.color + '" stroke-width="2"/>';
+    // Label at the start of the curve
+    if (c.data.length > 0) {
+      var lx = xPos(Math.log10(c.data[0].I));
+      var ly = yPos(Math.log10(c.data[0].t));
+      svg += '<text x="' + (lx+5) + '" y="' + (ly-5) + '" font-size="9" fill="' + c.color + '" font-weight="bold">' + c.label + '</text>';
+    }
+  }
+
+  // Draw markers (vertical lines for reference currents)
+  for (var mi = 0; mi < (markers || []).length; mi++) {
+    var m = markers[mi];
+    var mx = xPos(Math.log10(m.I));
+    if (m.style === 'vertical') {
+      svg += '<line x1="' + mx + '" y1="' + padT + '" x2="' + mx + '" y2="' + (h-padB) + '" stroke="' + m.color + '" stroke-width="1.5" stroke-dasharray="4,3"/>';
+      svg += '<text x="' + mx + '" y="' + (padT-5) + '" text-anchor="middle" font-size="8" fill="' + m.color + '">' + m.label + '</text>';
+    }
+  }
+
+  // Title
+  svg += '<text x="' + (w/2) + '" y="20" text-anchor="middle" font-size="11" fill="var(--text)" font-weight="bold">' + (title || tx('Selektivitetsdiagram', 'Selectivity diagram')) + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
 // HV fuse selection per Viggo's 3 criteria (Bog 5 side 173, 277)
 function sibaSelectHVFuse(I_fullload, I_inrush, fuseType) {
   fuseType = fuseType || 'fullRange_6_12kV';
@@ -33305,6 +33395,24 @@ function analyzerSolve(data) {
 
     // Render as a single Mathcad-style calculation card
     var supplyHtml = cxRenderSteps(supplySteps.steps, tx('Generelle beregninger (Viggo-metode)', 'General calculations (Viggo method)'));
+
+    // HV fuse selection (SIBA Full Range — Viggo's 3 criteria)
+    if (supplySteps.results.I11 && supplySteps.results.Iinrush) {
+      var fuseResult = sibaSelectHVFuse(supplySteps.results.I11, supplySteps.results.Iinrush);
+      supplyHtml += cxRenderSteps(fuseResult.steps, tx('Valg af HV-sikring (SIBA HHD)', 'HV fuse selection (SIBA HHD)'));
+
+      // SVG Selektivitetsdiagram (log-log TCC curve)
+      var fuseCurve = SIBA_HHD_DATA.curve_fullRange_50A; // default 50A
+      if (fuseResult.selected && fuseResult.selected.In <= 31.5) fuseCurve = SIBA_HHD_DATA.curve_fullRange_31_5A;
+      var diagCurves = [{ label: 'SIBA ' + (fuseResult.selected ? fuseResult.selected.In : 50) + 'A FR', color: '#3b82f6', data: fuseCurve }];
+      var diagMarkers = [];
+      if (supplySteps.results.Iinrush) diagMarkers.push({ label: 'I_inrush=' + supplySteps.results.Iinrush.toFixed(0) + 'A', color: '#ef4444', I: supplySteps.results.Iinrush, style: 'vertical' });
+      if (supplySteps.results.Ik3F_max) diagMarkers.push({ label: 'Ik3F,max=' + (cxMag(supplySteps.results.Ik3F_max)/1000).toFixed(1) + 'kA', color: '#000', I: cxMag(supplySteps.results.Ik3F_max), style: 'vertical' });
+      supplyHtml += '<div class="card fade-in"><div class="card-title">' + tx('Smeltekurve (selektivitetsdiagram)', 'Fuse curve (selectivity diagram)') + '</div>';
+      supplyHtml += svgSelektivitetsDiagram(diagCurves, diagMarkers);
+      supplyHtml += '</div>';
+    }
+
     results.push({
       type: 'supply_complex',
       label: tx('Forsyningsberegninger (kompleks)', 'Supply calculations (complex)'),
