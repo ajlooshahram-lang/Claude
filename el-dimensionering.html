@@ -1681,6 +1681,15 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Live Installation Twin — IEC 60617 component-symbol legend =====
+  'IEC 60617 symbols': '\u0646\u0645\u0627\u062F\u0647\u0627\u06CC IEC 60617',
+  'Circuit breaker (MCB/MCCB)': '\u06A9\u0644\u06CC\u062F \u0645\u062F\u0627\u0631 (MCB/MCCB)',
+  'Mechanical contact + cross': '\u06A9\u0646\u062A\u0627\u06A9\u062A \u0645\u06A9\u0627\u0646\u06CC\u06A9\u06CC + \u0636\u0631\u0628\u062F\u0631',
+  'Rectangle with centre line': '\u0645\u0633\u062A\u0637\u06CC\u0644 \u0628\u0627 \u062E\u0637 \u0645\u06CC\u0627\u0646\u06CC',
+  'RCD / residual-current device': 'RCD / \u062F\u0633\u062A\u06AF\u0627\u0647 \u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0642\u06CC\u0645\u0627\u0646\u062F\u0647',
+  'Socket-outlet': '\u067E\u0631\u06CC\u0632',
+  'Lighting point': '\u0646\u0642\u0637\u0647 \u0631\u0648\u0634\u0646\u0627\u06CC\u06CC',
+
   // ===== Cascade TCC cross-module device reactivity (DS/HD 60364-5-53 cl.536.4) =====
   'Module-selected devices (live sync)': '\u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0631 \u0645\u0627\u0698\u0648\u0644 (\u0647\u0645\u200C\u0632\u0645\u0627\u0646\u200C\u0633\u0627\u0632\u06CC \u0632\u0646\u062F\u0647)',
   'Devices selected in the Fuse/MCB/MCCB/Relay/RCD modules are reflected here automatically via the reactive bus.': '\u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0631 \u0645\u0627\u0698\u0648\u0644\u200C\u0647\u0627\u06CC \u0641\u06CC\u0648\u0632/MCB/MCCB/\u0631\u0644\u0647/RCD \u0628\u0647\u200C\u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0628\u0627\u0633 \u0648\u0627\u06A9\u0646\u0634\u06CC \u0627\u06CC\u0646\u062C\u0627 \u0646\u0645\u0627\u06CC\u0634 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.',
@@ -39150,6 +39159,99 @@ function liveRenderConnections(tree, positions, nodeW, nodeH, mode) {
   });
   return svg;
 }
+// liveClassifyDevice: derive the kind of IEC 60617 graphical symbol to draw for a
+// node, using ONLY real fields present on the sldTree node model and its protection
+// product object (see sldCreateNode / PRODUCTS). No fabricated device categories.
+// Returns one of: 'motor' | 'socket' | 'lighting' | 'rcd' | 'fuse' | 'breaker' | 'default'.
+// Load identity (motor / socket / lighting) is read from the circuit name; otherwise
+// the protective device family is read from its real product fields:
+//   - RCD/HPFI: rcdType / sensitivity (Acti9 iID, Hager) -> 'rcd' (RCBO also residual)
+//   - Fuse: size (D01/D02/NH) + i5s, gG model (Eaton/Siemens/TYTAN) -> 'fuse'
+//   - MCCB: frame / inOptions / trip (Schneider NSX) -> 'breaker'
+//   - MCB: curve + EN 60898-1 / IEC 60947-2 standard -> 'breaker'
+// Pure + deterministic so it is unit-testable headlessly.
+function liveClassifyDevice(node) {
+  if (!node) return 'default';
+  var name = (((node.name_en || '') + ' ' + (node.name_da || '') + ' ' + (node.name_fa || '')) + '').toLowerCase();
+  // Load identity from the circuit name (real templates: Belysning/Lighting,
+  // Stikkontakter/Sockets, Motor, Komfur/Cooker ...).
+  if (/motor/.test(name)) return 'motor';
+  if (/socket|stikkontakt|stik|outlet|pr\u00E6kontakt/.test(name)) return 'socket';
+  if (/light|belysning|lys|lamp/.test(name)) return 'lighting';
+  var p = node.protection || null;
+  if (p) {
+    // Residual-current device (HPFI/RCD) and RCBO: residual sensing is the
+    // safety-critical identity, so both map to the RCD symbol family.
+    if (p.rcdType || typeof p.sensitivity === 'number' || p.rcdSensitivity || p.type === 'RCD') return 'rcd';
+    // gG/NH/D0x fuse: identified by its size + 5s prearcing current (i5s).
+    if (p.size || typeof p.i5s === 'number' || p.type === 'Fuse' || /\bgg\b|fuse|sikring/.test(((p.model || '') + '').toLowerCase())) return 'fuse';
+    // Moulded-case circuit breaker (MCCB): frame / inOptions / trip class.
+    if (p.frame || p.inOptions || p.trip) return 'breaker';
+    // Miniature circuit breaker (MCB): tripping curve + EN 60898 / IEC 60947 standard.
+    if (p.curve || (p.standard && /60898|60947/.test(p.standard + ''))) return 'breaker';
+  }
+  return 'default';
+}
+
+// liveDeviceSymbol: pure helper returning an inline-SVG <g> string drawing the correct
+// IEC 60617 graphical symbol for the node inside the (x,y,w,h) box. The symbol strokes
+// use `color` (the live thermal / fault colour) so overload tinting still reads on the
+// glyph — the symbol is purely ADDITIVE and never overrides the conservative thermal
+// flagging (life-safety: a flagged node must never look "safe"). No animation classes
+// are attached, so the glyph is automatically still under prefers-reduced-motion /
+// body.motion-off (it cannot imply a live/safe state by motion).
+function liveDeviceSymbol(node, x, y, w, h, color) {
+  var kind = liveClassifyDevice(node);
+  var cx = x + w / 2, cy = y + h / 2;
+  var r = Math.min(w, h) / 2 - 2;
+  var s = '<g class="live-sym live-sym-' + kind + '" fill="none" stroke="' + color + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">';
+  if (kind === 'breaker') {
+    // IEC 60617 circuit-breaker: mechanical switch contact (open) + "x" function marker.
+    s += '<line x1="' + cx + '" y1="' + y + '" x2="' + cx + '" y2="' + (y + 3) + '"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + h) + '" x2="' + cx + '" y2="' + (y + h - 3) + '"/>';
+    s += '<circle cx="' + cx + '" cy="' + (y + h - 3) + '" r="1.2" fill="' + color + '" stroke="none"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + h - 3) + '" x2="' + (cx + 5) + '" y2="' + (y + 4) + '"/>';
+    s += '<line x1="' + (cx - 2.5) + '" y1="' + (y + 1.5) + '" x2="' + (cx + 2.5) + '" y2="' + (y + 6.5) + '"/>';
+    s += '<line x1="' + (cx + 2.5) + '" y1="' + (y + 1.5) + '" x2="' + (cx - 2.5) + '" y2="' + (y + 6.5) + '"/>';
+  } else if (kind === 'fuse') {
+    // IEC 60617 fuse (symbol family S00200): rectangle bisected lengthwise by a line.
+    s += '<line x1="' + cx + '" y1="' + y + '" x2="' + cx + '" y2="' + (y + 3) + '"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + h) + '" x2="' + cx + '" y2="' + (y + h - 3) + '"/>';
+    s += '<rect x="' + (cx - 4) + '" y="' + (y + 3) + '" width="8" height="' + (h - 6) + '" rx="0.5"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + 3) + '" x2="' + cx + '" y2="' + (y + h - 3) + '"/>';
+  } else if (kind === 'rcd') {
+    // Residual-current device (HPFI): switch contact + sensing toroid + I\u0394 marker.
+    s += '<line x1="' + cx + '" y1="' + y + '" x2="' + cx + '" y2="' + (y + 4) + '"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + h) + '" x2="' + cx + '" y2="' + (y + h - 4) + '"/>';
+    s += '<circle cx="' + cx + '" cy="' + (y + h - 5) + '" r="1.2" fill="' + color + '" stroke="none"/>';
+    s += '<line x1="' + cx + '" y1="' + (y + h - 5) + '" x2="' + (cx + 5) + '" y2="' + (y + 5) + '"/>';
+    s += '<circle cx="' + (cx - 3) + '" cy="' + cy + '" r="3.2"/>';
+    s += '<text x="' + (x + 0.5) + '" y="' + (y + h - 0.5) + '" font-size="5" fill="' + color + '" stroke="none">I\u0394</text>';
+  } else if (kind === 'motor') {
+    // IEC 60617 motor: circle enclosing the letter M.
+    s += '<line x1="' + cx + '" y1="' + y + '" x2="' + cx + '" y2="' + (y + 2) + '"/>';
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '"/>';
+    s += '<text x="' + cx + '" y="' + (cy + 3) + '" font-size="8" font-weight="bold" text-anchor="middle" fill="' + color + '" stroke="none">M</text>';
+  } else if (kind === 'socket') {
+    // IEC 60617 socket-outlet: half-circle open downward on a baseline, with feed line.
+    s += '<path d="M ' + (cx - 6) + ' ' + cy + ' A 6 6 0 0 1 ' + (cx + 6) + ' ' + cy + '"/>';
+    s += '<line x1="' + (cx - 6) + '" y1="' + cy + '" x2="' + (cx + 6) + '" y2="' + cy + '"/>';
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + cx + '" y2="' + (y + h) + '"/>';
+  } else if (kind === 'lighting') {
+    // IEC 60617 lighting point / lamp: circle crossed by an X.
+    var d = r * 0.707;
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '"/>';
+    s += '<line x1="' + (cx - d) + '" y1="' + (cy - d) + '" x2="' + (cx + d) + '" y2="' + (cy + d) + '"/>';
+    s += '<line x1="' + (cx + d) + '" y1="' + (cy - d) + '" x2="' + (cx - d) + '" y2="' + (cy + d) + '"/>';
+  } else {
+    // Default: generic consumer / unspecified load — a square with a diagonal stroke.
+    s += '<rect x="' + (cx - 6) + '" y="' + (cy - 6) + '" width="12" height="12" rx="1"/>';
+    s += '<line x1="' + (cx - 6) + '" y1="' + (cy + 6) + '" x2="' + (cx + 6) + '" y2="' + (cy - 6) + '"/>';
+  }
+  s += '</g>';
+  return s;
+}
+
 function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
   var svg = '';
   var multiplier = (mode === 'timelapse') ? liveGetLoadMultiplier(liveState.timelapseHour) : 1;
@@ -39289,6 +39391,11 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
       svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 42) + '" text-anchor="middle" font-size="6" fill="var(--text-muted,#666)">' + ib.toFixed(0) + 'A</text>';
     } else {
       svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="4"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="1.5"/>';
+      // IEC 60617 graphical symbol for the component (circuit breaker / fuse / RCD /
+      // motor / socket-outlet / lighting point / default). Drawn in the clear top-left
+      // corner so it never overlaps the centred labels, and stroked with borderColor so
+      // the conservative thermal/overload tinting is still visible on the glyph itself.
+      svg += liveDeviceSymbol(node, pos.x + 3, pos.y + 4, 16, 16, borderColor);
       svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 16) + '" text-anchor="middle" font-size="7" fill="var(--text,#333)">' + sldNodeName(node) + '</text>';
       svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 30) + '" text-anchor="middle" font-size="6" fill="var(--text-muted,#666)">' + (node.protectionIn || 0) + 'A ' + (node.cable ? node.cable.mm2 + 'mm\u00B2' : '') + '</text>';
       // Voltage indicator
@@ -41422,6 +41529,14 @@ function renderLiveInstallation() {
   html += '<div class="result-row"><span class="label" style="color:#4caf50">\u2588</span><span class="value">' + tx('Normal', 'Normal') + '</span></div>';
   html += '<div class="result-row"><span class="label" style="color:#ff9800">\u2588</span><span class="value">' + tx('Varm (hoej belastning)', 'Warm (high load)') + '</span></div>';
   html += '<div class="result-row"><span class="label" style="color:#f44336">\u2588</span><span class="value">' + tx('Overbelastet', 'Overloaded') + '</span></div>';
+  // IEC 60617 graphical-symbol key for the component glyphs drawn on each node.
+  html += '<div class="result-row" style="margin-top:6px"><span class="label" style="font-weight:700">' + tx('IEC 60617 symboler', 'IEC 60617 symbols') + '</span><span class="value"></span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('Afbryder (MCB/MCCB)', 'Circuit breaker (MCB/MCCB)') + '</span><span class="value">' + tx('Mekanisk kontakt + kryds', 'Mechanical contact + cross') + '</span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('Sikring', 'Fuse') + '</span><span class="value">' + tx('Rektangel med midterlinje', 'Rectangle with centre line') + '</span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('HPFI / fejlstroemsafbryder', 'RCD / residual-current device') + '</span><span class="value">I\u0394</span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('Motor', 'Motor') + '</span><span class="value">M</span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('Stikkontakt', 'Socket-outlet') + '</span><span class="value">\u232C</span></div>';
+  html += '<div class="result-row" style="font-size:0.85em"><span class="label">' + tx('Lyspunkt', 'Lighting point') + '</span><span class="value">\u2297</span></div>';
   if (mode === 'live') {
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Tip', 'Tip') + '</span><span class="value">' + tx('Klik paa en komponent for at navigere til modulet', 'Click a component to navigate to its module') + '</span></div>';
   }
