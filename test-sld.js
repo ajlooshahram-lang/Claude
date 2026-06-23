@@ -18487,6 +18487,219 @@ test('IEC 60617 symbol legend strings have Farsi entries in _FA', function() {
   assert(_FA['Motor'] && _FA['Motor'].length > 0, 'motor label has Farsi');
 });
 
+// =====================================================================
+// === ADVERSARIAL / EXACT-BOUNDARY tests for sldVerifyNode (life-safety)
+// =====================================================================
+// These tests defend the conservative DS/HD 60364 verdict logic at the
+// exact limits. They deliberately probe the equality edges (where a 1-unit
+// slip either way changes a life-safety verdict) and the derating path.
+// Fixtures are built directly with controlled _ib / _zs (exactly what
+// sldPropagateAll stores) and a custom cable carrying a known raw Iz, so the
+// boundary value is exact and not subject to floating drift from a long path.
+
+console.log('\n=== Adversarial / Exact-Boundary sldVerifyNode Tests (DS/HD 60364) ===\n');
+
+// Helper: build a minimal one-node tree under a transformer root.
+// Returns { tree, node }. The node carries explicit _ib/_zs so the engine
+// uses those values verbatim (node._ib || calc..., node._zs || calc...).
+function _advNode(over) {
+  sldNextId = 20000 + Math.floor(Math.random() * 10000);
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var node = sldCreateNode(over.type || 'final_circuit', trafo.id, over);
+  tree.nodes[node.id] = node;
+  trafo.childIds.push(node.id);
+  return { tree: tree, node: node };
+}
+function _ibCheck(results) { return results.find(function(r){ return r.rule === 'IB <= In <= Iz'; }); }
+function _zsCheck(results) { return results.find(function(r){ return r.rule.indexOf('Zs*Ia') === 0; }); }
+
+// --- 1. IB exactly == In (and In < Iz) -> OK (cl. 433.1, equality is the allowed limit) ---
+test('BOUNDARY: IB == In < Iz passes (cl.433.1, equality at lower limit is allowed)', function() {
+  // cable raw Iz=100A, unity derating (C/30/1) -> iz=100; In=50; IB forced to exactly 50.
+  var f = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 50, protection: { rating: 50, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 1 });
+  f.node._ib = 50; // IB == In exactly
+  var c = _ibCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'IB<=In<=Iz check must be present');
+  assert.strictEqual(c.status, 'ok', 'IB==In must pass (<= is inclusive). Got: ' + c.detail);
+  assert(c.clause.indexOf('433.1') >= 0, 'must cite cl.433.1');
+});
+
+// --- 2. In exactly == Iz (and IB < In) -> OK (equality at upper limit is allowed) ---
+test('BOUNDARY: IB < In == Iz passes (cl.433.1, equality at upper limit is allowed)', function() {
+  // iz=100 (unity), In=100 -> In == Iz; IB=40 < In.
+  var f = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 100, protection: { rating: 100, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 1 });
+  f.node._ib = 40;
+  var c = _ibCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'check present');
+  assert.strictEqual(c.status, 'ok', 'In==Iz must pass (<= inclusive). Got: ' + c.detail);
+});
+
+// --- 3. IB == In == Iz (all three equal) -> OK ---
+test('BOUNDARY: IB == In == Iz (all equal) passes (cl.433.1)', function() {
+  var f = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 100, protection: { rating: 100, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 1 });
+  f.node._ib = 100; // IB == In == Iz == 100
+  var c = _ibCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'check present');
+  assert.strictEqual(c.status, 'ok', 'IB==In==Iz must pass. Got: ' + c.detail);
+});
+
+// --- 4. In ONE INCREMENT above Iz (derating pulls iz just below In) -> FAIL "In > Iz" ---
+test('BOUNDARY: In one step above derated Iz fails with "In > Iz" (conservative, no tolerance)', function() {
+  // raw Iz=100; grouping=2 (0.80) -> derated iz=80.0; In=81 -> protIn > iz by 1A must FAIL.
+  var f = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 81, protection: { rating: 81, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 2 });
+  f.node._ib = 40; // ensure NOT the IB>In branch
+  var c = _ibCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'check present');
+  assert.strictEqual(c.status, 'fail', 'In=81 > Iz=80 must fail. Got: ' + c.detail);
+  // Must be the "In > Iz" branch, NOT the "IB > In" branch.
+  assert(c.detail.indexOf('In=') === 0 && c.detail.indexOf('> Iz=') > 0, 'must be the In>Iz branch. Got: ' + c.detail);
+  assert(c.detail.indexOf('IB=') === -1, 'must NOT be the IB>In branch. Got: ' + c.detail);
+});
+
+// --- 5. IB one increment above In -> FAIL "IB > In" ---
+test('BOUNDARY: IB one step above In fails with "IB > In" (cl.433.1)', function() {
+  var f = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 50, protection: { rating: 50, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 1 });
+  f.node._ib = 51; // IB just above In
+  var c = _ibCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'check present');
+  assert.strictEqual(c.status, 'fail', 'IB=51 > In=50 must fail. Got: ' + c.detail);
+  assert(c.detail.indexOf('IB=') === 0 && c.detail.indexOf('> In=') > 0, 'must be the IB>In branch. Got: ' + c.detail);
+});
+
+// --- 6. Derating FLIPS the verdict: same node ok at unity, fail once derated ---
+test('BOUNDARY: derating flips IB<=In<=Iz from ok to fail (Iz only decreases, engine honours it)', function() {
+  // raw Iz=100, In=90, IB=40. Unity factors: iz=100 -> 90<=100 OK.
+  var unity = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 90, protection: { rating: 90, curve: 'B' }, installMethod: 'C', temp: 30, grouping: 1 });
+  unity.node._ib = 40;
+  var cOk = _ibCheck(sldVerifyNode(unity.tree, unity.node.id));
+  assert.strictEqual(cOk.status, 'ok', 'at unity derating In=90<=Iz=100 must pass. Got: ' + cOk.detail);
+  // Same numbers but realistic derating A2(0.83)*temp40(0.87)*group2(0.80) -> iz = 100*0.57768 = 57.8 < 90 -> FAIL.
+  var derated = _advNode({ cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 90, protection: { rating: 90, curve: 'B' }, installMethod: 'A2', temp: 40, grouping: 2 });
+  derated.node._ib = 40;
+  var cFail = _ibCheck(sldVerifyNode(derated.tree, derated.node.id));
+  assert.strictEqual(cFail.status, 'fail', 'derating must reduce Iz below In and FAIL. Got: ' + cFail.detail);
+  assert(cFail.detail.indexOf('In=') === 0 && cFail.detail.indexOf('> Iz=') > 0, 'must fail on In>Iz branch. Got: ' + cFail.detail);
+});
+
+// --- 7. Zs*Ia exactly == U0 (230V) -> OK (boundary inclusive, cl.411 / Table 41.1) ---
+test('BOUNDARY: Zs*Ia == U0 (230V) passes (disconnection limit is inclusive)', function() {
+  // final_circuit, In=20 (<=32), curve B -> Ia = 5*20 = 100A; Zs=2.3 -> Zs*Ia = 230 == U0.
+  var f = _advNode({ type: 'final_circuit', protectionIn: 20, protection: { rating: 20, curve: 'B' }, cable: { iz: 100, r: 1, x: 0.1 } });
+  f.node._zs = 2.3;
+  var c = _zsCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'Zs*Ia check present');
+  assert.strictEqual(c.status, 'ok', 'Zs*Ia==230 must pass (<= inclusive). Got: ' + c.detail);
+});
+
+// --- 8. Zs*Ia just above 230V -> FAIL ---
+test('BOUNDARY: Zs*Ia just above U0 fails (no tolerance above 230V)', function() {
+  // In=20 curve B -> Ia=100; Zs=2.31 -> 231 > 230 must FAIL.
+  var f = _advNode({ type: 'final_circuit', protectionIn: 20, protection: { rating: 20, curve: 'B' }, cable: { iz: 100, r: 1, x: 0.1 } });
+  f.node._zs = 2.31;
+  var c = _zsCheck(sldVerifyNode(f.tree, f.node.id));
+  assert(c, 'check present');
+  assert.strictEqual(c.status, 'fail', 'Zs*Ia=231 > 230 must fail. Got: ' + c.detail);
+});
+
+// --- 9. Curve sensitivity: identical Zs, curve B/C/D change Ia (5x/10x/20x) and flip verdict ---
+test('BOUNDARY: same Zs, curve B vs C vs D changes Ia (5/10/20x) and flips Zs*Ia verdict', function() {
+  // In=10 final circuit, Zs=3.0 fixed.
+  // B: Ia=50  -> 3*50=150  <=230 -> OK
+  // C: Ia=100 -> 3*100=300 >230  -> FAIL
+  // D: Ia=200 -> 3*200=600 >230  -> FAIL
+  function run(curve) {
+    var f = _advNode({ type: 'final_circuit', protectionIn: 10, protection: { rating: 10, curve: curve }, cable: { iz: 100, r: 1, x: 0.1 } });
+    f.node._zs = 3.0;
+    return _zsCheck(sldVerifyNode(f.tree, f.node.id));
+  }
+  var b = run('B'), c = run('C'), d = run('D');
+  assert.strictEqual(b.status, 'ok', 'curve B (Ia=5*In) at Zs=3 must pass (150V). Got: ' + b.detail);
+  assert.strictEqual(c.status, 'fail', 'curve C (Ia=10*In) at Zs=3 must fail (300V). Got: ' + c.detail);
+  assert.strictEqual(d.status, 'fail', 'curve D (Ia=20*In) at Zs=3 must fail (600V). Got: ' + d.detail);
+  // Confirm the multipliers via the reported Zs*Ia value (3.0 * mult * 10).
+  assert(b.detail.indexOf('150V') >= 0, 'B must report Zs*Ia=150V (5x). Got: ' + b.detail);
+  assert(c.detail.indexOf('300V') >= 0, 'C must report Zs*Ia=300V (10x). Got: ' + c.detail);
+  assert(d.detail.indexOf('600V') >= 0, 'D must report Zs*Ia=600V (20x). Got: ' + d.detail);
+});
+
+// --- 10. Final-circuit (In<=32) uses 0.4s/Table 41.1; larger circuit uses 5s/cl.411.3.2.3 ---
+test('BOUNDARY: disconnection clause/time + Ia multiplier differ for final (<=32A) vs distribution path', function() {
+  // Final circuit In=16, curve B -> 0.4s, Table 41.1, Ia=5*16=80. Zs=2.0 -> 160V (ok), confirms Ia=80.
+  var fin = _advNode({ type: 'final_circuit', protectionIn: 16, protection: { rating: 16, curve: 'B' }, cable: { iz: 100, r: 1, x: 0.1 } });
+  fin.node._zs = 2.0;
+  var cFin = _zsCheck(sldVerifyNode(fin.tree, fin.node.id));
+  assert(cFin.rule.indexOf('0.4s') >= 0, 'final circuit must use 0.4s. Got rule: ' + cFin.rule);
+  assert(cFin.clause.indexOf('Table 41.1') >= 0, 'final circuit must cite Table 41.1. Got: ' + cFin.clause);
+  assert(cFin.detail.indexOf('160V') >= 0, 'Ia must be 5*16=80 -> Zs*Ia=160V. Got: ' + cFin.detail);
+
+  // Same node TYPE but In=63 (>32) -> else branch: 5s, cl.411.3.2.3, Ia=5*63=315. Zs=0.5 -> 158V.
+  var dist = _advNode({ type: 'final_circuit', protectionIn: 63, protection: { rating: 63, curve: 'B' }, cable: { iz: 200, r: 1, x: 0.1 } });
+  dist.node._zs = 0.5;
+  var cDist = _zsCheck(sldVerifyNode(dist.tree, dist.node.id));
+  assert(cDist.rule.indexOf('5s') >= 0, 'In>32 must use 5s. Got rule: ' + cDist.rule);
+  assert(cDist.clause.indexOf('411.3.2.3') >= 0, 'In>32 must cite cl.411.3.2.3. Got: ' + cDist.clause);
+  // Ia=5*63=315; 0.5*315 = 157.5 -> toFixed(0) = 158
+  assert(cDist.detail.indexOf('158V') >= 0, 'Ia must be 5*63=315 -> Zs*Ia=158V. Got: ' + cDist.detail);
+});
+
+// --- 11. Icu >= Ikmax evaluated AT DEVICE TERMINALS (parent fault), not node far-end ---
+test('BOUNDARY: Icu compared to parent-terminal Ikmax (not node far-end); == passes, just-below fails', function() {
+  // trafo -> main_board(mb) -> sub_board(node). Node has extra cable so node far-end Ik < parent terminal Ik.
+  sldNextId = 40000;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 4 });
+  tree.nodes[trafo.id] = trafo; tree.rootId = trafo.id;
+  var cable50 = PRODUCTS.cables.find(function(c){ return c.mm2 === 50 && c.material === 'Cu'; });
+  var mb = sldCreateNode('main_board', trafo.id, { cable: cable50, length_m: 5, phases: '3x400', voltage: 400, protectionIn: 100 });
+  tree.nodes[mb.id] = mb; trafo.childIds.push(mb.id);
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var node = sldCreateNode('sub_board', mb.id, { cable: cable10, length_m: 30, phases: '3x400', voltage: 400, power_kW: 20, protectionIn: 32, protection: { rating: 32, icu: 6 } });
+  tree.nodes[node.id] = node; mb.childIds.push(node.id);
+  sldPropagateAll(tree);
+
+  var terminalIk = mb._ikmax;       // fault at the busbar where the device sits
+  var farEndIk = node._ikmax;       // fault at the node's own cable far end
+  assert(terminalIk > farEndIk, 'parent terminal Ik (' + terminalIk.toFixed(0) + ') must exceed node far-end Ik (' + farEndIk.toFixed(0) + ')');
+
+  // (a) Icu sits BETWEEN far-end and terminal: terminal-based check FAILs; a far-end-based
+  //     check would have (wrongly) passed. The FAIL proves terminals are used.
+  node.protection.icu = ((terminalIk + farEndIk) / 2) / 1000;
+  var between = sldVerifyNode(tree, node.id).find(function(r){ return r.rule === 'Icu >= Ikmax'; });
+  assert(between, 'Icu check present');
+  assert.strictEqual(between.status, 'fail', 'Icu between far-end and terminal must FAIL (terminals used, not far-end). Got: ' + between.detail);
+  assert(between.detail.indexOf('at device terminals') >= 0, 'detail must reference device terminals. Got: ' + between.detail);
+
+  // (b) Icu just BELOW terminal Ik -> FAIL.
+  node.protection.icu = (terminalIk / 1000) - 0.001;
+  var below = sldVerifyNode(tree, node.id).find(function(r){ return r.rule === 'Icu >= Ikmax'; });
+  assert.strictEqual(below.status, 'fail', 'Icu just below terminal Ik must fail. Got: ' + below.detail);
+
+  // (c) Icu EXACTLY == terminal Ik -> OK (>= is inclusive).
+  node.protection.icu = terminalIk / 1000;
+  var equal = sldVerifyNode(tree, node.id).find(function(r){ return r.rule === 'Icu >= Ikmax'; });
+  assert.strictEqual(equal.status, 'ok', 'Icu == terminal Ik must pass (>= inclusive). Got: ' + equal.detail);
+});
+
+// --- 12. MCCB I2 = 1.3*In vs 1.45*Iz boundary: one ok case and one fail case ---
+test('BOUNDARY: MCCB I2=1.3*In vs 1.45*Iz (cl.433.1) - ok and fail cases', function() {
+  var mccb = PRODUCTS.mccbs.find(function(m){ return m.frame === 'NSX 100'; });
+  // OK: In=100 -> I2=130; iz=100 (unity) -> 1.45*100=145 >= 130 -> OK.
+  var okF = _advNode({ type: 'main_board', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 100, protection: mccb, installMethod: 'C', temp: 30, grouping: 1 });
+  okF.node._ib = 40;
+  var okC = sldVerifyNode(okF.tree, okF.node.id).find(function(r){ return r.rule === 'I2 <= 1.45*Iz'; });
+  assert(okC, 'MCCB I2 check must be present (frame/inOptions present)');
+  assert.strictEqual(okC.status, 'ok', 'I2=130 <= 1.45*Iz=145 must pass. Got: ' + okC.detail);
+  // FAIL: In=100 -> I2=130; raw iz=100, grouping=2 (0.80) -> iz=80 -> 1.45*80=116 < 130 -> FAIL.
+  var failF = _advNode({ type: 'main_board', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 100, protection: mccb, installMethod: 'C', temp: 30, grouping: 2 });
+  failF.node._ib = 40;
+  var failC = sldVerifyNode(failF.tree, failF.node.id).find(function(r){ return r.rule === 'I2 <= 1.45*Iz'; });
+  assert(failC, 'MCCB I2 check present');
+  assert.strictEqual(failC.status, 'fail', 'I2=130 > 1.45*Iz=116 must fail. Got: ' + failC.detail);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
