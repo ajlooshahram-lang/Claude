@@ -19077,6 +19077,117 @@ test('Ingestion: analyzerState has ingestion fields', function() {
   assert('ingestionNotice' in analyzerState, 'Should have ingestionNotice field');
 });
 
+// === Authorization Exam Intelligence Tests ===
+console.log('\n=== Authorization Exam Intelligence Tests ===');
+
+var _AUTH_EXAM_TEXT = 'El-autorisationsprove, december 2018. Godkendt af Sikkerhedsstyrelsen. ' +
+  'Opgave 1 Forsyningsanlaeg. Opgave 2 Bygningsinstallation. Opgave 3 spoergsmaal til bekendtgoerelser. ' +
+  'I en produktionsvirksomhed med transformerstation. Sk,max = 115 MVA. Sk,min = 60 MVA. Un = 10 kV. ' +
+  'S = 400 kVA. ek = 4,5 %. I> = 400 A. t> = 1,2 s. TN-C-S systemjording. DS/HD 60364. Faellesregulativ.';
+
+test('AUTORISATIONS_TERMINOLOGY exists with 12+ categories and 100+ terms', function() {
+  assert(typeof AUTORISATIONS_TERMINOLOGY === 'object', 'terminology object must exist');
+  var cats = Object.keys(AUTORISATIONS_TERMINOLOGY);
+  assert(cats.length >= 10, 'should have >=10 categories, got ' + cats.length);
+  assert(autorisationTermCount() >= 100, 'should have >=100 terms, got ' + autorisationTermCount());
+});
+
+test('Every terminology term has da, en and a clause field (or null)', function() {
+  var cats = Object.keys(AUTORISATIONS_TERMINOLOGY);
+  cats.forEach(function(c) {
+    AUTORISATIONS_TERMINOLOGY[c].forEach(function(t) {
+      assert(t.da && t.da.length > 0, 'term in ' + c + ' must have da');
+      assert(t.en && t.en.length > 0, 'term in ' + c + ' must have en');
+      assert('clause' in t, 'term ' + t.da + ' must have clause key');
+      assert('context' in t, 'term ' + t.da + ' must have context');
+    });
+  });
+});
+
+test('analyzerDetectAutorisationProject detects a real exam with high confidence', function() {
+  var d = analyzerDetectAutorisationProject(_AUTH_EXAM_TEXT);
+  assert.strictEqual(d.isAutorisationLevel, true, 'should detect authorization level');
+  assert(d.confidence >= 80, 'confidence should be >=80, got ' + d.confidence);
+});
+
+test('analyzerDetectAutorisationProject does NOT flag ordinary technical text', function() {
+  var d = analyzerDetectAutorisationProject('A simple DC circuit: R = 10 ohm, U = 12 V, find the current I.');
+  assert.strictEqual(d.isAutorisationLevel, false, 'should not flag random text');
+  assert(d.confidence < 40, 'confidence should be < 40');
+});
+
+test('analyzerDetectAutorisationProject extracts supply data (Sk, Un, ek, S)', function() {
+  var d = analyzerDetectAutorisationProject(_AUTH_EXAM_TEXT);
+  assert.strictEqual(d.forsyningsdata.skMax_MVA, 115, 'Sk,max should be 115');
+  assert.strictEqual(d.forsyningsdata.skMin_MVA, 60, 'Sk,min should be 60');
+  assert.strictEqual(d.forsyningsdata.un_kV, 10, 'Un should be 10');
+  assert.strictEqual(d.forsyningsdata.ek_pct, 4.5, 'ek should be 4.5');
+  assert.strictEqual(d.forsyningsdata.sn_kVA, 400, 'S should be 400');
+});
+
+test('analyzerDetectAutorisationProject identifies opgave parts and framework', function() {
+  var d = analyzerDetectAutorisationProject(_AUTH_EXAM_TEXT);
+  assert(d.opgaver.indexOf('opgave1_forsyning') >= 0, 'should detect opgave 1');
+  assert(d.opgaver.indexOf('opgave2_installation') >= 0, 'should detect opgave 2');
+  assert(d.regelsaet.length > 0, 'should detect regulatory framework');
+});
+
+test('AUTORISATION_EXAM_STRUCTURE has all three opgave parts with weights 20/60/20', function() {
+  assert(AUTORISATION_EXAM_STRUCTURE.opgave1_forsyning.weight === 20, 'opgave 1 = 20%');
+  assert(AUTORISATION_EXAM_STRUCTURE.opgave2_installation.weight === 60, 'opgave 2 = 60%');
+  assert(AUTORISATION_EXAM_STRUCTURE.opgave3_regler.weight === 20, 'opgave 3 = 20%');
+});
+
+test('analyzerAutorisationReview computes correct derived supply calculations', function() {
+  var d = analyzerDetectAutorisationProject(_AUTH_EXAM_TEXT);
+  var r = analyzerAutorisationReview(_AUTH_EXAM_TEXT, d);
+  assert(r !== null, 'review should exist for authorization project');
+  // Ik[kA] = Sk[MVA]/(sqrt(3)*Un[kV]) = 115/(1.732*10) = 6.64 kA
+  assert(Math.abs(r.derived.ikMax_kA - 6.64) < 0.05, 'ikMax should be ~6.64 kA, got ' + r.derived.ikMax_kA);
+  assert(Math.abs(r.derived.ikMin_kA - 3.46) < 0.05, 'ikMin should be ~3.46 kA, got ' + r.derived.ikMin_kA);
+  // LV full-load: 400 kVA / (sqrt(3)*400 V) = 577.4 A
+  assert(Math.abs(r.derived.inLV_A - 577.4) < 1, 'inLV should be ~577.4 A, got ' + r.derived.inLV_A);
+  // Trafo secondary SC: 577.4 / 0.045 = 12.83 kA
+  assert(Math.abs(r.derived.ikTrafoLV_kA - 12.83) < 0.1, 'ikTrafoLV should be ~12.83 kA, got ' + r.derived.ikTrafoLV_kA);
+});
+
+test('analyzerAutorisationReview flags missing supply info like an examiner', function() {
+  var partial = 'autorisationsprove forsyningsanlaeg transformerstation. S = 630 kVA.';
+  var d = analyzerDetectAutorisationProject(partial);
+  var r = analyzerAutorisationReview(partial, d);
+  assert(r.missingInfo.length > 0, 'should flag missing supply data');
+});
+
+test('analyzerAutorisationReview returns null for non-authorization text', function() {
+  var d = analyzerDetectAutorisationProject('Ohm law R=10 U=12');
+  var r = analyzerAutorisationReview('Ohm law R=10 U=12', d);
+  assert.strictEqual(r, null, 'should return null for non-authorization');
+});
+
+test('renderAutorisationReview renders a banner for authorization projects', function() {
+  analyzerState.rawText = _AUTH_EXAM_TEXT;
+  analyzerState.autorisationDetected = analyzerDetectAutorisationProject(_AUTH_EXAM_TEXT);
+  var html = renderAutorisationReview();
+  assert(html.length > 0, 'should render non-empty banner');
+  assert(html.indexOf('115') >= 0 || html.indexOf('Sk') >= 0, 'should show supply data');
+  analyzerState.autorisationDetected = null;
+});
+
+test('renderAutorisationReview returns empty string when not authorization level', function() {
+  analyzerState.autorisationDetected = null;
+  var html = renderAutorisationReview();
+  assert.strictEqual(html, '', 'should be empty when no detection');
+});
+
+test('analyzerState has autorisationDetected field', function() {
+  assert('autorisationDetected' in analyzerState, 'should have autorisationDetected field');
+});
+
+test('Authorization intelligence is non-invasive (core calc unchanged)', function() {
+  var ib = sldCalcNodeIB({ power_kW: 3.45, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib - 15.79) < 0.1, 'sldCalcNodeIB must be unchanged: ' + ib);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

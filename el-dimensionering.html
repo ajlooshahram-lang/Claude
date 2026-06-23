@@ -1681,6 +1681,14 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Authorization Exam Intelligence (Danish autorisationsprove) =====
+  'Authorization level detected': '\u0633\u0637\u062D \u0645\u062C\u0648\u0632 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F',
+  'confidence': '\u0627\u0637\u0645\u06CC\u0646\u0627\u0646',
+  'Supply data found': '\u062F\u0627\u062F\u0647\u200C\u0647\u0627\u06CC \u062A\u063A\u0630\u06CC\u0647 \u06CC\u0627\u0641\u062A \u0634\u062F',
+  'Expected calculations (derived)': '\u0645\u062D\u0627\u0633\u0628\u0627\u062A \u0645\u0648\u0631\u062F \u0627\u0646\u062A\u0638\u0627\u0631 (\u0645\u0634\u062A\u0642)',
+  'Assignment structure': '\u0633\u0627\u062E\u062A\u0627\u0631 \u062A\u06A9\u0644\u06CC\u0641',
+  'Examiner would ask about': '\u0645\u0645\u062A\u062D\u0646 \u062F\u0631\u0628\u0627\u0631\u0647 \u0627\u06CC\u0646 \u0645\u0648\u0627\u0631\u062F \u0645\u06CC\u200C\u067E\u0631\u0633\u062F',
+  'Regulatory framework': '\u0686\u0627\u0631\u0686\u0648\u0628 \u0645\u0642\u0631\u0631\u0627\u062A\u06CC',
   // ===== Voltage-drop verdict — lighting-specific limit qualifier (DS/HD 60364-5-52 cl. 525) =====
   'lighting limit': '\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0631\u0648\u0634\u0646\u0627\u06CC\u06CC',
   // ===== Live Installation Twin — IEC 60617 component-symbol legend =====
@@ -6424,6 +6432,29 @@ const _FA = {
   'File processing error: ': 'خطای پردازش فایل: ',
   'No text found in file.': 'متنی در فایل یافت نشد.',
   'Dismiss': 'بستن',
+  // ===== Authorization Exam Intelligence — Farsi translations =====
+  'Authorization level detected': 'سطح مجوز تشخیص داده شد',
+  'Supply data found': 'داده‌های تغذیه یافت شد',
+  'Expected assignment structure': 'ساختار تکلیف مورد انتظار',
+  'Confidence': 'اطمینان',
+  'Supply': 'تغذیه',
+  'Sizing': 'ابعاد‌سازی',
+  'Protection': 'حفاظت',
+  'Supply data': 'داده‌های تغذیه',
+  'Verification': 'تأیید',
+  'Documentation': 'مستندسازی',
+  'Motor installation': 'نصب موتور',
+  'Special locations': 'مکان‌های خاص',
+  'Panel/Switchboard': 'تابلو/تابلوبرق',
+  'Cable/Wiring': 'کابل/سیم‌کشی',
+  'Load calculation': 'محاسبه بار',
+  'Earthing/Bonding': 'ارتینگ/باندینگ',
+  'Assignment 1 (Supply)': 'تکلیف ۱ (تغذیه)',
+  'Assignment 2 (Installation)': 'تکلیف ۲ (نصب)',
+  'Assignment 3 (Regulations)': 'تکلیف ۳ (مقررات)',
+  'Missing elements': 'عناصر مفقود',
+  'Detected elements': 'عناصر شناسایی‌شده',
+  'Regulatory framework': 'چارچوب مقرراتی',
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -36663,7 +36694,8 @@ var analyzerState = {
   solutionShown: false, // Whether the capstone "Complete exam solution" is rendered
   mode: 'upload', // 'upload' or 'paste'
   ingestionProgress: null, // progress text during PDF/DOCX extraction
-  ingestionNotice: null    // error/warning banner text
+  ingestionNotice: null,   // error/warning banner text
+  autorisationDetected: null // Authorization-exam-level project detection result
 };
 // Normalize input text: strip page numbers, headers, fix encoding
 function analyzerNormalize(text) {
@@ -37556,9 +37588,358 @@ function findCableProduct(mm2, cableType) {
   return null;
 }
 // Run the full analyzer pipeline - ENHANCED with reactive bus population
+// ============================================================================
+// ===== AUTHORIZATION EXAM INTELLIGENCE (Danish Autorisationsprøve) =====
+// ============================================================================
+// Learned from 71 real Danish electrical authorization exams (2006-2023).
+// Teaches the Project Analyzer to understand authorization-level language,
+// project structure, expected reasoning, and compliance expectations.
+// All offline, no external dependencies.
+
+// Danish electrical authorization vocabulary, organized by domain.
+// Each term: da (Danish), en (English), clause (standard ref or null),
+// context (how it is used in an exam). Optional: symbol, unit, formula.
+var AUTORISATIONS_TERMINOLOGY = {
+  forsyning: [
+    { da: 'Kortslutningseffekt', en: 'Short-circuit power', symbol: 'Sk', unit: 'MVA', formula: 'Sk = sqrt(3)*Un*Ik', clause: 'IEC 60909', context: 'Oplyses af netselskabet for 10/60 kV station' },
+    { da: 'Kortslutningsspaending', en: 'Short-circuit voltage', symbol: 'ek', unit: '%', formula: 'ek = sqrt(er^2 + ex^2)', clause: 'IEC 60076', context: 'Transformerens navnepladedata' },
+    { da: 'Ohmsk kortslutningsspaending', en: 'Resistive SC voltage', symbol: 'er', unit: '%', formula: 'er = Pk*100/Sn', clause: 'IEC 60076', context: 'Beregnes fra belastningstabet Pk' },
+    { da: 'Reaktiv kortslutningsspaending', en: 'Reactive SC voltage', symbol: 'ex', unit: '%', formula: 'ex = sqrt(ek^2 - er^2)', clause: 'IEC 60076', context: 'Dominerer for store transformere' },
+    { da: 'Fuldlaststroem', en: 'Full-load current', symbol: 'In', unit: 'A', formula: 'In = Sn/(sqrt(3)*Un)', clause: 'DS/HD 60364-4-43', context: 'Bruges til dimensionering af sikringer og kabler' },
+    { da: 'Linjerelae', en: 'Line relay', symbol: 'I>/t>', unit: 'A/s', formula: null, clause: 'BEK 1608', context: 'Konstanttidsrelae i 10/60 kV forsyning' },
+    { da: 'Sloejfefelt', en: 'Ring main unit', symbol: null, unit: null, formula: null, clause: 'BEK 1114', context: 'Til indsloejfning paa 10 kV ringnet' },
+    { da: 'Radialnet', en: 'Radial network', symbol: null, unit: null, formula: null, clause: null, context: 'Ringnet med aabent punkt fungerer som radialnet' },
+    { da: 'HH-sikring', en: 'HV HRC fuse', symbol: null, unit: 'A', formula: null, clause: 'IEC 60282-1', context: 'SIBA HHD type til transformerbeskyttelse' },
+    { da: 'Indsloejfning', en: 'Loop-in connection', symbol: null, unit: null, formula: null, clause: null, context: 'Transformerstation indsloejfes paa eksisterende ringnet' },
+    { da: 'Sikringslastadskiller', en: 'Fused load-break switch', symbol: null, unit: 'A', formula: null, clause: 'IEC 60282', context: 'Kombineret afbryder og sikring i HV-felt' },
+    { da: 'Transformerstation', en: 'Substation', symbol: null, unit: null, formula: null, clause: null, context: '10/0.4 kV station med transformer og tavler' },
+    { da: 'Samleskinne', en: 'Busbar', symbol: null, unit: null, formula: null, clause: 'IEC 61439', context: '10 kV eller 0.4 kV fordelingsskinne' },
+    { da: 'Forsyningsspaending', en: 'Supply voltage', symbol: 'Un', unit: 'kV/V', formula: null, clause: null, context: 'Nominel netspaending fra forsyningsselskab' },
+    { da: 'Konstanttidsrelae', en: 'Definite-time relay', symbol: 'I>/t>', unit: 'A/s', formula: null, clause: 'BEK 1608', context: 'Fast udloesetid uanset fejlstroemmens stoerrelse' }
+  ],
+  dimensionering: [
+    { da: 'Belastningsstroem', en: 'Load current', symbol: 'IB', unit: 'A', formula: 'IB = P/(sqrt(3)*U*cosphi)', clause: 'DS/HD 60364-4-43 §433.1', context: 'Grundlag for al dimensionering' },
+    { da: 'Maerkestroem', en: 'Rated current', symbol: 'In', unit: 'A', formula: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 §433.1', context: 'Beskyttelsens nominelle stroem' },
+    { da: 'Stroembaereevne', en: 'Current-carrying capacity', symbol: 'Iz', unit: 'A', formula: 'Iz = Iz_tabel * Ca * Cg', clause: 'DS/HD 60364-5-52', context: 'Korrigeret for temp og gruppering' },
+    { da: 'Temperaturkorrektionsfaktor', en: 'Temperature correction factor', symbol: 'Ca', unit: null, formula: null, clause: 'DS/HD 60364-5-52 Tabel B.52.14', context: 'Reducerer Iz ved forhoejet omgivelsestemperatur' },
+    { da: 'Grupperingskorrektionsfaktor', en: 'Grouping correction factor', symbol: 'Cg', unit: null, formula: null, clause: 'DS/HD 60364-5-52 Tabel B.52.17', context: 'Reducerer Iz ved samlet fremfoering' },
+    { da: 'Samtidighedsfaktor', en: 'Simultaneity factor', symbol: 'Sf', unit: null, formula: null, clause: 'DS/HD 60364-4-43', context: 'Reduktion af belastning pga. ikke-samtidig brug' },
+    { da: 'Spaendingsfald', en: 'Voltage drop', symbol: 'dU', unit: 'V/%', formula: 'dU = sqrt(3)*IB*L*(r*cosphi + x*sinphi)', clause: 'DS/HD 60364-5-52 §525', context: 'Max 3% belysning, 5% oevrige' },
+    { da: 'Fejlsloejfeimpedans', en: 'Earth fault loop impedance', symbol: 'Zs', unit: 'ohm', formula: 'Zs = Zt + 2*L*(r+x)/1000', clause: 'DS/HD 60364-4-41', context: 'Skal sikre frakobling inden for kravtid' },
+    { da: 'Udkoblingsbetingelse', en: 'Disconnection condition', symbol: null, unit: null, formula: 'Zs*Ia <= U0', clause: 'DS/HD 60364-4-41 §411.3.2', context: 'Grundlaeggende sikkerhedskrav' },
+    { da: 'Selektivitet', en: 'Selectivity / discrimination', symbol: 'Is', unit: 'kA', formula: null, clause: 'DS/HD 60364-5-53 §536', context: 'Nedstroems beskyttelse skal udloese FOER opstroems' },
+    { da: 'Adiabatisk betingelse', en: 'Adiabatic condition', symbol: null, unit: null, formula: 'k^2*S^2 >= I^2*t', clause: 'DS/HD 60364-4-43 §434.5.2', context: 'Kablet maa ikke overophedes under kortslutning' },
+    { da: 'Brydeevne', en: 'Breaking capacity', symbol: 'Icu', unit: 'kA', formula: 'Icu >= Ik_max', clause: 'DS/HD 60364-4-43 §434.5.1', context: 'Afbryder skal kunne klare prospektiv fejlstroem' },
+    { da: 'Overbelastningsbeskyttelse', en: 'Overload protection', symbol: null, unit: null, formula: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 §433.1', context: 'Grundreglen - kablet maa aldrig overbelastes' },
+    { da: 'Kortslutningsbeskyttelse', en: 'Short-circuit protection', symbol: null, unit: null, formula: 'k^2*S^2 >= I^2*t', clause: 'DS/HD 60364-4-43 §434', context: 'Kablet skal beskyttes mod termisk skade' },
+    { da: 'Kortslutningsudloeserens effektivitet', en: 'SC release effectiveness', symbol: null, unit: null, formula: 'Ik_min >= Ia', clause: 'DS/HD 60364-4-41', context: 'Min. fejlstroem skal udloese beskyttelsen i tide' }
+  ]
+};
+
+
+AUTORISATIONS_TERMINOLOGY.beskyttelse = [
+  { da: 'Automatisk afbrydelse af forsyningen', en: 'Automatic disconnection of supply', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41 §411', context: 'Primaer beskyttelsesmetode i TN og TT' },
+  { da: 'Fejlstroemsafbryder (HPFI/RCD)', en: 'Residual current device (RCD)', symbol: 'IDn', unit: 'mA', formula: null, clause: 'DS/HD 60364-4-41 §411.3.3', context: '30 mA paa stikkontakter <=32A, badevaerelse, udendoers' },
+  { da: 'Maksimalafbryder', en: 'Moulded case circuit breaker (MCCB)', symbol: 'Ir/Isd/Ii', unit: 'A', formula: null, clause: 'IEC 60947-2', context: 'Justerbar overbelastning og kortslutning' },
+  { da: 'Automatsikring', en: 'Miniature circuit breaker (MCB)', symbol: null, unit: 'A', formula: null, clause: 'IEC 60898', context: 'Kurve B (3-5x), C (5-10x), D (10-20x)' },
+  { da: 'Smeltesikring', en: 'HRC fuse', symbol: null, unit: 'A', formula: null, clause: 'IEC 60269', context: 'NH-type (gG = general purpose, aM = motor)' },
+  { da: 'Motorvaern', en: 'Motor protection circuit breaker', symbol: null, unit: 'A', formula: null, clause: 'IEC 60947-4-1', context: 'Kombineret kort-/overbelastningsbeskyttelse for motor' },
+  { da: 'Termorelae', en: 'Thermal overload relay', symbol: null, unit: 'A', formula: null, clause: 'IEC 60947-4-1', context: 'Indstilles til motorens maerkestroem' },
+  { da: 'Frakoblingstid', en: 'Disconnection time', symbol: 'ta', unit: 's', formula: null, clause: 'DS/HD 60364-4-41 §411.3.2 Tabel 41.1', context: 'TN: 0,4s (<=32A) / 5s. TT: 0,2s / 1s' },
+  { da: 'Beskyttelse mod indirekte beroering', en: 'Protection against indirect contact', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41', context: 'Sikrer mod stoed ved isolationsfejl paa udsatte dele' },
+  { da: 'Beskyttelse mod direkte beroering', en: 'Protection against direct contact', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41 §410', context: 'Isolation, afskaermning, hindringer' },
+  { da: 'Udsatte dele', en: 'Exposed conductive parts', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-1', context: 'Ledende dele der kan beroeres og blive spaendingsfoerende ved fejl' },
+  { da: 'Beroeringsspaending', en: 'Touch voltage', symbol: 'Ut', unit: 'V', formula: 'Ut = Zs*Ia (TT: RA*IDn)', clause: 'DS/HD 60364-4-41', context: 'Skal holdes under 50 V AC' }
+];
+AUTORISATIONS_TERMINOLOGY.forsyningsdata = [
+  { da: 'Nominel spaending', en: 'Nominal voltage', symbol: 'Un', unit: 'kV/V', formula: null, clause: null, context: '10 kV (MV) eller 400/230 V (LV)' },
+  { da: 'Maksimal kortslutningseffekt', en: 'Maximum SC power', symbol: 'Sk,max', unit: 'MVA', formula: 'Ik_max = Sk_max/(sqrt(3)*Un)', clause: 'IEC 60909', context: 'Til bestemmelse af max Ik -> brydeevne' },
+  { da: 'Minimal kortslutningseffekt', en: 'Minimum SC power', symbol: 'Sk,min', unit: 'MVA', formula: 'Ik_min = Sk_min/(sqrt(3)*Un)', clause: 'IEC 60909', context: 'Til kontrol af beskyttelsens effektivitet' },
+  { da: 'Effektfaktor ved kortslutning', en: 'Power factor at SC', symbol: 'cosphi_k', unit: null, formula: null, clause: 'IEC 60909', context: 'Bestemmer R/X-forholdet i nettet' },
+  { da: 'Spaendingsfaktor', en: 'Voltage factor', symbol: 'c', unit: null, formula: null, clause: 'IEC 60909-0', context: 'cmax=1,05-1,10 / cmin=0,95 for Ik-beregning' },
+  { da: 'Netimpedans', en: 'Network impedance', symbol: 'Znet', unit: 'mohm', formula: 'Znet = c*Un^2/Sk', clause: 'IEC 60909', context: 'Beregnes fra kortslutningseffekten' },
+  { da: 'Transformerimpedans', en: 'Transformer impedance', symbol: 'Zt', unit: 'mohm', formula: 'Zt = (ek/100)*Un^2/Sn', clause: 'IEC 60076', context: 'Dominerende impedans i LV-net' },
+  { da: 'Prospektiv kortslutningsstroem', en: 'Prospective SC current', symbol: 'Ik', unit: 'kA', formula: 'Ik = c*Un/(sqrt(3)*Z)', clause: 'IEC 60909', context: 'Maksimal forventet fejlstroem paa stedet' }
+];
+AUTORISATIONS_TERMINOLOGY.verifikation = [
+  { da: 'Foerste verifikation', en: 'Initial verification', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6 §6.4', context: 'Eftersyn + proevning foer ibrugtagning' },
+  { da: 'Periodisk verifikation', en: 'Periodic verification', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6 §6.5', context: 'Tilbagevendende eftersyn (bolig hvert 5. aar)' },
+  { da: 'Visuel inspektion', en: 'Visual inspection', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6 §6.4.2', context: 'Foer maaling - kontrol af synlige forhold' },
+  { da: 'Isolationsmodstand', en: 'Insulation resistance', symbol: 'Riso', unit: 'Mohm', formula: null, clause: 'DS/HD 60364-6 §6.4.3.3', context: 'Min 1,0 Mohm ved 500 V for kredse <=500V' },
+  { da: 'Gennemgangsmaaling', en: 'Continuity test', symbol: 'R1+R2', unit: 'ohm', formula: null, clause: 'DS/HD 60364-6 §6.4.3.2', context: 'Kontrol af PE-leder gennemgang' },
+  { da: 'Maaling af fejlsloejfeimpedans', en: 'Loop impedance measurement', symbol: 'Zs', unit: 'ohm', formula: null, clause: 'DS/HD 60364-6 §6.4.3.7', context: 'Maales paa fjerneste punkt af kredsen' },
+  { da: 'RCD-proevning', en: 'RCD test', symbol: null, unit: 'ms', formula: null, clause: 'DS/HD 60364-6 §6.4.3.7', context: 'Udloesestroem og -tid kontrolleres med instrument' },
+  { da: 'Afproevningsprotokol', en: 'Test protocol', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6', context: 'Dokumentation af alle maalinger' },
+  { da: 'Polaritetstest', en: 'Polarity test', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6 §6.4.3.6', context: 'Kontrol af korrekt fase/nul tilslutning' },
+  { da: 'Faserekkefoelge', en: 'Phase sequence', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-6 §6.4.3.8', context: 'Kontrol af rotationsretning for 3-fase' }
+];
+
+
+AUTORISATIONS_TERMINOLOGY.dokumentation = [
+  { da: 'En-stregsdiagram', en: 'Single-line diagram', symbol: null, unit: null, formula: null, clause: 'IEC 60617', context: 'Skematisk oversigt over hele installationen' },
+  { da: 'Kredsskema', en: 'Circuit diagram', symbol: null, unit: null, formula: null, clause: 'IEC 60617', context: 'Detaljeret forbindelsesdiagram' },
+  { da: 'Belastningsskema', en: 'Load schedule', symbol: null, unit: null, formula: null, clause: null, context: 'Tabel over belastninger pr. fase med Sf og cosphi' },
+  { da: 'Kabelskema', en: 'Cable schedule', symbol: null, unit: null, formula: null, clause: null, context: 'Oversigt over kabeltyper, tvaersnit og laengder' },
+  { da: 'Installationserklaering', en: 'Installation declaration', symbol: null, unit: null, formula: null, clause: 'BEK 1082', context: 'Lovpligtig erklaering fra autoriseret installatoer' },
+  { da: 'Tavledokumentation', en: 'Switchboard documentation', symbol: null, unit: null, formula: null, clause: 'EN 61439', context: 'Tavleerklaering med beregninger og verifikation' },
+  { da: 'Stykliste', en: 'Bill of materials', symbol: null, unit: null, formula: null, clause: null, context: 'Komplet komponentliste til projektet' }
+];
+AUTORISATIONS_TERMINOLOGY.motor = [
+  { da: 'Startstroem', en: 'Starting current', symbol: 'Ist', unit: 'A', formula: 'Ist = (Ist/In)*In', clause: 'IEC 60947-4-1', context: 'DOL: 6-8x In, stjerne-trekant: ~2x reduktion' },
+  { da: 'Direkte start (DOL)', en: 'Direct-on-line start', symbol: null, unit: null, formula: null, clause: null, context: 'Hoejeste startstroem - kraever kurve D / motorvaern' },
+  { da: 'Stjerne-trekant start', en: 'Star-delta start', symbol: null, unit: null, formula: null, clause: null, context: 'Reducerer startstroem til ~1/3 af DOL' },
+  { da: 'Softstarter', en: 'Soft starter', symbol: null, unit: null, formula: null, clause: 'IEC 60947-4-2', context: 'Reducerer startstroem til ~3x In' },
+  { da: 'Frekvensomformer', en: 'Variable frequency drive (VFD)', symbol: null, unit: null, formula: null, clause: 'IEC 61800', context: 'Variabel hastighed - kraever Type B RCD' },
+  { da: 'Virkningsgrad', en: 'Efficiency', symbol: 'eta', unit: null, formula: 'In = P/(sqrt(3)*U*cosphi*eta)', clause: null, context: 'Maa medregnes i motorens stroemberegning' },
+  { da: 'Kontaktor', en: 'Contactor', symbol: null, unit: 'A', formula: null, clause: 'IEC 60947-4-1', context: 'AC-3 kategori for motorlast' },
+  { da: 'Motorafgang', en: 'Motor feeder', symbol: null, unit: null, formula: null, clause: 'IEC 60947-4-1', context: 'Kortslutningsbeskyttelse + kontaktor + termorelae' }
+];
+AUTORISATIONS_TERMINOLOGY.jording = [
+  { da: 'Systemjording', en: 'System earthing', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-1', context: 'TN-C-S, TN-S, TT eller IT' },
+  { da: 'PEN-leder', en: 'PEN conductor', symbol: 'PEN', unit: null, formula: null, clause: 'DS/HD 60364-5-54', context: 'Kombineret PE og N - opsplittes i hovedtavle' },
+  { da: 'Beskyttelsesleder', en: 'Protective conductor', symbol: 'PE', unit: 'mm2', formula: null, clause: 'DS/HD 60364-5-54 Tabel 54.2', context: 'Dimensioneres efter faseleder eller adiabatisk' },
+  { da: 'Hovedudligningsforbindelse', en: 'Main equipotential bonding', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41 §411.3.1.2', context: 'Forbinder fremmede ledende dele til PE' },
+  { da: 'Supplerende udligning', en: 'Supplementary bonding', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-701', context: 'Kraevet i badevaerelser og saerlige rum' },
+  { da: 'Jordelektrode', en: 'Earth electrode', symbol: 'RA', unit: 'ohm', formula: 'RA*IDn <= 50V', clause: 'DS/HD 60364-5-54', context: 'Jordspyd/baand - kritisk i TT-system' },
+  { da: 'Jordelektrodemodstand', en: 'Earth electrode resistance', symbol: 'RA', unit: 'ohm', formula: 'RA <= 50/IDn', clause: 'DS/HD 60364-4-41 §411.5.3', context: 'TT: <=1667 ohm for 30 mA RCD' },
+  { da: 'Beskyttelsesjord', en: 'Protective earth', symbol: 'PE', unit: null, formula: null, clause: 'DS/HD 60364-5-54', context: 'Separat beskyttelsesleder efter opsplitning' }
+];
+
+
+AUTORISATIONS_TERMINOLOGY.saerlige = [
+  { da: 'Badevaerelse (zoner)', en: 'Bathroom (zones)', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-701', context: 'Zone 0/1/2 med IP-krav og supplerende udligning' },
+  { da: 'Ladning af elbiler', en: 'EV charging', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-722', context: 'Type B RCD, kontinuerlig last, PEN-brudsbeskyttelse' },
+  { da: 'Solcelleanlaeg', en: 'PV installation', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-712', context: 'DC-afbryder, anti-oedrift, flere spaendingskilder' },
+  { da: 'Svoemmebassin', en: 'Swimming pool', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-702', context: 'Skaerpede zonekrav og SELV' },
+  { da: 'Byggeplads', en: 'Construction site', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-704', context: 'Reduceret spaending, robust materiel, hyppig proevning' },
+  { da: 'Landbrug', en: 'Agricultural premises', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-705', context: 'Stoev, fugt, dyr - skaerpet IP og brandbeskyttelse' },
+  { da: 'Eksplosionsfarlige omraader', en: 'Explosive atmospheres (ATEX)', symbol: null, unit: null, formula: null, clause: 'DS/EN 60079', context: 'Zoneklassifikation og Ex-materiel' },
+  { da: 'Noedbelysning', en: 'Emergency lighting', symbol: null, unit: null, formula: null, clause: 'DS/EN 1838', context: 'Separat forsyning, batteribackup, regelmaessig test' },
+  { da: 'Brandalarmanlaeg', en: 'Fire alarm system', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-5-56', context: 'Separat kreds, brandsikker kabel' },
+  { da: 'Medicinske omraader', en: 'Medical locations', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-710', context: 'IT-system, isolationsovervaagning, redundans' }
+];
+AUTORISATIONS_TERMINOLOGY.tavle = [
+  { da: 'Hovedtavle', en: 'Main distribution board', symbol: null, unit: null, formula: null, clause: 'EN 61439-1/2', context: 'Foerste fordeling efter stikledning' },
+  { da: 'Undertavle', en: 'Sub-distribution board', symbol: null, unit: null, formula: null, clause: 'EN 61439-1/2', context: 'Underfordeling forsynet fra hovedtavle' },
+  { da: 'Gruppetavle', en: 'Group/final board', symbol: null, unit: null, formula: null, clause: 'EN 61439-3', context: 'Fordeling til slutkredse i bolig/erhverv' },
+  { da: 'Maalersektion', en: 'Metering section', symbol: null, unit: null, formula: null, clause: 'EN 61439', context: 'Plads til elmaaler og maaletransformere' },
+  { da: 'Klasse I beskyttelse', en: 'Class I protection', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41', context: 'Beroeringsbeskyttelse via PE-tilslutning' },
+  { da: 'Klasse II beskyttelse', en: 'Class II protection', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-4-41', context: 'Dobbelt/forstaerket isolation, ingen PE' },
+  { da: 'Tavlevarme', en: 'Switchboard heat dissipation', symbol: 'Pv', unit: 'W', formula: null, clause: 'EN 61439-1', context: 'Effekttab skal afsaettes uden overtemperatur' },
+  { da: 'Maaletransformer', en: 'Current transformer (CT)', symbol: null, unit: 'A/A', formula: null, clause: 'IEC 61869-2', context: 'Til maaling af store stroemme (fx 800/5A)' }
+];
+AUTORISATIONS_TERMINOLOGY.kabel = [
+  { da: 'Stikledning', en: 'Service cable', symbol: null, unit: null, formula: null, clause: 'Faellesregulativet', context: 'Forsyningskabel fra net til hovedtavle' },
+  { da: 'Foeringsvej', en: 'Cable route', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-5-52', context: 'Kabelbakke, roer, direkte i jord' },
+  { da: 'Installationsmetode', en: 'Installation method', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-5-52 Tabel A.52.3', context: 'Metode A-G bestemmer Iz-tabelvaerdi' },
+  { da: 'Kabelbakke', en: 'Cable tray', symbol: null, unit: null, formula: null, clause: 'IEC 61537', context: 'Perforeret bakke - metode E/F' },
+  { da: 'XLPE-isolation', en: 'XLPE insulation', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-5-52', context: '90 grader C ledertemperatur - hoejere Iz' },
+  { da: 'PVC-isolation', en: 'PVC insulation', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-5-52', context: '70 grader C ledertemperatur' },
+  { da: 'Ledertvaersnit', en: 'Conductor cross-section', symbol: 'S', unit: 'mm2', formula: null, clause: 'IEC 60228', context: 'Standardraekke: 1.5, 2.5, 4, 6, 10, 16, 25...' },
+  { da: 'Enkeltleder', en: 'Single core', symbol: null, unit: null, formula: null, clause: null, context: 'Fx 4x400mm2 i trekant paa kabelstige' },
+  { da: 'Neutralleder', en: 'Neutral conductor', symbol: 'N', unit: 'mm2', formula: null, clause: 'DS/HD 60364-5-52 §523.6.3', context: 'Regnes som belastet ved >33% 3. harmoniske' },
+  { da: 'Kabelimpedans', en: 'Cable impedance', symbol: 'Z', unit: 'ohm/km', formula: 'Z = sqrt(r^2+x^2)', clause: null, context: 'r og x pr. km fra kabeldata' }
+];
+AUTORISATIONS_TERMINOLOGY.belastning = [
+  { da: 'Belastningsoversigt', en: 'Load overview', symbol: null, unit: null, formula: null, clause: null, context: 'Tabel med belastninger fordelt pr. fase' },
+  { da: 'Tilsyneladende effekt', en: 'Apparent power', symbol: 'S', unit: 'VA', formula: 'S = sqrt(3)*U*I', clause: null, context: 'Summeres pr. fase i belastningsskema' },
+  { da: 'Aktiv effekt', en: 'Active power', symbol: 'P', unit: 'W', formula: 'P = S*cosphi', clause: null, context: 'Den nyttige effekt' },
+  { da: 'Reaktiv effekt', en: 'Reactive power', symbol: 'Q', unit: 'var', formula: 'Q = S*sinphi', clause: null, context: 'Magnetiseringseffekt' },
+  { da: 'Fasebalancering', en: 'Phase balancing', symbol: null, unit: null, formula: null, clause: null, context: 'Fordel 1-fase laster jaevnt paa L1/L2/L3' },
+  { da: 'Diversificeret belastning', en: 'Diversified load', symbol: null, unit: null, formula: 'Pb = Sf*P_installeret', clause: null, context: 'Reel belastning efter samtidighed' },
+  { da: 'Boligforsyning (formel)', en: 'Dwelling supply formula', symbol: 'Pb', unit: 'kW', formula: 'Pb = 0.834*(W*n)^0.89', clause: 'Faellesregulativet', context: 'Netselskabets erfaringsformel for boligenheder' },
+  { da: 'Kontinuerlig last', en: 'Continuous load', symbol: null, unit: null, formula: null, clause: 'DS/HD 60364-7-722', context: 'EV/varmepumpe - ingen samtidighedsreduktion' }
+];
+
+
+// Recognized authorization exam structure (constant across 2006-2023 exams):
+// Opgave 1 (20%) Forsyning, Opgave 2 (60%) Installation, Opgave 3 (20%) Regler.
+var AUTORISATION_EXAM_STRUCTURE = {
+  opgave1_forsyning: {
+    weight: 20,
+    da: 'Forsyningsanlaeg', en: 'Supply installation',
+    expectedElements: [
+      { key: 'enstregsdiagram', da: 'En-stregsdiagram over transformerstation', en: 'Single-line diagram of substation' },
+      { key: 'hv_kabel', da: 'Dimensioner hoejspaendingsforsyningsledere', en: 'Size HV supply conductors' },
+      { key: 'lv_sikring', da: 'Vaelg lavspaendingssikring (overbelastning)', en: 'Select LV fuse (overload)' },
+      { key: 'lv_kabel', da: 'Dimensioner lavspaendingsforsyningsleder', en: 'Size LV supply conductor' },
+      { key: 'selektivitet', da: 'Kontroller selektivitet HV/LV', en: 'Verify HV/LV selectivity' },
+      { key: 'jording', da: 'Dimensioner system- og beskyttelsesjord', en: 'Size system and protective earth' }
+    ],
+    typicalData: {
+      voltageLevel: '10/0.4 kV',
+      transformerSizes: [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000],
+      ek_typical: [4, 4.5, 5, 5.5, 6],
+      hvFuseTypes: ['SIBA HHD', 'ABB CEF'],
+      relayTypes: ['konstanttid I>/t>', 'IDMT']
+    }
+  },
+  opgave2_installation: {
+    weight: 60,
+    da: 'Bygningsinstallation', en: 'Building installation',
+    expectedElements: [
+      { key: 'enstregsdiagram', da: 'En-stregsdiagram for installation', en: 'Single-line diagram for installation' },
+      { key: 'belastningsskema', da: 'Belastningsskema med fasefordeling', en: 'Load schedule with phase distribution' },
+      { key: 'kabeldimensionering', da: 'Kabeldimensionering med korrektion', en: 'Cable sizing with correction factors' },
+      { key: 'overbelastning', da: 'Overbelastningsbeskyttelse (IB<=In<=Iz)', en: 'Overload protection (IB<=In<=Iz)' },
+      { key: 'kortslutning', da: 'Kortslutningsbeskyttelse + brydeevne', en: 'Short-circuit protection + breaking capacity' },
+      { key: 'spaendingsfald', da: 'Spaendingsfaldskontrol', en: 'Voltage drop verification' },
+      { key: 'indirekte_beroering', da: 'Beskyttelse mod indirekte beroering (Zs)', en: 'Protection against indirect contact (Zs)' },
+      { key: 'selektivitet', da: 'Selektivitetskontrol', en: 'Selectivity verification' }
+    ],
+    typicalData: {
+      buildingTypes: ['fabrik', 'kontor', 'institution', 'boligblok', 'butikscenter'],
+      supplyVoltage: '3x400/230V',
+      earthingSystems: ['TN-C-S', 'TN-S'],
+      temperatureRanges: { administration: 25, lager: 20, produktion: 35, serverrum: 15 }
+    }
+  },
+  opgave3_regler: {
+    weight: 20,
+    da: 'Spoergsmaal til bekendtgoerelser/standarder', en: 'Questions on regulations/standards',
+    expectedElements: [
+      { key: 'paragrafhenvisning', da: 'Korrekt paragrafhenvisning', en: 'Correct clause reference' },
+      { key: 'fortolkning', da: 'Fortolkning af krav', en: 'Interpretation of requirement' },
+      { key: 'praktisk_anvendelse', da: 'Praktisk anvendelse', en: 'Practical application' }
+    ]
+  }
+};
+
+
+// Helper: parse a Danish-decimal number ("0,45" -> 0.45)
+function autoNum(s) {
+  if (s === undefined || s === null) return null;
+  var v = parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+  return isNaN(v) ? parseFloat(String(s).replace(',', '.')) : v;
+}
+
+// Detect whether uploaded text is an authorization-level exam/project,
+// and extract the supply data the way an examiner reads the opening page.
+function analyzerDetectAutorisationProject(text) {
+  var detected = { isAutorisationLevel: false, confidence: 0, opgaver: [], forsyningsdata: {}, regelsaet: [], buildingType: null };
+  if (!text) return detected;
+  var lower = text.toLowerCase();
+  var score = 0;
+
+  if (lower.indexOf('autorisationsprove') >= 0 || lower.indexOf('autorisationspr\u00f8ve') >= 0) score += 50;
+  if (lower.indexOf('godkendt af sikkerhedsstyrelsen') >= 0) score += 30;
+  if (lower.indexOf('opgave 1') >= 0 && lower.indexOf('opgave 2') >= 0) score += 20;
+  if (lower.indexOf('forsyningsanl') >= 0) score += 15;
+  if (lower.indexOf('bygningsinstallation') >= 0) score += 15;
+  if (lower.indexOf('bekendtg') >= 0) score += 10;
+  if (lower.indexOf('staerkstroms') >= 0 || lower.indexOf('st\u00e6rkstr\u00f8ms') >= 0) score += 10;
+  if (lower.indexOf('ds/hd 60364') >= 0 || lower.indexOf('hd 60364') >= 0) score += 10;
+  if (lower.indexOf('faellesregulativ') >= 0 || lower.indexOf('f\u00e6llesregulativ') >= 0) score += 10;
+  if (lower.indexOf('transformerstation') >= 0) score += 10;
+  if (lower.indexOf('kortslutningseffekt') >= 0) score += 10;
+
+  // Which opgave parts are present
+  if (lower.indexOf('forsyningsanl') >= 0 || lower.indexOf('transformerstation') >= 0) detected.opgaver.push('opgave1_forsyning');
+  if (lower.indexOf('bygningsinstallation') >= 0 || lower.indexOf('belastningsskema') >= 0 || lower.indexOf('belastningsoversigt') >= 0) detected.opgaver.push('opgave2_installation');
+  if (lower.indexOf('spoergsmaal til') >= 0 || lower.indexOf('sp\u00f8rgsm\u00e5l til') >= 0 || lower.indexOf('opgave 3') >= 0) detected.opgaver.push('opgave3_regler');
+
+  // Regulatory framework
+  if (lower.indexOf('sb6') >= 0 || lower.indexOf('afsnit 6') >= 0) detected.regelsaet.push('SB6 (Staerkstroemsbekendtgoerelsen)');
+  if (lower.indexOf('1082') >= 0) detected.regelsaet.push('BEK 1082 (installationer)');
+  if (lower.indexOf('1114') >= 0) detected.regelsaet.push('BEK 1114 (anlaeg)');
+  if (lower.indexOf('1608') >= 0) detected.regelsaet.push('BEK 1608 (drift)');
+  if (lower.indexOf('60364') >= 0) detected.regelsaet.push('DS/HD 60364-serien');
+  if (lower.indexOf('faellesregulativ') >= 0 || lower.indexOf('f\u00e6llesregulativ') >= 0) detected.regelsaet.push('Faellesregulativet');
+
+  // Building type
+  var btypes = [['fabrik','fabrik'],['produktion','produktion'],['kontor','kontor'],['institution','institution'],['boligblok','boligblok'],['butik','butik'],['lager','lager']];
+  for (var b = 0; b < btypes.length; b++) { if (lower.indexOf(btypes[b][0]) >= 0) { detected.buildingType = btypes[b][1]; break; } }
+
+  // Extract supply data (examiner reads these off the opening page)
+  var m;
+  m = text.match(/[Ss]k\s*(?:n\s*)?,?\s*max\s*[=:]?\s*([\d.,]+)\s*MVA/);
+  if (m) { detected.forsyningsdata.skMax_MVA = autoNum(m[1]); score += 5; }
+  m = text.match(/[Ss]k\s*(?:n\s*)?,?\s*min\s*[=:]?\s*([\d.,]+)\s*MVA/);
+  if (m) { detected.forsyningsdata.skMin_MVA = autoNum(m[1]); score += 5; }
+  m = text.match(/[Uu][Nn]\s*[=:]?\s*(?:3\s*[x\u00d7\u00b7]\s*)?([\d.,]+)\s*kV/);
+  if (m) { detected.forsyningsdata.un_kV = autoNum(m[1]); score += 5; }
+  m = text.match(/[Ee][Kk]\s*[=:]?\s*([\d.,]+)\s*%/);
+  if (m) { detected.forsyningsdata.ek_pct = autoNum(m[1]); score += 5; }
+  m = text.match(/[Ee][Rr]\s*[=:]?\s*([\d.,]+)\s*%/);
+  if (m) { detected.forsyningsdata.er_pct = autoNum(m[1]); }
+  m = text.match(/[Ss]\s*[=:]\s*([\d.,]+)\s*kVA/);
+  if (m) { detected.forsyningsdata.sn_kVA = autoNum(m[1]); score += 5; }
+  m = text.match(/I\s*>\s*[=:]?\s*([\d.,]+)\s*A/);
+  if (m) { detected.forsyningsdata.relayI_A = autoNum(m[1]); }
+  m = text.match(/t\s*>\s*[=:]?\s*([\d.,]+)\s*s/);
+  if (m) { detected.forsyningsdata.relayT_s = autoNum(m[1]); }
+
+  detected.confidence = Math.min(score, 100);
+  detected.isAutorisationLevel = score >= 40;
+  return detected;
+}
+
+
+// Build the examiner-style review: which expected elements are present per
+// opgave, what is missing, and which derived calculations the examiner expects.
+function analyzerAutorisationReview(text, detection) {
+  if (!detection || !detection.isAutorisationLevel) return null;
+  var lower = (text || '').toLowerCase();
+  var review = { opgaver: [], derived: {}, missingInfo: [] };
+
+  var partKeys = ['opgave1_forsyning', 'opgave2_installation', 'opgave3_regler'];
+  for (var p = 0; p < partKeys.length; p++) {
+    var key = partKeys[p];
+    var spec = AUTORISATION_EXAM_STRUCTURE[key];
+    var present = detection.opgaver.indexOf(key) >= 0;
+    var elems = [];
+    for (var e = 0; e < spec.expectedElements.length; e++) {
+      var el = spec.expectedElements[e];
+      // Heuristic: element considered "addressed" if a keyword appears
+      var kw = el.key.split('_')[0];
+      var addressed = present && (lower.indexOf(kw) >= 0 ||
+        (el.da && lower.indexOf(el.da.toLowerCase().split(' ')[0]) >= 0));
+      elems.push({ key: el.key, da: el.da, en: el.en, addressed: addressed });
+    }
+    review.opgaver.push({ key: key, da: spec.da, en: spec.en, weight: spec.weight, present: present, elements: elems });
+  }
+
+  // Derived supply-side calculations the examiner expects (Opgave 1)
+  var f = detection.forsyningsdata;
+  if (f.skMax_MVA && f.un_kV) {
+    // Ik[kA] = Sk[MVA] / (sqrt(3) * Un[kV]) - fault current on the supply (e.g. 10 kV) side
+    review.derived.ikMax_kA = +(f.skMax_MVA / (Math.sqrt(3) * f.un_kV)).toFixed(2);
+  }
+  if (f.skMin_MVA && f.un_kV) {
+    review.derived.ikMin_kA = +(f.skMin_MVA / (Math.sqrt(3) * f.un_kV)).toFixed(2);
+  }
+  if (f.sn_kVA && f.un_kV) {
+    // For 10/0.4 kV transformer, full-load current on the LV side (0.4 kV)
+    review.derived.inHV_A = +(f.sn_kVA / (Math.sqrt(3) * f.un_kV)).toFixed(1);
+    review.derived.inLV_A = +(f.sn_kVA * 1000 / (Math.sqrt(3) * 400)).toFixed(1);
+  }
+  if (f.sn_kVA && f.ek_pct) {
+    // Transformer secondary SC current (simplified, transformer impedance only)
+    var inLV = f.sn_kVA * 1000 / (Math.sqrt(3) * 400);
+    review.derived.ikTrafoLV_kA = +((inLV / (f.ek_pct / 100)) / 1000).toFixed(2);
+  }
+
+  // What an examiner would flag as missing
+  if (!f.un_kV) review.missingInfo.push({ da: 'Nominel spaending (Un) mangler', en: 'Nominal voltage (Un) missing' });
+  if (!f.skMax_MVA && detection.opgaver.indexOf('opgave1_forsyning') >= 0) review.missingInfo.push({ da: 'Maksimal kortslutningseffekt (Sk,max) mangler', en: 'Max short-circuit power (Sk,max) missing' });
+  if (!f.skMin_MVA && detection.opgaver.indexOf('opgave1_forsyning') >= 0) review.missingInfo.push({ da: 'Minimal kortslutningseffekt (Sk,min) mangler - kraeves til kontrol af udloeser', en: 'Min short-circuit power (Sk,min) missing - needed for release check' });
+  if (!f.ek_pct && f.sn_kVA) review.missingInfo.push({ da: 'Kortslutningsspaending (ek%) mangler for transformeren', en: 'Short-circuit voltage (ek%) missing for transformer' });
+
+  return review;
+}
+
+// Count terminology terms (for tests / glossary stats)
+function autorisationTermCount() {
+  var n = 0, cats = Object.keys(AUTORISATIONS_TERMINOLOGY);
+  for (var i = 0; i < cats.length; i++) n += AUTORISATIONS_TERMINOLOGY[cats[i]].length;
+  return n;
+}
+
 function analyzerRun(text) {
   analyzerState.rawText = text;
   analyzerState.solutionShown = false; // fresh analysis hides any previous capstone solution
+  // Authorization-exam recognition: read the supply data the way an examiner would.
+  analyzerState.autorisationDetected = analyzerDetectAutorisationProject(text);
   var normalized = analyzerNormalize(text);
   analyzerState.segments = analyzerSegment(normalized);
   // Extract from entire text (comprehensive: all module types)
@@ -38181,8 +38562,93 @@ function renderAnalyzer() {
   return html;
 }
 // Render analyzer results - ENHANCED with dependency graph and module flow
+// Render the examiner-style authorization review banner.
+function renderAutorisationReview() {
+  var det = analyzerState.autorisationDetected;
+  if (!det || !det.isAutorisationLevel) return '';
+  var html = '<div class="card fade-in" style="border-left:4px solid var(--primary)">';
+  html += '<div class="card-title">\uD83C\uDF93 ' + tx('Autorisationsniveau detekteret', 'Authorization level detected') +
+    ' <span style="font-size:0.8rem;color:var(--text-muted)">(' + tx('sikkerhed', 'confidence') + ': ' + det.confidence + '%)</span></div>';
+  html += '<div class="info-row">' + tx(
+    'Dette ligner en dansk autorisationspr\u00f8ve. Analysatoren l\u00e6ser forsyningsdata og opgavestruktur som en censor.',
+    'This looks like a Danish authorization exam. The analyzer reads supply data and assignment structure like an examiner.') + '</div>';
+
+  // Supply data found
+  var f = det.forsyningsdata || {};
+  var fk = Object.keys(f);
+  if (fk.length > 0) {
+    html += '<div class="result-box"><div class="result-title">' + tx('Forsyningsdata fundet', 'Supply data found') + '</div>';
+    var labels = {
+      skMax_MVA: 'Sk,max [MVA]', skMin_MVA: 'Sk,min [MVA]', un_kV: 'Un [kV]',
+      ek_pct: 'ek [%]', er_pct: 'er [%]', sn_kVA: 'S [kVA]', relayI_A: 'I> [A]', relayT_s: 't> [s]'
+    };
+    for (var i = 0; i < fk.length; i++) {
+      html += '<div class="result-row"><span class="label">' + (labels[fk[i]] || fk[i]) + '</span><span class="value">' + f[fk[i]] + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  var review = analyzerAutorisationReview(analyzerState.rawText, det);
+  if (review) {
+    // Derived calculations the examiner expects
+    var dk = Object.keys(review.derived);
+    if (dk.length > 0) {
+      html += '<div class="result-box"><div class="result-title">' + tx('Forventede beregninger (afledt)', 'Expected calculations (derived)') + '</div>';
+      var dlabels = {
+        ikMax_kA: tx('Maks. kortslutning paa forsyning Ik,max', 'Max SC current on supply Ik,max') + ' [kA]',
+        ikMin_kA: tx('Min. kortslutning paa forsyning Ik,min', 'Min SC current on supply Ik,min') + ' [kA]',
+        inHV_A: tx('Fuldlaststroem HV-side', 'Full-load current HV side') + ' [A]',
+        inLV_A: tx('Fuldlaststroem LV-side (0,4 kV)', 'Full-load current LV side (0.4 kV)') + ' [A]',
+        ikTrafoLV_kA: tx('Trafo sekundaer kortslutning', 'Transformer secondary SC') + ' [kA]'
+      };
+      for (var j = 0; j < dk.length; j++) {
+        html += '<div class="result-row"><span class="label">' + (dlabels[dk[j]] || dk[j]) + '</span><span class="value">' + review.derived[dk[j]] + '</span></div>';
+      }
+      html += '</div>';
+    }
+
+    // Opgave structure with addressed/missing elements
+    html += '<div class="result-box"><div class="result-title">' + tx('Opgavestruktur', 'Assignment structure') + '</div>';
+    for (var p = 0; p < review.opgaver.length; p++) {
+      var op = review.opgaver[p];
+      var icon = op.present ? '\u2705' : '\u2B1C';
+      html += '<div class="result-row"><span class="label">' + icon + ' ' + tx(op.da, op.en) + '</span><span class="value">' + op.weight + '%</span></div>';
+      if (op.present) {
+        for (var e = 0; e < op.elements.length; e++) {
+          var el = op.elements[e];
+          var em = el.addressed ? '\u2713' : '\u2014';
+          var col = el.addressed ? 'var(--success)' : 'var(--text-muted)';
+          html += '<div class="result-row" style="padding-left:18px;font-size:0.82rem"><span class="label" style="color:' + col + '">' + em + ' ' + tx(el.da, el.en) + '</span></div>';
+        }
+      }
+    }
+    html += '</div>';
+
+    // Missing info (examiner would ask)
+    if (review.missingInfo && review.missingInfo.length > 0) {
+      html += '<div class="result-box" style="border:1px solid var(--warning)"><div class="result-title">\u26A0\uFE0F ' + tx('Censor ville spoerge om', 'Examiner would ask about') + '</div>';
+      for (var m = 0; m < review.missingInfo.length; m++) {
+        html += '<div class="result-row"><span class="label">' + tx(review.missingInfo[m].da, review.missingInfo[m].en) + '</span></div>';
+      }
+      html += '</div>';
+    }
+
+    // Regulatory framework
+    if (det.regelsaet && det.regelsaet.length > 0) {
+      html += '<div class="result-box"><div class="result-title">' + tx('Regelgrundlag', 'Regulatory framework') + '</div>';
+      html += '<div class="result-row"><span class="label">' + det.regelsaet.join(' \u00b7 ') + '</span></div></div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function renderAnalyzerResults() {
   var html = '';
+
+  // Authorization-exam review banner (shown only for authorization-level projects)
+  html += renderAutorisationReview();
 
   // Completeness score
   var comp = analyzerState.completeness;
