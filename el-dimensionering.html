@@ -38194,6 +38194,118 @@ function analyzerInflateZlib(data) {
   return analyzerInflate(data);
 }
 
+// Async inflate using native DecompressionStream (Chrome 80+, Firefox 113+, Safari 16.4+).
+// This is C++ speed, never freezes, and handles all DEFLATE variants correctly.
+// Falls back to our manual inflater for very old browsers.
+function analyzerInflateNativeRaw(compressed) {
+  if (typeof DecompressionStream === 'undefined') return Promise.resolve(analyzerInflate(compressed));
+  return new Promise(function(resolve) {
+    try {
+      var ds = new DecompressionStream('deflate-raw');
+      var writer = ds.writable.getWriter();
+      var reader = ds.readable.getReader();
+      var chunks = [];
+      writer.write(compressed).catch(function(){});
+      writer.close().catch(function(){});
+      (function pump() {
+        reader.read().then(function(r) {
+          if (r.done) {
+            var total = 0;
+            for (var i = 0; i < chunks.length; i++) total += chunks[i].length;
+            var out = new Uint8Array(total);
+            var p = 0;
+            for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], p); p += chunks[i].length; }
+            resolve(out);
+          } else {
+            chunks.push(new Uint8Array(r.value));
+            pump();
+          }
+        }).catch(function() { resolve(analyzerInflate(compressed)); });
+      })();
+    } catch(e) { resolve(analyzerInflate(compressed)); }
+  });
+}
+
+// Async DOCX extractor using native decompression (non-blocking, correct).
+function analyzerExtractDocxAsync(arrayBuffer) {
+  return new Promise(function(resolve) {
+    var data = new Uint8Array(arrayBuffer);
+    var len = data.length;
+    function readU16(off) { return data[off] | (data[off+1] << 8); }
+    function readU32(off) { return (data[off] | (data[off+1]<<8) | (data[off+2]<<16) | (data[off+3]<<24)) >>> 0; }
+
+    // Find End of Central Directory
+    var eocd = -1;
+    for (var i = len - 22; i >= Math.max(0, len - 65556); i--) {
+      if (data[i]===0x50 && data[i+1]===0x4B && data[i+2]===0x05 && data[i+3]===0x06) { eocd = i; break; }
+    }
+    if (eocd < 0) { resolve(null); return; }
+    var cdOff = readU32(eocd + 16);
+    var cdCount = readU16(eocd + 10);
+
+    // Parse central directory to find word/document.xml
+    var docCompData = null;
+    var docCompMethod = 0;
+    var off = cdOff;
+    for (var e = 0; e < cdCount && off + 46 <= len; e++) {
+      if (data[off]!==0x50||data[off+1]!==0x4B||data[off+2]!==0x01||data[off+3]!==0x02) break;
+      var compMethod = readU16(off + 10);
+      var compSize = readU32(off + 20);
+      var nameLen = readU16(off + 28);
+      var extraLen = readU16(off + 30);
+      var commentLen = readU16(off + 32);
+      var localOff = readU32(off + 42);
+      var name = '';
+      for (var ni = 0; ni < nameLen && off+46+ni < len; ni++) name += String.fromCharCode(data[off+46+ni]);
+
+      if (name === 'word/document.xml') {
+        var lh = localOff;
+        if (lh + 30 <= len) {
+          var lNameLen = readU16(lh + 26);
+          var lExtraLen = readU16(lh + 28);
+          var dataStart = lh + 30 + lNameLen + lExtraLen;
+          var safeEnd = Math.min(dataStart + compSize, len);
+          docCompData = data.subarray(dataStart, safeEnd);
+          docCompMethod = compMethod;
+        }
+        break;
+      }
+      off += 46 + nameLen + extraLen + commentLen;
+    }
+
+    if (!docCompData) { resolve(null); return; }
+
+    // Inflate the document.xml
+    var inflatePromise;
+    if (docCompMethod === 0) {
+      inflatePromise = Promise.resolve(docCompData);
+    } else if (docCompMethod === 8) {
+      inflatePromise = analyzerInflateNativeRaw(docCompData);
+    } else {
+      resolve(null); return;
+    }
+
+    inflatePromise.then(function(xmlBytes) {
+      if (!xmlBytes || xmlBytes.length === 0) { resolve(null); return; }
+      var xml = analyzerBytesToLatin1(xmlBytes);
+      // Handle UTF-8 if present
+      if (xml.indexOf('encoding="UTF-8"') >= 0 || xml.indexOf('encoding="utf-8"') >= 0) {
+        try { xml = new TextDecoder('utf-8').decode(xmlBytes); } catch(e) {}
+      }
+      // Extract text from WordprocessingML
+      var text = '';
+      var paragraphs = xml.split(/<w:p[ >\/]/);
+      for (var pi = 0; pi < paragraphs.length; pi++) {
+        var pText = '';
+        paragraphs[pi].replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, function(m, t) { pText += t; });
+        if (paragraphs[pi].indexOf('<w:tab') >= 0) pText = pText.replace(/\t/g, '') + '\t';
+        if (pText.length > 0) text += pText + '\n';
+      }
+      resolve(text.trim().length > 0 ? text : null);
+    }).catch(function() { resolve(null); });
+  });
+}
+
 // DOCX files are ZIP archives. Parse the central directory to find word/document.xml
 function analyzerParseZip(arrayBuffer) {
   var data = new Uint8Array(arrayBuffer);
@@ -38345,7 +38457,14 @@ function analyzerExtractPdf(arrayBuffer) {
     var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
     var decoded = null;
     if (isFlate && streamData.length > 2) {
-      try { decoded = analyzerInflateZlib(streamData); } catch(e) { decoded = null; }
+      try {
+        // Strip zlib header if present, then inflate
+        var raw = streamData;
+        if ((raw[0] & 0x0F) === 8 && ((raw[0] * 256 + raw[1]) % 31 === 0)) {
+          raw = streamData.subarray(2);
+        }
+        decoded = analyzerInflate(raw);
+      } catch(e) { decoded = null; }
     } else if (!isFlate) {
       decoded = streamData;
     }
@@ -38516,8 +38635,21 @@ function analyzerHandleFileObject(file) {
         var error = null;
         try {
           if (name.endsWith('.docx')) {
-            text = analyzerExtractDocx(buffer);
-            if (!text) error = tx('Kunne ikke udpakke DOCX-indhold.', 'Could not extract DOCX content.');
+            // Use async native decompression (non-blocking, correct for all DEFLATE)
+            analyzerExtractDocxAsync(buffer).then(function(docxText) {
+              analyzerState.ingestionProgress = null;
+              if (docxText && docxText.trim().length > 0) {
+                analyzerRun(docxText);
+              } else {
+                analyzerState.ingestionNotice = tx('Kunne ikke udpakke DOCX-indhold.', 'Could not extract DOCX content.');
+                renderModule('analyzer');
+              }
+            }).catch(function(ex) {
+              analyzerState.ingestionProgress = null;
+              analyzerState.ingestionNotice = tx('Fejl ved DOCX-behandling: ', 'DOCX processing error: ') + (ex.message || ex);
+              renderModule('analyzer');
+            });
+            return; // async — don't continue to the sync path below
           } else {
             text = analyzerExtractPdf(buffer);
             if (text) {
