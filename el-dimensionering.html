@@ -35203,19 +35203,30 @@ function analyzerHandleFileObject(file) {
             });
             return; // async — don't continue to the sync path below
           } else {
-            text = analyzerExtractPdf(buffer);
-            if (text) {
-              text = analyzerCleanPdfText(text);
-              var gate = analyzerPdfQualityGate(text);
-              if (!gate.ok) {
-                if (gate.reason === 'too_short') error = tx('PDF indeholder ingen læsbar tekst — muligvis scannet/billede-PDF.', 'PDF contains no readable text — possibly scanned/image PDF.');
-                else if (gate.reason === 'binary_garbage') error = tx('PDF-tekst er ulæselig (binær/krypteret). Prøv en anden fil.', 'PDF text is unreadable (binary/encrypted). Try another file.');
-                else if (gate.reason === 'cid_noise') error = tx('PDF bruger indlejrede skrifttyper der ikke kan afkodes offline. Kopier teksten manuelt.', 'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.');
-                text = null;
+            // PDF: use async native DecompressionStream (same as DOCX)
+            analyzerExtractPdfAsync(buffer).then(function(pdfText) {
+              analyzerState.ingestionProgress = null;
+              if (pdfText) {
+                pdfText = analyzerCleanPdfText(pdfText);
+                var gate = analyzerPdfQualityGate(pdfText);
+                if (!gate.ok) {
+                  if (gate.reason === 'too_short') analyzerState.ingestionNotice = tx('PDF indeholder ingen læsbar tekst — muligvis scannet/billede-PDF.', 'PDF contains no readable text — possibly scanned/image PDF.');
+                  else if (gate.reason === 'binary_garbage') analyzerState.ingestionNotice = tx('PDF-tekst er ulæselig (binær/krypteret). Prøv en anden fil.', 'PDF text is unreadable (binary/encrypted). Try another file.');
+                  else if (gate.reason === 'cid_noise') analyzerState.ingestionNotice = tx('PDF bruger indlejrede skrifttyper der ikke kan afkodes offline. Kopier teksten manuelt.', 'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.');
+                  renderModule('analyzer');
+                } else {
+                  analyzerRun(pdfText);
+                }
+              } else {
+                analyzerState.ingestionNotice = tx('Kunne ikke udpakke tekst fra PDF.', 'Could not extract text from PDF.');
+                renderModule('analyzer');
               }
-            } else {
-              error = tx('Kunne ikke udpakke tekst fra PDF.', 'Could not extract text from PDF.');
-            }
+            }).catch(function(ex) {
+              analyzerState.ingestionProgress = null;
+              analyzerState.ingestionNotice = tx('Fejl ved PDF-behandling: ', 'PDF processing error: ') + (ex.message || ex);
+              renderModule('analyzer');
+            });
+            return; // async — don't continue
           }
         } catch(ex) {
           error = tx('Fejl ved filbehandling: ', 'File processing error: ') + (ex.message || ex);
