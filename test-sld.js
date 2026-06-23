@@ -9986,8 +9986,8 @@ test('calcDetail integration: renderShortCircuit shows Ik detail', function() {
   scState.zTrafo = 5;
   activeModule = 'scircuit';
   var html = renderShortCircuit();
-  assert(html.indexOf('calc-detail') >= 0, 'scircuit has calc-detail');
-  assert(html.indexOf('Ik3max') >= 0, 'scircuit detail has Ik3max');
+  assert(html.indexOf('eng-step') >= 0 || html.indexOf('calc-detail') >= 0, 'scircuit has Mathcad steps or calc-detail');
+  assert(html.indexOf('Ik3max') >= 0 || html.indexOf('k3F,max') >= 0, 'scircuit detail has Ik3max or Ik3F,max');
   assert(html.indexOf('IEC 60909') >= 0, 'scircuit detail has IEC ref');
   activeModule = 'load';
   cableState.crossSection = null;

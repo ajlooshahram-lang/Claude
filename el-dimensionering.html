@@ -8739,141 +8739,156 @@ function renderVdrop() {
   return html;
 }
 
-// ===== SHORT CIRCUIT MODULE =====
+// ===== SHORT CIRCUIT MODULE (Mathcad Prime Style) =====
 function renderShortCircuit() {
   const zNetSteps = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20];
   const zTrafoSteps = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50];
 
-  // Cable impedance
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
   const currentType = cables[cableState.type];
   const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
   const selectedCable = currentCores[cableState.crossSection];
 
-  let zCable = 0;
+  let zCable = 0, rCable = 0, xCable = 0;
   if (selectedCable) {
-    const L = vdropState.length / 1000; // km
-    const rCable = selectedCable.r * L;
-    const xCable = selectedCable.x * L;
-    zCable = Math.sqrt(rCable * rCable + xCable * xCable) * 1000; // mOhm
+    const L = vdropState.length / 1000;
+    rCable = selectedCable.r * L * 1000; // mΩ
+    xCable = selectedCable.x * L * 1000; // mΩ
+    zCable = Math.sqrt(rCable * rCable + xCable * xCable); // mΩ (scalar magnitude)
   }
 
   const zTotal = scState.zNet + scState.zTrafo + zCable;
   const Un = loadState.voltage === '3x400' ? 400 : 230;
-  const cFactor = 1.05; // voltage factor per IEC 60909
-
-  // Ik max (3-phase, at busbar)
+  const cFactor = 1.05;
   const ikMax3ph = (cFactor * Un) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
-  // Ik min (2-phase at end of cable, factor 0.95)
   const ikMin2ph = (0.95 * Un) / (2 * zTotal / 1000);
 
-  // Get protection device Icu and Isd for check
+  // Protection device data
   let deviceIcu = 0, deviceIsd = 0;
-  if (activeModule === 'scircuit') {
-    // Try MCCB first
-    deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000; // A
-    const io = mccbState.inVal * mccbState.ioMult;
-    deviceIsd = io * mccbState.isdMult * 1.1;
+  if (mcbState.rating) {
+    const mcb = MCB_TYPES[mcbState.type];
+    if (mcb) { deviceIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000; deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating; }
+  } else if (mccbState.inVal) {
+    deviceIcu = (MCCB_TRIPS[mccbState.trip] || 50) * 1000;
+    deviceIsd = mccbState.inVal * (mccbState.ioMult || 1) * (mccbState.isdMult || 10) * 1.1;
+  }
+  const check1 = deviceIcu > 0 && deviceIcu >= ikMax3ph;
+  const check2 = deviceIsd > 0 && ikMin2ph >= deviceIsd;
 
-    // Or MCB
-    if (mcbState.rating) {
-      const mcb = MCB_TYPES[mcbState.type];
-      if (mcb) {
-        const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
-        if (mcbIcu > 0) {
-          deviceIcu = mcbIcu;
-          deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
-        }
-      }
-    }
+  function mcLine(sym, op, expr, res, unit, note) {
+    var h = '<div class="eng-step">';
+    h += '<span class="eng-sym">' + sym + '</span>';
+    if (op) h += '<span class="eng-formula">' + op + ' ' + (expr || '') + '</span>';
+    if (res !== undefined && res !== null) h += '<span class="eng-result">= ' + res + (unit ? ' <span style="color:#1565c0;font-weight:700">' + unit + '</span>' : '') + '</span>';
+    if (note) h += '<span class="eng-note">' + note + '</span>';
+    h += '</div>';
+    return h;
+  }
+  function mcSection(title) {
+    return '<div style="color:var(--primary);font-size:0.82rem;text-transform:uppercase;letter-spacing:1.2px;margin:18px 0 8px;font-family:sans-serif;font-weight:800;border-bottom:2px solid var(--primary);padding-bottom:4px">' + title + '</div>';
   }
 
-  const check1 = deviceIcu >= ikMax3ph;
-  const check2 = deviceIsd <= ikMin2ph;
-  // Disconnection time per DS/HD 60364-4-41: final circuits <=32A must clear
-  // within 0.4s (TN), distribution within 5s. Met if Ik min trips the magnetic element.
-  const ibForTime = calcIB();
-  const reqTime = (ibForTime <= 32 && loadState.voltage !== '3x400') ? 0.4 : (ibForTime <= 32 ? 0.4 : 5);
-  const discOk = ikMin2ph >= deviceIsd; // Ik min reaches the instantaneous/magnetic trip
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Kortslutningsberegning I<sub>k</sub>', 'Short-Circuit Calculation I<sub>k</sub>') + '</div>';
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('scTitle')}</div>
-      <div class="info-row">${tx('V\u00E6lg netimpedans og trafoimpedans. Kabelimpedans beregnes fra kabelmodulet.', 'Select network impedance and transformer impedance. Cable impedance is calculated from the cable module.')}</div>
+  // Impedance selectors
+  html += '<div class="select-group"><div class="select-label">Z<sub>net</sub> [m\u03A9]</div><div class="select-grid">';
+  for (var ni=0; ni<zNetSteps.length; ni++) html += '<button class="sel-btn' + (scState.zNet===zNetSteps[ni]?' selected':'') + '" onclick="scState.zNet=' + zNetSteps[ni] + ';renderModule(\'scircuit\')">' + zNetSteps[ni] + '</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('scZnet')}</div>
-        <div class="select-grid">
-          ${zNetSteps.map(z =>
-            `<button class="sel-btn ${scState.zNet === z ? 'selected' : ''}" onclick="scState.zNet=${z};renderModule('scircuit')">${z}</button>`
-          ).join('')}
-        </div>
-      </div>
+  html += '<div class="select-group"><div class="select-label">Z<sub>trafo</sub> [m\u03A9]</div><div class="select-grid">';
+  for (var ti=0; ti<zTrafoSteps.length; ti++) html += '<button class="sel-btn' + (scState.zTrafo===zTrafoSteps[ti]?' selected':'') + '" onclick="scState.zTrafo=' + zTrafoSteps[ti] + ';renderModule(\'scircuit\')">' + zTrafoSteps[ti] + '</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('scZtrafo')}</div>
-        <div class="select-grid">
-          ${zTrafoSteps.map(z =>
-            `<button class="sel-btn ${scState.zTrafo === z ? 'selected' : ''}" onclick="scState.zTrafo=${z};renderModule('scircuit')">${z}</button>`
-          ).join('')}
-        </div>
-      </div>
+  if (selectedCable) {
+    html += '<div style="padding:8px 12px;background:var(--primary-glow);border:1px solid var(--primary-light);border-radius:8px;font-size:0.82rem;margin-bottom:12px">';
+    html += tx('Kabel','Cable') + ': <strong>' + cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m</strong> \u2192 Z<sub>kabel</sub> = ' + zCable.toFixed(2) + ' m\u03A9';
+    html += '</div>';
+  }
+  html += '</div>';
 
-      ${selectedCable ? `
-        <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
-          <div class="result-row"><span class="label">${tx('Kabelimpedans', 'Cable impedance')}</span><span class="value">${zCable.toFixed(2)} m\u03A9</span></div>
-          <div class="result-row"><span class="label">${tx('Kabel', 'Cable')}</span><span class="value">${cableState.type} ${cableState.crossSection} mm\u00B2 \u00D7 ${vdropState.length} m</span></div>
-        </div>
-      ` : `
-        <div class="result-box warning" style="margin-top:12px">
-          <div class="result-row"><span class="label">${tx('V\u00E6lg kabel i "Kabler"-modulet for fuld beregning', 'Select cable in "Cables" module for full calculation')}</span></div>
-        </div>
-      `}
-    </div>
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Kortslutning \u2014 Mathcad Prime', 'Short Circuit \u2014 Mathcad Prime') + '</div>';
 
-    <div class="card fade-in">
-      <div class="card-title">${t('scResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('scIkmax')} (3-${tx('faset', 'phase')})</span><span class="value">${(ikMax3ph/1000).toFixed(2)} kA</span></div>
-        <div class="result-row"><span class="label">${t('scIkmin')} (2-${tx('faset', 'phase')})</span><span class="value">${ikMin2ph.toFixed(0)} A</span></div>
-        <div class="result-row"><span class="label">Z total</span><span class="value">${zTotal.toFixed(2)} m\u03A9</span></div>
-      </div>
+  // GIVEN DATA
+  html += mcSection(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcLine('Z<sub>net</sub>', ':=', '', scState.zNet, 'm\u03A9', tx('Netimpedans (forsyningsselskab)','Network impedance (utility)'));
+  html += mcLine('Z<sub>T</sub>', ':=', '', scState.zTrafo, 'm\u03A9', tx('Trafoimpedans (fra u<sub>k</sub>%)','Transformer impedance (from u<sub>k</sub>%)'));
+  if (selectedCable) {
+    html += mcLine('r<sub>kabel</sub>', '= r \u00B7 L =', selectedCable.r + ' \u00B7 ' + (vdropState.length/1000).toFixed(3), rCable.toFixed(2), 'm\u03A9', '');
+    html += mcLine('x<sub>kabel</sub>', '= x \u00B7 L =', selectedCable.x + ' \u00B7 ' + (vdropState.length/1000).toFixed(3), xCable.toFixed(2), 'm\u03A9', '');
+    html += mcLine('Z<sub>kabel</sub>', '= \u221A(r\u00B2 + x\u00B2) =', '\u221A(' + rCable.toFixed(2) + '\u00B2 + ' + xCable.toFixed(2) + '\u00B2)', zCable.toFixed(2), 'm\u03A9', cableState.type + ' ' + cableState.crossSection + ' mm\u00B2');
+  } else {
+    html += mcLine('Z<sub>kabel</sub>', ':=', '', '0', 'm\u03A9', tx('(intet kabel valgt)','(no cable selected)'));
+  }
+  html += mcLine('U<sub>n</sub>', ':=', '', Un, 'V', '');
+  html += mcLine('c', ':=', '', cFactor, '', '<span class="eng-ref">IEC 60909-0 Tabel 1</span>');
 
-      ${deviceIcu > 0 ? `
-      <div class="result-box ${check1 && check2 ? '' : 'error'}" style="margin-top:12px">
-        <div class="result-title">${tx('Kontrol', 'Verification')}</div>
-        <div class="result-row">
-          <span class="label">${t('scCheck1')}</span>
-          <span class="value">
-            ${(deviceIcu/1000).toFixed(1)} kA \u2265 ${(ikMax3ph/1000).toFixed(2)} kA
-            <span class="verify-badge ${check1 ? 'ok' : 'fail'}">${check1 ? t('ok') : t('fail')}</span>
-          </span>
-        </div>
-        <div class="result-row">
-          <span class="label">${t('scCheck2')}</span>
-          <span class="value">
-            ${deviceIsd.toFixed(0)} A \u2264 ${ikMin2ph.toFixed(0)} A
-            <span class="verify-badge ${check2 ? 'ok' : 'fail'}">${check2 ? t('ok') : t('fail')}</span>
-          </span>
-        </div>
-        <div class="result-row">
-          <span class="label">${tx('Frakoblingstid', 'Disconnection time')} (DS/HD 60364-4-41)</span>
-          <span class="value">
-            \u2264 ${reqTime.toFixed(1)} s
-            <span class="verify-badge ${discOk ? 'ok' : 'fail'}">${discOk ? (tx('OK <0,4s', 'OK <0.4s')) : (tx('For langsom', 'Too slow'))}</span>
-          </span>
-        </div>
-      </div>
-      ` : `
-      <div class="result-box warning" style="margin-top:12px">
-        <div class="result-row"><span class="label">${tx('V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning', 'Select protection device (MCB/MCCB) for verification')}</span></div>
-      </div>
-      `}
-      ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '')}
-      ${renderScircuitSim(scState.zNet, scState.zTrafo, zCable, ikMax3ph, ikMin2ph)}
-    </div>
-  `;
+  // CALCULATION
+  html += mcSection(tx('BEREGNING', 'CALCULATION'));
+
+  // Total impedance at busbar
+  html += mcLine('Z<sub>tavle</sub>', '= Z<sub>net</sub> + Z<sub>T</sub> =', scState.zNet + ' + ' + scState.zTrafo, (scState.zNet + scState.zTrafo).toFixed(1), 'm\u03A9', tx('Ved tavleklemmer','At busbar terminals'));
+
+  // Total impedance at far end
+  html += mcLine('Z<sub>total</sub>', '= Z<sub>tavle</sub> + Z<sub>kabel</sub> =', (scState.zNet + scState.zTrafo).toFixed(1) + ' + ' + zCable.toFixed(2), zTotal.toFixed(2), 'm\u03A9', tx('Ved kabelende','At cable far end'));
+
+  // Ik3F,max formula
+  html += '<div style="margin-top:12px"></div>';
+  html += mcLine('I<sub>k3F,max</sub>', ':=', 'c \u00B7 U<sub>n</sub> / (\u221A3 \u00B7 Z<sub>tavle</sub>)', null, null, '<span class="eng-ref">IEC 60909-0 \u00A76.2</span>');
+  html += '<div class="depth-3">';
+  html += mcLine('', '=', cFactor + ' \u00B7 ' + Un + ' / (\u221A3 \u00B7 ' + ((scState.zNet + scState.zTrafo)/1000).toFixed(4) + ')', null, null, null);
+  html += '</div>';
+
+  // Ik3F result box
+  html += '<div style="background:linear-gradient(135deg,rgba(0,180,255,0.06),rgba(0,230,118,0.04));border:2px solid var(--primary);border-radius:10px;padding:12px 16px;margin:10px 0">';
+  html += '<div class="eng-step" style="border:none;padding:0"><span class="eng-sym" style="font-size:1.15em;font-weight:800">I<sub>k3F,max</sub></span>';
+  html += '<span class="eng-result" style="font-size:1.3em;color:var(--primary);font-weight:800">= ' + (ikMax3ph/1000).toFixed(2) + ' <span style="color:#1565c0">kA</span></span></div></div>';
+
+  // Ik2min formula
+  html += mcLine('I<sub>k2,min</sub>', ':=', '0,95 \u00B7 U<sub>n</sub> / (2 \u00B7 Z<sub>total</sub>)', null, null, '<span class="eng-ref">IEC 60909-0 \u00A79</span> ' + tx('(2-faset, kabelende)','(2-phase, far end)'));
+  html += '<div class="depth-3">';
+  html += mcLine('', '=', '0,95 \u00B7 ' + Un + ' / (2 \u00B7 ' + (zTotal/1000).toFixed(4) + ')', null, null, null);
+  html += '</div>';
+
+  // Ik2min result box
+  html += '<div style="background:linear-gradient(135deg,rgba(255,193,7,0.06),rgba(0,180,255,0.04));border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin:10px 0">';
+  html += '<div class="eng-step" style="border:none;padding:0"><span class="eng-sym" style="font-size:1.15em;font-weight:800">I<sub>k2,min</sub></span>';
+  html += '<span class="eng-result" style="font-size:1.3em;color:#92400e;font-weight:800">= ' + ikMin2ph.toFixed(0) + ' <span style="color:#1565c0">A</span></span></div></div>';
+
+  // VERIFICATION
+  html += mcSection(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.95rem;line-height:2.4">';
+
+  if (deviceIcu > 0) {
+    html += '<div>' + (check1 ? '\u2705' : '\u274C') + ' I<sub>cu</sub> \u2265 I<sub>k3F,max</sub> : <strong>' + (deviceIcu/1000).toFixed(1) + ' kA \u2265 ' + (ikMax3ph/1000).toFixed(2) + ' kA</strong>';
+    html += ' \u2192 ' + (check1 ? '<span style="color:var(--success);font-weight:700">OK</span>' : '<span style="color:var(--danger);font-weight:700">' + tx('BRYDEEVNE UTILSTR\u00C6KKELIG','BREAKING CAPACITY INSUFFICIENT') + '</span>');
+    html += '</div>';
+    html += '<div style="font-size:0.78rem;color:var(--text-muted);padding-left:24px;margin-top:-4px"><span class="eng-ref">DS/HD 60364-4-43 \u00A7434.5.1</span></div>';
+
+    html += '<div>' + (check2 ? '\u2705' : '\u274C') + ' I<sub>k2,min</sub> \u2265 I<sub>a</sub> : <strong>' + ikMin2ph.toFixed(0) + ' A \u2265 ' + deviceIsd.toFixed(0) + ' A</strong>';
+    html += ' \u2192 ' + (check2 ? '<span style="color:var(--success);font-weight:700">OK</span>' : '<span style="color:var(--danger);font-weight:700">' + tx('FRAKOBLINGSKRAV IKKE OPFYLDT','DISCONNECTION REQUIREMENT NOT MET') + '</span>');
+    html += '</div>';
+    html += '<div style="font-size:0.78rem;color:var(--text-muted);padding-left:24px;margin-top:-4px"><span class="eng-ref">DS/HD 60364-4-41 \u00A7411.3.2</span> ' + tx('Udkobling inden','Disconnection within') + ' 0,4 s</div>';
+  } else {
+    html += '<div class="eng-assumption">' + tx('V\u00E6lg MCB eller MCCB for at aktivere Icu/Ia-kontrol.','Select MCB or MCCB to activate Icu/Ia verification.') + '</div>';
+  }
+  html += '</div>';
+
+  // References
+  html += '<div style="margin-top:14px;padding-top:8px;border-top:1px solid var(--border);font-family:sans-serif">';
+  html += '<span class="eng-ref">IEC 60909-0</span> ';
+  html += '<span class="eng-ref">DS/HD 60364-4-43 \u00A7434</span> ';
+  html += '<span class="eng-ref">DS/HD 60364-4-41 \u00A7411</span>';
+  html += '</div>';
+
+  html += '</div>'; // close Mathcad card
+
+  // Simulation (existing)
+  if (typeof renderScircuitSim === 'function') html += renderScircuitSim(scState.zNet, scState.zTrafo, zCable, ikMax3ph, ikMin2ph);
+
+  return html;
 }// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====
 // Data from 1.-Dim-af-trafo.ppx.pptx + Elektroteknik Opgavesamling 4. udgave
 let trafoState = {
