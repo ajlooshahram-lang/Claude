@@ -15143,6 +15143,115 @@ test('reverseEngineerSolve compliance includes specific DS/HD 60364 clauses', fu
   assert(hasDS, 'Should reference DS/HD 60364');
 });
 
+// --- Selectivity / discrimination (final link in the 60364 chain) ---
+
+test('reverseEngineerSolve exposes a structured selectivity field (final chain step)', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var sel = reverseState.result.selectivity;
+  assert(sel && typeof sel === 'object', 'result.selectivity should exist');
+  assert(sel.upstreamIn > 0, 'Upstream In should be positive');
+  assert(sel.downstreamIn > 0, 'Downstream In should be positive');
+  assert(Math.abs(sel.ratio - sel.upstreamIn / sel.downstreamIn) < 1e-6, 'ratio = upstreamIn/downstreamIn');
+  assert(sel.clause.indexOf('DS/HD 60364-5-53') >= 0, 'Selectivity should cite DS/HD 60364-5-53');
+});
+
+test('reverse selectivity ratio flags small load as selective, near-rated load as not', function() {
+  // Small downstream load vs 100A main board => well selective
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result.selectivity.ratio >= 1.6, 'Small load should be selective vs 100A main board');
+  assert(reverseState.result.selectivity.selective === true, 'selective flag true for small load');
+
+  // Large downstream load approaching 100A main board => ratio drops below 1.6
+  reverseState.power_kW = 55;
+  reverseState.phases = '3x400';
+  reverseState.voltage = 400;
+  reverseState.cosPhi = 0.9;
+  reverseState.cableLength_m = 20;
+  reverseState.protectionType = 'MCCB';
+  reverseState.cableMaterial = 'Cu';
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result.selectivity.ratio < 1.6, 'Near-rated load should yield ratio < 1.6 (ratio=' + reverseState.result.selectivity.ratio.toFixed(2) + ')');
+  assert(reverseState.result.selectivity.selective === false, 'selective flag false for near-rated load');
+});
+
+test('reverse compliance report includes the engine selectivity verdict citing 60364-5-53', function() {
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var comp = reverseState.result.compliance;
+  var sel = comp.filter(function(c){ return /Selectivity|Selektivitet/.test(c.rule); });
+  assert(sel.length >= 1, 'Compliance should carry a selectivity verdict');
+  assert(sel.some(function(c){ return c.clause.indexOf('60364-5-53') >= 0; }), 'Selectivity verdict should cite 60364-5-53');
+  // chain integrity: IB/In/Iz, Vdrop, Zs and selectivity all present
+  assert(comp.length >= 4, 'Full 60364 chain (IB/In/Iz, Vdrop, Zs, selectivity) should be present');
+});
+
+test('renderReverse single mode shows an Optimization Notes section (output #4)', function() {
+  reverseState.multiMode = false;
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 25;
+  reverseState.protectionType = 'MCB';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  var html = renderReverse();
+  assert(html.indexOf('Optimization Notes') > 0 || html.indexOf('Optimeringsnoter') > 0, 'Should show optimization notes section');
+  assert(html.indexOf('<input') === -1, 'Optimization notes must stay click-only (no inputs)');
+  assert(html.indexOf('<textarea') === -1, 'No textarea in reverse output');
+});
+
+test('renderReverse Optimization Notes lists upsize steps when a long cable forces upsizing', function() {
+  reverseState.multiMode = false;
+  reverseState.power_kW = 3.45;
+  reverseState.phases = '1x230';
+  reverseState.voltage = 230;
+  reverseState.cosPhi = 0.95;
+  reverseState.cableLength_m = 200; // forces voltage-drop upsizing
+  reverseState.protectionType = 'MCB';
+  reverseState.installMethod = 'C';
+  reverseState.ambientTemp = 30;
+  reverseState.grouping = 1;
+  reverseState.cableMaterial = 'Cu';
+  reverseState.result = null;
+  reverseEngineerSolve();
+  assert(reverseState.result.iterations > 1, 'Long cable should trigger multiple iterations');
+  var html = renderReverse();
+  assert(/Upsize|Upgrade|Switch to|Fallback/.test(html), 'Optimization notes should list at least one upsize step');
+});
+
+test('Farsi strings exist for new Optimization Notes text', function() {
+  assert.ok(_FA['Optimization Notes'], 'Optimization Notes must have Farsi');
+  assert.ok(_FA['No upsizing needed \u2013 the first cable and device choice passed every check.'], 'no-upsize note must have Farsi');
+  assert.ok(_FA['The engine upsized conservatively to satisfy DS/HD 60364:'], 'upsize note must have Farsi');
+  assert.ok(_FA['Upstream'], 'Upstream must have Farsi');
+  assert.ok(_FA['Downstream'], 'Downstream must have Farsi');
+});
+
 test('renderReverse returns HTML string with click-only controls', function() {
   var html = renderReverse();
   assert(typeof html === 'string', 'Should return string');

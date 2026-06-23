@@ -2238,7 +2238,9 @@ const _FA = {
   'Time-Current Characteristic': '\u0645\u0634\u062E\u0635\u0647 \u0632\u0645\u0627\u0646-\u062C\u0631\u06CC\u0627\u0646',
   'Upstream': '\u0628\u0627\u0644\u0627\u062F\u0633\u062A',
   'Downstream': '\u067E\u0627\u06CC\u06CC\u0646\u200C\u062F\u0633\u062A',
-  'Selectivity limit': '\u062D\u062F \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC',
+  'Optimization Notes': '\u06CC\u0627\u062F\u062F\u0627\u0634\u062A\u200C\u0647\u0627\u06CC \u0628\u0647\u06CC\u0646\u0647\u200C\u0633\u0627\u0632\u06CC',
+  'No upsizing needed \u2013 the first cable and device choice passed every check.': '\u0646\u06CC\u0627\u0632\u06CC \u0628\u0647 \u0628\u0632\u0631\u06AF\u200C\u062A\u0631 \u06A9\u0631\u062F\u0646 \u0646\u0628\u0648\u062F \u2013 \u0627\u0648\u0644\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0627\u0628\u0644 \u0648 \u062F\u0633\u062A\u06AF\u0627\u0647 \u062F\u0631 \u0647\u0645\u0647 \u06A9\u0646\u062A\u0631\u0644\u200C\u0647\u0627 \u0642\u0628\u0648\u0644 \u0634\u062F.',
+  'The engine upsized conservatively to satisfy DS/HD 60364:': '\u0645\u0648\u062A\u0648\u0631 \u0628\u0631\u0627\u06CC \u0628\u0631\u0622\u0648\u0631\u062F\u0647 \u06A9\u0631\u062F\u0646 DS/HD 60364 \u0628\u0647 \u0635\u0648\u0631\u062A \u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647 \u0628\u0632\u0631\u06AF\u200C\u062A\u0631 \u06A9\u0631\u062F:',
   'Selectivity Analysis': '\u062A\u062D\u0644\u06CC\u0644 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC',
   'Selectivity with upstream': '\u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC \u0628\u0627 \u0628\u0627\u0644\u0627\u062F\u0633\u062A',
   'Show time-current curve': '\u0646\u0645\u0627\u06CC\u0634 \u0645\u0646\u062D\u0646\u06CC \u0632\u0645\u0627\u0646-\u062C\u0631\u06CC\u0627\u0646',
@@ -39284,6 +39286,35 @@ function reverseEngineerSolve() {
     protIn: protIn
   });
 
+  // Step g (final link in the 60364 check chain): discrimination / selectivity.
+  // Compare the downstream final-circuit device against the upstream main-board
+  // device. Current discrimination needs an In ratio of at least 1.6 (rule of
+  // thumb per HD 60364-5-53 cl. 536.4 current-selectivity); below that, time/
+  // energy selectivity must be confirmed against the manufacturer table.
+  var upstreamIn = 100; // main-board MCCB In (A) built into the verification tree
+  try {
+    if (tree && tree.rootId && tree.nodes[tree.rootId].childIds.length > 0) {
+      var _mbId = tree.nodes[tree.rootId].childIds[0];
+      if (_mbId && tree.nodes[_mbId] && tree.nodes[_mbId].protectionIn) {
+        upstreamIn = tree.nodes[_mbId].protectionIn;
+      }
+    }
+  } catch (eSel) {}
+  var selRatio = protIn > 0 ? (upstreamIn / protIn) : 0;
+  var selOk = selRatio >= 1.6;
+  var selectivity = {
+    upstreamIn: upstreamIn,
+    downstreamIn: protIn,
+    ratio: selRatio,
+    selective: selOk,
+    clause: 'DS/HD 60364-5-53 cl. 536.4'
+  };
+  // Note: sldVerifyNode() already contributes the formal selectivity compliance
+  // verdict (via sldAnalyzeSelectivity, DS/HD 60364-5-53 cl.536). We keep the
+  // transparent In-ratio here for the Optimization Notes summary only, so the
+  // compliance report is not duplicated.
+  log.push('Selectivity: upstream ' + upstreamIn + 'A / downstream ' + protIn + 'A = ratio ' + selRatio.toFixed(2) + (selOk ? ' (selective)' : ' (verify with manufacturer table)'));
+
   // Store result
   var iz = cable.iz * kTotal;
   st.result = {
@@ -39300,6 +39331,7 @@ function reverseEngineerSolve() {
     ikmax: ikData.ikmax,
     ikmin: ikData.ikmin,
     zs: ikData.zs,
+    selectivity: selectivity,
     compliance: compliance,
     bom: bom,
     tree: tree,
@@ -40112,6 +40144,29 @@ function renderReverse() {
       // Live Twin SVG
       html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Kredsdiagram', 'Circuit Diagram') + '</div>';
       html += renderReverseLiveTwin(r);
+      html += '</div>';
+
+      // Optimization notes: where the engine upsized and why, plus selectivity verdict
+      html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Optimeringsnoter', 'Optimization Notes') + '</div>';
+      var optNotes = [];
+      if (r.log && r.log.length > 0) {
+        for (var oi = 0; oi < r.log.length; oi++) {
+          var ln = r.log[oi];
+          if (/Upsize|Upgrade|Switch to|Fallback/.test(ln)) optNotes.push(ln);
+        }
+      }
+      if (optNotes.length === 0) {
+        html += '<div style="color:#4caf50;font-size:0.9em">' + tx('Ingen opsizing n\u00F8dvendig \u2013 f\u00F8rste valg af kabel og afbryder bestod alle kontroller.', 'No upsizing needed \u2013 the first cable and device choice passed every check.') + '</div>';
+      } else {
+        html += '<div style="color:#ff9800;font-size:0.9em;margin-bottom:6px">' + tx('Motoren opsizede konservativt for at opfylde DS/HD 60364:', 'The engine upsized conservatively to satisfy DS/HD 60364:') + '</div>';
+        html += '<ul style="margin:0;padding-left:18px;color:#ddd;font-size:0.85em">';
+        for (var on = 0; on < optNotes.length; on++) { html += '<li>' + optNotes[on] + '</li>'; }
+        html += '</ul>';
+      }
+      if (r.selectivity) {
+        var selColor = r.selectivity.selective ? '#4caf50' : '#ff9800';
+        html += '<div style="margin-top:8px;color:' + selColor + ';font-size:0.85em">' + tx('Selektivitet', 'Selectivity') + ': ' + tx('Opstr\u00F8ms', 'Upstream') + ' ' + r.selectivity.upstreamIn + 'A / ' + tx('Nedstr\u00F8ms', 'Downstream') + ' ' + r.selectivity.downstreamIn + 'A = ' + r.selectivity.ratio.toFixed(2) + ' (' + r.selectivity.clause + ')</div>';
+      }
       html += '</div>';
 
       // Solver log
