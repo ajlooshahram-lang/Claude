@@ -18388,6 +18388,105 @@ test('Cascade reactivity: trilingual strings have Farsi entries in _FA', functio
   assert(_FA['Devices selected in the Fuse/MCB/MCCB/Relay/RCD modules are reflected here automatically via the reactive bus.'], 'info line has Farsi');
 });
 
+// === Live Installation Twin — IEC 60617 component symbols ===
+
+test('liveClassifyDevice classifies motor / socket / lighting loads from circuit name', function() {
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Motor 5.5kW', name_da: 'Motor 5.5kW' }), 'motor');
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Sockets', name_da: 'Stikkontakter' }), 'socket');
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Lighting', name_da: 'Belysning' }), 'lighting');
+});
+
+test('liveClassifyDevice classifies protection device families from real product fields', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  var mccb = PRODUCTS.mccbs[0];
+  var fuse = PRODUCTS.fuses.find(function(f){ return f.size && typeof f.i5s === 'number'; });
+  var rcd = PRODUCTS.rcds[0];
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Cooker', name_da: 'Komfur', protection: mcb }), 'breaker', 'MCB -> breaker');
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Feeder', name_da: 'Foedeledning', protection: mccb }), 'breaker', 'MCCB -> breaker');
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Feeder', name_da: 'Foedeledning', protection: fuse }), 'fuse', 'gG fuse -> fuse');
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Group', name_da: 'Gruppe', protection: rcd }), 'rcd', 'RCD -> rcd');
+});
+
+test('liveClassifyDevice returns default for an unrecognised node', function() {
+  assert.strictEqual(liveClassifyDevice({ name_en: 'Mystery', name_da: 'Mystisk', protection: null }), 'default');
+  assert.strictEqual(liveClassifyDevice(null), 'default', 'null node is safe');
+  assert.strictEqual(liveClassifyDevice({}), 'default', 'empty node is safe');
+});
+
+test('liveDeviceSymbol returns the expected IEC 60617 SVG primitive per device type', function() {
+  var COL = '#ff9800';
+  var br = liveDeviceSymbol({ name_en: 'Cooker', protection: PRODUCTS.mcbs[0] }, 0, 0, 16, 16, COL);
+  assert(br.indexOf('live-sym-breaker') >= 0 && br.indexOf('<line') >= 0, 'breaker uses switch lines');
+
+  var fu = liveDeviceSymbol({ name_en: 'Feeder', protection: PRODUCTS.fuses.find(function(f){ return f.size; }) }, 0, 0, 16, 16, COL);
+  assert(fu.indexOf('live-sym-fuse') >= 0 && fu.indexOf('<rect') >= 0, 'fuse uses a bisected rectangle');
+
+  var rc = liveDeviceSymbol({ name_en: 'Group', protection: PRODUCTS.rcds[0] }, 0, 0, 16, 16, COL);
+  assert(rc.indexOf('live-sym-rcd') >= 0 && rc.indexOf('<circle') >= 0, 'rcd uses a sensing toroid circle');
+
+  var mo = liveDeviceSymbol({ name_en: 'Motor 5.5kW' }, 0, 0, 16, 16, COL);
+  assert(mo.indexOf('live-sym-motor') >= 0 && mo.indexOf('M</text>') >= 0, 'motor is a circle with M');
+
+  var so = liveDeviceSymbol({ name_en: 'Sockets', name_da: 'Stikkontakter' }, 0, 0, 16, 16, COL);
+  assert(so.indexOf('live-sym-socket') >= 0 && so.indexOf('<path') >= 0, 'socket is a half-circle path');
+
+  var li = liveDeviceSymbol({ name_en: 'Lighting', name_da: 'Belysning' }, 0, 0, 16, 16, COL);
+  assert(li.indexOf('live-sym-lighting') >= 0 && li.indexOf('<circle') >= 0, 'lighting is a crossed circle');
+});
+
+test('liveDeviceSymbol returns valid output for an unknown type (default branch)', function() {
+  var out = liveDeviceSymbol({ name_en: 'Mystery', protection: null }, 0, 0, 16, 16, '#2196f3');
+  assert(typeof out === 'string', 'returns a string');
+  assert(out.indexOf('live-sym-default') >= 0, 'uses the default symbol class');
+  assert(out.indexOf('<rect') >= 0, 'default glyph contains a primitive');
+  assert(out.indexOf('<g') === 0 && out.lastIndexOf('</g>') === out.length - 4, 'wrapped in a closed <g> group');
+});
+
+test('liveDeviceSymbol strokes the glyph with the supplied thermal/overload colour (life-safety tinting)', function() {
+  var overloadRed = '#f44336';
+  var out = liveDeviceSymbol({ name_en: 'Motor 5.5kW' }, 0, 0, 16, 16, overloadRed);
+  assert(out.indexOf('stroke="' + overloadRed + '"') >= 0, 'overload colour must read on the symbol');
+});
+
+test('liveRenderNodes draws an IEC 60617 symbol on final-circuit (else-branch) nodes', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var layout = liveRenderSvg(tree, 'live');
+  var svg = liveRenderNodes(tree, layout.positions, layout.nodeW, layout.nodeH, 'live');
+  assert(svg.indexOf('live-sym-') >= 0, 'at least one node carries a component symbol');
+  // Default tree: Belysning (lighting), Stikkontakter (socket), Komfur (MCB -> breaker)
+  assert(svg.indexOf('live-sym-lighting') >= 0, 'lighting circuit gets a lighting point');
+  assert(svg.indexOf('live-sym-socket') >= 0, 'socket circuit gets a socket-outlet');
+  assert(svg.indexOf('live-sym-breaker') >= 0, 'MCB-protected circuit gets a breaker symbol');
+});
+
+test('renderLiveInstallation produces a complete </svg> for every mode without throwing', function() {
+  var modes = ['live', 'fault', 'timelapse', 'disasters'];
+  var savedMode = liveState.mode, savedDisaster = liveState.disasterScenario, savedFault = liveState.faultResult;
+  modes.forEach(function(m) {
+    liveState.mode = m;
+    liveState.disasterScenario = (m === 'disasters') ? 'cable_fire' : null;
+    liveState.faultResult = null;
+    var html = renderLiveInstallation();
+    assert(typeof html === 'string', m + ' mode returns a string');
+    assert(html.indexOf('<svg') >= 0 && html.indexOf('</svg>') >= 0, m + ' mode emits a complete SVG');
+  });
+  liveState.mode = savedMode; liveState.disasterScenario = savedDisaster; liveState.faultResult = savedFault;
+});
+
+test('IEC 60617 symbol legend strings have Farsi entries in _FA', function() {
+  assert(_FA['IEC 60617 symbols'] && _FA['IEC 60617 symbols'].length > 0, 'legend title has Farsi');
+  assert(_FA['Circuit breaker (MCB/MCCB)'] && _FA['Circuit breaker (MCB/MCCB)'].length > 0, 'breaker label has Farsi');
+  assert(_FA['Mechanical contact + cross'] && _FA['Mechanical contact + cross'].length > 0, 'breaker desc has Farsi');
+  assert(_FA['Rectangle with centre line'] && _FA['Rectangle with centre line'].length > 0, 'fuse desc has Farsi');
+  assert(_FA['RCD / residual-current device'] && _FA['RCD / residual-current device'].length > 0, 'rcd label has Farsi');
+  assert(_FA['Socket-outlet'] && _FA['Socket-outlet'].length > 0, 'socket label has Farsi');
+  assert(_FA['Lighting point'] && _FA['Lighting point'].length > 0, 'lighting label has Farsi');
+  assert(_FA['Fuse'] && _FA['Fuse'].length > 0, 'fuse label has Farsi');
+  assert(_FA['Motor'] && _FA['Motor'].length > 0, 'motor label has Farsi');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
