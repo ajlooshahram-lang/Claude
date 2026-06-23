@@ -2153,6 +2153,69 @@ function renderUserModeSelector() {
   return html;
 }
 
+// --- Mathcad Prime Global Rendering Helpers ---
+// These match the EXACT visual style from Viggo Bisch's Mathcad Prime worksheets:
+// - Multiple := definitions on one line
+// - Stacked fractions with overbar
+// - ∠angle complex results
+// - Green commentary, yellow decisions, OK/FAIL badges
+// - Arrow → for "therefore select"
+
+// Single Mathcad line: symbol := formula = result unit
+function mcPrimeLine(sym, op, expr, res, unit, note) {
+  var h = '<div class="eng-step">';
+  h += '<span class="eng-sym">' + sym + '</span>';
+  if (op) h += '<span class="eng-formula">' + op + ' ' + (expr || '') + '</span>';
+  if (res !== undefined && res !== null) h += '<span class="eng-result">= ' + res + (unit ? ' <span class="eng-unit">' + unit + '</span>' : '') + '</span>';
+  if (note) h += '<span class="eng-note">' + note + '</span>';
+  h += '</div>';
+  return h;
+}
+
+// Multiple := definitions on one horizontal line
+function mcPrimeDefLine(defs) {
+  var h = '<div class="mc-line-group">';
+  for (var i = 0; i < defs.length; i++) {
+    var d = defs[i];
+    h += '<span class="mc-def"><span class="mc-var">' + d.sym + '</span><span class="mc-op">\u2009:=\u2009</span><span class="mc-val">' + d.val + '</span>';
+    if (d.unit) h += '<span class="mc-unit">\u2009' + d.unit + '</span>';
+    h += '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// Section header (orange/green bar)
+function mcPrimeHeader(text, color) {
+  var bg = color === 'green' ? 'linear-gradient(90deg,#2e7d32,#43a047)' : 'linear-gradient(90deg,#f57f17,#ff8f00)';
+  return '<div class="mc-section-header" style="background:' + bg + '">' + text + '</div>';
+}
+
+// Green commentary block (red text on green bg)
+function mcPrimeComment(text) { return '<div class="mc-comment">' + text + '</div>'; }
+
+// Yellow decision box
+function mcPrimeDecision(text) { return '<div class="mc-decision">' + text + '</div>'; }
+
+// OK/FAIL badges
+function mcPrimeOk() { return '<span class="mc-ok">OK.</span>'; }
+function mcPrimeFail(text) { return '<span class="mc-fail">' + (text || 'FEJL') + '</span>'; }
+
+// Reference tag (yellow)
+function mcPrimeRef(text) { return '<span class="mc-ref">' + text + '</span>'; }
+
+// Arrow → for "therefore select"
+function mcPrimeArrow() { return ' <span style="font-size:1.2em;margin:0 8px">\u2192</span> '; }
+
+// Blue evaluation result box
+function mcPrimeResult(sym, value, unit) {
+  return '<div class="mc-eval-box"><span style="font-style:italic;font-weight:700">' + sym + '</span><span style="font-weight:800;margin-left:8px">= ' + value + '</span>' + (unit ? '<span class="eng-unit" style="margin-left:4px">' + unit + '</span>' : '') + '</div>';
+}
+
+// Stacked fraction
+function mcPrimeFrac(num, den) {
+  return '<span class="mc-frac"><span class="mc-num">' + num + '</span><span class="mc-den">' + den + '</span></span>';
+}
 
 // ===== DATA FROM UPLOADED FILES =====
 
