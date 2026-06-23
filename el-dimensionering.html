@@ -41458,18 +41458,33 @@ function renderPE() {
   if (s.phaseSize !== null) {
     var entry = PE_TABLE_542.filter(function(r) { return r.phase === s.phaseSize; })[0];
     var calcPE = peCalcSize(s.phaseSize);
-    html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
-    html += '<div class="result-row"><span class="label">' + tx('Faseleder', 'Phase conductor') + '</span><span class="value">' + s.phaseSize + ' mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">' + tx('Kr\u00E6vet PE-leder', 'Required PE conductor') + '</span><span class="value" style="font-weight:700;color:var(--primary)">' + calcPE + ' mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">' + tx('Regel', 'Rule') + '</span><span class="value">' + (entry ? entry.rule : '') + '</span></div>';
-    html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-5-54 Table 54.2</span></div>';
+    var peRule = s.phaseSize <= 16 ? 'S<sub>PE</sub> = S' : (s.phaseSize <= 35 ? 'S<sub>PE</sub> = 16 mm\u00B2' : 'S<sub>PE</sub> = S/2');
+
+    // ═══ MATHCAD PRIME WORKSHEET ═══
+    html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+    html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('PE-leder \u2014 dimensionering', 'PE Conductor \u2014 sizing') + '</div>';
+
+    html += mcPrimeHeader(tx('GIVNE DATA', 'GIVEN DATA'));
+    html += mcPrimeDefLine([
+      { sym: 'S', val: s.phaseSize, unit: 'mm\u00B2' },
+      { sym: tx('Materiale','Material'), val: 'Cu', unit: '' }
+    ]);
+
+    html += mcPrimeHeader(tx('TABELMETODE (forenklet)', 'TABLE METHOD (simplified)'));
+    html += mcPrimeComment(tx('DS/HD 60364-5-54 Tabel 54.2: S\u226416 \u2192 S_PE=S ; 16<S\u226435 \u2192 S_PE=16 ; S>35 \u2192 S_PE=S/2', 'DS/HD 60364-5-54 Table 54.2: S\u226416 \u2192 S_PE=S ; 16<S\u226435 \u2192 S_PE=16 ; S>35 \u2192 S_PE=S/2'));
+    html += mcPrimeLine('S<sub>PE</sub>', ':= ' + peRule + ' =', 'S = ' + s.phaseSize, calcPE, 'mm\u00B2', mcPrimeRef('Tabel 54.2') + ' (' + (entry ? entry.rule : '') + ')');
+
+    html += mcPrimeResult('S<sub>PE</sub>', calcPE, 'mm\u00B2');
+
+    // Adiabatic method (the Viggo screenshot 3 method) — depth-3
+    html += '<div class="depth-3">';
+    html += mcPrimeHeader(tx('ADIABATISK METODE (verifikation)', 'ADIABATIC METHOD (verification)'));
+    html += mcPrimeComment(tx('Termisk verifikation per DS/HD 60364-5-54 \u00A7543.1.2 / DS/EN 50522 \u00A75.2.2', 'Thermal verification per DS/HD 60364-5-54 \u00A7543.1.2 / DS/EN 50522 \u00A75.2.2'));
+    html += mcPrimeLine('S<sub>min</sub>', ':= ' + mcPrimeFrac('\u221A(I\u00B2 \u00B7 t)', 'k') + ' =', '', '', '', tx('k = 143 (Cu/PVC), 176 (Cu/XLPE)','k = 143 (Cu/PVC), 176 (Cu/XLPE)'));
+    html += mcPrimeLine('', '', '', '', '', tx('k fra DS/HD 60364-5-54 Tabel 54.3','k from DS/HD 60364-5-54 Table 54.3'));
     html += '</div>';
 
-    // Visual diagram
-    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Regler for PE-dimensionering', 'PE sizing rules') + '</div>';
-    html += '<div class="result-row"><span class="label">S \u2264 16 mm\u00B2</span><span class="value">PE = S</span></div>';
-    html += '<div class="result-row"><span class="label">16 < S \u2264 35 mm\u00B2</span><span class="value">PE = 16 mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">S > 35 mm\u00B2</span><span class="value">PE = S/2</span></div>';
+    html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/HD 60364-5-54 Tabel 54.2') + ' ' + mcPrimeRef('\u00A7543.1.2') + ' ' + mcPrimeRef('DS/EN 50522') + '</div>';
     html += '</div>';
   }
 
