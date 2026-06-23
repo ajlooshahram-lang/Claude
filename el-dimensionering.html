@@ -32906,7 +32906,9 @@ var analyzerState = {
   mode: 'upload', // 'upload' or 'paste'
   ingestionProgress: null, // progress text during PDF/DOCX extraction
   ingestionNotice: null,   // error/warning banner text
-  autorisationDetected: null // Authorization-exam-level project detection result
+  autorisationDetected: null, // Authorization-exam-level project detection result
+  belastningsskema: null, // cxBelastningsskema result (vector load schedule)
+  belastningsskemaLoads: null // raw load list for belastningsskema
 };
 // Normalize input text: strip page numbers, headers, fix encoding
 function analyzerNormalize(text) {
@@ -33219,8 +33221,108 @@ function analyzerExtract(text) {
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
 
+  // === MULTI-LOAD EXTRACTION (Belastningsskema) ===
+  // Detect multiple loads from exam text — typical patterns:
+  // "Motor 37 kW, cos φ 0,87" / "Pumpe: 15 kW, cosφ = 0,85" / "Belysning 8 kW, cos 1,0"
+  // "M1: 22 kW, cosφ 0.87, 3-faset" / "3 stk. varmeblæser 5 kW, cos 1.0, L1/L2/L3"
+  // Also: tabular formats from exams (Mrk | kW | cosφ | Sf | Fase)
+  data.multiLoads = analyzerExtractMultiLoads(text, data);
+
   return data;
 }
+
+// Extract multiple loads from text for Viggo-style belastningsskema.
+// Returns array of: { name, P_kW, cosPhi, Sf, phases, assignedPhase }
+// Matches patterns found in Danish authorization exams (Opgave 1 forsyning):
+// - "Motor M1: 22 kW, cosφ 0,87, 3-faset, Sf=0,8"
+// - "Pumpe 15 kW cos 0,85"
+// - Tabular: lines with (kW + cosφ) on same line
+function analyzerExtractMultiLoads(text, data) {
+  var loads = [];
+  var lines = text.split(/\n/);
+
+  // Pattern: line contains a name + kW + cosφ (optional Sf, phase)
+  // This covers both free-text and tabular formats
+  var kWCosRe = /([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F0-9 _.\/-]{0,30}?)\s*[:;\-]?\s*(?:P\s*[:=]?\s*)?(\d+[.,]?\d*)\s*kW[\s,;]*(?:cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?\s*)?[:=]?\s*(\d+[.,]\d+))?/gi;
+  var match;
+  var seenNames = {};
+  while ((match = kWCosRe.exec(text)) !== null) {
+    var name = match[1].trim().replace(/[:;\-\s]+$/, '');
+    // Skip very generic prefixes that aren't load names
+    if (/^(beregn|find|bestem|kontroller|vis|opgave|svar|med|for|den|det|fra|til|som)\s*$/i.test(name)) continue;
+    if (/^(belastning|effekt|P[n]?)\s*$/i.test(name)) name = 'Last';
+    var P_kW = parseFloat(match[2].replace(',', '.'));
+    var cos = match[3] ? parseFloat(match[3].replace(',', '.')) : null;
+    if (P_kW <= 0 || P_kW > 10000) continue; // sanity
+    if (cos !== null && (cos <= 0 || cos > 1)) cos = null;
+
+    // Detect simultaneity factor on same line
+    var lineIdx = text.indexOf(match[0]);
+    var lineEnd = text.indexOf('\n', lineIdx);
+    var restLine = lineEnd > lineIdx ? text.substring(lineIdx, lineEnd) : text.substring(lineIdx, lineIdx + 200);
+    var sfM = restLine.match(/(?:sf|Sf|samtidighed(?:sfaktor)?)\s*[:=]?\s*(\d+[.,]\d+)/i);
+    var sf = sfM ? parseFloat(sfM[1].replace(',', '.')) : 1.0;
+    if (sf <= 0 || sf > 1) sf = 1.0;
+
+    // Detect phase assignment
+    var phases = 3; // default
+    var assignedPhase = 'L1';
+    if (/1[\s-]*fas|1x230|enfase/i.test(restLine)) { phases = 1; }
+    else if (/3[\s-]*fas|3x400|trefase/i.test(restLine)) { phases = 3; }
+    var phM = restLine.match(/\b(L[123])\b/);
+    if (phM && phases === 1) assignedPhase = phM[1];
+
+    // Deduplicate by name+power
+    var key = name.toLowerCase() + '_' + P_kW;
+    if (seenNames[key]) continue;
+    seenNames[key] = true;
+
+    loads.push({
+      name: name,
+      P_kW: P_kW,
+      cosPhi: cos || (data.cosPhi || 0.9),
+      Sf: sf,
+      phases: phases,
+      assignedPhase: assignedPhase
+    });
+  }
+
+  // Also try simple "N kW" repeated pattern without clear names (table rows)
+  // Pattern: multiple lines each containing a kW value (exam table format)
+  if (loads.length < 2) {
+    var simpleKwLines = [];
+    for (var li = 0; li < lines.length; li++) {
+      var lineStr = lines[li];
+      var simpleM = lineStr.match(/(\d+[.,]?\d*)\s*kW/i);
+      var simpleCos = lineStr.match(/(?:cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?\s*)?[:=]?\s*)?(\d+[.,]\d+)/);
+      if (simpleM) {
+        var pw = parseFloat(simpleM[1].replace(',', '.'));
+        if (pw > 0 && pw < 5000) {
+          simpleKwLines.push({ line: lineStr, P_kW: pw, cos: simpleCos ? parseFloat(simpleCos[1].replace(',', '.')) : null });
+        }
+      }
+    }
+    // Only use table pattern if we found 3+ lines with kW values (otherwise it's noise)
+    if (simpleKwLines.length >= 3 && loads.length < 2) {
+      loads = [];
+      for (var si = 0; si < simpleKwLines.length; si++) {
+        var sl = simpleKwLines[si];
+        var sName = sl.line.match(/^([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F0-9 _.\/-]{0,25})/);
+        loads.push({
+          name: sName ? sName[1].trim() : ('Last ' + (si + 1)),
+          P_kW: sl.P_kW,
+          cosPhi: (sl.cos && sl.cos > 0 && sl.cos <= 1) ? sl.cos : (data.cosPhi || 0.9),
+          Sf: 1.0,
+          phases: 3,
+          assignedPhase: 'L1'
+        });
+      }
+    }
+  }
+
+  return loads.length >= 2 ? loads : [];
+}
+
 // Detect question types from text - COMPREHENSIVE coverage of ALL module types
 // Handles exact phrasing from all 8 Elektroteknik textbooks (Bind 1-8) and exam patterns
 function analyzerDetectQuestions(text) {
@@ -33358,6 +33460,28 @@ function analyzerSolve(data) {
   }
   total++;
 
+  // === BELASTNINGSSKEMA (Vectorial Load Schedule — Viggo Bisch method) ===
+  // When multiple loads are detected, compute the Viggo-style belastningsskema
+  // using complex phasor summation per phase (cxBelastningsskema).
+  if (data.multiLoads && data.multiLoads.length >= 2 && typeof cxBelastningsskema === 'function') {
+    var bsResult = cxBelastningsskema(data.multiLoads, Un);
+    analyzerState.belastningsskema = bsResult;
+    analyzerState.belastningsskemaLoads = data.multiLoads;
+    // Override the scalar IB with the vectorially-correct belastningsskema IB
+    ib = bsResult.IB;
+    var bsHtml = renderAnalyzerBelastningsskema(bsResult, data.multiLoads, Un);
+    results.push({
+      type: 'belastningsskema',
+      label: tx('Belastningsskema (vektorsummation)', 'Load Schedule (vector summation)'),
+      value: 'IB = ' + bsResult.IB.toFixed(2) + ' A, cos\u03C6 = ' + bsResult.cosPhi_total.toFixed(3),
+      html: bsHtml,
+      asked: hasQuestion(data, 'ib'),
+      bonus: false
+    });
+    solved++;
+    total++;
+  }
+
   // === ALWAYS COMPUTE: Iz (cable current capacity) ===
 
   // === TRANSFORMER / SUPPLY CALCULATIONS (Viggo Bisch method — complex throughout) ===
@@ -33452,6 +33576,35 @@ function analyzerSolve(data) {
       asked: true
     });
     solved += miniSteps.length; total += miniSteps.length;
+
+    // SIBA HV fuse selection (3 criteria — Viggo Bisch method)
+    // Automatic when transformer data is available (standard in Opgave 1)
+    var _sibaI11 = I11_HV;
+    var _sibaInrush = 12 * I11_HV;
+    var _sibaFuseResult = sibaSelectHVFuse(_sibaI11, _sibaInrush);
+    var _sibaHtml = cxRenderSteps(_sibaFuseResult.steps, tx('Valg af HV-sikring (SIBA HHD)', 'HV fuse selection (SIBA HHD)'));
+    // Add SVG selectivity diagram with fuse curve
+    var _sibaCurveKey = 'curve_fullRange_' + (_sibaFuseResult.selected ? String(_sibaFuseResult.selected.In).replace('.', '_') + 'A' : '50A');
+    var _sibaCurve = SIBA_HHD_DATA[_sibaCurveKey] || SIBA_HHD_DATA.curve_fullRange_50A;
+    if (_sibaCurve && typeof svgSelektivitetsDiagram === 'function') {
+      var _sibaDiagCurves = [{ label: 'SIBA ' + (_sibaFuseResult.selected ? _sibaFuseResult.selected.In : '?') + 'A FR', color: '#3b82f6', data: _sibaCurve }];
+      var _sibaDiagMarkers = [
+        { label: 'I<sub>inrush</sub>=' + _sibaInrush.toFixed(0) + 'A', color: '#ef4444', I: _sibaInrush, style: 'vertical' },
+        { label: 'I<sub>1/1</sub>=' + _sibaI11.toFixed(1) + 'A', color: '#16a34a', I: _sibaI11, style: 'vertical' }
+      ];
+      _sibaHtml += '<div style="margin-top:12px">';
+      _sibaHtml += svgSelektivitetsDiagram(_sibaDiagCurves, _sibaDiagMarkers);
+      _sibaHtml += '</div>';
+    }
+    results.push({
+      type: 'hv_fuse',
+      label: tx('HV-sikring (SIBA HHD Full Range)', 'HV fuse (SIBA HHD Full Range)'),
+      value: (_sibaFuseResult.selected ? _sibaFuseResult.selected.In + ' A' : '?') + ' SIBA Full Range',
+      html: _sibaHtml,
+      asked: hasQuestion(data, 'hv_fuse') || hasQuestion(data, 'device'),
+      bonus: !hasQuestion(data, 'hv_fuse') && !hasQuestion(data, 'device')
+    });
+    solved++; total++;
   }
 
   // ===================================================================
@@ -34909,6 +35062,8 @@ function analyzerExtractPdf(arrayBuffer) {
     var startIdx = match.index + match[0].length;
     var endIdx = str.indexOf('endstream', startIdx);
     if (endIdx < 0) continue;
+    // Size cap: skip streams > 200 KB (not text content)
+    if (endIdx - startIdx > 200000) { streamRe.lastIndex = endIdx + 9; continue; }
     var streamData = data.subarray(startIdx, endIdx);
     var preStream = str.substring(Math.max(0, match.index - 500), match.index);
     var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
@@ -34928,7 +35083,8 @@ function analyzerExtractPdfAsync(arrayBuffer) {
     var data = new Uint8Array(arrayBuffer);
     var str = analyzerBytesToLatin1(data);
     var texts = [];
-    var MAX_STREAMS = 2000;
+    var MAX_STREAMS = 200;
+    var MAX_STREAM_BYTES = 200000; // 200 KB: real content streams are 2-30 KB; skip large fonts/images
 
     // Collect all stream positions and their compressed data
     var streams = [];
@@ -34938,7 +35094,16 @@ function analyzerExtractPdfAsync(arrayBuffer) {
       var startIdx = match.index + match[0].length;
       var endIdx = str.indexOf('endstream', startIdx);
       if (endIdx < 0) continue;
+      // Per-stream size cap — skip streams that are too large to be text content
+      if (endIdx - startIdx > MAX_STREAM_BYTES) { streamRe.lastIndex = endIdx + 9; continue; }
       var preStream = str.substring(Math.max(0, match.index - 500), match.index);
+      // Skip known non-text streams (fonts, images, metadata)
+      if (/\/(FontFile\d?|Length1)\b/.test(preStream) ||
+          /\/Subtype\s*\/(Image|Type1C|CIDFontType0C|TrueType|OpenType)\b/.test(preStream) ||
+          /\/Type\s*\/(Metadata|ObjStm|XRef|Font)\b/.test(preStream) ||
+          /\/(ICCBased|DCTDecode|JPXDecode|CCITTFaxDecode|JBIG2Decode)\b/.test(preStream)) {
+        streamRe.lastIndex = endIdx + 9; continue;
+      }
       var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
       streams.push({ startIdx: startIdx, endIdx: endIdx, isFlate: isFlate });
     }
@@ -34993,6 +35158,8 @@ function analyzerExtractPdfAsync(arrayBuffer) {
               if (r.done) {
                 var total = 0;
                 for (var c = 0; c < chunks.length; c++) total += chunks[c].length;
+                // Post-inflation size guard: skip if inflated output > 512 KB (not text content)
+                if (total > 512 * 1024) { processStream(idx + 1); return; }
                 var inflated = new Uint8Array(total);
                 var p = 0;
                 for (var c = 0; c < chunks.length; c++) { inflated.set(chunks[c], p); p += chunks[c].length; }
@@ -35029,61 +35196,60 @@ function analyzerExtractPdfAsync(arrayBuffer) {
   });
 }
 
-// Parse PDF content operators to extract text
+// Parse PDF content operators to extract text.
+// Uses a LINE-BY-LINE parser — NO backtracking regex on content streams.
+// (The old /BT\b([\s\S]*?)ET\b/g regex caused catastrophic backtracking on
+// large inflated content, freezing the browser for minutes.)
 function analyzerParsePdfContent(content) {
+  if (!content || content.length === 0) return null;
+  // Safety: skip absurdly large content (real page text streams are 2-30 KB)
+  if (content.length > 512 * 1024) return null;
+  var lines = content.split('\n');
   var result = '';
-  // Find text objects BT...ET
-  var btRe = /BT\b([\s\S]*?)ET\b/g;
-  var btMatch;
-  while ((btMatch = btRe.exec(content)) !== null) {
-    var block = btMatch[1];
-    // Extract text from Tj, TJ, ', " operators
-    // Tj: (string) Tj
-    var tjRe = /\(([^)]*)\)\s*Tj/g;
-    var tjM;
-    while ((tjM = tjRe.exec(block)) !== null) {
-      result += analyzerDecodePdfString(tjM[1]);
+  var inBT = false;
+  for (var i = 0; i < lines.length; i++) {
+    var L = lines[i].trim();
+    if (!L) continue;
+    // BT/ET delimiters — may appear alone or at start/end of a line
+    if (L === 'BT' || L.indexOf('BT') === 0 && /^BT\s*$/.test(L)) { inBT = true; continue; }
+    if (L === 'ET' || /^ET\s*$/.test(L)) { inBT = false; result += '\n'; continue; }
+    if (!inBT) continue;
+    // --- Text-showing operators (line-by-line, zero backtracking) ---
+    // Tj: (text) Tj
+    var tj = L.match(/\(([^)]*)\)\s*Tj/);
+    if (tj) { result += analyzerDecodePdfString(tj[1]); continue; }
+    // TJ array on a single line: [...] TJ
+    if (L.indexOf('TJ') >= 0 && L.indexOf('[') >= 0) {
+      // Extract all string fragments from the TJ array
+      L.replace(/\(([^)]*)\)/g, function(_, t) { result += analyzerDecodePdfString(t); return ''; });
+      // Large negative numbers indicate word spacing
+      L.replace(/-(\d{3,})/g, function(_, d) { if (parseInt(d) > 100) result += ' '; return ''; });
+      continue;
     }
-    // TJ: [(string) num (string) ...] TJ
-    var tjArrRe = /\[([\s\S]*?)\]\s*TJ/g;
-    var arrM;
-    while ((arrM = tjArrRe.exec(block)) !== null) {
-      var arr = arrM[1];
-      var strRe = /\(([^)]*)\)/g;
-      var sM;
-      while ((sM = strRe.exec(arr)) !== null) {
-        result += analyzerDecodePdfString(sM[1]);
+    // Hex string: <hex> Tj
+    var hexTj = L.match(/<([0-9A-Fa-f]+)>\s*Tj/);
+    if (hexTj) { result += analyzerDecodeHexString(hexTj[1]); continue; }
+    // Inline Tj after other operators on same line
+    if (L.indexOf('Tj') >= 0) {
+      L.replace(/\(([^)]*)\)\s*Tj/g, function(_, t) { result += analyzerDecodePdfString(t); return ''; });
+    }
+    // ' operator (move to next line + show string): (text) '
+    if (L.indexOf("'") >= 0) {
+      var sq = L.match(/\(([^)]*)\)\s*'/);
+      if (sq) { result += '\n' + analyzerDecodePdfString(sq[1]); continue; }
+    }
+    // Td/TD/Tm/T* — positioning operators imply line breaks
+    if (/\bTd\b|\bTD\b|\bTm\b|\bT\*/.test(L)) {
+      var tdMatch = L.match(/([\d.-]+)\s+([\d.-]+)\s+Td/);
+      if (tdMatch) {
+        var yOff = parseFloat(tdMatch[2]);
+        if (Math.abs(yOff) > 1) result += '\n';
+      } else {
+        result += '\n';
       }
-      // Check for large negative numbers indicating spaces
-      var numRe = /\]\s*(-?\d+)\s*\[/g;
-      // Actually detect spacing from TJ array numbers
-      var spacingRe = /(-\d{3,})/g;
-      var spM;
-      while ((spM = spacingRe.exec(arr)) !== null) {
-        if (parseInt(spM[1]) < -100) result += ' ';
-      }
-    }
-    // Hex strings: <hex> Tj
-    var hexTjRe = /<([0-9A-Fa-f]+)>\s*Tj/g;
-    var hM;
-    while ((hM = hexTjRe.exec(block)) !== null) {
-      result += analyzerDecodeHexString(hM[1]);
-    }
-    // Detect line breaks from Td/Tm operators
-    var tdRe = /[\d.-]+\s+([\d.-]+)\s+Td/g;
-    var tdM;
-    while ((tdM = tdRe.exec(block)) !== null) {
-      var yOff = parseFloat(tdM[1]);
-      if (yOff < -1 || yOff > 1) result += '\n';
-    }
-    // ' operator: (string) '
-    var sqRe = /\(([^)]*)\)\s*'/g;
-    var sqM;
-    while ((sqM = sqRe.exec(block)) !== null) {
-      result += '\n' + analyzerDecodePdfString(sqM[1]);
     }
   }
-  return result || null;
+  return result.trim() || null;
 }
 
 // Decode PDF escaped string
@@ -35296,7 +35462,7 @@ function analyzerHandlePaste() {
 
 // Reset
 function analyzerReset() {
-  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload', ingestionProgress: null, ingestionNotice: null, autorisationDetected: null };
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload', ingestionProgress: null, ingestionNotice: null, autorisationDetected: null, belastningsskema: null, belastningsskemaLoads: null };
   renderModule('analyzer');
 }
 
@@ -35447,6 +35613,93 @@ function renderAutorisationReview() {
   }
 
   html += '</div>';
+  return html;
+}
+
+// Render a Viggo Bisch-style belastningsskema table in the analyzer output.
+// Shows: Mrk | P [kW] | cos φ | Sf | I₁/₁ [A] | Fase | ∠°
+// Then per-phase vectorial sums and the dimensioning current IB.
+function renderAnalyzerBelastningsskema(bsResult, loads, Un) {
+  var html = '';
+  html += '<div style="overflow-x:auto;margin:8px 0">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;text-align:center">';
+  html += '<thead><tr style="background:var(--primary-glow);font-weight:700">';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border);text-align:left">' + tx('Mrk', 'Tag') + '</th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">P [kW]</th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">cos \u03C6</th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">S<sub>f</sub></th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">I [A]</th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">' + tx('Fase', 'Phase') + '</th>';
+  html += '<th style="padding:6px 8px;border:1px solid var(--border)">\u2220\u00B0</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var i = 0; i < bsResult.rows.length; i++) {
+    var row = bsResult.rows[i];
+    var ld = loads[i];
+    var phLabel = ld.phases === 3 ? '3\u223C' : (ld.assignedPhase || 'L1');
+    html += '<tr>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border);text-align:left;font-weight:600">' + row.name + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border)">' + row.P_kW.toFixed(1) + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border)">' + row.cosPhi.toFixed(2) + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border)">' + row.Sf.toFixed(1) + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border);font-weight:700">' + row.I_mag.toFixed(2) + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border)">' + phLabel + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid var(--border)">' + row.angle.toFixed(1) + '\u00B0</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // Per-phase vector sum results (Viggo-style dual display: rectangular + polar)
+  html += '<div class="result-box" style="margin-top:10px">';
+  html += '<div class="result-title">' + tx('Fasestr\u00f8mme (vektorsummation)', 'Phase currents (vector summation)') + '</div>';
+  var phases = [
+    { label: 'L1', vec: bsResult.L1 },
+    { label: 'L2', vec: bsResult.L2 },
+    { label: 'L3', vec: bsResult.L3 }
+  ];
+  for (var p = 0; p < phases.length; p++) {
+    var ph = phases[p];
+    var mag = cxMag(ph.vec);
+    var ang = cxAngleDeg(ph.vec);
+    html += '<div class="result-row">';
+    html += '<span class="label">I<sub>' + ph.label + '</sub></span>';
+    html += '<span class="value">' + mag.toFixed(2) + ' A \u2220 ' + ang.toFixed(1) + '\u00B0';
+    html += ' <small style="color:var(--text-muted)">(' + ph.vec.re.toFixed(2) + (ph.vec.im >= 0 ? ' + j' : ' \u2212 j') + Math.abs(ph.vec.im).toFixed(2) + ')</small>';
+    html += '</span></div>';
+  }
+
+  // Dimensioning current (the largest phase magnitude)
+  html += '<div class="result-row" style="border-top:2px solid var(--primary);margin-top:6px;padding-top:6px">';
+  html += '<span class="label" style="font-weight:800">I<sub>B</sub> (' + tx('dimensionerende', 'dimensioning') + ')</span>';
+  html += '<span class="value" style="font-weight:800;font-size:1.1em;color:var(--primary)">' + bsResult.IB.toFixed(2) + ' A</span>';
+  html += '</div>';
+  html += '<div class="result-row">';
+  html += '<span class="label">cos \u03C6<sub>total</sub></span>';
+  html += '<span class="value">' + bsResult.cosPhi_total.toFixed(3) + '</span>';
+  html += '</div>';
+
+  // Phase imbalance warning (DS/HD 60364)
+  var maxPh = Math.max(cxMag(bsResult.L1), cxMag(bsResult.L2), cxMag(bsResult.L3));
+  var minPh = Math.min(cxMag(bsResult.L1), cxMag(bsResult.L2), cxMag(bsResult.L3));
+  if (maxPh > 0) {
+    var imbalPct = ((maxPh - minPh) / maxPh * 100);
+    html += '<div class="result-row">';
+    html += '<span class="label">' + tx('Faseubalance', 'Phase imbalance') + '</span>';
+    html += '<span class="value">' + imbalPct.toFixed(1) + '%';
+    if (imbalPct > 20) html += ' <span style="color:var(--danger)">\u26A0 > 20%</span>';
+    else if (imbalPct > 10) html += ' <span style="color:var(--warning)">\u26A0</span>';
+    else html += ' \u2705';
+    html += '</span></div>';
+  }
+
+  html += '</div>';
+
+  // Method citation
+  html += '<div style="margin-top:8px;font-size:0.75rem;color:var(--text-muted)">';
+  html += tx('Metode: Vektorsummation af belastningsstr\u00f8mme (Viggo Bisch). Fasevinkel fra arccos(cos\u03C6). Ref: DS/HD 60364-5-52, Bog 5 s.295.',
+             'Method: Vector summation of load currents (Viggo Bisch). Phase angle from arccos(cos\u03C6). Ref: DS/HD 60364-5-52, Book 5 p.295.');
+  html += '</div>';
+
   return html;
 }
 
