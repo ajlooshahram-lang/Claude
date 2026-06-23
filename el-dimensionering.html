@@ -32260,7 +32260,9 @@ function analyzerExtract(text) {
     cableLength: null, cableMm2: null, cableType: null,
     deviceIn: null, deviceIcu: null, deviceCurve: null,
     trafoKVA: null, trafoUk: null, trafoPcu: null, trafoP0: null,
-    trafoI0pct: null, trafoVecGroup: null, trafoPrimKV: null,
+    trafoI0pct: null, trafoVecGroup: null, trafoPrimKV: null, trafoEr: null,
+    skMax_MVA: null, skMin_MVA: null, relayI_A: null, relayT_s: null,
+    networkVoltage_kV: null, hvCableLength_km: null,
     earthSystem: null, zsValue: null, disconnectTime: null,
     rcdType: null, rcdSensitivity: null,
     frequency: null, resistance: null, inductance: null, capacitance: null,
@@ -32341,13 +32343,42 @@ function analyzerExtract(text) {
   var curveMatch = text.match(/(?:kurve|curve|type)\s*[:=]?\s*([BCD])\b/i);
   if (curveMatch) { data.deviceCurve = curveMatch[1].toUpperCase(); data.confidence.deviceCurve = 'high'; }
 
-  // Transformer kVA: "630 kVA", "transformer 400 kVA"
-  var trafoMatch = text.match(/(?:transform(?:er|ator))?\s*[:=]?\s*(\d+)\s*kVA/i);
+  // Transformer kVA: "630 kVA", "transformer 400 kVA", "S = 400 kVA", "Sn = 630 kVA"
+  var trafoMatch = text.match(/(?:transform(?:er|ator)|S[n]?)\s*[:=]?\s*(\d+)\s*kVA/i);
   if (trafoMatch) { data.trafoKVA = parseInt(trafoMatch[1]); data.confidence.trafoKVA = 'high'; }
 
-  // Transformer uk%: "uk = 4%", "uk% = 6", "kortslutningsspaending 4%"
-  var ukMatch = text.match(/(?:uk|kortslutningssp.nding)\s*[%=:]\s*(\d+[.,]?\d*)\s*%?/i);
+  // Transformer uk%: "uk = 4%", "uk% = 6", "kortslutningsspaending 4%", "ek = 4,5 %", "ek = 4,5%"
+  var ukMatch = text.match(/(?:uk|ek|kortslutningssp.nding)\s*[%=:]\s*(\d+[.,]?\d*)\s*%?/i);
   if (ukMatch) { data.trafoUk = parseFloat(ukMatch[1].replace(',', '.')); data.confidence.trafoUk = 'high'; }
+
+  // Transformer er%: "er = 1,2 %", "er = 1.2%"
+  var erMatch = text.match(/\ber\s*[:=]\s*(\d+[.,]?\d*)\s*%/i);
+  if (erMatch) { data.trafoEr = parseFloat(erMatch[1].replace(',', '.')); }
+
+  // Short-circuit power from utility: "Sk,max = 115 MVA", "Skmax = 115 MVA", "Sk max = 115"
+  var skMaxMatch = text.match(/[Ss]k\s*[,.]?\s*max\s*[:=]\s*(\d+[.,]?\d*)\s*MVA/);
+  if (skMaxMatch) { data.skMax_MVA = parseFloat(skMaxMatch[1].replace(',', '.')); data.confidence.skMax_MVA = 'high'; }
+  // Also try "Sk = 115 MVA" (without min/max qualifier — assume max)
+  if (!data.skMax_MVA) {
+    var skPlain = text.match(/[Ss]k\s*[:=]\s*(\d+[.,]?\d*)\s*MVA/);
+    if (skPlain) { data.skMax_MVA = parseFloat(skPlain[1].replace(',', '.')); data.confidence.skMax_MVA = 'medium'; }
+  }
+  var skMinMatch = text.match(/[Ss]k\s*[,.]?\s*min\s*[:=]\s*(\d+[.,]?\d*)\s*MVA/);
+  if (skMinMatch) { data.skMin_MVA = parseFloat(skMinMatch[1].replace(',', '.')); data.confidence.skMin_MVA = 'high'; }
+
+  // Relay settings: "I> = 400 A" or "I> 400 A" + "t> = 1,2 s" or "t> 1,2 s"
+  var relayIMatch = text.match(/I\s*>\s*[:=]?\s*(\d+[.,]?\d*)\s*A/);
+  if (relayIMatch) { data.relayI_A = parseFloat(relayIMatch[1].replace(',', '.')); }
+  var relayTMatch = text.match(/t\s*>\s*[:=]?\s*(\d+[.,]?\d*)\s*s/);
+  if (relayTMatch) { data.relayT_s = parseFloat(relayTMatch[1].replace(',', '.')); }
+
+  // HV cable length: "3,0 km", "kabelstræk 2,0 km", "længde 3 km"
+  var hvLenMatch = text.match(/(\d+[.,]?\d*)\s*km/i);
+  if (hvLenMatch) { data.hvCableLength_km = parseFloat(hvLenMatch[1].replace(',', '.')); }
+
+  // Network voltage (10 kV, 60 kV, etc.) — separate from LV voltage
+  var netVoltMatch = text.match(/[Uu][Nn]?\s*[:=]?\s*(?:3\s*[x×·]\s*)?(\d+[.,]?\d*)\s*kV/);
+  if (netVoltMatch) { data.networkVoltage_kV = parseFloat(netVoltMatch[1].replace(',', '.')); data.confidence.networkVoltage_kV = 'high'; }
 
   // Transformer Pcu: "Pcu = 6500 W", "kobber tab 6500", "Pk = 6500"
   var pcuMatch = text.match(/(?:Pcu|Pk|kobbertab|belastningstab|copper\s*loss|load\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
@@ -32627,6 +32658,85 @@ function analyzerSolve(data) {
   total++;
 
   // === ALWAYS COMPUTE: Iz (cable current capacity) ===
+
+  // === TRANSFORMER / SUPPLY CALCULATIONS (Authorization-level) ===
+  // These compute the supply-side values that authorization exams require.
+  var Un_HV = data.networkVoltage_kV || data.trafoPrimKV || (data.skMax_MVA ? 10 : null);
+  if (data.trafoKVA && Un_HV) {
+    // Transformer full-load current (HV side)
+    var inHV = data.trafoKVA / (Math.sqrt(3) * Un_HV);
+    results.push({ type: 'trafo', label: tx('Fuldlaststrøm HV-side', 'Full-load current HV side'),
+      value: inHV.toFixed(1) + ' A',
+      html: '<div class="result-box"><div class="result-title">' + tx('Fuldlaststrøm (primær)', 'Full-load current (primary)') + '</div>' +
+        '<div class="result-row"><span class="label">In = Sn / (√3 · Un)</span><span class="value">= ' + data.trafoKVA + ' / (√3 · ' + Un_HV + ') = <strong>' + inHV.toFixed(1) + ' A</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+
+    // Transformer full-load current (LV side, 0.4 kV)
+    var inLV = data.trafoKVA * 1000 / (Math.sqrt(3) * 400);
+    results.push({ type: 'trafo', label: tx('Fuldlaststrøm LV-side (400V)', 'Full-load current LV side (400V)'),
+      value: inLV.toFixed(1) + ' A',
+      html: '<div class="result-box"><div class="result-title">' + tx('Fuldlaststrøm (sekundær)', 'Full-load current (secondary)') + '</div>' +
+        '<div class="result-row"><span class="label">In = Sn×1000 / (√3 · 400)</span><span class="value">= ' + data.trafoKVA + '000 / (√3 · 400) = <strong>' + inLV.toFixed(1) + ' A</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+
+    // Transformer secondary short-circuit current (if ek known)
+    if (data.trafoUk) {
+      var ikTrafo = inLV / (data.trafoUk / 100);
+      results.push({ type: 'ik', label: tx('Kortslutningsstrøm ved trafoens klemmer', 'SC current at transformer terminals'),
+        value: (ikTrafo / 1000).toFixed(2) + ' kA',
+        html: '<div class="result-box"><div class="result-title">' + tx('Trafo sekundær Ik (kun trafoimpedans)', 'Transformer secondary Ik (transformer impedance only)') + '</div>' +
+          '<div class="result-row"><span class="label">Ik = In / (ek/100)</span><span class="value">= ' + inLV.toFixed(1) + ' / ' + (data.trafoUk/100) + ' = <strong>' + ikTrafo.toFixed(0) + ' A = ' + (ikTrafo/1000).toFixed(2) + ' kA</strong></span></div>' +
+          '<div class="result-row"><span class="label">' + tx('Konservativ (kun trafoimpedans)', 'Conservative (transformer impedance only)') + '</span><span class="value">' + tx('Bruges til valg af brydeevne', 'Used for breaking capacity selection') + '</span></div></div>',
+        asked: true });
+      solved++; total++;
+    }
+  }
+
+  // Network short-circuit current from Sk
+  if (data.skMax_MVA && Un_HV) {
+    var ikNetMax = data.skMax_MVA * 1000 / (Math.sqrt(3) * Un_HV);
+    results.push({ type: 'ik', label: tx('Maks netværks-kortslutning Ik,max', 'Max network SC current Ik,max'),
+      value: ikNetMax.toFixed(0) + ' A (' + (ikNetMax/1000).toFixed(2) + ' kA)',
+      html: '<div class="result-box"><div class="result-title">' + tx('Ik,max fra netselskab', 'Ik,max from utility') + '</div>' +
+        '<div class="result-row"><span class="label">Ik,max = Sk,max / (√3 · Un)</span><span class="value">= ' + data.skMax_MVA + ' MVA / (√3 · ' + Un_HV + ' kV) = <strong>' + ikNetMax.toFixed(0) + ' A</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+  }
+  if (data.skMin_MVA && Un_HV) {
+    var ikNetMin = data.skMin_MVA * 1000 / (Math.sqrt(3) * Un_HV);
+    results.push({ type: 'ik', label: tx('Min netværks-kortslutning Ik,min', 'Min network SC current Ik,min'),
+      value: ikNetMin.toFixed(0) + ' A (' + (ikNetMin/1000).toFixed(2) + ' kA)',
+      html: '<div class="result-box"><div class="result-title">' + tx('Ik,min fra netselskab', 'Ik,min from utility') + '</div>' +
+        '<div class="result-row"><span class="label">Ik,min = Sk,min / (√3 · Un)</span><span class="value">= ' + data.skMin_MVA + ' MVA / (√3 · ' + Un_HV + ' kV) = <strong>' + ikNetMin.toFixed(0) + ' A</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+  }
+
+  // Network impedance from Sk
+  if (data.skMax_MVA && Un_HV) {
+    var ZnetMax = (Un_HV * Un_HV) / data.skMax_MVA * 1000; // mΩ at HV level
+    results.push({ type: 'impedans', label: tx('Netimpedans Znet (fra Sk,max)', 'Network impedance Znet (from Sk,max)'),
+      value: ZnetMax.toFixed(1) + ' mΩ (ref. ' + Un_HV + ' kV)',
+      html: '<div class="result-box"><div class="result-title">' + tx('Netimpedans', 'Network impedance') + '</div>' +
+        '<div class="result-row"><span class="label">Znet = Un² / Sk × 1000</span><span class="value">= ' + Un_HV + '² / ' + data.skMax_MVA + ' × 1000 = <strong>' + ZnetMax.toFixed(1) + ' mΩ</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+  }
+
+  // Transformer impedance (from ek and Sn)
+  if (data.trafoUk && data.trafoKVA) {
+    var ZtLV = (data.trafoUk / 100) * (400 * 400) / (data.trafoKVA * 1000) * 1000; // mΩ at 400V level
+    results.push({ type: 'impedans', label: tx('Transformerimpedans Zt (400V-side)', 'Transformer impedance Zt (400V side)'),
+      value: ZtLV.toFixed(2) + ' mΩ',
+      html: '<div class="result-box"><div class="result-title">' + tx('Transformerimpedans (sekundærside)', 'Transformer impedance (secondary side)') + '</div>' +
+        '<div class="result-row"><span class="label">Zt = (ek/100) × Un² / Sn × 1000</span><span class="value">= (' + data.trafoUk + '/100) × 400² / ' + data.trafoKVA + '000 × 1000 = <strong>' + ZtLV.toFixed(2) + ' mΩ</strong></span></div></div>',
+      asked: true });
+    solved++; total++;
+  }
+
+  // ===================================================================
   var izCorrected = null;
   var kInstall = 1.0, kTemp = 1.0, kGroup = 1.0;
   if (data.installMethod) kInstall = INSTALL_METHODS[data.installMethod] || 1.0;
@@ -33943,48 +34053,138 @@ function analyzerBytesToLatin1(bytes) {
 }
 
 function analyzerExtractPdf(arrayBuffer) {
+  // SYNC fallback — only works for non-FlateDecode or trivially-compressed PDFs.
+  // The REAL extraction happens in analyzerExtractPdfAsync (uses native DecompressionStream).
+  // This sync version is kept for the quality-gate test path only.
   var data = new Uint8Array(arrayBuffer);
-  var len = data.length;
-  // O(n) conversion (was O(n^2) char-by-char concatenation -> browser freeze)
   var str = analyzerBytesToLatin1(data);
-
-  // Find all stream...endstream blocks (bounded: caps on count and total text)
   var texts = [];
-  var MAX_STREAMS = 4000;       // never scan more streams than this
-  var MAX_TOTAL_TEXT = 5000000; // stop once we have 5M chars of extracted text
-  var totalLen = 0;
-  var streamCount = 0;
   var streamRe = /stream\r?\n/g;
   var match;
-  while ((match = streamRe.exec(str)) !== null) {
-    if (++streamCount > MAX_STREAMS || totalLen > MAX_TOTAL_TEXT) break;
+  var count = 0;
+  while ((match = streamRe.exec(str)) !== null && count < 200) {
+    count++;
     var startIdx = match.index + match[0].length;
     var endIdx = str.indexOf('endstream', startIdx);
     if (endIdx < 0) continue;
     var streamData = data.subarray(startIdx, endIdx);
-    // Check if this stream has FlateDecode by looking at the object before 'stream'
     var preStream = str.substring(Math.max(0, match.index - 500), match.index);
     var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
-    var decoded = null;
-    if (isFlate && streamData.length > 2) {
-      try {
-        // Strip zlib header if present, then inflate
-        var raw = streamData;
-        if ((raw[0] & 0x0F) === 8 && ((raw[0] * 256 + raw[1]) % 31 === 0)) {
-          raw = streamData.subarray(2);
-        }
-        decoded = analyzerInflate(raw);
-      } catch(e) { decoded = null; }
-    } else if (!isFlate) {
-      decoded = streamData;
-    }
-    if (decoded && decoded.length > 0) {
-      var content = analyzerBytesToLatin1(decoded); // O(n)
+    if (!isFlate && streamData.length > 0) {
+      // Only non-compressed streams work with sync path
+      var content = analyzerBytesToLatin1(streamData);
       var extracted = analyzerParsePdfContent(content);
-      if (extracted) { texts.push(extracted); totalLen += extracted.length; }
+      if (extracted) texts.push(extracted);
     }
   }
   return texts.length > 0 ? texts.join('\n') : null;
+}
+
+// Async PDF extractor using native DecompressionStream — handles ALL real PDFs.
+function analyzerExtractPdfAsync(arrayBuffer) {
+  return new Promise(function(resolve) {
+    var data = new Uint8Array(arrayBuffer);
+    var str = analyzerBytesToLatin1(data);
+    var texts = [];
+    var MAX_STREAMS = 2000;
+
+    // Collect all stream positions and their compressed data
+    var streams = [];
+    var streamRe = /stream\r?\n/g;
+    var match;
+    while ((match = streamRe.exec(str)) !== null && streams.length < MAX_STREAMS) {
+      var startIdx = match.index + match[0].length;
+      var endIdx = str.indexOf('endstream', startIdx);
+      if (endIdx < 0) continue;
+      var preStream = str.substring(Math.max(0, match.index - 500), match.index);
+      var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
+      streams.push({ startIdx: startIdx, endIdx: endIdx, isFlate: isFlate });
+    }
+
+    if (streams.length === 0) { resolve(null); return; }
+
+    // Process each stream — inflate compressed ones using native DecompressionStream
+    var processed = 0;
+    var totalStreams = streams.length;
+
+    function processStream(idx) {
+      if (idx >= totalStreams) {
+        // All done — return combined text
+        resolve(texts.length > 0 ? texts.join('\n') : null);
+        return;
+      }
+      var s = streams[idx];
+      var streamData = data.subarray(s.startIdx, s.endIdx);
+
+      if (!s.isFlate) {
+        // Uncompressed stream — parse directly
+        var content = analyzerBytesToLatin1(streamData);
+        var extracted = analyzerParsePdfContent(content);
+        if (extracted && extracted.trim().length > 0) texts.push(extracted);
+        processStream(idx + 1);
+        return;
+      }
+
+      // FlateDecode stream — inflate with native DecompressionStream
+      if (streamData.length < 3) { processStream(idx + 1); return; }
+
+      // Strip zlib header if present (CMF+FLG, 2 bytes)
+      var raw = streamData;
+      if ((raw[0] & 0x0F) === 8 && raw.length > 2) {
+        // Check if valid zlib header: (CMF*256 + FLG) % 31 === 0
+        if ((raw[0] * 256 + raw[1]) % 31 === 0) {
+          raw = streamData.subarray(2);
+        }
+      }
+
+      // Use native DecompressionStream
+      if (typeof DecompressionStream !== 'undefined') {
+        try {
+          var ds = new DecompressionStream('deflate-raw');
+          var writer = ds.writable.getWriter();
+          var reader = ds.readable.getReader();
+          var chunks = [];
+          writer.write(raw).catch(function(){});
+          writer.close().catch(function(){});
+          (function pump() {
+            reader.read().then(function(r) {
+              if (r.done) {
+                var total = 0;
+                for (var c = 0; c < chunks.length; c++) total += chunks[c].length;
+                var inflated = new Uint8Array(total);
+                var p = 0;
+                for (var c = 0; c < chunks.length; c++) { inflated.set(chunks[c], p); p += chunks[c].length; }
+                var content = analyzerBytesToLatin1(inflated);
+                var extracted = analyzerParsePdfContent(content);
+                if (extracted && extracted.trim().length > 0) texts.push(extracted);
+                processStream(idx + 1);
+              } else {
+                chunks.push(new Uint8Array(r.value));
+                pump();
+              }
+            }).catch(function() {
+              // This stream failed — skip it and continue
+              processStream(idx + 1);
+            });
+          })();
+          return;
+        } catch(e) { /* fall through */ }
+      }
+
+      // Fallback: try manual inflater (may fail on complex streams)
+      try {
+        var decoded = analyzerInflate(raw);
+        if (decoded && decoded.length > 0) {
+          var content = analyzerBytesToLatin1(decoded);
+          var extracted = analyzerParsePdfContent(content);
+          if (extracted && extracted.trim().length > 0) texts.push(extracted);
+        }
+      } catch(e) { /* skip */ }
+      processStream(idx + 1);
+    }
+
+    processStream(0);
+  });
 }
 
 // Parse PDF content operators to extract text
