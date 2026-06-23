@@ -1105,6 +1105,7 @@ const T = {
       sld: 'Installationsplan',
       ai: 'Spørg AI-Elektriker',
       bid: 'Tilbud',
+      kalkulation: 'Kalkulation',
       projekt: 'Projekt',
       verify: 'Verifikation',
       draw: 'Tegning',
@@ -1304,6 +1305,7 @@ const T = {
       sld: 'Installation Plan',
       ai: 'Ask AI-Electrician',
       bid: 'Bid / Quote',
+      kalkulation: 'Calculation',
       projekt: 'Project',
       verify: 'Verify',
       draw: 'Drawing',
@@ -1495,6 +1497,7 @@ const T = {
       sld: 'نقشه تاسیسات',
       ai: 'پرسش از AI',
       bid: 'پیشنهاد قیمت',
+      kalkulation: 'محاسبه و برآورد',
       projekt: 'پروژه',
       verify: 'صحت‌سنجی',
       draw: 'نقشه',
@@ -1676,6 +1679,50 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Kalkulation (estimating / tender engine; EG Sigma GC / Calcia GC competitor) =====
+  'Calculation / Tender': '\u0645\u062D\u0627\u0633\u0628\u0647 / \u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0642\u06CC\u0645\u062A',
+  'Automatic material take-off straight from your single-line diagram (sldTree = single source of truth). Materials, labour (akkord), overhead, margin and 25% VAT are computed from the dimensioned installation \u2014 no re-typing.': '\u0628\u0631\u0622\u0648\u0631\u062F \u062E\u0648\u062F\u06A9\u0627\u0631 \u0645\u0635\u0627\u0644\u062D \u0645\u0633\u062A\u0642\u06CC\u0645\u0627\u064B \u0627\u0632 \u062F\u06CC\u0627\u06AF\u0631\u0627\u0645 \u062A\u06A9\u200C\u062E\u0637\u06CC \u0634\u0645\u0627 (\u0645\u0646\u0628\u0639 \u0648\u0627\u062D\u062F \u062D\u0642\u06CC\u0642\u062A). \u0645\u0635\u0627\u0644\u062D\u060C \u062F\u0633\u062A\u0645\u0632\u062F (\u0622\u06A9\u0648\u0631\u062F)\u060C \u0633\u0631\u0628\u0627\u0631\u060C \u0633\u0648\u062F \u0648 \u0645\u0627\u0644\u06CC\u0627\u062A \u06F2\u06F5\u066A \u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A \u0637\u0631\u0627\u062D\u06CC\u200C\u0634\u062F\u0647 \u0645\u062D\u0627\u0633\u0628\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u2014 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E \u0645\u062C\u062F\u062F.',
+  'A competitor to EG Sigma GC / Calcia GC \u2014 but wired directly to the installation. Cables sized per DS/HD 60364-5-52, overcurrent 4-43, fault protection 4-41.': '\u0631\u0642\u06CC\u0628 EG Sigma GC / Calcia GC \u2014 \u0627\u0645\u0627 \u0645\u0633\u062A\u0642\u06CC\u0645\u0627\u064B \u0628\u0647 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A \u0645\u062A\u0635\u0644 \u0627\u0633\u062A. \u0645\u0642\u0637\u0639 \u06A9\u0627\u0628\u0644 \u0637\u0628\u0642 DS/HD 60364-5-52\u060C \u0627\u0636\u0627\u0641\u0647\u200C\u062C\u0631\u06CC\u0627\u0646 4-43\u060C \u062D\u0641\u0627\u0638\u062A \u062E\u0637\u0627 4-41.',
+  'Circuits/boards read from installation': '\u0645\u062F\u0627\u0631\u0647\u0627/\u062A\u0627\u0628\u0644\u0648\u0647\u0627\u06CC \u062E\u0648\u0627\u0646\u062F\u0647\u200C\u0634\u062F\u0647 \u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A',
+  'Unique line items': '\u0627\u0642\u0644\u0627\u0645 \u06CC\u06A9\u062A\u0627',
+  'Auto bill of materials (from installation)': '\u0641\u0647\u0631\u0633\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0645\u0635\u0627\u0644\u062D (\u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A)',
+  'No installation found. Design your installation in the Installation Plan (single-line diagram) first \u2014 Kalkulation then builds the bill of materials from it automatically.': '\u062A\u0627\u0633\u06CC\u0633\u0627\u062A\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F. \u0627\u0628\u062A\u062F\u0627 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A \u062E\u0648\u062F \u0631\u0627 \u062F\u0631 \u0646\u0642\u0634\u0647 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A (\u062F\u06CC\u0627\u06AF\u0631\u0627\u0645 \u062A\u06A9\u200C\u062E\u0637\u06CC) \u0637\u0631\u0627\u062D\u06CC \u06A9\u0646\u06CC\u062F \u2014 \u0633\u067E\u0633 \u0645\u062D\u0627\u0633\u0628\u0647 \u0641\u0647\u0631\u0633\u062A \u0645\u0635\u0627\u0644\u062D \u0631\u0627 \u0628\u0647 \u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0645\u06CC\u200C\u0633\u0627\u0632\u062F.',
+  'Wholesaler': '\u0639\u0645\u062F\u0647\u200C\u0641\u0631\u0648\u0634',
+  'Live prices connected.': '\u0642\u06CC\u0645\u062A\u200C\u0647\u0627\u06CC \u0632\u0646\u062F\u0647 \u0645\u062A\u0635\u0644 \u0634\u062F.',
+  'Indicative prices, index': '\u0642\u06CC\u0645\u062A\u200C\u0647\u0627\u06CC \u0631\u0627\u0647\u0646\u0645\u0627\u060C \u0634\u0627\u062E\u0635',
+  'Discount / rabat group (%)': '\u062A\u062E\u0641\u06CC\u0641 / \u06AF\u0631\u0648\u0647 \u062A\u062E\u0641\u06CC\u0641 (\u066A)',
+  'Labour method': '\u0631\u0648\u0634 \u062F\u0633\u062A\u0645\u0632\u062F',
+  'Akkord (install time)': '\u0622\u06A9\u0648\u0631\u062F (\u0632\u0645\u0627\u0646 \u0646\u0635\u0628)',
+  'Fixed hours': '\u0633\u0627\u0639\u0627\u062A \u062B\u0627\u0628\u062A',
+  'Total install time': '\u0632\u0645\u0627\u0646 \u06A9\u0644 \u0646\u0635\u0628',
+  'Auto-derived from per-component akkord times': '\u0628\u0647 \u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0632 \u0632\u0645\u0627\u0646\u200C\u0647\u0627\u06CC \u0622\u06A9\u0648\u0631\u062F \u0647\u0631 \u0642\u0637\u0639\u0647 \u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0634\u062F\u0647',
+  'Labour hours': '\u0633\u0627\u0639\u0627\u062A \u06A9\u0627\u0631',
+  'Hourly rate': '\u0646\u0631\u062E \u0633\u0627\u0639\u062A\u06CC',
+  'Overhead (%)': '\u0633\u0631\u0628\u0627\u0631 (\u066A)',
+  'Margin / DB (%)': '\u0633\u0648\u062F / \u062D\u0627\u0634\u06CC\u0647 (\u066A)',
+  'Tender (auto from installation)': '\u067E\u06CC\u0634\u0646\u0647\u0627\u062F (\u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A)',
+  'Materials (list price)': '\u0645\u0635\u0627\u0644\u062D (\u0642\u06CC\u0645\u062A \u0644\u06CC\u0633\u062A)',
+  'Discount': '\u062A\u062E\u0641\u06CC\u0641',
+  'Materials net': '\u0645\u0635\u0627\u0644\u062D \u062E\u0627\u0644\u0635',
+  'Labour': '\u062F\u0633\u062A\u0645\u0632\u062F',
+  'Overhead': '\u0633\u0631\u0628\u0627\u0631',
+  'Margin / DB': '\u0633\u0648\u062F / \u062D\u0627\u0634\u06CC\u0647',
+  'Subtotal excl. VAT': '\u062C\u0645\u0639 \u062C\u0632\u0626 \u0628\u062F\u0648\u0646 \u0645\u0627\u0644\u06CC\u0627\u062A',
+  'VAT 25%': '\u0645\u0627\u0644\u06CC\u0627\u062A \u06F2\u06F5\u066A',
+  'TOTAL incl. VAT': '\u062C\u0645\u0639 \u06A9\u0644 \u0628\u0627 \u0645\u0627\u0644\u06CC\u0627\u062A',
+  'Print tender': '\u0686\u0627\u067E \u067E\u06CC\u0634\u0646\u0647\u0627\u062F',
+  'Indicative tender. Materials and install time are derived from the dimensioned installation per DS/HD 60364 (5-52 cable, 4-43 overcurrent, 4-41 fault protection). Final price depends on the wholesaler daily prices and project conditions.': '\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0631\u0627\u0647\u0646\u0645\u0627. \u0645\u0635\u0627\u0644\u062D \u0648 \u0632\u0645\u0627\u0646 \u0646\u0635\u0628 \u0627\u0632 \u062A\u0627\u0633\u06CC\u0633\u0627\u062A \u0637\u0631\u0627\u062D\u06CC\u200C\u0634\u062F\u0647 \u0637\u0628\u0642 DS/HD 60364 (\u06A9\u0627\u0628\u0644 5-52\u060C \u0627\u0636\u0627\u0641\u0647\u200C\u062C\u0631\u06CC\u0627\u0646 4-43\u060C \u062D\u0641\u0627\u0638\u062A \u062E\u0637\u0627 4-41) \u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0634\u062F\u0647 \u0627\u0633\u062A. \u0642\u06CC\u0645\u062A \u0646\u0647\u0627\u06CC\u06CC \u0628\u0647 \u0642\u06CC\u0645\u062A\u200C\u0647\u0627\u06CC \u0631\u0648\u0632\u0627\u0646\u0647 \u0639\u0645\u062F\u0647\u200C\u0641\u0631\u0648\u0634 \u0648 \u0634\u0631\u0627\u06CC\u0637 \u067E\u0631\u0648\u0698\u0647 \u0628\u0633\u062A\u06AF\u06CC \u062F\u0627\u0631\u062F.',
+  'Cables': '\u06A9\u0627\u0628\u0644\u200C\u0647\u0627',
+  'MCBs': '\u06A9\u0644\u06CC\u062F\u0647\u0627\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0645\u06CC\u0646\u06CC\u0627\u062A\u0648\u0631\u06CC',
+  'MCCBs': '\u06A9\u0644\u06CC\u062F\u0647\u0627\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0642\u0627\u0644\u0628\u200C\u0631\u06CC\u062E\u062A\u0647',
+  'Fuses': '\u0641\u06CC\u0648\u0632\u0647\u0627',
+  'RCBOs': 'RCBO\u0647\u0627',
+  'SPDs': '\u0628\u0631\u0642\u200C\u06AF\u06CC\u0631\u0647\u0627',
+  'Contactors': '\u06A9\u0646\u062A\u0627\u06A9\u062A\u0648\u0631\u0647\u0627',
+  'MPCBs': '\u062D\u0641\u0627\u0638\u062A \u0645\u0648\u062A\u0648\u0631',
+  'Overload relays': '\u0631\u0644\u0647\u200C\u0647\u0627\u06CC \u0627\u0636\u0627\u0641\u0647 \u0628\u0627\u0631',
+  'Wiring devices': '\u062A\u062C\u0647\u06CC\u0632\u0627\u062A \u0633\u06CC\u0645\u200C\u06A9\u0634\u06CC',
+
   // ===== Innovation modules (Time Machine, Expansion DNA, Risk Detector,
   //       Customer Trust, Memory Vault, Regulation Assistant,
   //       Inspection Simulator, Quality Score) =====
@@ -9041,7 +9088,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis']
+    keys: ['standards', 'bank', 'pdf', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis']
   }
 ];
 
@@ -11355,6 +11402,7 @@ function renderModule(mod) {
     case 'bank': content = renderBank(); break;
     case 'ai': content = renderAiElectrician(); break;
     case 'bid': content = renderBid(); break;
+    case 'kalkulation': content = renderKalkulation(); break;
     case 'projekt': content = renderProjekt(); break;
     case 'verify': content = renderVerify(); break;
     case 'draw': content = renderDrawing(); break;
@@ -11463,7 +11511,7 @@ function renderModule(mod) {
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide','archive'];
+  const noQi = ['standards','bank','ai','bid','kalkulation','projekt','verify','draw','exam','kritisk','guide','archive'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -15658,6 +15706,243 @@ function renderBid() {
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">${tx('Vejledende tilbud. Endelig pris afh\u00E6nger af grossistens dagspriser, rabatter og projektforhold.', 'Indicative bid. Final price depends on the wholesaler daily prices, discounts and project conditions.')}</div>
     </div>
   `;
+}
+
+// ===== KALKULATION (estimating / tender engine) =====
+// Danish-market answer to EG Sigma GC / Calcia GC. Unlike the manual Bid basket,
+// Kalkulation performs an AUTOMATIC material take-off straight from the SLD tree
+// (sldTree = single source of truth) and turns the dimensioned installation into a
+// priced tender (tilbud): materials -> rabat -> net -> labour (akkord) -> overhead
+// -> margin (DB) -> moms 25% -> total. All inputs are click-only (buttons/sliders).
+let kalkulationState = {
+  wholesaler: 'Lemvigh-Müller',
+  rabat: 40,            // grossist-rabat / rabatgruppe (% off list)
+  laborMode: 'akkord',  // 'akkord' = auto from montagetid, 'fast' = stepper hours
+  laborHours: 20,       // used in 'fast' mode (click stepper only)
+  hourlyRate: 550,      // montørtimepris (preset tiers, click only)
+  overhead: 10,         // generalomkostninger / tillæg (%)
+  margin: 15            // avance / dækningsbidrag DB (%)
+};
+
+// Determine which PRODUCTS category a product id belongs to (used to price a
+// protective device pulled from the SLD tree without re-typing anything).
+function kalkulationCatOf(id) {
+  var cats = ['cables','mcbs','mccbs','fuses','rcds','rcbos','spds','contactors','mpcbs','overloadRelays','wiringDevices'];
+  for (var i = 0; i < cats.length; i++) {
+    var arr = PRODUCTS[cats[i]] || [];
+    for (var j = 0; j < arr.length; j++) { if (arr[j].id === id) return cats[i]; }
+  }
+  return null;
+}
+
+// AUTO material take-off from the SLD tree (single source of truth).
+// Every node contributes its feeder/branch cable (quantity = length_m, in metres)
+// and its overcurrent protective device (1 piece). Identical products are merged.
+// Cable sizing per DS/HD 60364-5-52, device per 4-43, both already verified upstream.
+function kalkulationTakeoff(tree) {
+  if (!tree || !tree.nodes) return [];
+  var map = {};
+  function add(cat, id, qty, product) {
+    if (!cat || !id || !(qty > 0)) return;
+    var key = cat + '|' + id;
+    if (map[key]) { map[key].qty += qty; }
+    else { map[key] = { cat: cat, id: id, qty: qty, product: product }; }
+  }
+  Object.keys(tree.nodes).forEach(function(nid) {
+    var n = tree.nodes[nid];
+    if (!n) return;
+    if (n.cable && n.cable.id && (n.length_m || 0) > 0) {
+      add('cables', n.cable.id, n.length_m, n.cable);
+    }
+    if (n.protection && n.protection.id) {
+      var cat = kalkulationCatOf(n.protection.id);
+      if (cat) add(cat, n.protection.id, 1, n.protection);
+    }
+  });
+  return Object.keys(map).map(function(k) { return map[k]; });
+}
+
+// Danish-practice tender math. Conservative: quantities taken exactly as designed,
+// all unit prices are ex. moms, and the 25% moms is the LAST operation so it is never
+// understated. Returns every intermediate figure for a transparent printable tilbud.
+function kalkulationCompute(takeoff, opts) {
+  opts = opts || kalkulationState;
+  var ws = WHOLESALERS[opts.wholesaler] || { idx: 1 };
+  var materialsList = 0, totalMinutes = 0;
+  (takeoff || []).forEach(function(it) {
+    var prod = findProduct(it.cat, it.id) || it.product;
+    if (!prod) return;
+    var unit = Math.round(priceFor(it.cat, prod) * ws.idx);
+    materialsList += unit * it.qty;
+    totalMinutes += montagetidFor(it.cat) * it.qty;
+  });
+  var rabat = opts.rabat || 0;
+  var materialsNet = materialsList * (1 - rabat / 100);
+  var akkordHours = totalMinutes / 60;
+  var hours = opts.laborMode === 'akkord' ? akkordHours : (opts.laborHours || 0);
+  var labour = hours * (opts.hourlyRate || 0);
+  var costBase = materialsNet + labour;
+  var overhead = costBase * (opts.overhead || 0) / 100;
+  var subBeforeMargin = costBase + overhead;
+  var margin = subBeforeMargin * (opts.margin || 0) / 100;
+  var exVat = subBeforeMargin + margin;
+  var vat = exVat * 0.25;
+  var total = exVat + vat;
+  return {
+    materialsList: materialsList, materialsNet: materialsNet,
+    totalMinutes: totalMinutes, akkordHours: akkordHours, hours: hours,
+    labour: labour, costBase: costBase, overhead: overhead, margin: margin,
+    exVat: exVat, vat: vat, total: total
+  };
+}
+
+// Count of priced circuits/boards read from the installation (transformer excluded).
+function kalkulationCircuitCount(tree) {
+  if (!tree || !tree.nodes) return 0;
+  var c = 0;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    var n = tree.nodes[nid];
+    if (n && n.type !== 'transformer') c++;
+  });
+  return c;
+}
+
+function renderKalkulation() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree :
+             (typeof sldCreateTree === 'function' ? sldCreateTree() : null);
+  var ws = WHOLESALERS[kalkulationState.wholesaler] || { idx: 1, feed: '' };
+  var wsKeys = Object.keys(WHOLESALERS);
+  var rabatOptions = [0, 20, 30, 40, 50, 55, 60];
+  var hourlyOptions = [450, 500, 550, 600, 650, 750];
+  var overheadOptions = [0, 5, 10, 15, 20, 25];
+  var marginOptions = [0, 10, 15, 20, 25, 30];
+
+  var takeoff = kalkulationTakeoff(tree);
+  var r = kalkulationCompute(takeoff, kalkulationState);
+  var circuits = kalkulationCircuitCount(tree);
+  var fmt = function(n) { return Math.round(n).toLocaleString('da-DK'); };
+
+  var catNames = { cables: tx('Kabler','Cables'), mcbs: tx('Automatsikringer','MCBs'), mccbs: tx('Maksimalafbrydere','MCCBs'), fuses: tx('Sikringer','Fuses'), rcds: 'HPFI/RCD', rcbos: tx('HPFI-auto','RCBOs'), spds: tx('Overspænding','SPDs'), contactors: tx('Kontaktorer','Contactors'), mpcbs: tx('Motorværn','MPCBs'), overloadRelays: tx('Termorelæ','Overload relays'), wiringDevices: tx('Stik/Afbryder','Wiring devices') };
+
+  var lines = takeoff.map(function(it) {
+    var prod = findProduct(it.cat, it.id) || it.product;
+    if (!prod) return '';
+    var unit = Math.round(priceFor(it.cat, prod) * ws.idx);
+    var lineTotal = unit * it.qty;
+    var unitLabel = it.cat === 'cables' ? 'kr/m' : 'kr/stk';
+    var qtyLabel = it.cat === 'cables' ? (it.qty + ' m') : (it.qty + ' stk');
+    var spec = prod.mm2 ? (' ' + prod.mm2 + 'mm\u00B2') : (prod.rating ? (' ' + (prod.curve || '') + prod.rating + 'A') : '');
+    return '' +
+      '<div class="result-row" style="align-items:center;gap:10px">' +
+        (typeof getComponentVisual === 'function' ? getComponentVisual(it.cat, prod) : '') +
+        '<div style="flex:1">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px">' +
+            '<span class="label"><strong>' + prod.brand + '</strong> ' + prod.model + spec + '</span>' +
+            '<span class="value">' + fmt(lineTotal) + ' kr</span>' +
+          '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">' +
+            (catNames[it.cat] || it.cat) + ' \u00B7 ' + qtyLabel + ' \u00D7 ' + unit + ' ' + unitLabel +
+            ' \u00B7 \u23F1\uFE0F ' + montagetidFor(it.cat) + ' min/' + (it.cat === 'cables' ? 'm' : 'stk') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }).join('');
+
+  var emptyMsg = tx('Ingen installation fundet. Tegn din installation i Installationsplan (enstreget diagram) f\u00F8rst \u2014 s\u00E5 laver Kalkulation automatisk styklisten herfra.',
+                    'No installation found. Design your installation in the Installation Plan (single-line diagram) first \u2014 Kalkulation then builds the bill of materials from it automatically.');
+
+  return '' +
+  '<div class="card fade-in">' +
+    '<div class="card-title">\uD83E\uDDEE ' + tx('Kalkulation / Tilbud', 'Calculation / Tender') + '</div>' +
+    '<div class="info-row">' + tx('Automatisk materialeoptag direkte fra dit enstregede diagram (sldTree = \u00E9n sandhedskilde). Materialer, arbejdsl\u00F8n (akkord), generalomkostninger, avance og moms 25% beregnes ud fra den dimensionerede installation \u2014 ingen genindtastning.', 'Automatic material take-off straight from your single-line diagram (sldTree = single source of truth). Materials, labour (akkord), overhead, margin and 25% VAT are computed from the dimensioned installation \u2014 no re-typing.') + '</div>' +
+    '<div class="info-row" style="font-size:0.72rem;color:var(--text-muted)">' + tx('Konkurrent til EG Sigma GC / Calcia GC \u2014 men koblet direkte til installationen. Kabler dimensioneret iht. DS/HD 60364-5-52, overstr\u00F8m 4-43, fejlbeskyttelse 4-41.', 'A competitor to EG Sigma GC / Calcia GC \u2014 but wired directly to the installation. Cables sized per DS/HD 60364-5-52, overcurrent 4-43, fault protection 4-41.') + '</div>' +
+    '<div class="result-box" style="margin-top:8px">' +
+      '<div class="result-row"><span class="label">' + tx('Kredse/tavler l\u00E6st fra installationen', 'Circuits/boards read from installation') + '</span><span class="value">' + circuits + '</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Unikke varelinjer', 'Unique line items') + '</span><span class="value">' + takeoff.length + '</span></div>' +
+    '</div>' +
+  '</div>' +
+
+  '<div class="card fade-in">' +
+    '<div class="card-title">' + tx('Automatisk stykliste (fra installation)', 'Auto bill of materials (from installation)') + ' (' + takeoff.length + ')</div>' +
+    (lines || ('<div class="info-row">' + emptyMsg + '</div>')) +
+  '</div>' +
+
+  '<div class="card fade-in">' +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Grossist', 'Wholesaler') + '</div>' +
+      '<div class="select-grid">' +
+        wsKeys.map(function(w) {
+          return '<button class="sel-btn ' + (kalkulationState.wholesaler === w ? 'selected' : '') + '" onclick="kalkulationState.wholesaler=\'' + w + '\';renderModule(\'kalkulation\')">' + w + (WHOLESALERS[w].feed ? ' \uD83D\uDD17' : '') + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">' + (ws.feed ? tx('Live priser tilsluttet.', 'Live prices connected.') : (tx('Vejledende priser, prisindeks', 'Indicative prices, index') + ' ' + ws.idx.toFixed(2))) + '</div>' +
+    '</div>' +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Rabat / rabatgruppe (%)', 'Discount / rabat group (%)') + '</div>' +
+      '<div class="select-grid">' +
+        rabatOptions.map(function(rb) { return '<button class="sel-btn ' + (kalkulationState.rabat === rb ? 'selected' : '') + '" onclick="kalkulationState.rabat=' + rb + ';renderModule(\'kalkulation\')">' + rb + '%</button>'; }).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Arbejdsl\u00F8n-metode', 'Labour method') + '</div>' +
+      '<div class="select-grid">' +
+        '<button class="sel-btn ' + (kalkulationState.laborMode === 'akkord' ? 'selected' : '') + '" onclick="kalkulationState.laborMode=\'akkord\';renderModule(\'kalkulation\')">' + tx('Akkord (montagetid)', 'Akkord (install time)') + '</button>' +
+        '<button class="sel-btn ' + (kalkulationState.laborMode === 'fast' ? 'selected' : '') + '" onclick="kalkulationState.laborMode=\'fast\';renderModule(\'kalkulation\')">' + tx('Fast timer', 'Fixed hours') + '</button>' +
+      '</div>' +
+    '</div>' +
+    (kalkulationState.laborMode === 'akkord' ?
+      '<div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">' +
+        '<div class="result-row"><span class="label">' + tx('Montagetid i alt', 'Total install time') + '</span><span class="value">' + Math.round(r.totalMinutes) + ' min = ' + r.akkordHours.toFixed(1) + ' t</span></div>' +
+        '<div class="result-row"><span class="label" style="font-size:0.72rem;color:var(--text-muted)">' + tx('Beregnet automatisk fra akkord-tider pr. komponent', 'Auto-derived from per-component akkord times') + '</span></div>' +
+      '</div>'
+      :
+      '<div class="select-group">' +
+        '<div class="select-label">' + tx('Arbejdstimer', 'Labour hours') + '</div>' +
+        '<div class="select-grid" style="align-items:center">' +
+          '<button class="sel-btn" style="min-width:0" onclick="kalkulationState.laborHours=Math.max(0,kalkulationState.laborHours-1);renderModule(\'kalkulation\')">\u2212</button>' +
+          '<span style="font-weight:700;min-width:60px;text-align:center">' + kalkulationState.laborHours + ' t</span>' +
+          '<button class="sel-btn" style="min-width:0" onclick="kalkulationState.laborHours+=1;renderModule(\'kalkulation\')">+</button>' +
+        '</div>' +
+      '</div>') +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Timepris', 'Hourly rate') + '</div>' +
+      '<div class="select-grid">' +
+        hourlyOptions.map(function(h) { return '<button class="sel-btn ' + (kalkulationState.hourlyRate === h ? 'selected' : '') + '" onclick="kalkulationState.hourlyRate=' + h + ';renderModule(\'kalkulation\')">' + h + ' kr</button>'; }).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Generalomkostninger (%)', 'Overhead (%)') + '</div>' +
+      '<div class="select-grid">' +
+        overheadOptions.map(function(o) { return '<button class="sel-btn ' + (kalkulationState.overhead === o ? 'selected' : '') + '" onclick="kalkulationState.overhead=' + o + ';renderModule(\'kalkulation\')">' + o + '%</button>'; }).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="select-group">' +
+      '<div class="select-label">' + tx('Avance / d\u00E6kningsbidrag DB (%)', 'Margin / DB (%)') + '</div>' +
+      '<div class="select-grid">' +
+        marginOptions.map(function(mk) { return '<button class="sel-btn ' + (kalkulationState.margin === mk ? 'selected' : '') + '" onclick="kalkulationState.margin=' + mk + ';renderModule(\'kalkulation\')">' + mk + '%</button>'; }).join('') +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+
+  '<div class="card fade-in">' +
+    '<div class="card-title">' + tx('Tilbud (auto fra installation)', 'Tender (auto from installation)') + '</div>' +
+    '<div class="result-box">' +
+      '<div class="result-row"><span class="label">' + tx('Materialer (listepris)', 'Materials (list price)') + '</span><span class="value">' + fmt(r.materialsList) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Rabat', 'Discount') + ' (\u2212' + kalkulationState.rabat + '%)</span><span class="value">\u2212' + fmt(r.materialsList - r.materialsNet) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Materialer netto', 'Materials net') + '</span><span class="value">' + fmt(r.materialsNet) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Arbejdsl\u00F8n', 'Labour') + ' (' + r.hours.toFixed(1) + ' t \u00D7 ' + kalkulationState.hourlyRate + (kalkulationState.laborMode === 'akkord' ? ', akkord' : '') + ')</span><span class="value">' + fmt(r.labour) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Generalomkostninger', 'Overhead') + ' (+' + kalkulationState.overhead + '%)</span><span class="value">' + fmt(r.overhead) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Avance / DB', 'Margin / DB') + ' (+' + kalkulationState.margin + '%)</span><span class="value">' + fmt(r.margin) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Subtotal ekskl. moms', 'Subtotal excl. VAT') + '</span><span class="value">' + fmt(r.exVat) + ' kr</span></div>' +
+      '<div class="result-row"><span class="label">' + tx('Moms 25%', 'VAT 25%') + '</span><span class="value">' + fmt(r.vat) + ' kr</span></div>' +
+      '<div class="result-row" style="border-top:2px solid var(--success);margin-top:6px;padding-top:10px">' +
+        '<span class="label" style="font-weight:800;color:var(--text)">' + tx('TOTAL inkl. moms', 'TOTAL incl. VAT') + '</span>' +
+        '<span class="value" style="font-size:1.15rem;color:var(--success)">' + fmt(r.total) + ' kr</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv tilbud', 'Print tender') + '</button></div>' +
+    '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">' + tx('Vejledende tilbud. Materialer og montagetid er udledt af den dimensionerede installation iht. DS/HD 60364 (5-52 kabel, 4-43 overstr\u00F8m, 4-41 fejlbeskyttelse). Endelig pris afh\u00E6nger af grossistens dagspriser og projektforhold.', 'Indicative tender. Materials and install time are derived from the dimensioned installation per DS/HD 60364 (5-52 cable, 4-43 overcurrent, 4-41 fault protection). Final price depends on the wholesaler daily prices and project conditions.') + '</div>' +
+  '</div>';
 }
 
 // (Removed: configurePriceFeed — used prompt() free-text to enter a B2B price-feed

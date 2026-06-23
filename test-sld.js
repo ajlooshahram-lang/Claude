@@ -17695,8 +17695,101 @@ test('Kept module keys still present after dedupe', function() {
     assert(_innovHtml.indexOf(k + ':') >= 0, 'Kept key should still be in translations: ' + k);
   });
 });
-test('Stray kalkulation duplicate of bid fully removed', function() {
-  assert(_innovHtml.indexOf('kalkulation') < 0, 'kalkulation should be removed everywhere');
+test('Kalkulation module replaces the old stray bid-duplicate (now a real, wired module)', function() {
+  // The previous stray `kalkulation` key was a duplicate of `bid`. It is now a
+  // real estimating/tender engine. Verify it is wired cleanly and consistently.
+  assert(T.da.modules.kalkulation === 'Kalkulation', 'Danish label present');
+  assert(T.en.modules.kalkulation === 'Calculation', 'English label present');
+  assert(T.fa.modules.kalkulation && T.fa.modules.kalkulation.length > 0, 'Farsi label present');
+  assert(_innovHtml.indexOf("case 'kalkulation': content = renderKalkulation();") >= 0, 'kalkulation has a renderModule case');
+  assert(typeof renderKalkulation === 'function', 'renderKalkulation is defined');
+  var groups = NAV_GROUPS.filter(function(g) { return g.keys.indexOf('kalkulation') >= 0; });
+  assert(groups.length === 1, 'kalkulation appears in exactly one NAV_GROUP (found ' + groups.length + ')');
+});
+test('Kalkulation: kalkulationCatOf maps a product id to its PRODUCTS category', function() {
+  assert(kalkulationCatOf('SE-iC60N-B16') === 'mcbs', 'MCB id -> mcbs');
+  assert(kalkulationCatOf('NKT-NOIKLX-2.5') === 'cables', 'cable id -> cables');
+  assert(kalkulationCatOf('does-not-exist') === null, 'unknown id -> null');
+});
+test('Kalkulation: auto material take-off reads the SLD tree (single source of truth)', function() {
+  var tree = sldCreateTree();
+  var to = kalkulationTakeoff(tree);
+  assert(to.length > 0, 'take-off produced line items from the tree');
+  // Transformer has cable:null and contributes nothing.
+  // Main board feeder cable is 50mm2 Cu, 10 m.
+  var c50 = to.find(function(x) { return x.cat === 'cables' && x.id === 'NKT-NOIKLX-50'; });
+  assert(c50 && c50.qty === 10, 'main board feeder cable taken off at 10 m');
+  // Sockets (25 m) + Cooker (15 m) share the 2.5mm2 cable -> merged to 40 m.
+  var c25 = to.find(function(x) { return x.cat === 'cables' && x.id === 'NKT-NOIKLX-2.5'; });
+  assert(c25 && c25.qty === 40, 'identical 2.5mm2 cable merged to 25+15 = 40 m (got ' + (c25 && c25.qty) + ')');
+  // Sockets + Cooker both use a B16 MCB -> merged to qty 2.
+  var b16 = to.find(function(x) { return x.cat === 'mcbs' && x.id === 'SE-iC60N-B16'; });
+  assert(b16 && b16.qty === 2, 'identical B16 MCB merged across 2 circuits (got ' + (b16 && b16.qty) + ')');
+  // Main board overcurrent device is an MCCB.
+  assert(to.find(function(x) { return x.cat === 'mccbs'; }), 'main board MCCB taken off');
+});
+test('Kalkulation: take-off handles empty/missing trees gracefully', function() {
+  assert(kalkulationTakeoff(null).length === 0, 'null tree -> empty');
+  assert(kalkulationTakeoff({ nodes: {} }).length === 0, 'no nodes -> empty');
+});
+test('Kalkulation: tender math adds 25% moms as the final operation', function() {
+  var prod = findProduct('mcbs', 'SE-iC60N-B16');
+  var to = [{ cat: 'mcbs', id: 'SE-iC60N-B16', qty: 1, product: prod }];
+  // Zero everything except materials: total must be exactly materials x 1.25 (moms).
+  var bare = { wholesaler: 'Lemvigh-Müller', rabat: 0, laborMode: 'fast', laborHours: 0, hourlyRate: 0, overhead: 0, margin: 0 };
+  var r = kalkulationCompute(to, bare);
+  var mat = priceFor('mcbs', prod); // Lemvigh-Müller idx = 1.00
+  assert(r.materialsList === mat, 'materials list = unit price (got ' + r.materialsList + ', expected ' + mat + ')');
+  assert(Math.abs(r.vat - r.exVat * 0.25) < 1e-9, 'VAT is exactly 25% of ex-VAT subtotal');
+  assert(Math.abs(r.total - r.exVat * 1.25) < 1e-9, 'total = ex-VAT x 1.25');
+  assert(Math.abs(r.total - mat * 1.25) < 1e-9, 'bare total = materials x 1.25');
+});
+test('Kalkulation: full cost chain (rabat -> labour -> overhead -> margin -> moms)', function() {
+  var prod = findProduct('mcbs', 'SE-iC60N-B16');
+  var to = [{ cat: 'mcbs', id: 'SE-iC60N-B16', qty: 1, product: prod }];
+  var opts = { wholesaler: 'Lemvigh-Müller', rabat: 40, laborMode: 'fast', laborHours: 10, hourlyRate: 500, overhead: 10, margin: 15 };
+  var r = kalkulationCompute(to, opts);
+  var mat = priceFor('mcbs', prod);
+  var net = mat * 0.60;
+  var labour = 10 * 500;
+  var base = net + labour;
+  var oh = base * 0.10;
+  var sub = base + oh;
+  var margin = sub * 0.15;
+  var ex = sub + margin;
+  assert(Math.abs(r.materialsNet - net) < 1e-9, 'materials net after 40% rabat');
+  assert(Math.abs(r.labour - labour) < 1e-9, 'labour = hours x rate');
+  assert(Math.abs(r.overhead - oh) < 1e-9, 'overhead = 10% of cost base');
+  assert(Math.abs(r.margin - margin) < 1e-9, 'margin = 15% of subtotal');
+  assert(Math.abs(r.exVat - ex) < 1e-9, 'ex-VAT subtotal');
+  assert(Math.abs(r.total - ex * 1.25) < 1e-9, 'total includes 25% moms');
+});
+test('Kalkulation: akkord labour is auto-derived from per-component install times', function() {
+  var prod = findProduct('mcbs', 'SE-iC60N-B16');
+  var to = [{ cat: 'mcbs', id: 'SE-iC60N-B16', qty: 3, product: prod }];
+  var opts = { wholesaler: 'Lemvigh-Müller', rabat: 0, laborMode: 'akkord', laborHours: 0, hourlyRate: 600, overhead: 0, margin: 0 };
+  var r = kalkulationCompute(to, opts);
+  var expMin = montagetidFor('mcbs') * 3;
+  assert(r.totalMinutes === expMin, 'akkord minutes = montagetid x qty');
+  assert(Math.abs(r.hours - expMin / 60) < 1e-9, 'akkord hours derived from minutes');
+  assert(Math.abs(r.labour - (expMin / 60) * 600) < 1e-9, 'akkord labour = hours x rate');
+});
+test('renderKalkulation is click-only (no free-text inputs)', function() {
+  var html = renderKalkulation();
+  assert(html.length > 200, 'renders substantial HTML');
+  assert(html.indexOf('<input type="text"') < 0 && html.indexOf('<textarea') < 0, 'no text inputs / textareas');
+  assert(html.indexOf("type='text'") < 0, 'no single-quoted text inputs either');
+});
+test('renderKalkulation cites DS/HD 60364 and shows the 25% moms line', function() {
+  var html = renderKalkulation();
+  assert(html.indexOf('60364') >= 0, 'cites DS/HD 60364');
+  assert(html.indexOf('25%') >= 0, 'shows 25% moms');
+  assert(html.indexOf('TOTAL') >= 0, 'shows a total line');
+});
+test('Kalkulation: Farsi strings exist for new user-facing text', function() {
+  assert(_FA['Calculation / Tender'] && _FA['Calculation / Tender'].length > 0, 'title has Farsi');
+  assert(_FA['Tender (auto from installation)'] && _FA['Tender (auto from installation)'].length > 0, 'tender header has Farsi');
+  assert(_FA['Auto bill of materials (from installation)'], 'BOM header has Farsi');
 });
 test('Nav consistency: every nav key has a case mapping to a defined function', function() {
   var navKeys = [].concat.apply([], [..._innovHtml.matchAll(/keys:\s*\[([^\]]+)\]/g)].map(function(m) {
