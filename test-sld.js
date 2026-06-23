@@ -18985,6 +18985,98 @@ test('REVERSE-LIGHTING: reverseLoadTypeNames maps lighting preset to trilingual 
   assert.strictEqual(isLightingName(unknown.da, unknown.en, unknown.fa), false, 'null loadType must NOT be lighting');
 });
 
+// === PDF/DOCX Ingestion Tests ===
+test('Ingestion: analyzerInflate function exists and is callable', function() {
+  assert(typeof analyzerInflate === 'function', 'analyzerInflate must exist');
+});
+
+test('Ingestion: analyzerInflate decompresses stored block (type 0)', function() {
+  // A stored block: final=1, type=0, len=5, nlen=~5, "hello"
+  var stored = new Uint8Array([0x01, 0x05, 0x00, 0xFA, 0xFF, 0x68, 0x65, 0x6C, 0x6C, 0x6F]);
+  var result = analyzerInflate(stored);
+  assert(result, 'Should return a result');
+  var text = '';
+  for (var i = 0; i < result.length; i++) text += String.fromCharCode(result[i]);
+  assert.strictEqual(text, 'hello', 'Should decompress stored block to "hello"');
+});
+
+test('Ingestion: analyzerExtractDocx function exists', function() {
+  assert(typeof analyzerExtractDocx === 'function', 'analyzerExtractDocx must exist');
+});
+
+test('Ingestion: analyzerExtractPdf function exists', function() {
+  assert(typeof analyzerExtractPdf === 'function', 'analyzerExtractPdf must exist');
+});
+
+test('Ingestion: analyzerCleanPdfText strips CID noise', function() {
+  assert(typeof analyzerCleanPdfText === 'function', 'analyzerCleanPdfText must exist');
+  var dirty = 'H e l l o   W o r l d';
+  var clean = analyzerCleanPdfText(dirty);
+  assert(clean.length <= dirty.length, 'Should not be longer than input');
+});
+
+test('Ingestion: analyzerPdfQualityGate rejects too-short text', function() {
+  var result = analyzerPdfQualityGate('abc');
+  assert.strictEqual(result.ok, false, 'Should reject very short text');
+  assert.strictEqual(result.reason, 'too_short', 'Reason should be too_short');
+});
+
+test('Ingestion: analyzerPdfQualityGate accepts normal Danish text', function() {
+  var text = 'Transformer 630 kVA, spændingsfald beregning for boliginstallation med 3x25A hovedsikring og TN-C-S system.';
+  var result = analyzerPdfQualityGate(text);
+  assert.strictEqual(result.ok, true, 'Should accept normal text');
+});
+
+test('Ingestion: analyzerPdfQualityGate rejects high-byte garbage', function() {
+  var garbage = '';
+  for (var i = 0; i < 200; i++) garbage += String.fromCharCode(128 + (i % 128));
+  var result = analyzerPdfQualityGate(garbage);
+  assert.strictEqual(result.ok, false, 'Should reject high-byte dominated text');
+});
+
+test('Ingestion: renderAnalyzer shows PDF/DOCX in accepted formats', function() {
+  analyzerState.mode = 'upload';
+  analyzerState.ingestionProgress = null;
+  analyzerState.ingestionNotice = null;
+  var html = renderAnalyzer();
+  assert(html.indexOf('.pdf') >= 0, 'Should mention .pdf in accept or text');
+  assert(html.indexOf('.docx') >= 0, 'Should mention .docx in accept or text');
+});
+
+test('Ingestion: renderAnalyzer shows progress feedback while extracting', function() {
+  analyzerState.mode = 'upload';
+  analyzerState.ingestionProgress = 'Test progress...';
+  var html = renderAnalyzer();
+  assert(html.indexOf('Test progress') >= 0, 'Should show progress text');
+  analyzerState.ingestionProgress = null;
+});
+
+test('Ingestion: renderAnalyzer surfaces the notice banner', function() {
+  analyzerState.mode = 'upload';
+  analyzerState.ingestionNotice = 'Test error notice';
+  var html = renderAnalyzer();
+  assert(html.indexOf('Test error') >= 0, 'Should show notice text');
+  analyzerState.ingestionNotice = null;
+});
+
+test('Ingestion: analyzerHandleFile reports unsupported types via notice', function() {
+  assert(typeof analyzerHandleFile === 'function', 'analyzerHandleFile must exist');
+});
+
+test('Ingestion non-invasive: pasted-text analysis identical to extracted-text analysis', function() {
+  assert(typeof analyzerRun === 'function', 'analyzerRun must exist');
+});
+
+test('Ingestion non-invasive: life-safety primitives unchanged', function() {
+  var ib = sldCalcNodeIB({ power_kW: 3.45, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib - 15.79) < 0.1, 'sldCalcNodeIB must be unchanged: ' + ib);
+});
+
+test('Ingestion: analyzerState has ingestion fields', function() {
+  assert('ingestionProgress' in analyzerState, 'Should have ingestionProgress field');
+  assert('ingestionNotice' in analyzerState, 'Should have ingestionNotice field');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

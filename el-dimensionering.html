@@ -6411,6 +6411,19 @@ const _FA = {
   'Notification': 'اعلان',
   'Evacuation': 'تخلیه',
   'Impedance (Z)': 'امپدانس (Z)',
+  // ===== PDF/DOCX Ingestion translations =====
+  'Supported formats: .txt, .md, .pdf, .docx': 'فرمت‌های پشتیبانی شده: .txt، .md، .pdf، .docx',
+  'Reading file...': 'در حال خواندن فایل...',
+  'Extracting DOCX...': 'در حال استخراج DOCX...',
+  'Extracting PDF text...': 'در حال استخراج متن PDF...',
+  'PDF contains no readable text — possibly scanned/image PDF.': 'PDF متن خوانا ندارد — احتمالاً PDF اسکن شده/تصویری.',
+  'PDF text is unreadable (binary/encrypted). Try another file.': 'متن PDF خوانا نیست (باینری/رمزنگاری). فایل دیگری امتحان کنید.',
+  'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.': 'PDF از فونت‌های جاسازی شده استفاده می‌کند که آفلاین قابل رمزگشایی نیستند. متن را دستی کپی کنید.',
+  'Could not extract DOCX content.': 'محتوای DOCX قابل استخراج نبود.',
+  'Could not extract text from PDF.': 'متن از PDF قابل استخراج نبود.',
+  'File processing error: ': 'خطای پردازش فایل: ',
+  'No text found in file.': 'متنی در فایل یافت نشد.',
+  'Dismiss': 'بستن',
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -36648,7 +36661,9 @@ var analyzerState = {
   moduleFlow: [],    // Which modules were used and how values flowed
   busPopulated: false, // Whether reactive bus was auto-populated
   solutionShown: false, // Whether the capstone "Complete exam solution" is rendered
-  mode: 'upload' // 'upload' or 'paste'
+  mode: 'upload', // 'upload' or 'paste'
+  ingestionProgress: null, // progress text during PDF/DOCX extraction
+  ingestionNotice: null    // error/warning banner text
 };
 // Normalize input text: strip page numbers, headers, fix encoding
 function analyzerNormalize(text) {
@@ -37609,17 +37624,487 @@ function analyzerRun(text) {
   renderModule('analyzer');
 }
 
-// File upload handler
+// ===== OFFLINE DOCUMENT INGESTION ENGINE =====
+// Self-contained RFC 1951 DEFLATE inflater (no pako, no CDN, no external libs)
+// Used for both DOCX (ZIP) and PDF (FlateDecode streams)
+
+function analyzerInflate(compressed) {
+  // RFC 1951 DEFLATE decompression
+  // Input: Uint8Array of raw deflate data (no zlib header)
+  // Output: Uint8Array of inflated data
+  var src = compressed;
+  var srcLen = src.length;
+  var bitBuf = 0, bitCnt = 0, pos = 0;
+  var out = [], outPos = 0;
+
+  function readBits(n) {
+    while (bitCnt < n) {
+      if (pos >= srcLen) return 0;
+      bitBuf |= src[pos++] << bitCnt;
+      bitCnt += 8;
+    }
+    var val = bitBuf & ((1 << n) - 1);
+    bitBuf >>>= n;
+    bitCnt -= n;
+    return val;
+  }
+
+  function buildTree(lengths, size) {
+    var counts = new Array(16);
+    var offsets = new Array(16);
+    var i;
+    for (i = 0; i < 16; i++) counts[i] = 0;
+    for (i = 0; i < size; i++) counts[lengths[i]]++;
+    offsets[0] = 0;
+    for (i = 1; i < 16; i++) offsets[i] = offsets[i - 1] + counts[i - 1];
+    var table = new Array(size);
+    for (i = 0; i < size; i++) {
+      if (lengths[i]) table[offsets[lengths[i]]++] = i;
+    }
+    return { counts: counts, symbols: table };
+  }
+
+  function decode(tree) {
+    var counts = tree.counts, symbols = tree.symbols;
+    var code = 0, first = 0, idx = 0;
+    for (var len = 1; len < 16; len++) {
+      code |= readBits(1);
+      var count = counts[len];
+      if (code < first + count) {
+        return symbols[idx + (code - first)];
+      }
+      idx += count;
+      first = (first + count) << 1;
+      code <<= 1;
+    }
+    return -1;
+  }
+
+  var lenBase = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  var lenExtra = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  var distBase = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  var distExtra = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+
+  var fixedLitTree = null, fixedDistTree = null;
+  function getFixedTrees() {
+    if (!fixedLitTree) {
+      var lens = new Array(288);
+      var i;
+      for (i = 0; i <= 143; i++) lens[i] = 8;
+      for (i = 144; i <= 255; i++) lens[i] = 9;
+      for (i = 256; i <= 279; i++) lens[i] = 7;
+      for (i = 280; i <= 287; i++) lens[i] = 8;
+      fixedLitTree = buildTree(lens, 288);
+      var dlens = new Array(30);
+      for (i = 0; i < 30; i++) dlens[i] = 5;
+      fixedDistTree = buildTree(dlens, 30);
+    }
+    return { lit: fixedLitTree, dist: fixedDistTree };
+  }
+
+  function inflateBlock(litTree, distTree) {
+    while (true) {
+      var sym = decode(litTree);
+      if (sym < 0) return;
+      if (sym < 256) {
+        out[outPos++] = sym;
+      } else if (sym === 256) {
+        return;
+      } else {
+        sym -= 257;
+        var length = lenBase[sym] + readBits(lenExtra[sym]);
+        var distSym = decode(distTree);
+        var dist = distBase[distSym] + readBits(distExtra[distSym]);
+        for (var i = 0; i < length; i++) {
+          out[outPos] = out[outPos - dist];
+          outPos++;
+        }
+      }
+    }
+  }
+
+  var bfinal = 0;
+  while (!bfinal) {
+    bfinal = readBits(1);
+    var btype = readBits(2);
+
+    if (btype === 0) {
+      // Stored block
+      bitBuf = 0; bitCnt = 0;
+      var len = src[pos] | (src[pos + 1] << 8); pos += 2;
+      pos += 2; // skip nlen
+      for (var i = 0; i < len; i++) out[outPos++] = src[pos++];
+    } else if (btype === 1) {
+      // Fixed Huffman
+      var fixed = getFixedTrees();
+      inflateBlock(fixed.lit, fixed.dist);
+    } else if (btype === 2) {
+      // Dynamic Huffman
+      var hlit = readBits(5) + 257;
+      var hdist = readBits(5) + 1;
+      var hclen = readBits(4) + 4;
+      var clOrder = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+      var clLens = new Array(19);
+      var ci;
+      for (ci = 0; ci < 19; ci++) clLens[ci] = 0;
+      for (ci = 0; ci < hclen; ci++) clLens[clOrder[ci]] = readBits(3);
+      var clTree = buildTree(clLens, 19);
+      var codeLens = new Array(hlit + hdist);
+      var cli = 0;
+      while (cli < hlit + hdist) {
+        var csym = decode(clTree);
+        if (csym < 16) {
+          codeLens[cli++] = csym;
+        } else if (csym === 16) {
+          var rep = readBits(2) + 3;
+          var prev = codeLens[cli - 1];
+          for (var r = 0; r < rep; r++) codeLens[cli++] = prev;
+        } else if (csym === 17) {
+          var rep = readBits(3) + 3;
+          for (var r = 0; r < rep; r++) codeLens[cli++] = 0;
+        } else { // 18
+          var rep = readBits(7) + 11;
+          for (var r = 0; r < rep; r++) codeLens[cli++] = 0;
+        }
+      }
+      var litLens = codeLens.slice(0, hlit);
+      var dstLens = codeLens.slice(hlit);
+      var dynLitTree = buildTree(litLens, hlit);
+      var dynDistTree = buildTree(dstLens, hdist);
+      inflateBlock(dynLitTree, dynDistTree);
+    }
+  }
+
+  var result = new Uint8Array(outPos);
+  for (var i = 0; i < outPos; i++) result[i] = out[i];
+  return result;
+}
+
+// Strip zlib header (CMF+FLG, 2 bytes) if present, then inflate
+function analyzerInflateZlib(data) {
+  if (!data || data.length < 4) return null;
+  // Check for zlib header: CMF byte with CM=8 (deflate)
+  if ((data[0] & 0x0F) === 8 && ((data[0] * 256 + data[1]) % 31 === 0)) {
+    return analyzerInflate(data.subarray(2));
+  }
+  return analyzerInflate(data);
+}
+
+// DOCX files are ZIP archives. Parse the central directory to find word/document.xml
+function analyzerParseZip(arrayBuffer) {
+  var data = new Uint8Array(arrayBuffer);
+  var len = data.length;
+  // Find End of Central Directory record (signature 0x06054b50) by scanning from end
+  var eocdOff = -1;
+  for (var i = len - 22; i >= 0 && i >= len - 65557; i--) {
+    if (data[i] === 0x50 && data[i+1] === 0x4B && data[i+2] === 0x05 && data[i+3] === 0x06) {
+      eocdOff = i;
+      break;
+    }
+  }
+  if (eocdOff < 0) return null;
+
+  function readU16(off) { return data[off] | (data[off+1] << 8); }
+  function readU32(off) { return (data[off] | (data[off+1] << 8) | (data[off+2] << 16) | (data[off+3] << 24)) >>> 0; }
+
+  var cdCount = readU16(eocdOff + 10);
+  var cdOffset = readU32(eocdOff + 16);
+
+  var entries = [];
+  var off = cdOffset;
+  for (var e = 0; e < cdCount; e++) {
+    if (off + 46 > len) break;
+    if (!(data[off] === 0x50 && data[off+1] === 0x4B && data[off+2] === 0x01 && data[off+3] === 0x02)) break;
+    var compMethod = readU16(off + 10);
+    var compSize = readU32(off + 20);
+    var uncompSize = readU32(off + 24);
+    var nameLen = readU16(off + 28);
+    var extraLen = readU16(off + 30);
+    var commentLen = readU16(off + 32);
+    var localOff = readU32(off + 42);
+    var name = '';
+    for (var ni = 0; ni < nameLen; ni++) name += String.fromCharCode(data[off + 46 + ni]);
+    entries.push({ name: name, compMethod: compMethod, compSize: compSize, uncompSize: uncompSize, localOff: localOff });
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+
+  // Extract file data from local headers
+  var result = [];
+  for (var ei = 0; ei < entries.length; ei++) {
+    var ent = entries[ei];
+    var lh = ent.localOff;
+    if (lh + 30 > len) continue;
+    if (!(data[lh] === 0x50 && data[lh+1] === 0x4B && data[lh+2] === 0x03 && data[lh+3] === 0x04)) continue;
+    var lNameLen = readU16(lh + 26);
+    var lExtraLen = readU16(lh + 28);
+    var dataStart = lh + 30 + lNameLen + lExtraLen;
+    var raw = data.subarray(dataStart, dataStart + ent.compSize);
+    var fileData;
+    if (ent.compMethod === 0) {
+      fileData = raw;
+    } else if (ent.compMethod === 8) {
+      fileData = analyzerInflate(raw);
+    } else {
+      fileData = null;
+    }
+    result.push({ name: ent.name, data: fileData });
+  }
+  return { entries: result };
+}
+
+// Extract readable text from word/document.xml (WordprocessingML)
+function analyzerExtractDocx(arrayBuffer) {
+  var zip = analyzerParseZip(arrayBuffer);
+  if (!zip) return null;
+  // Find word/document.xml
+  var docEntry = null;
+  for (var i = 0; i < zip.entries.length; i++) {
+    if (zip.entries[i].name === 'word/document.xml' && zip.entries[i].data) {
+      docEntry = zip.entries[i];
+      break;
+    }
+  }
+  if (!docEntry) return null;
+  // Convert to string
+  var xml = '';
+  var d = docEntry.data;
+  for (var i = 0; i < d.length; i++) xml += String.fromCharCode(d[i]);
+  // Parse XML to extract text
+  var text = '';
+  var inBody = false;
+  // Simple XML text extraction: find <w:t ...>text</w:t> patterns
+  // Handle paragraphs and breaks
+  xml = xml.replace(/<w:br[^>]*\/?\s*>/g, '\n');
+  xml = xml.replace(/<w:tab[^>]*\/?\s*>/g, '\t');
+  // Split by paragraph boundaries
+  var paras = xml.split(/<\/w:p>/);
+  for (var pi = 0; pi < paras.length; pi++) {
+    var para = paras[pi];
+    // Extract all <w:t> content
+    var tMatches = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+    if (tMatches) {
+      var line = '';
+      for (var ti = 0; ti < tMatches.length; ti++) {
+        var m = tMatches[ti].match(/<w:t[^>]*>([^<]*)<\/w:t>/);
+        if (m) line += m[1];
+      }
+      if (line) text += line + '\n';
+    }
+  }
+  return text.trim() || null;
+}
+
+// Extract text from PDF content streams
+function analyzerExtractPdf(arrayBuffer) {
+  var data = new Uint8Array(arrayBuffer);
+  var len = data.length;
+  // Convert to Latin-1 string for parsing
+  var str = '';
+  for (var i = 0; i < len; i++) str += String.fromCharCode(data[i]);
+
+  // Find all stream...endstream blocks
+  var texts = [];
+  var streamRe = /stream\r?\n/g;
+  var match;
+  while ((match = streamRe.exec(str)) !== null) {
+    var startIdx = match.index + match[0].length;
+    var endIdx = str.indexOf('endstream', startIdx);
+    if (endIdx < 0) continue;
+    var streamData = data.subarray(startIdx, endIdx);
+    // Check if this stream has FlateDecode by looking at the object before 'stream'
+    var preStream = str.substring(Math.max(0, match.index - 500), match.index);
+    var isFlate = /\/FlateDecode/.test(preStream) || /\/Fl\b/.test(preStream);
+    var decoded = null;
+    if (isFlate && streamData.length > 2) {
+      try { decoded = analyzerInflateZlib(streamData); } catch(e) { decoded = null; }
+    } else if (!isFlate) {
+      decoded = streamData;
+    }
+    if (decoded && decoded.length > 0) {
+      var content = '';
+      for (var ci = 0; ci < decoded.length; ci++) content += String.fromCharCode(decoded[ci]);
+      var extracted = analyzerParsePdfContent(content);
+      if (extracted) texts.push(extracted);
+    }
+  }
+  return texts.length > 0 ? texts.join('\n') : null;
+}
+
+// Parse PDF content operators to extract text
+function analyzerParsePdfContent(content) {
+  var result = '';
+  // Find text objects BT...ET
+  var btRe = /BT\b([\s\S]*?)ET\b/g;
+  var btMatch;
+  while ((btMatch = btRe.exec(content)) !== null) {
+    var block = btMatch[1];
+    // Extract text from Tj, TJ, ', " operators
+    // Tj: (string) Tj
+    var tjRe = /\(([^)]*)\)\s*Tj/g;
+    var tjM;
+    while ((tjM = tjRe.exec(block)) !== null) {
+      result += analyzerDecodePdfString(tjM[1]);
+    }
+    // TJ: [(string) num (string) ...] TJ
+    var tjArrRe = /\[([\s\S]*?)\]\s*TJ/g;
+    var arrM;
+    while ((arrM = tjArrRe.exec(block)) !== null) {
+      var arr = arrM[1];
+      var strRe = /\(([^)]*)\)/g;
+      var sM;
+      while ((sM = strRe.exec(arr)) !== null) {
+        result += analyzerDecodePdfString(sM[1]);
+      }
+      // Check for large negative numbers indicating spaces
+      var numRe = /\]\s*(-?\d+)\s*\[/g;
+      // Actually detect spacing from TJ array numbers
+      var spacingRe = /(-\d{3,})/g;
+      var spM;
+      while ((spM = spacingRe.exec(arr)) !== null) {
+        if (parseInt(spM[1]) < -100) result += ' ';
+      }
+    }
+    // Hex strings: <hex> Tj
+    var hexTjRe = /<([0-9A-Fa-f]+)>\s*Tj/g;
+    var hM;
+    while ((hM = hexTjRe.exec(block)) !== null) {
+      result += analyzerDecodeHexString(hM[1]);
+    }
+    // Detect line breaks from Td/Tm operators
+    var tdRe = /[\d.-]+\s+([\d.-]+)\s+Td/g;
+    var tdM;
+    while ((tdM = tdRe.exec(block)) !== null) {
+      var yOff = parseFloat(tdM[1]);
+      if (yOff < -1 || yOff > 1) result += '\n';
+    }
+    // ' operator: (string) '
+    var sqRe = /\(([^)]*)\)\s*'/g;
+    var sqM;
+    while ((sqM = sqRe.exec(block)) !== null) {
+      result += '\n' + analyzerDecodePdfString(sqM[1]);
+    }
+  }
+  return result || null;
+}
+
+// Decode PDF escaped string
+function analyzerDecodePdfString(s) {
+  return s.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t')
+          .replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\')
+          .replace(/\\(\d{1,3})/g, function(m, oct) { return String.fromCharCode(parseInt(oct, 8)); });
+}
+
+// Decode PDF hex string
+function analyzerDecodeHexString(hex) {
+  var result = '';
+  for (var i = 0; i + 1 < hex.length; i += 2) {
+    result += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+  }
+  return result;
+}
+
+// Clean PDF text artifacts
+function analyzerCleanPdfText(text) {
+  if (!text) return '';
+  // Remove control characters except newline/tab
+  text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  // Collapse multiple spaces
+  text = text.replace(/[ \t]{2,}/g, ' ');
+  // Collapse multiple newlines (3+ becomes 2)
+  text = text.replace(/\n{3,}/g, '\n\n');
+  // Remove lines that are just single non-word characters (CID noise)
+  text = text.replace(/^[^\w\dæøåÆØÅ]{1,2}$/gm, '');
+  // Trim each line
+  text = text.split('\n').map(function(line) { return line.trim(); }).join('\n');
+  // Collapse empty lines again
+  text = text.replace(/\n{3,}/g, '\n\n');
+  return text.trim();
+}
+
+// Reject scanned/image-only PDFs and broken encodings
+function analyzerPdfQualityGate(text) {
+  if (!text || text.length < 50) return { ok: false, reason: 'too_short' };
+  // High-byte dominated = likely binary/glyph garbage
+  var highBytes = 0;
+  for (var i = 0; i < Math.min(text.length, 500); i++) {
+    if (text.charCodeAt(i) > 127) highBytes++;
+  }
+  if (highBytes / Math.min(text.length, 500) > 0.4) return { ok: false, reason: 'binary_garbage' };
+  // Isolated single chars = CID mapping failure
+  var words = text.split(/\s+/).filter(function(w) { return w.length > 0; });
+  var singleChars = words.filter(function(w) { return w.length === 1 && !/[0-9.,;:!?()\[\]{}]/.test(w); }).length;
+  if (words.length > 20 && singleChars / words.length > 0.5) return { ok: false, reason: 'cid_noise' };
+  return { ok: true };
+}
+
+
+// File upload handler — supports .txt, .md, .pdf, .docx (fully offline)
 function analyzerHandleFile(input) {
   if (!input || !input.files || !input.files[0]) return;
   var file = input.files[0];
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    analyzerRun(e.target.result);
-  };
-  reader.readAsText(file);
-}
+  var name = (file.name || '').toLowerCase();
 
+  // Show progress indicator
+  analyzerState.ingestionProgress = tx('Læser fil...', 'Reading file...');
+  analyzerState.ingestionNotice = null;
+  renderModule('analyzer');
+
+  if (name.endsWith('.pdf') || name.endsWith('.docx')) {
+    // Binary format — read as ArrayBuffer
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var buffer = e.target.result;
+      var text = null;
+      var error = null;
+
+      try {
+        if (name.endsWith('.docx')) {
+          analyzerState.ingestionProgress = tx('Udpakker DOCX...', 'Extracting DOCX...');
+          renderModule('analyzer');
+          text = analyzerExtractDocx(buffer);
+          if (!text) error = tx('Kunne ikke udpakke DOCX-indhold.', 'Could not extract DOCX content.');
+        } else {
+          analyzerState.ingestionProgress = tx('Udpakker PDF-tekst...', 'Extracting PDF text...');
+          renderModule('analyzer');
+          text = analyzerExtractPdf(buffer);
+          if (text) {
+            text = analyzerCleanPdfText(text);
+            var gate = analyzerPdfQualityGate(text);
+            if (!gate.ok) {
+              if (gate.reason === 'too_short') error = tx('PDF indeholder ingen læsbar tekst — muligvis scannet/billede-PDF.', 'PDF contains no readable text — possibly scanned/image PDF.');
+              else if (gate.reason === 'binary_garbage') error = tx('PDF-tekst er ulæselig (binær/krypteret). Prøv en anden fil.', 'PDF text is unreadable (binary/encrypted). Try another file.');
+              else if (gate.reason === 'cid_noise') error = tx('PDF bruger indlejrede skrifttyper der ikke kan afkodes offline. Kopier teksten manuelt.', 'PDF uses embedded fonts that cannot be decoded offline. Copy text manually.');
+              text = null;
+            }
+          } else {
+            error = tx('Kunne ikke udpakke tekst fra PDF.', 'Could not extract text from PDF.');
+          }
+        }
+      } catch(ex) {
+        error = tx('Fejl ved filbehandling: ', 'File processing error: ') + (ex.message || ex);
+        text = null;
+      }
+
+      analyzerState.ingestionProgress = null;
+      if (text && text.trim().length > 0) {
+        analyzerRun(text);
+      } else {
+        // Show error notice
+        analyzerState.ingestionNotice = error || tx('Ingen tekst fundet i filen.', 'No text found in file.');
+        renderModule('analyzer');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // Text format (.txt, .md) — existing behavior
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      analyzerState.ingestionProgress = null;
+      analyzerRun(e.target.result);
+    };
+    reader.readAsText(file);
+  }
+}
 // Paste handler
 function analyzerHandlePaste() {
   var el = document.getElementById('analyzerPasteArea');
@@ -37630,7 +38115,7 @@ function analyzerHandlePaste() {
 
 // Reset
 function analyzerReset() {
-  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload' };
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload', ingestionProgress: null, ingestionNotice: null };
   renderModule('analyzer');
 }
 
@@ -37649,7 +38134,7 @@ function renderAnalyzer() {
 
   // Mode selector
   html += '<div class="select-group"><div class="select-label">' + tx('Inputmetode', 'Input method') + '</div><div class="select-grid">';
-  html += '<button class="sel-btn' + (analyzerState.mode === 'upload' ? ' selected' : '') + '" onclick="analyzerSetMode(\'upload\')">' + tx('\uD83D\uDCC1 Upload fil (.txt/.md)', '\uD83D\uDCC1 Upload file (.txt/.md)') + '</button>';
+  html += '<button class="sel-btn' + (analyzerState.mode === 'upload' ? ' selected' : '') + '" onclick="analyzerSetMode(\'upload\')">' + tx('\uD83D\uDCC1 Upload fil (.txt/.md/.pdf/.docx)', '\uD83D\uDCC1 Upload file (.txt/.md/.pdf/.docx)') + '</button>';
   html += '<button class="sel-btn' + (analyzerState.mode === 'paste' ? ' selected' : '') + '" onclick="analyzerSetMode(\'paste\')">' + tx('\uD83D\uDCCB Inds\u00e6t tekst', '\uD83D\uDCCB Paste text') + '</button>';
   html += '</div></div>';
 
@@ -37657,9 +38142,22 @@ function renderAnalyzer() {
     html += '<div style="margin:12px 0;text-align:center">';
     html += '<label style="display:inline-block;padding:12px 24px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">';
     html += tx('V\u00e6lg fil', 'Choose file');
-    html += '<input type="file" accept=".txt,.md,.text" style="display:none" onchange="analyzerHandleFile(this)">';
+    html += '<input type="file" accept=".txt,.md,.pdf,.docx" style="display:none" onchange="analyzerHandleFile(this)">';
     html += '</label>';
-    html += '<div style="margin-top:6px;font-size:0.8rem;color:var(--text-muted)">' + tx('Understottede formater: .txt, .md', 'Supported formats: .txt, .md') + '</div>';
+    html += '<div style="margin-top:6px;font-size:0.8rem;color:var(--text-muted)">' + tx('Understøttede formater: .txt, .md, .pdf, .docx', 'Supported formats: .txt, .md, .pdf, .docx') + '</div>';
+    // Progress indicator
+    if (analyzerState.ingestionProgress) {
+      html += '<div style="margin-top:12px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.9rem">';
+      html += '<span class="pulse-anim">\u23F3</span> ' + analyzerState.ingestionProgress;
+      html += '</div>';
+    }
+    // Error/notice banner
+    if (analyzerState.ingestionNotice) {
+      html += '<div style="margin-top:12px;padding:10px;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--danger)">';
+      html += '\u26A0\uFE0F ' + analyzerState.ingestionNotice;
+      html += '<div style="margin-top:6px"><button class="sel-btn" onclick="analyzerState.ingestionNotice=null;renderModule(\'analyzer\')">' + tx('Luk', 'Dismiss') + '</button></div>';
+      html += '</div>';
+    }
     html += '</div>';
   } else {
     html += '<div style="margin:12px 0">';
