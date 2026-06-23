@@ -10002,8 +10002,9 @@ test('calcDetail integration: renderLoad shows IB detail', function() {
   loadState.simFactor = 1.0;
   loadState.expFactor = 1.0;
   var html = renderLoad();
-  assert(html.indexOf('calc-detail') >= 0, 'load module has calc-detail');
-  assert(html.indexOf('IB') >= 0, 'load detail has IB');
+  // Mathcad Prime style: IB shown as definition + evaluation in engineering steps
+  assert(html.indexOf('eng-step') >= 0 || html.indexOf('calc-detail') >= 0, 'load module has Mathcad steps or calc-detail');
+  assert(html.indexOf('I<sub>B</sub>') >= 0 || html.indexOf('IB') >= 0, 'load detail has IB');
 });
 
 test('calcDetail integration: upRenderFindingDetail renders for overload finding', function() {

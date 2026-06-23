@@ -1023,6 +1023,233 @@ math,
   .mathml-formula math { display: inline; }
   .math-unit { color: #1565c0; font-weight: bold; }
 }
+
+/* ====================================================================
+   DESIGN SYSTEM: Engineering Transparency + Progressive Disclosure
+   ====================================================================
+   3-Layer Model:
+     Layer 1 (.eng-summary)  — Executive Summary, always visible
+     Layer 2 (.eng-detail)   — Engineering Summary, expandable
+     Layer 3 (.eng-chain)    — Full Reasoning Chain, nested expand
+   ==================================================================== */
+
+/* --- Layer 1: Executive Summary --- */
+.eng-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  transition: var(--transition);
+  flex-wrap: wrap;
+}
+.eng-summary:hover { border-color: var(--primary-light); box-shadow: var(--shadow-sm); }
+.eng-summary .eng-label { flex: 1; font-weight: 600; font-size: 0.9rem; color: var(--text); min-width: 120px; }
+.eng-summary .eng-value { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 700; font-size: 0.95rem; color: var(--primary); white-space: nowrap; }
+.eng-summary .eng-sub { font-size: 0.78rem; color: var(--text-muted); width: 100%; margin-top: 4px; }
+
+/* --- Verdict Badges --- */
+.eng-verdict {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 16px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px;
+  text-transform: uppercase; white-space: nowrap;
+  flex-shrink: 0;
+}
+.eng-verdict.ok { background: rgba(0,230,118,0.12); color: #047857; border: 1px solid rgba(0,230,118,0.3); }
+.eng-verdict.fail { background: rgba(255,82,82,0.1); color: #b91c1c; border: 1px solid rgba(255,82,82,0.3); }
+.eng-verdict.warn { background: rgba(255,193,7,0.12); color: #92400e; border: 1px solid rgba(255,193,7,0.3); }
+.eng-verdict.info { background: rgba(0,180,255,0.1); color: #1e40af; border: 1px solid rgba(0,180,255,0.3); }
+
+/* --- Layer 2: Engineering Detail (expandable) --- */
+.eng-detail {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: var(--card);
+  transition: var(--transition);
+}
+.eng-detail[open] { box-shadow: var(--shadow-sm); border-color: var(--primary-light); }
+.eng-detail > summary {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--primary);
+  background: linear-gradient(135deg, rgba(0,180,255,0.04), transparent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  user-select: none;
+  transition: var(--transition);
+}
+.eng-detail > summary::-webkit-details-marker { display: none; }
+.eng-detail > summary::before { content: '\25B6'; font-size: 0.7em; transition: transform 0.2s; }
+.eng-detail[open] > summary::before { transform: rotate(90deg); }
+.eng-detail > summary:hover { background: rgba(0,180,255,0.08); }
+.eng-detail > summary .eng-summary-hint {
+  margin-left: auto; font-size: 0.72rem; font-weight: 400;
+  color: var(--text-muted); white-space: nowrap;
+}
+.eng-detail > .eng-body { padding: 14px 16px; font-size: 0.84rem; line-height: 1.6; }
+
+/* --- Layer 3: Full Reasoning Chain (nested) --- */
+.eng-chain {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: rgba(0,180,255,0.02);
+}
+.eng-chain > summary {
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  list-style: none;
+  display: flex; align-items: center; gap: 6px;
+}
+.eng-chain > summary::-webkit-details-marker { display: none; }
+.eng-chain > summary::before { content: '\25B7'; font-size: 0.65em; transition: transform 0.2s; }
+.eng-chain[open] > summary::before { transform: rotate(90deg); }
+.eng-chain > .eng-chain-body { padding: 12px 14px; font-size: 0.82rem; }
+
+/* --- Calculation Step (Mathcad-style) --- */
+.eng-step {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border-light);
+  font-family: 'Times New Roman', serif; font-size: 1rem; line-height: 1.8;
+}
+.eng-step:last-child { border-bottom: none; }
+.eng-step .eng-sym { min-width: 80px; font-style: italic; white-space: nowrap; color: var(--text); }
+.eng-step .eng-formula { color: var(--text-muted); }
+.eng-step .eng-subst { color: var(--text); }
+.eng-step .eng-result { font-weight: 700; color: var(--success); white-space: nowrap; }
+.eng-step .eng-note { width: 100%; font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding-left: 80px; font-family: sans-serif; }
+
+/* --- Standards Reference (clickable) --- */
+.eng-ref {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 0.74rem; font-weight: 600;
+  background: rgba(0,180,255,0.08); color: var(--primary);
+  border: 1px solid rgba(0,180,255,0.2);
+  cursor: help; white-space: nowrap;
+  text-decoration: none;
+  transition: var(--transition);
+}
+.eng-ref:hover { background: rgba(0,180,255,0.15); border-color: var(--primary-light); }
+.eng-ref::before { content: '\00A7'; font-weight: 700; }
+
+/* --- Assumption Block --- */
+.eng-assumption {
+  padding: 8px 12px; margin: 6px 0;
+  background: rgba(255,193,7,0.06);
+  border-left: 3px solid var(--warning);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.8rem; color: var(--text);
+}
+.eng-assumption::before { content: '\26A0\FE0F '; font-size: 0.9em; }
+.eng-assumption.conservative { border-left-color: var(--success); background: rgba(0,230,118,0.04); }
+.eng-assumption.conservative::before { content: '\1F6E1\FE0F '; }
+
+/* --- Alternative Considered --- */
+.eng-alternative {
+  padding: 6px 12px; margin: 4px 0;
+  background: var(--border-light);
+  border-radius: 6px;
+  font-size: 0.78rem; color: var(--text-light);
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.eng-alternative .eng-alt-name { font-weight: 600; white-space: nowrap; }
+.eng-alternative .eng-alt-reason { color: var(--text-muted); }
+.eng-alternative::before { content: '\2717'; color: var(--danger); font-weight: 700; margin-top: 1px; }
+
+/* --- Smart Card Selector --- */
+.eng-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.eng-card {
+  padding: 14px 12px; border: 1.5px solid var(--border);
+  border-radius: 10px; cursor: pointer; text-align: center;
+  background: var(--card); transition: var(--transition);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.eng-card:hover { border-color: var(--primary-light); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.eng-card.selected { border-color: var(--primary); background: var(--primary-glow); box-shadow: 0 0 0 3px rgba(0,180,255,0.15); }
+.eng-card .eng-card-icon { font-size: 1.6rem; }
+.eng-card .eng-card-title { font-weight: 700; font-size: 0.82rem; color: var(--text); }
+.eng-card .eng-card-desc { font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; }
+
+/* --- Context Panel (Advanced Settings - Collapsed) --- */
+.eng-advanced {
+  border: 1px solid var(--border); border-radius: 8px;
+  margin-top: 12px; overflow: hidden;
+}
+.eng-advanced > summary {
+  padding: 8px 14px; cursor: pointer;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  list-style: none; display: flex; align-items: center; gap: 6px;
+}
+.eng-advanced > summary::-webkit-details-marker { display: none; }
+.eng-advanced > summary::before { content: '\2699\FE0F'; }
+.eng-advanced > .eng-advanced-body { padding: 12px 14px; border-top: 1px solid var(--border-light); }
+
+/* --- User Mode Depth Visibility --- */
+body.mode-apprentice .depth-2,
+body.mode-apprentice .depth-3,
+body.mode-apprentice .advanced-only { display: none !important; }
+body.mode-electrician .depth-3,
+body.mode-electrician .advanced-only { display: none !important; }
+body.mode-engineer .advanced-only { display: none !important; }
+/* Expert mode: everything visible (no hiding) */
+
+/* --- Wizard Step Indicator --- */
+.eng-wizard-steps {
+  display: flex; gap: 4px; margin-bottom: 16px; overflow-x: auto;
+  padding: 4px 0;
+}
+.eng-wizard-step {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 0.76rem; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
+}
+.eng-wizard-step.active { background: var(--primary); color: #fff; }
+.eng-wizard-step.done { background: rgba(0,230,118,0.15); color: #047857; }
+.eng-wizard-step.pending { background: var(--border-light); color: var(--text-muted); }
+.eng-wizard-step .eng-wiz-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700;
+}
+.eng-wizard-step.active .eng-wiz-num { background: rgba(255,255,255,0.2); }
+.eng-wizard-step.done .eng-wiz-num { background: rgba(0,230,118,0.3); }
+.eng-wizard-step.pending .eng-wiz-num { background: var(--border); }
+
+/* --- Input Group (Minimal) --- */
+.eng-input-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border-light);
+}
+.eng-input-row:last-child { border-bottom: none; }
+.eng-input-row .eng-input-label { flex: 1; font-size: 0.84rem; font-weight: 500; color: var(--text); }
+.eng-input-row .eng-input-value { font-weight: 700; font-size: 0.9rem; color: var(--primary); min-width: 60px; text-align: right; }
+.eng-input-row .eng-input-unit { font-size: 0.78rem; color: var(--text-muted); min-width: 30px; }
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .eng-summary { padding: 10px 12px; gap: 8px; }
+  .eng-cards { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .eng-card { padding: 10px 8px; }
+  .eng-step { font-size: 0.9rem; }
+  .eng-wizard-steps { gap: 3px; }
+}
 </style>
 </head>
 <body>
@@ -1660,6 +1887,195 @@ function setLang(l) {
   renderNav();
   renderModule(activeModule);
 }
+
+// ====================================================================
+// DESIGN SYSTEM: User Modes + Engineering Reasoning Framework
+// ====================================================================
+
+// --- User Mode State ---
+var USER_MODES = {
+  apprentice: { depth: 1, explanations: true, warnings: true, formulas: false, label_da: 'L\u00E6rling', label_en: 'Apprentice' },
+  electrician: { depth: 2, explanations: false, warnings: true, formulas: false, label_da: 'Elektriker', label_en: 'Electrician' },
+  engineer: { depth: 3, explanations: false, warnings: true, formulas: true, label_da: 'Ingeni\u00F8r', label_en: 'Engineer' },
+  expert: { depth: 3, explanations: false, warnings: true, formulas: true, advanced: true, label_da: 'Ekspert', label_en: 'Expert' }
+};
+var userMode = localStorage.getItem('userMode') || 'electrician';
+
+function setUserMode(mode) {
+  if (!USER_MODES[mode]) return;
+  userMode = mode;
+  localStorage.setItem('userMode', mode);
+  // Apply body class for CSS depth visibility
+  document.body.className = document.body.className.replace(/mode-\w+/g, '').trim();
+  document.body.classList.add('mode-' + mode);
+  if (typeof renderModule === 'function') renderModule(activeModule);
+}
+
+// Initialize mode class on load
+(function() {
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.classList.add('mode-' + userMode);
+  } else if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function() {
+      document.body.classList.add('mode-' + userMode);
+    });
+  }
+})();
+
+// --- Engineering Reasoning Framework ---
+// Generates a complete 3-layer progressive disclosure HTML block
+// for any engineering calculation result.
+function engReasoning(params) {
+  var p = params || {};
+  var html = '';
+
+  // === LAYER 1: Executive Summary (always visible) ===
+  html += '<div class="eng-summary">';
+  // Verdict badge
+  var status = p.conclusion && p.conclusion.status ? p.conclusion.status : 'info';
+  var verdictLabel = status === 'ok' ? '\u2705 OK' : (status === 'fail' ? '\u274C ' + tx('FEJL', 'FAIL') : (status === 'warn' ? '\u26A0 ' + tx('Advarsel', 'Warning') : '\u2139\uFE0F'));
+  html += '<span class="eng-verdict ' + status + '">' + verdictLabel + '</span>';
+  // Label
+  html += '<span class="eng-label">' + (p.title || '') + '</span>';
+  // Value
+  if (p.conclusion && p.conclusion.value != null) {
+    html += '<span class="eng-value">' + p.conclusion.value + (p.conclusion.unit ? ' ' + p.conclusion.unit : '') + '</span>';
+  }
+  html += '</div>';
+
+  // === LAYER 2: Engineering Summary (expandable) ===
+  html += '<details class="eng-detail depth-2">';
+  html += '<summary>' + tx('Vis teknisk grundlag', 'Show engineering basis');
+  html += '<span class="eng-summary-hint">' + tx('klik for detaljer', 'click for details') + '</span></summary>';
+  html += '<div class="eng-body">';
+
+  // Input parameters table
+  if (p.inputs && p.inputs.length > 0) {
+    html += '<div style="margin-bottom:10px"><strong style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">' + tx('Indgangsdata', 'Input Data') + '</strong></div>';
+    html += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-bottom:12px">';
+    html += '<tr style="background:var(--border-light)"><th style="padding:4px 8px;text-align:left;font-weight:600">' + tx('Parameter', 'Parameter') + '</th><th style="padding:4px 8px;text-align:left">' + tx('Symbol', 'Symbol') + '</th><th style="padding:4px 8px;text-align:right">' + tx('V\u00E6rdi', 'Value') + '</th><th style="padding:4px 8px;text-align:left;color:var(--text-muted)">' + tx('Kilde', 'Source') + '</th></tr>';
+    for (var i = 0; i < p.inputs.length; i++) {
+      var inp = p.inputs[i];
+      html += '<tr style="border-bottom:1px solid var(--border-light)"><td style="padding:4px 8px">' + (inp.name || '') + '</td><td style="padding:4px 8px;font-family:monospace;font-style:italic">' + (inp.symbol || '') + '</td><td style="padding:4px 8px;text-align:right;font-weight:600;font-family:monospace">' + (inp.value != null ? inp.value : '\u2014') + (inp.unit ? ' <span style="color:var(--text-muted)">' + inp.unit + '</span>' : '') + '</td><td style="padding:4px 8px;font-size:0.75rem;color:var(--text-muted)">' + (inp.source || '') + '</td></tr>';
+    }
+    html += '</table>';
+  }
+
+  // Standards reference
+  if (p.standard) {
+    html += '<div style="margin-bottom:8px"><span class="eng-ref">' + p.standard + '</span></div>';
+  }
+
+  // Verification checks (quick summary)
+  if (p.verification && p.verification.length > 0) {
+    html += '<div style="margin-bottom:8px">';
+    for (var v = 0; v < p.verification.length; v++) {
+      var vf = p.verification[v];
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.82rem">';
+      html += '<span>' + (vf.passed ? '\u2705' : '\u274C') + '</span>';
+      html += '<span>' + vf.check + '</span>';
+      if (vf.detail) html += '<span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">' + vf.detail + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Conclusion justification
+  if (p.conclusion && p.conclusion.justification) {
+    html += '<div style="padding:8px 12px;background:' + (status === 'ok' ? 'var(--success-bg)' : (status === 'fail' ? 'var(--danger-bg)' : 'var(--warning-bg)')) + ';border-radius:6px;font-size:0.82rem;font-weight:600">';
+    html += p.conclusion.justification;
+    html += '</div>';
+  }
+
+  // === LAYER 3: Full Reasoning Chain (nested inside Layer 2) ===
+  html += '<details class="eng-chain depth-3">';
+  html += '<summary>' + tx('Fuld teknisk udledning', 'Full engineering derivation') + '</summary>';
+  html += '<div class="eng-chain-body">';
+
+  // Assumptions
+  if (p.assumptions && p.assumptions.length > 0) {
+    html += '<div style="margin-bottom:10px"><strong style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">' + tx('Foruds\u00E6tninger', 'Assumptions') + '</strong></div>';
+    for (var a = 0; a < p.assumptions.length; a++) {
+      var assum = p.assumptions[a];
+      html += '<div class="eng-assumption' + (assum.conservative ? ' conservative' : '') + '">' + assum.text;
+      if (assum.standard) html += ' <span class="eng-ref">' + assum.standard + '</span>';
+      html += '</div>';
+    }
+  }
+
+  // Formula
+  if (p.formula) {
+    html += '<div style="margin:12px 0;padding:10px 14px;background:var(--border-light);border-radius:8px;font-family:\'Times New Roman\',serif">';
+    html += '<div style="font-weight:700;margin-bottom:4px;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-family:sans-serif">' + tx('Formel', 'Formula') + '</div>';
+    html += '<div style="font-size:1.05rem">' + (p.formula.expression || '') + '</div>';
+    if (p.formula.explanation) html += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;font-family:sans-serif">' + p.formula.explanation + '</div>';
+    if (p.formula.whyThisFormula) html += '<div style="font-size:0.76rem;color:var(--primary);margin-top:4px;font-style:italic;font-family:sans-serif">' + tx('Hvorfor denne formel: ', 'Why this formula: ') + p.formula.whyThisFormula + '</div>';
+    html += '</div>';
+  }
+
+  // Substitution
+  if (p.substitution) {
+    html += '<div style="margin:8px 0;font-family:monospace;font-size:0.88rem;padding:6px 12px;background:rgba(0,180,255,0.04);border-radius:6px">';
+    html += '<strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> ' + p.substitution;
+    html += '</div>';
+  }
+
+  // Intermediate steps (Mathcad-style)
+  if (p.intermediateSteps && p.intermediateSteps.length > 0) {
+    html += '<div style="margin:10px 0"><strong style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">' + tx('Mellemregninger', 'Intermediate Steps') + '</strong></div>';
+    for (var s = 0; s < p.intermediateSteps.length; s++) {
+      var step = p.intermediateSteps[s];
+      html += '<div class="eng-step">';
+      if (step.desc) html += '<span class="eng-sym">' + step.desc + '</span>';
+      if (step.expr) html += '<span class="eng-formula">= ' + step.expr + '</span>';
+      if (step.result != null) html += '<span class="eng-result">= ' + step.result + '</span>';
+      html += '</div>';
+    }
+  }
+
+  // Alternatives considered
+  if (p.alternatives && p.alternatives.length > 0) {
+    html += '<div style="margin:12px 0"><strong style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">' + tx('Overvejede alternativer', 'Alternatives Considered') + '</strong></div>';
+    for (var al = 0; al < p.alternatives.length; al++) {
+      var alt = p.alternatives[al];
+      html += '<div class="eng-alternative"><span class="eng-alt-name">' + alt.name + '</span><span class="eng-alt-reason">' + alt.reason_rejected + '</span></div>';
+    }
+  }
+
+  // Economic note
+  if (p.economicNote) {
+    html += '<div style="margin-top:10px;padding:6px 10px;background:rgba(0,180,255,0.04);border-radius:6px;font-size:0.78rem;color:var(--text-light)">';
+    html += '\uD83D\uDCB0 ' + p.economicNote;
+    html += '</div>';
+  }
+
+  // Full reference
+  if (p.reference) {
+    html += '<div style="margin-top:10px;font-size:0.75rem;color:var(--text-muted)">';
+    html += '<strong>' + tx('Reference', 'Reference') + ':</strong> ' + p.reference;
+    html += '</div>';
+  }
+
+  html += '</div></details>'; // close Layer 3
+  html += '</div></details>'; // close Layer 2
+
+  return html;
+}
+
+// --- Helper: Render a user mode selector (for the UI header/settings) ---
+function renderUserModeSelector() {
+  var html = '<div class="select-grid" style="margin:8px 0">';
+  var modes = ['apprentice', 'electrician', 'engineer', 'expert'];
+  for (var mi = 0; mi < modes.length; mi++) {
+    var m = modes[mi];
+    var mData = USER_MODES[m];
+    var label = lang === 'da' ? mData.label_da : mData.label_en;
+    html += '<button class="sel-btn' + (userMode === m ? ' selected' : '') + '" onclick="setUserMode(\'' + m + '\')">' + label + '</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
 
 // ===== DATA FROM UPLOADED FILES =====
 
@@ -7684,126 +8100,174 @@ function calcDetailIB(power_kW, cosPhi, voltage, ib, sf, ef) {
   });
 }
 
-// ===== LOAD MODULE =====
+// ===== LOAD MODULE (Mathcad Prime Style) =====
 function renderLoad() {
   const ib = calcIB();
   const S = calcS();
-  const powerSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500];
-  const cosPhiSteps = [0.7, 0.75, 0.8, 0.85, 0.87, 0.9, 0.92, 0.95, 0.97, 1.0];
-  const sfSteps = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-  const efSteps = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
+  const is3 = loadState.voltage === '3x400';
+  const Un = is3 ? 400 : 230;
+  const P_W = loadState.power * 1000;
+  const denom = is3 ? (Math.sqrt(3) * Un * loadState.cosPhi) : (Un * loadState.cosPhi);
+  const ibBase = P_W / denom;
+  const Q_kvar = loadState.power * Math.tan(Math.acos(loadState.cosPhi));
+  const sinPhi = Math.sqrt(1 - loadState.cosPhi * loadState.cosPhi);
 
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${t('loadTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+  // Mathcad Prime worksheet helper — renders one "line" of the worksheet
+  function mcLine(sym, op, expr, res, unit, note) {
+    var h = '<div class="eng-step">';
+    h += '<span class="eng-sym">' + sym + '</span>';
+    if (op) h += '<span class="eng-formula">' + op + ' ' + (expr || '') + '</span>';
+    if (res !== undefined && res !== null) h += '<span class="eng-result">= ' + res + (unit ? ' <span style="color:#1565c0;font-weight:700">' + unit + '</span>' : '') + '</span>';
+    if (note) h += '<span class="eng-note">' + note + '</span>';
+    h += '</div>';
+    return h;
+  }
+  // Section header in the worksheet
+  function mcSection(title) {
+    return '<div style="color:var(--primary);font-size:0.82rem;text-transform:uppercase;letter-spacing:1.2px;margin:18px 0 8px;font-family:sans-serif;font-weight:800;border-bottom:2px solid var(--primary);padding-bottom:4px">' + title + '</div>';
+  }
 
-      <div class="select-group">
-        <div class="select-label">${tx('Hurtigvalg (typiske belastninger)', 'Quick presets (typical loads)')}</div>
-        <div class="select-grid">
-          <button class="sel-btn" onclick="applyLoadPreset('ev11')">${tx('EV-lader 11kW', 'EV charger 11kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('ev22')">${tx('EV-lader 22kW', 'EV charger 22kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('pv')">${tx('Solcelle 10kW', 'Solar PV 10kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('cooker')">${tx('Komfur', 'Cooker')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('heatpump')">${tx('Varmepumpe', 'Heat pump')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('sockets')">${tx('Stikgruppe', 'Socket circuit')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('light')">${tx('Lysgruppe', 'Lighting')}</button>
-        </div>
-        ${loadState._preset ? `<div style="font-size:0.74rem;color:var(--primary);margin-top:6px">${tx('Forudindstilling:', 'Preset:')} <strong>${loadState._preset}</strong> ${loadState._presetNote ? '\u2014 ' + loadState._presetNote : ''}</div>` : ''}
-      </div>
+  var html = '';
 
-      <div class="select-group">
-        <div class="select-label">${t('voltage')}</div>
-        <div class="select-grid">
-          ${['3x400', '1x230'].map(v =>
-            `<button class="sel-btn ${loadState.voltage === v ? 'selected' : ''}" onclick="loadState.voltage='${v}';renderModule('load')">${v} V</button>`
-          ).join('')}
-        </div>
-      </div>
+  // ═══ INPUT CARD: Context + Selections (Progressive Disclosure) ═══
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Belastningsberegning', 'Load Calculation') + '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('power')}</div>
-        <div class="select-grid">
-          ${powerSteps.map(p =>
-            `<button class="sel-btn ${loadState.power === p ? 'selected' : ''}" onclick="loadState.power=${p};renderModule('load')">${p}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // User mode selector
+  html += '<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+  html += '<span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">' + tx('Tilstand', 'Mode') + ':</span>';
+  html += renderUserModeSelector();
+  html += '</div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('powerFactor')}</div>
-        <div class="select-grid">
-          ${cosPhiSteps.map(c =>
-            `<button class="sel-btn ${loadState.cosPhi === c ? 'selected' : ''}" onclick="loadState.cosPhi=${c};renderModule('load')">${c}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Smart cards for load type presets
+  html += '<div class="select-group"><div class="select-label">' + tx('V\u00E6lg belastningstype', 'Select load type') + '</div>';
+  html += '<div class="eng-cards">';
+  var presets = [
+    { key:'ev11', icon:'\u26A1', t:'EV 11kW' },
+    { key:'ev22', icon:'\u26A1', t:'EV 22kW' },
+    { key:'heatpump', icon:'\uD83C\uDF21\uFE0F', t:tx('Varmepumpe','Heat pump') },
+    { key:'cooker', icon:'\uD83C\uDF73', t:tx('Komfur','Cooker') },
+    { key:'sockets', icon:'\uD83D\uDD0C', t:tx('Stik','Sockets') },
+    { key:'light', icon:'\uD83D\uDCA1', t:tx('Lys','Light') },
+    { key:'pv', icon:'\u2600\uFE0F', t:tx('Sol','Solar') }
+  ];
+  for (var pi=0; pi<presets.length; pi++) {
+    var pc = presets[pi];
+    html += '<div class="eng-card' + (loadState._preset===pc.key?' selected':'') + '" onclick="applyLoadPreset(\'' + pc.key + '\')">';
+    html += '<span class="eng-card-icon">' + pc.icon + '</span>';
+    html += '<span class="eng-card-title">' + pc.t + '</span>';
+    html += '</div>';
+  }
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('simultaneity')}</div>
-        <div class="select-grid">
-          ${sfSteps.map(s =>
-            `<button class="sel-btn ${loadState.simFactor === s ? 'selected' : ''}" onclick="loadState.simFactor=${s};renderModule('load')">${s}</button>`
-          ).join('')}
-        </div>
-      </div>
+  // Phase toggle
+  html += '<div class="select-group"><div class="select-label">' + tx('Faser','Phases') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (is3?' selected':'') + '" onclick="loadState.voltage=\'3x400\';renderModule(\'load\')">3\u223C 400V</button>';
+  html += '<button class="sel-btn' + (!is3?' selected':'') + '" onclick="loadState.voltage=\'1x230\';renderModule(\'load\')">1\u223C 230V</button>';
+  html += '</div></div>';
 
-      <div class="select-group">
-        <div class="select-label">${t('expansion')}</div>
-        <div class="select-grid">
-          ${efSteps.map(e =>
-            `<button class="sel-btn ${loadState.expFactor === e ? 'selected' : ''}" onclick="loadState.expFactor=${e};renderModule('load')">${e}</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
+  // Power (context-adapted range)
+  var pwSteps = is3 ? [3,5,7,11,15,22,30,37,45,55,75,90,110,132,160,200,250,315,400,500] : [1,2,3,4,5,6,7,8,10,12,14,16,18,20];
+  html += '<div class="select-group"><div class="select-label">P [kW]</div><div class="select-grid">';
+  for (var pw=0; pw<pwSteps.length; pw++) html += '<button class="sel-btn' + (loadState.power===pwSteps[pw]?' selected':'') + '" onclick="loadState.power=' + pwSteps[pw] + ';renderModule(\'load\')">' + pwSteps[pw] + '</button>';
+  html += '</div></div>';
 
-    <div class="card fade-in">
-      <div class="card-title">${t('loadResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('ib')}</span><span class="value">${ib.toFixed(1)} A</span></div>
-        <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
-        <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
-        <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
-      </div>
-      ${calcDetailIB(loadState.power, loadState.cosPhi, loadState.voltage, ib, loadState.simFactor, loadState.expFactor)}
-    </div>
+  // cos φ (depth-2: hidden in apprentice mode)
+  html += '<div class="select-group depth-2"><div class="select-label">cos \u03C6</div><div class="select-grid">';
+  var cosS = [0.7,0.8,0.85,0.87,0.9,0.92,0.95,1.0];
+  for (var ci=0; ci<cosS.length; ci++) html += '<button class="sel-btn' + (loadState.cosPhi===cosS[ci]?' selected':'') + '" onclick="loadState.cosPhi=' + cosS[ci] + ';renderModule(\'load\')">' + cosS[ci] + '</button>';
+  html += '</div></div>';
 
-    ${renderRecommendations(lang === 'da' ? 'Anbefalede kabler til IB = ' + ib.toFixed(1) + ' A' : 'Recommended cables for IB = ' + ib.toFixed(1) + ' A', recommendCables(ib), 'cable')}
-    ${renderRecommendations(tx('Anbefalede sikringer', 'Recommended fuses'), recommendFuses(ib), 'fuse')}
-    ${renderRecommendations(tx('Anbefalede automatsikringer', 'Recommended MCBs'), recommendMCBs(ib), 'mcb')}
-    ${ib > 63 ? renderRecommendations(tx('Anbefalede maksimalafbrydere', 'Recommended MCCBs'), recommendMCCBs(ib), 'mccb') : ''}
-    ${renderRecommendations(tx('Anbefalet HPFI/RCD', 'Recommended RCD'), recommendRCDs(ib, loadState.voltage), 'rcd')}
-    ${renderRecommendations(tx('Anbefalede kontaktorer (motor)', 'Recommended contactors (motor)'), recommendContactors(ib), 'contactor')}
-    ${renderRecommendations(tx('Anbefalet motorv\u00E6rn', 'Recommended motor protection'), recommendMPCBs(ib), 'mpcb')}
-    ${renderRecommendations(tx('Anbefalet termorel\u00E6', 'Recommended overload relay'), recommendOverloadRelays(ib), 'relay')}
+  // Advanced factors (collapsed)
+  html += '<details class="eng-advanced depth-2"><summary>' + tx('Korrektionsfaktorer','Correction factors') + '</summary><div class="eng-advanced-body">';
+  html += '<div class="select-group"><div class="select-label">S<sub>f</sub> (' + tx('samtidighed','simultaneity') + ')</div><div class="select-grid">';
+  [0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0].forEach(function(v){ html += '<button class="sel-btn' + (loadState.simFactor===v?' selected':'') + '" onclick="loadState.simFactor=' + v + ';renderModule(\'load\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">E<sub>f</sub> (' + tx('udvidelse','expansion') + ')</div><div class="select-grid">';
+  [1.0,1.1,1.2,1.3,1.5].forEach(function(v){ html += '<button class="sel-btn' + (loadState.expFactor===v?' selected':'') + '" onclick="loadState.expFactor=' + v + ';renderModule(\'load\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '</div></details>';
+  html += '</div>'; // close input card
 
-    ${renderLoadSchedule()}
+  // ═══ MATHCAD PRIME WORKSHEET ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:20px 24px">';
+  html += '<div class="card-title" style="font-family:sans-serif;border-bottom-color:var(--primary)">';
+  html += '\uD83D\uDCD0 ' + tx('Beregningsark \u2014 Mathcad Prime', 'Calculation Sheet \u2014 Mathcad Prime') + '</div>';
 
-    <div class="card fade-in">
-      <div class="card-title">\uD83C\uDFD8\uFE0F ${tx('Boligudstykning \u2013 diversitet (Fællesregulativet)', 'Housing estate \u2013 diversity (net-company formula)')}</div>
-      <div class="info-row">${tx('Netselskabets erfaringsformel: Pb = 0,834 \u00B7 (W\u00B7n)^0,89. Klik antal boliger og energi/bolig.', 'Net-company experience formula: Pb = 0.834 \u00B7 (W\u00B7n)^0.89. Click number of homes and energy/home.')}</div>
-      <div class="select-group">
-        <div class="select-label">${tx('Antal boliger (n)', 'Number of homes (n)')}</div>
-        <div class="select-grid">
-          ${[10,25,50,75,100,115,150,200,300].map(v=>`<button class="sel-btn ${diversityState.homes===v?'selected':''}" onclick="diversityState.homes=${v};renderModule('load')">${v}</button>`).join('')}
-        </div>
-      </div>
-      <div class="select-group">
-        <div class="select-label">${tx('Energi pr. bolig (kWh/\u00E5r) \u2013 inkl. evt. EV', 'Energy per home (kWh/yr) \u2013 incl. any EV')}</div>
-        <div class="select-grid">
-          ${[2000,3000,4300,5000,6000,8300,10000,12000].map(v=>`<button class="sel-btn ${diversityState.kwhPerHome===v?'selected':''}" onclick="diversityState.kwhPerHome=${v};renderModule('load')">${v}</button>`).join('')}
-        </div>
-      </div>
-      <div class="result-box">
-        <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
-        <div class="result-row"><span class="label">W \u00B7 n</span><span class="value">${(diversityState.kwhPerHome/1000*diversityState.homes).toFixed(0)} MWh/\u00E5r</span></div>
-        <div class="result-row"><span class="label">Pb = 0,834 \u00B7 (W\u00B7n)^0,89</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
-        <div class="result-row"><span class="label">${tx('IB (cos\u03C6 0,95)', 'IB (cos\u03C6 0.95)')}</span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
-      </div>
-    </div>
-  `;
+  // Section: GIVEN DATA (definitions with :=)
+  html += mcSection(tx('GIVNE DATA', 'GIVEN DATA'));
+  html += mcLine('P', ':=', '', loadState.power, 'kW', tx('Nominel aktiv effekt', 'Rated active power'));
+  html += mcLine('U<sub>n</sub>', ':=', '', Un, 'V', is3 ? tx('Linje-linje sp\u00E6nding (3\u223C)','Line-to-line voltage (3\u223C)') : tx('Fase-nul sp\u00E6nding (1\u223C)','Phase-neutral voltage (1\u223C)'));
+  html += mcLine('cos \u03C6', ':=', '', loadState.cosPhi, '', tx('Effektfaktor','Power factor'));
+  if (loadState.simFactor !== 1.0) html += mcLine('S<sub>f</sub>', ':=', '', loadState.simFactor, '', tx('Samtidighedsfaktor','Simultaneity factor'));
+  if (loadState.expFactor !== 1.0) html += mcLine('E<sub>f</sub>', ':=', '', loadState.expFactor, '', tx('Udviddelsesfaktor','Expansion factor'));
+
+  // Section: CALCULATION
+  html += mcSection(tx('BEREGNING', 'CALCULATION'));
+
+  // Formula definition
+  var fDef = is3 ? 'P / (\u221A3 \u00B7 U<sub>n</sub> \u00B7 cos\u03C6)' : 'P / (U<sub>n</sub> \u00B7 cos\u03C6)';
+  var sfEf = (loadState.simFactor!==1.0 ? ' \u00B7 S<sub>f</sub>' : '') + (loadState.expFactor!==1.0 ? ' \u00B7 E<sub>f</sub>' : '');
+  html += mcLine('I<sub>B</sub>', ':=', fDef + sfEf, null, null, '<span class="eng-ref">DS/HD 60364-4-43 \u00A7433.1</span>');
+
+  // Evaluation (substitution)
+  var subst = is3
+    ? P_W + ' / (\u221A3 \u00B7 ' + Un + ' \u00B7 ' + loadState.cosPhi + ')'
+    : P_W + ' / (' + Un + ' \u00B7 ' + loadState.cosPhi + ')';
+  if (loadState.simFactor!==1.0) subst += ' \u00B7 ' + loadState.simFactor;
+  if (loadState.expFactor!==1.0) subst += ' \u00B7 ' + loadState.expFactor;
+  html += mcLine('I<sub>B</sub>', '=', subst, null, null, null);
+
+  // Intermediate (depth-3)
+  html += '<div class="depth-3">';
+  html += mcLine('', '=', P_W + ' / ' + denom.toFixed(1) + (loadState.simFactor!==1.0||loadState.expFactor!==1.0 ? ' \u00B7 ' + (loadState.simFactor*loadState.expFactor).toFixed(2) : ''), null, null, tx('N\u00E6vner = ','Denom = ') + denom.toFixed(1));
+  html += '</div>';
+
+  // RESULT (highlighted — the Mathcad Prime "blue box" evaluation)
+  html += '<div style="background:linear-gradient(135deg,rgba(0,180,255,0.06),rgba(0,230,118,0.04));border:2px solid var(--primary);border-radius:10px;padding:12px 16px;margin:12px 0">';
+  html += '<div class="eng-step" style="border:none;padding:0">';
+  html += '<span class="eng-sym" style="font-size:1.2em;font-weight:800">I<sub>B</sub></span>';
+  html += '<span class="eng-result" style="font-size:1.4em;color:var(--primary);font-weight:800">= ' + ib.toFixed(2) + ' <span style="color:#1565c0">A</span></span>';
+  html += '</div></div>';
+
+  // Additional calculations (depth-2)
+  html += '<div class="depth-2">';
+  html += mcLine('S', '= P / cos\u03C6 =', loadState.power + ' / ' + loadState.cosPhi, S.toFixed(2), 'kVA', tx('Tilsyneladende effekt','Apparent power'));
+  html += mcLine('Q', '= P \u00B7 tan\u03C6 =', loadState.power + ' \u00B7 ' + Math.tan(Math.acos(loadState.cosPhi)).toFixed(3), Q_kvar.toFixed(2), 'kvar', tx('Reaktiv effekt','Reactive power'));
+  html += mcLine('sin \u03C6', '=', '\u221A(1 \u2212 cos\u00B2\u03C6)', sinPhi.toFixed(4), '', null);
+  html += '</div>';
+
+  // Section: VERIFICATION
+  html += mcSection(tx('VERIFIKATION', 'VERIFICATION'));
+  html += '<div style="font-size:0.9rem;line-height:2">';
+  html += '<div>' + (ib > 0 ? '\u2705' : '\u274C') + ' I<sub>B</sub> > 0 : ' + ib.toFixed(1) + ' A ' + (ib > 0 ? 'OK' : 'FEJL') + '</div>';
+  html += '<div>' + (ib <= 630 ? '\u2705' : '\u26A0\uFE0F') + ' I<sub>B</sub> \u2264 630 A : ' + (ib <= 630 ? tx('Inden for standardomr\u00E5de','Within standard range') : tx('Speciall\u00F8sning p\u00E5kr\u00E6vet','Special solution required')) + '</div>';
+  var protType = ib <= 63 ? 'MCB (B/C/D)' : (ib <= 630 ? 'MCCB (NSX)' : tx('Effektafbryder','Power breaker'));
+  html += '<div>\u2139\uFE0F ' + tx('Beskyttelsestype','Protection type') + ': <strong>' + protType + '</strong></div>';
+  html += '</div>';
+
+  // References
+  html += '<div style="margin-top:14px;padding-top:8px;border-top:1px solid var(--border);font-family:sans-serif">';
+  html += '<span class="eng-ref">DS/HD 60364-4-43 \u00A7433.1</span> ';
+  html += '<span class="eng-ref">IEC 60898-1</span> ';
+  html += '<span class="eng-ref depth-3">DS/HD 60364-5-52 Tabel B.52</span>';
+  html += '</div>';
+
+  html += '</div>'; // close Mathcad card
+
+  // ═══ RECOMMENDATIONS (collapsed — progressive disclosure) ═══
+  html += '<details class="eng-advanced"><summary>\uD83D\uDCE6 ' + tx('Anbefalede komponenter','Recommended components') + '</summary><div class="eng-advanced-body">';
+  html += renderRecommendations(tx('Kabler','Cables') + ' (IB=' + ib.toFixed(0) + 'A)', recommendCables(ib), 'cable');
+  html += renderRecommendations('MCB', recommendMCBs(ib), 'mcb');
+  html += renderRecommendations(tx('Sikringer','Fuses'), recommendFuses(ib), 'fuse');
+  if (ib > 63) html += renderRecommendations('MCCB', recommendMCCBs(ib), 'mccb');
+  html += renderRecommendations('RCD', recommendRCDs(ib, loadState.voltage), 'rcd');
+  html += '</div></details>';
+
+  // Load Schedule (existing)
+  html += renderLoadSchedule();
+
+  return html;
 }
 
 function calcIB() {
