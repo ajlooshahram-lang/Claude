@@ -33237,7 +33237,7 @@ function analyzerSolve(data) {
   }
   total++;
 
-  // === ALWAYS COMPUTE: Voltage drop ===
+  // === ALWAYS COMPUTE: Voltage drop (Viggo method — complex cable impedance) ===
   if (ib && data.cableLength && data.cableMm2 && data.cosPhi) {
     var cableProduct = findCableProduct(data.cableMm2, data.cableType);
     if (cableProduct) {
@@ -33250,8 +33250,31 @@ function analyzerSolve(data) {
         vdropVal = 2 * ib * L_km * (cableProduct.r * data.cosPhi + cableProduct.x * sinPhi);
       }
       vdropPct = (vdropVal / Un) * 100;
-      var vdHtml = calcDetailVdrop(ib, data.cableLength, cableProduct.r, cableProduct.x, data.cosPhi, voltageStr, vdropVal, vdropPct, cableProduct.model + ' ' + data.cableMm2 + 'mm\u00B2');
-      results.push({ type: 'vdrop', label: 'Sp\u00e6ndingsfald \u0394U%', value: vdropPct.toFixed(2) + '%', html: vdHtml, status: vdropPct <= 4 ? 'ok' : 'fail', asked: hasQuestion(data, 'vdrop') });
+
+      // Viggo-style step display for voltage drop
+      var vdSteps = [];
+      var Zw = cxCableImpedanceMOhm(data.cableLength, cableProduct.r, cableProduct.x);
+      vdSteps.push(cxMathcadStep('Z<sub>W</sub>', 'l \u00B7 (r + jx)',
+        (data.cableLength/1000).toFixed(3) + ' \u00B7 (' + cableProduct.r + ' + j' + cableProduct.x + ')',
+        Zw, 'm\u03A9', null));
+      var prefix = voltageStr === '3x400' ? '\u221A3' : '2';
+      vdSteps.push(cxScalarStep('\u0394U', prefix + ' \u00B7 I<sub>B</sub> \u00B7 l \u00B7 (r\u00B7cos\u03C6 + x\u00B7sin\u03C6)',
+        prefix + ' \u00B7 ' + ib.toFixed(1) + ' \u00B7 ' + L_km.toFixed(3) + ' \u00B7 (' + cableProduct.r + '\u00B7' + data.cosPhi + ' + ' + cableProduct.x + '\u00B7' + sinPhi.toFixed(3) + ')',
+        vdropVal.toFixed(2), 'V', null));
+      vdSteps.push(cxScalarStep('\u0394U%', '\u0394U / U<sub>n</sub> \u00D7 100',
+        vdropVal.toFixed(2) + ' / ' + Un + ' \u00D7 100',
+        vdropPct.toFixed(2), '%',
+        vdropPct <= 3 ? '\u2705 OK (' + tx('under 3% — belysning OK', 'under 3% — lighting OK') + ')' :
+        vdropPct <= 5 ? '\u26A0\uFE0F ' + tx('Over 3% — ikke egnet til belysning', 'Over 3% — not suitable for lighting') :
+        '\u274C ' + tx('Over 5% — overskrider grænsen!', 'Over 5% — exceeds limit!')));
+      results.push({
+        type: 'vdrop',
+        label: tx('Spændingsfald \u0394U% (Viggo-metode)', 'Voltage drop \u0394U% (Viggo method)'),
+        value: vdropPct.toFixed(2) + '% (' + vdropVal.toFixed(2) + ' V)',
+        html: cxRenderSteps(vdSteps, tx('Spændingsfaldskontrol — DS/HD 60364-5-52 §525', 'Voltage drop check — DS/HD 60364-5-52 §525')),
+        status: vdropPct <= 4 ? 'ok' : 'fail',
+        asked: hasQuestion(data, 'vdrop')
+      });
       solved++;
     }
   } else if (hasQuestion(data, 'vdrop')) {
@@ -33259,22 +33282,54 @@ function analyzerSolve(data) {
   }
   total++;
 
-  // === ALWAYS COMPUTE: Short-circuit current ===
+  // === ALWAYS COMPUTE: Short-circuit current (Viggo method — complex impedances) ===
   if (data.cableMm2 && data.cableLength) {
     var cProd = findCableProduct(data.cableMm2, data.cableType);
     if (cProd) {
-      var zNet = 1; // default 1 mOhm network
-      var zTrafo = 5; // default 5 mOhm
-      if (data.trafoKVA && data.trafoUk) {
-        zTrafo = (data.trafoUk / 100) * (Un * Un / (data.trafoKVA * 1000)) * 1000;
-      }
-      var zCable = (cProd.r + cProd.x) * (data.cableLength / 1000) * 1000; // mOhm (r,x in Ohm/km)
-      var zTotal = zNet + zTrafo + zCable;
-      var cFactor = 1.05;
-      var ik3max = (cFactor * Un) / (Math.sqrt(3) * (zNet + zTrafo) / 1000);
-      var ik2min = (0.95 * Un) / (2 * zTotal / 1000);
-      var ikHtml = calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ik3max, ik2min, zTotal, (data.cableType || 'NOIKLX') + ' ' + data.cableMm2 + 'mm\u00B2');
-      results.push({ type: 'ik', label: 'Kortslutningsstr\u00f8m Ik', value: 'Ik3max=' + (ik3max/1000).toFixed(2) + ' kA', html: ikHtml, asked: hasQuestion(data, 'ik') });
+      // Build impedance path as COMPLEX vectors (Viggo method)
+      var _RX = 0.2; // default R/X for network if not known
+      var _Znet_cx = cxNetImpedanceLV(data.skMax_MVA || (data.trafoKVA ? data.trafoKVA * 0.05 : 22), _RX, Un);
+      var _Zt_cx = (data.trafoKVA && data.trafoUk) ?
+        cxTrafoImpedanceLV(data.trafoUk / 100, data.trafoKVA * 1000, data.trafoPcu || 0) :
+        cxRect(2, 10); // default ~11 mΩ
+      var _Zw_cx = cxCableImpedanceMOhm(data.cableLength, cProd.r, cProd.x);
+      var _Ztotal_cx = cxPathImpedance([_Znet_cx, _Zt_cx, _Zw_cx]);
+
+      // 3-phase max fault at start of cable (no cable impedance)
+      var _Zstart_cx = cxPathImpedance([_Znet_cx, _Zt_cx]);
+      var _Ik3F_max_cx = cxFaultCurrent3F(Un, cxScale(_Zstart_cx, 0.001), 1.05); // convert mΩ→Ω
+
+      // Minimum fault at end of cable (fault loop: factor 2 for PE return)
+      var _ZsFB_cx = cxAdd(cxAdd(_Znet_cx, _Zt_cx), cxScale(_Zw_cx, 2)); // Zs = Znet + Zt + 2·Zw
+      var _IkMin_cx = cxFaultCurrentFN(230, cxScale(_ZsFB_cx, 0.001), 0.95); // U0=230V, Zs in Ω
+
+      var ikSteps = [];
+      ikSteps.push(cxMathcadStep('Z<sub>net,LV</sub>', '(U<sub>n</sub>\u00B2 / S<sub>k</sub>) \u2220 arccot(R/X)',
+        null, _Znet_cx, 'm\u03A9', null));
+      ikSteps.push(cxMathcadStep('Z<sub>T,LV</sub>', '(U<sub>n</sub>\u00B2 \u00B7 e<sub>k</sub> / S<sub>T</sub>) \u2220 arccos(e<sub>r</sub>/e<sub>k</sub>)',
+        null, _Zt_cx, 'm\u03A9', null));
+      ikSteps.push(cxMathcadStep('Z<sub>W</sub>', 'l \u00B7 (r + jx)',
+        (data.cableLength/1000).toFixed(3) + ' km \u00B7 (' + cProd.r + ' + j' + cProd.x + ') \u00D7 1000',
+        _Zw_cx, 'm\u03A9', null));
+      ikSteps.push(cxMathcadStep('Z<sub>total</sub>', 'Z<sub>net</sub> + Z<sub>T</sub> + Z<sub>W</sub>',
+        tx('Kompleks vektoraddition', 'Complex vector addition'),
+        _Ztotal_cx, 'm\u03A9', null));
+      ikSteps.push(cxMathcadStep('I<sub>K3F,max</sub>', 'c<sub>max</sub> \u00B7 U<sub>n</sub> / (\u221A3 \u00B7 |Z<sub>net</sub>+Z<sub>T</sub>|)',
+        '1,05 \u00B7 ' + Un + ' / (\u221A3 \u00B7 ' + cxMag(_Zstart_cx).toFixed(2) + ' m\u03A9)',
+        _Ik3F_max_cx, 'A',
+        tx('Ved tavlen (uden kabelimpedans)', 'At the board (without cable impedance)')));
+      ikSteps.push(cxScalarStep('I<sub>K,min</sub> (FB)', 'c<sub>min</sub> \u00B7 U<sub>0</sub> / |Z<sub>s</sub>|',
+        '0,95 \u00B7 230 / ' + (cxMag(_ZsFB_cx)/1000).toFixed(4) + ' \u03A9',
+        cxMag(_IkMin_cx).toFixed(0), 'A',
+        'Z<sub>s</sub> = Z<sub>net</sub> + Z<sub>T</sub> + 2\u00B7Z<sub>W</sub> = ' + cxFmtPolar(_ZsFB_cx, 1) + ' m\u03A9'));
+
+      results.push({
+        type: 'ik',
+        label: tx('Kortslutningsberegning (Viggo — kompleks)', 'Short-circuit calculation (Viggo — complex)'),
+        value: 'I<sub>K3F,max</sub>=' + (cxMag(_Ik3F_max_cx)/1000).toFixed(2) + ' kA',
+        html: cxRenderSteps(ikSteps, tx('Kortslutningsberegning — IEC 60909 + DS/HD 60364', 'Short-circuit calculation — IEC 60909 + DS/HD 60364')),
+        asked: hasQuestion(data, 'ik')
+      });
       solved++;
     }
   } else if (hasQuestion(data, 'ik')) {
