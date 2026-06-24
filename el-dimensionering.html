@@ -1540,6 +1540,9 @@ const T = {
       smartgrid: 'Smart Grid',
       kls: 'KLS Kvalitetssystem',
       kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne',
+      autosolver: '\uD83C\uDF93 Eksamen Auto-l\u00f8ser',
+      vektordiagram: '\uD83E\uDDED Vektordiagram',
+      kritisk_review: '\uD83E\uDDE0 Kritisk Review',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
@@ -1749,6 +1752,9 @@ const T = {
       smartgrid: 'Smart Grid',
       kls: 'KLS Quality System',
       kritisk: '\uD83E\uDDE0 Project + Critical Mind',
+      autosolver: '\uD83C\uDF93 Exam Auto-Solver',
+      vektordiagram: '\uD83E\uDDED Vector Diagram',
+      kritisk_review: '\uD83E\uDDE0 Critical Review',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
@@ -5009,7 +5015,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap', 'autosolver', 'vektordiagram', 'kritisk_review']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -7703,6 +7709,9 @@ function renderModule(mod) {
     case 'smartgrid': content = renderSmartGrid(); break;
     case 'kls': content = renderKLS(); break;
     case 'kritisk': content = renderKritisk(); break;
+    case 'autosolver': content = renderAutoSolver(); break;
+    case 'vektordiagram': content = renderVektordiagram(); break;
+    case 'kritisk_review': content = renderKritiskReview(); break;
     case 'impedans': content = renderImpedans(); break;
     case 'trefase': content = renderTrefase(); break;
     case 'motorteori': content = renderMotorteori(); break;
@@ -28147,6 +28156,572 @@ function impedansFmtF(f) {
   if (f >= 1e3) return (f / 1e3).toFixed(2) + ' kHz';
   return f.toFixed(1) + ' Hz';
 }
+// ============================================================================
+// ===== WAVE 2 ENGINEERING INTELLIGENCE =====================================
+//  FEATURE 17  autosolver       Full authorization exam auto-solver (Opg 1-2-3)
+//  FEATURE 16  vektordiagram    Complex-impedance phasor / Argand canvas
+//  FEATURE 18  kritisk_review   "Critical Mind" adversarial worst-case review
+//
+//  LIFE-SAFETY CRITICAL. Exact DS/HD 60364 + IEC 60909 formulas, Viggo Bisch
+//  methodology (arccot network angle, arccos transformer angle, dual rect+polar
+//  display, Danish decimal comma, Mathcad Prime layout). All three features draw
+//  the SAME pure compute engine (autoSolverSolve) so the exam solution, the
+//  phasor canvas and the adversarial audit can never disagree.
+//
+//  CONSERVATIVE BY CONSTRUCTION:
+//   - Ik,max  (breaking capacity)  : c = 1.05, lowest supply impedance, cold cable
+//   - Ik,min  (disconnection)      : c = 0.95, highest supply impedance, WARM cable
+//                                     (r x 1.5), earth-loop factor 2 on cables
+//   - margin < 15% is flagged as a warning even when it technically passes
+// ============================================================================
+
+// --- Danish decimal comma for displayed values (Viggo: 0,800 not 0.800) ------
+function asDa(s) { return String(s).replace(/\./g, ','); }
+
+// Dual rect+polar string for a complex impedance, Danish comma, with unit.
+function asZdual(z, dp, unit) {
+  dp = (dp == null) ? 3 : dp;
+  var u = unit ? (' ' + unit) : '';
+  return asDa(cxFmtRect(z, dp)) + u + ' \u2002{\u2002' + asDa(cxFmtPolar(z, dp)) + u + '\u2002}';
+}
+
+// Mathcad-Prime line whose result is a complex number shown in BOTH forms.
+function asMcZ(sym, op, expr, z, unit, note) {
+  return mcPrimeLine(sym, op, expr, asZdual(z, 3, unit), '', note);
+}
+// Mathcad-Prime line for a scalar result with Danish comma.
+function asMcS(sym, op, expr, val, unit, note) {
+  return mcPrimeLine(sym, op, asDa(expr), asDa(val), unit, note);
+}
+
+// --- Fault-current helpers. Impedances are in mOhm (LV / 400 V level), so
+//     I = c*U / (sqrt3 * Z[Ohm]) = c*U*1000 / (sqrt3 * Z[mOhm])  ->  Amps. ------
+function asIk3(U_V, Z_mohm, c) { var m = cxMag(Z_mohm); return m > 0 ? (c * U_V * 1000) / (Math.sqrt(3) * m) : 0; }
+function asIk1(U0_V, Zs_mohm, c) { var m = cxMag(Zs_mohm); return m > 0 ? (c * U0_V * 1000) / m : 0; }
+
+// --- Conductor r,x in Ohm/km (NKT-class values, Cu) keyed by cross-section -----
+var AS_CABLE_RX = {
+  1.5: { r: 14.48, x: 0.115 }, 2.5: { r: 8.71, x: 0.110 }, 4: { r: 5.43, x: 0.107 },
+  6: { r: 3.62, x: 0.100 }, 10: { r: 2.16, x: 0.094 }, 16: { r: 1.36, x: 0.090 },
+  25: { r: 0.863, x: 0.086 }, 35: { r: 0.627, x: 0.083 }, 50: { r: 0.463, x: 0.083 },
+  70: { r: 0.321, x: 0.082 }, 95: { r: 0.231, x: 0.082 }, 120: { r: 0.183, x: 0.080 },
+  150: { r: 0.149, x: 0.080 }, 185: { r: 0.118, x: 0.080 }, 240: { r: 0.0902, x: 0.079 }
+};
+
+// --- Device trip threshold Ia (the current that disconnects within the required
+//     time). For TN fault protection the requirement is Ik,min >= Ia. We round Ia
+//     UP (conservative: harder to satisfy) and pick the required disconnect time
+//     from DS/HD 60364-4-41 Table 41.1. ----------------------------------------
+function asDeviceIa(lv) {
+  var In = lv.In || 0;
+  var t = (In <= 32) ? 0.4 : 5.0; // TN: final <=32A -> 0,4s; distribution -> 5s
+  if (lv.device === 'MCB') {
+    var m = (lv.curve === 'B') ? 5 : (lv.curve === 'D') ? 20 : 10; // B 5x, C 10x, D 20x
+    return { Ia: m * In, basis: (lv.curve || 'C') + '\u00B7I<sub>n</sub> (' + m + '\u00D7)', t: t };
+  }
+  if (lv.device === 'fuse') {
+    // gG fuse: conservative 5x In trip current for the required time window.
+    return { Ia: 5 * In, basis: 'I<sub>a</sub>(gG) \u2248 5\u00B7I<sub>n</sub>', t: t };
+  }
+  // MCCB: short-time pickup Isd (default 10x In) is the magnetic disconnect.
+  var isd = lv.isdMult || 10;
+  return { Ia: isd * In, basis: 'I<sub>sd</sub> = ' + isd + '\u00B7I<sub>n</sub>', t: t };
+}
+
+// ----------------------------------------------------------------------------
+//  STATE  (100% click-only — every field is set by a button / select handler)
+// ----------------------------------------------------------------------------
+let autoSolverState = {
+  // OPGAVE 1 — supply data
+  Un_HV_kV: 10,        // HV nominal (display / context)
+  Un_LV: 400,          // LV line voltage
+  U0: 230,             // LV phase voltage
+  Sk_max_MVA: 250,     // utility max short-circuit power -> Ik,max (Znet,min)
+  Sk_min_MVA: 150,     // utility min short-circuit power -> Ik,min (Znet,max)
+  RX: 0.1,             // network R/X ratio (angle via arccot)
+  Sn_kVA: 630,         // transformer rated power
+  ek_pct: 4,           // transformer short-circuit voltage ek
+  Pcu_W: 6500,         // transformer copper/load loss (angle via arccos)
+  earthing: 'TN',      // earthing system
+  ambientC: 30,        // ambient for Iz derating
+  grouping: 1,         // grouped circuits for Iz derating
+  // OPGAVE 2 — building cascade (main board -> sub board -> final circuit)
+  levels: [
+    { key: 'main', name_da: 'Hovedtavle', name_en: 'Main board', S_mm2: 150, r: 0.149, x: 0.080, n: 1, len_m: 30, IB: 250, In: 250, device: 'MCCB', isdMult: 10, mat: 'Cu', ins: 'XLPE', phases: '3x400', cosPhi: 0.9 },
+    { key: 'sub', name_da: 'Undertavle', name_en: 'Sub board', S_mm2: 35, r: 0.627, x: 0.083, n: 1, len_m: 25, IB: 80, In: 100, device: 'MCCB', isdMult: 10, mat: 'Cu', ins: 'XLPE', phases: '3x400', cosPhi: 0.9 },
+    { key: 'final', name_da: 'Slutkreds', name_en: 'Final circuit', S_mm2: 6, r: 3.62, x: 0.100, n: 1, len_m: 20, IB: 16, In: 16, device: 'MCB', curve: 'C', mat: 'Cu', ins: 'PVC', phases: '3x400', cosPhi: 0.9 }
+  ]
+};
+
+// ----------------------------------------------------------------------------
+//  THE PURE ENGINE — used by all three Wave-2 features (no DOM, no globals
+//  mutated). Returns the complete Opgave-1 + Opgave-2 result set.
+// ----------------------------------------------------------------------------
+function autoSolverSolve(st) {
+  st = st || autoSolverState;
+  var U = st.Un_LV || 400, U0 = st.U0 || 230;
+  var ek = (st.ek_pct || 4) / 100;
+  var Sn = (st.Sn_kVA || 630) * 1000;
+  var Pcu = st.Pcu_W || 0;
+  var RX = (st.RX != null) ? st.RX : 0.1;
+
+  // ===== OPGAVE 1 — FORSYNING =====
+  // Network impedance referred to LV (mOhm). arccot(R/X) network angle.
+  var Znet_minF = cxNetImpedanceLV(st.Sk_max_MVA, RX, U); // smallest Z  -> Ik,max
+  var Znet_maxF = cxNetImpedanceLV(st.Sk_min_MVA, RX, U); // largest Z   -> Ik,min
+  // Transformer impedance at LV (mOhm). arccos(Pcu/(Sn*ek)) transformer angle.
+  var Ztrafo = cxTrafoImpedanceLV(ek, Sn, Pcu);
+  // er for display
+  var er_pct = (Pcu / Sn) * 100;
+  // Combined supply impedance at the LV busbar.
+  var Zbus_max = cxAdd(Znet_minF, Ztrafo); // for Ik,max
+  var Zbus_min = cxAdd(Znet_maxF, Ztrafo); // for Ik,min
+  var I11 = cxFullLoadCurrent(Sn, U);      // LV full-load current
+  var Ik3_bus = asIk3(U, Zbus_max, 1.05);  // 3-ph fault at busbar (breaking duty)
+  var Ik1_bus = asIk1(U0, Zbus_min, 0.95);
+
+  // ===== OPGAVE 2 — BYGNINGSINSTALLATION (cascade) =====
+  var Z1 = Object.assign({}, Zbus_max);    // positive-seq path (cable factor 1, cold) -> Ik,max
+  var Zloop = Object.assign({}, Zbus_min); // earth-fault loop (cable factor 2, WARM) -> Ik,min
+  var cumVdrop = 0;
+  var nodes = [];
+  for (var i = 0; i < st.levels.length; i++) {
+    var lv = st.levels[i];
+    var n = lv.n || 1;
+    var is3 = (lv.phases !== '1x230');
+    // Cold positive-sequence cable impedance (mOhm), parallel-aware.
+    var Zc = cxScale(cxCableImpedanceMOhm(lv.len_m, lv.r, lv.x), 1 / n);
+    Z1 = cxAdd(Z1, Zc);
+    // Warm earth-loop cable impedance: r x 1.5, factor 2 (go + return).
+    var ZcLoop = cxScale(cxScale(cxCableImpedanceMOhm(lv.len_m, lv.r * 1.5, lv.x), 1 / n), 2);
+    Zloop = cxAdd(Zloop, ZcLoop);
+
+    var Ik3max = asIk3(U, Z1, 1.05);
+    var Ik1min = asIk1(U0, Zloop, 0.95);
+
+    // OB-kontrol: IB <= In <= Iz  (derated Iz)
+    var sizing = cxCableSizing(lv.In, 'C', st.ambientC || 30, st.grouping || 1, lv.S_mm2, lv.mat || 'Cu', lv.ins || 'XLPE');
+    var Iz = sizing.Iz_corr;
+    var IB = lv.IB || 0;
+    var obOk = (IB <= lv.In) && (lv.In <= Iz);
+
+    // Spaendingsfald (voltage drop %), cumulative through the cascade.
+    var cos = lv.cosPhi || 0.9, sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+    var dv;
+    if (is3) { dv = Math.sqrt(3) * IB * (lv.len_m / 1000) * (lv.r * cos + lv.x * sin) / U * 100; }
+    else { dv = 2 * IB * (lv.len_m / 1000) * (lv.r * cos + lv.x * sin) / U0 * 100; }
+    cumVdrop += dv;
+
+    // Fejlbeskyttelse: Ik,min >= Ia  and  Zs*Ia <= U0(0,95)
+    var ia = asDeviceIa(lv);
+    var Zs_ohm = cxMag(Zloop) / 1000;
+    var fbOk = Ik1min >= ia.Ia;
+    var zsIa = Zs_ohm * ia.Ia;
+    var u0min = 0.95 * U0;
+    var fbZsOk = zsIa <= u0min;
+
+    // KB-kontrol: I2t <= k2S2 (adiabatic)
+    var kb = cxKBKontrol(Ik3max, ia.t, lv.S_mm2, lv.mat || 'Cu', lv.ins || 'XLPE');
+
+    nodes.push({
+      lv: lv, is3: is3, Zc: Object.assign({}, Zc),
+      Z1: Object.assign({}, Z1), Zloop: Object.assign({}, Zloop),
+      Ik3max: Ik3max, Ik1min: Ik1min, Iz: Iz, sizing: sizing, IB: IB,
+      obOk: obOk, dv: dv, cumVdrop: cumVdrop, ia: ia, fbOk: fbOk,
+      zsIa: zsIa, u0min: u0min, fbZsOk: fbZsOk, Zs_ohm: Zs_ohm, kb: kb
+    });
+  }
+
+  return {
+    U: U, U0: U0, Znet_minF: Znet_minF, Znet_maxF: Znet_maxF, Ztrafo: Ztrafo,
+    er_pct: er_pct, Zbus_max: Zbus_max, Zbus_min: Zbus_min, I11: I11,
+    Ik3_bus: Ik3_bus, Ik1_bus: Ik1_bus, nodes: nodes, cumVdrop: cumVdrop
+  };
+}
+
+// ----------------------------------------------------------------------------
+//  FEATURE 17  —  click handlers
+// ----------------------------------------------------------------------------
+function asSet(field, val) { autoSolverState[field] = val; renderModule('autosolver'); }
+function asSetLevel(i, field, val) { if (autoSolverState.levels[i]) { autoSolverState.levels[i][field] = val; } renderModule('autosolver'); }
+function asSetCable(i, mm2) {
+  var lv = autoSolverState.levels[i]; if (!lv) return;
+  var rx = AS_CABLE_RX[mm2]; if (rx) { lv.S_mm2 = mm2; lv.r = rx.r; lv.x = rx.x; }
+  renderModule('autosolver');
+}
+
+function asBtnRow(field, opts, cur, suffix) {
+  return opts.map(function (o) {
+    var v = (typeof o === 'object') ? o.v : o;
+    var lbl = (typeof o === 'object') ? o.l : (o + (suffix || ''));
+    var arg = (typeof v === 'string') ? ("'" + v + "'") : v;
+    return '<button class="sel-btn' + (cur == v ? ' selected' : '') + '" onclick="asSet(\'' + field + '\',' + arg + ')">' + lbl + '</button>';
+  }).join('');
+}
+function asLvBtnRow(i, field, opts, cur, suffix) {
+  return opts.map(function (o) {
+    var v = (typeof o === 'object') ? o.v : o;
+    var lbl = (typeof o === 'object') ? o.l : (o + (suffix || ''));
+    var arg = (typeof v === 'string') ? ("'" + v + "'") : v;
+    return '<button class="sel-btn' + (cur == v ? ' selected' : '') + '" onclick="asSetLevel(' + i + ',\'' + field + '\',' + arg + ')">' + lbl + '</button>';
+  }).join('');
+}
+
+function renderAutoSolver() {
+  var st = autoSolverState;
+  var R = autoSolverSolve(st);
+  var h = '';
+
+  // ---- intro / supply input (Opgave 1 data) ----
+  h += '<div class="card fade-in"><div class="card-title">\uD83C\uDF93 ' + tx('Autorisationspr\u00F8ve \u2014 Auto-l\u00F8ser (Opgave 1\u21922\u21923)', 'Authorization exam \u2014 Auto-solver (Opgave 1\u21922\u21923)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'L\u00F8ser hele 3-delte autorisationspr\u00f8ve fra ende til ende med Viggo Bischs metode: komplekse impedanser (arccot for net, arccos for trafo), dobbelt rektangul\u00e6r + pol\u00e6r visning, IEC 60909 c-faktorer og DS/HD 60364. 100% klik. Konservativ \u2014 runder mod sikkerhed.',
+    'Solves the complete 3-part authorization exam end-to-end with Viggo Bisch\'s method: complex impedances (arccot for network, arccos for transformer), dual rectangular + polar display, IEC 60909 c-factors and DS/HD 60364. 100% click. Conservative \u2014 rounds toward safety.') + '</div>';
+
+  h += '<div class="select-group"><div class="select-label">S<sub>k,max</sub> (MVA) \u2014 ' + tx('giver I<sub>k,max</sub>', 'gives I<sub>k,max</sub>') + '</div><div class="select-grid">' + asBtnRow('Sk_max_MVA', [100, 150, 200, 250, 300, 500], st.Sk_max_MVA) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">S<sub>k,min</sub> (MVA) \u2014 ' + tx('giver I<sub>k,min</sub>', 'gives I<sub>k,min</sub>') + '</div><div class="select-grid">' + asBtnRow('Sk_min_MVA', [50, 100, 120, 150, 200, 250], st.Sk_min_MVA) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">R/X ' + tx('(netvinkel via arccot)', '(network angle via arccot)') + '</div><div class="select-grid">' + asBtnRow('RX', [0.05, 0.1, 0.2, 0.3], st.RX) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Transformer', 'Transformer') + ' S<sub>N</sub> (kVA)</div><div class="select-grid">' + asBtnRow('Sn_kVA', [400, 630, 800, 1000, 1250], st.Sn_kVA) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">e<sub>k</sub> (%)</div><div class="select-grid">' + asBtnRow('ek_pct', [4, 4.5, 6], st.ek_pct) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">P<sub>Cu</sub> (W) \u2014 ' + tx('(trafovinkel via arccos)', '(transformer angle via arccos)') + '</div><div class="select-grid">' + asBtnRow('Pcu_W', [4600, 6500, 8400, 10500, 13000], st.Pcu_W) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">U<sub>n</sub> (V)</div><div class="select-grid">' + asBtnRow('Un_LV', [400], st.Un_LV) + '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Jordingssystem', 'Earthing system') + '</div><div class="select-grid">' + asBtnRow('earthing', ['TN', 'TT', 'IT'], st.earthing) + '</div></div>';
+  h += '</div>';
+
+  // ---- cascade input (Opgave 2 data) ----
+  h += '<div class="card fade-in"><div class="card-title">\uD83C\uDFE2 ' + tx('Bygningsinstallation \u2014 kaskade', 'Building installation \u2014 cascade') + '</div>';
+  st.levels.forEach(function (lv, i) {
+    h += '<div class="result-box" style="margin-top:10px"><div class="result-title">' + tx(lv.name_da, lv.name_en) + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">' + tx('Tv\u00e6rsnit', 'Cross-section') + '</span>';
+    h += [1.5, 2.5, 6, 16, 35, 50, 95, 150, 240].map(function (mm2) {
+      return '<button class="sel-btn' + (lv.S_mm2 == mm2 ? ' selected' : '') + '" onclick="asSetCable(' + i + ',' + mm2 + ')">' + mm2 + 'mm\u00b2</button>';
+    }).join('') + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">' + tx('L\u00e6ngde', 'Length') + '</span>' + asLvBtnRow(i, 'len_m', [5, 10, 15, 20, 25, 30, 50, 75, 100], lv.len_m, ' m') + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">I<sub>B</sub> ' + tx('last', 'load') + '</span>' + asLvBtnRow(i, 'IB', [6, 10, 16, 25, 50, 80, 125, 160, 250], lv.IB, ' A') + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">I<sub>n</sub> ' + tx('apparat', 'device') + '</span>' + asLvBtnRow(i, 'In', [6, 10, 16, 25, 32, 50, 80, 100, 125, 160, 250], lv.In, ' A') + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">' + tx('Apparat', 'Device') + '</span>' + asLvBtnRow(i, 'device', ['MCB', 'fuse', 'MCCB'], lv.device) + (lv.device === 'MCB' ? (' ' + asLvBtnRow(i, 'curve', ['B', 'C', 'D'], lv.curve || 'C')) : '') + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:110px">' + tx('Isolering', 'Insulation') + '</span>' + asLvBtnRow(i, 'ins', ['PVC', 'XLPE'], lv.ins) + '</div>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // =====================================================================
+  //  OPGAVE 1 — FORSYNING (20%)
+  // =====================================================================
+  h += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:18px 22px">';
+  h += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('OPGAVE 1 \u2014 Forsyning (20%)', 'OPGAVE 1 \u2014 Supply (20%)') + '</div>';
+  h += mcPrimeHeader(tx('NETIMPEDANS (arccot R/X)', 'NETWORK IMPEDANCE (arccot R/X)'));
+  h += asMcZ('Z<sub>net,min</sub>', ':= (U<sub>n</sub>\u00b2/S<sub>k,max</sub>) \u2220 arccot(R/X) =',
+    '(' + st.Un_LV + '\u00b2/' + st.Sk_max_MVA + '\u00b710\u2076) \u2220 arccot(' + asDa(st.RX) + ')', R.Znet_minF, 'm\u03A9', tx('lille Z \u2192 max fejl', 'small Z \u2192 max fault'));
+  h += asMcZ('Z<sub>net,max</sub>', ':= (U<sub>n</sub>\u00b2/S<sub>k,min</sub>) \u2220 arccot(R/X) =',
+    '(' + st.Un_LV + '\u00b2/' + st.Sk_min_MVA + '\u00b710\u2076) \u2220 arccot(' + asDa(st.RX) + ')', R.Znet_maxF, 'm\u03A9', tx('stor Z \u2192 min fejl', 'large Z \u2192 min fault'));
+  h += mcPrimeHeader(tx('TRANSFORMERIMPEDANS (arccos e_r/e_k)', 'TRANSFORMER IMPEDANCE (arccos e_r/e_k)'));
+  h += asMcS('e<sub>r</sub>', ':= P<sub>Cu</sub>/S<sub>N</sub> =', st.Pcu_W + '/' + (st.Sn_kVA * 1000), R.er_pct.toFixed(3), '%', tx('resistiv andel', 'resistive part'));
+  h += asMcZ('Z<sub>T</sub>', ':= (U<sub>n</sub>\u00b2\u00b7e<sub>k</sub>/S<sub>N</sub>) \u2220 arccos(e<sub>r</sub>/e<sub>k</sub>) =',
+    '(' + st.Un_LV + '\u00b2\u00b7' + asDa(st.ek_pct) + '%/' + (st.Sn_kVA * 1000) + ') \u2220 arccos(' + asDa(R.er_pct.toFixed(3)) + '/' + asDa(st.ek_pct) + ')', R.Ztrafo, 'm\u03A9', null);
+  h += mcPrimeHeader(tx('SAMLET FORSYNINGSIMPEDANS VED LAVSP\u00C6NDINGSSKINNE', 'COMBINED SUPPLY IMPEDANCE AT LV BUSBAR'));
+  h += asMcZ('Z<sub>fors,max</sub>', ':= Z<sub>net,min</sub> + Z<sub>T</sub> =', '', R.Zbus_max, 'm\u03A9', tx('til I<sub>k,max</sub>', 'for I<sub>k,max</sub>'));
+  h += asMcZ('Z<sub>fors,min</sub>', ':= Z<sub>net,max</sub> + Z<sub>T</sub> =', '', R.Zbus_min, 'm\u03A9', tx('til I<sub>k,min</sub>', 'for I<sub>k,min</sub>'));
+  h += asMcS('I<sub>1/1</sub>', ':= S<sub>N</sub>/(\u221A3\u00b7U<sub>n</sub>) =', (st.Sn_kVA * 1000) + '/(\u221A3\u00b7' + st.Un_LV + ')', R.I11.toFixed(1), 'A', tx('fuldlaststr\u00f8m LV', 'full-load current LV'));
+  h += asMcS('I\u2032<sub>k3,max</sub>', ':= 1,05\u00b7U<sub>n</sub>/(\u221A3\u00b7|Z<sub>fors,max</sub>|) =', '', (R.Ik3_bus / 1000).toFixed(2), 'kA', tx('3-faset ved skinne (c=1,05)', '3-phase at busbar (c=1.05)'));
+  h += '</div>';
+
+  // =====================================================================
+  //  OPGAVE 2 — BYGNINGSINSTALLATION (60%)
+  // =====================================================================
+  h += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:18px 22px">';
+  h += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('OPGAVE 2 \u2014 Bygningsinstallation (60%)', 'OPGAVE 2 \u2014 Building installation (60%)') + '</div>';
+  R.nodes.forEach(function (nd) {
+    var lv = nd.lv;
+    h += mcPrimeHeader(tx(lv.name_da, lv.name_en) + ' \u2014 ' + lv.S_mm2 + 'mm\u00b2 ' + (lv.mat || 'Cu') + '/' + (lv.ins || 'XLPE') + ', ' + lv.len_m + 'm');
+    h += asMcZ('Z<sub>kabel</sub>', ':= l\u00b7(r+jx)/n =', lv.len_m + 'm\u00b7(' + asDa(lv.r) + '+j' + asDa(lv.x) + ')\u03A9/km', nd.Zc, 'm\u03A9', tx('positiv sekvens', 'positive sequence'));
+    h += asMcZ('Z<sub>1,akk</sub>', ':= \u03A3 Z (kold, faktor 1) =', '', nd.Z1, 'm\u03A9', tx('akkumuleret til I<sub>k,max</sub>', 'accumulated for I<sub>k,max</sub>'));
+    h += asMcZ('Z<sub>s,akk</sub>', ':= \u03A3 Z (varm r\u00b71,5, sl\u00f8jfe \u00d72) =', '', nd.Zloop, 'm\u03A9', tx('jordfejlssl\u00f8jfe til I<sub>k,min</sub>', 'earth-loop for I<sub>k,min</sub>'));
+    h += asMcS('I<sub>k3,max</sub>', ':= 1,05\u00b7U<sub>n</sub>/(\u221A3\u00b7|Z<sub>1,akk</sub>|) =', '', (nd.Ik3max / 1000).toFixed(2), 'kA', tx('til brydeevne I<sub>cu</sub>', 'for breaking capacity I<sub>cu</sub>'));
+    h += asMcS('I<sub>k,min</sub>', ':= 0,95\u00b7U\u2080/|Z<sub>s,akk</sub>| =', '', nd.Ik1min.toFixed(0), 'A', tx('til udkobling (varm)', 'for disconnection (warm)'));
+    // OB
+    h += mcPrimeLine(tx('OB', 'OL'), 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>z</sub> =', asDa(nd.IB.toFixed(1)) + ' \u2264 ' + lv.In + ' \u2264 ' + asDa(nd.Iz.toFixed(1)) + ' A', (nd.obOk ? mcPrimeOk() : mcPrimeFail(tx('Kabel for lille', 'Cable too small'))), '', mcPrimeRef('DS/HD 60364-4-43 \u00a7433.1'));
+    // Vdrop
+    h += mcPrimeLine('\u0394U', '\u03A3 =', asDa(nd.cumVdrop.toFixed(2)) + '% (\u2264 4%)', (nd.cumVdrop <= 4 ? mcPrimeOk() : mcPrimeFail('>4%')), '', mcPrimeRef('DS/HD 60364-5-52 \u00a7525'));
+    // FB
+    h += mcPrimeLine(tx('FB', 'FP'), 'I<sub>k,min</sub> \u2265 I<sub>a</sub> =', nd.Ik1min.toFixed(0) + ' \u2265 ' + nd.ia.Ia.toFixed(0) + ' A (' + nd.ia.basis + ', t\u2264' + asDa(nd.ia.t) + 's)', (nd.fbOk ? mcPrimeOk() : mcPrimeFail(tx('Udkobler ikke', 'No disconnect'))), '', mcPrimeRef('DS/HD 60364-4-41 \u00a7411.3.2'));
+    // KB
+    h += mcPrimeLine(tx('KB', 'SC'), 'I\u00b2t \u2264 k\u00b2S\u00b2 =', (nd.kb.I2t / 1e6).toFixed(2) + ' \u2264 ' + (nd.kb.k2S2 / 1e6).toFixed(2) + ' \u00d710\u2076 A\u00b2s (k=' + nd.kb.k + ')', (nd.kb.ok ? mcPrimeOk() : mcPrimeFail(tx('Ikke beskyttet', 'Not protected'))), '', mcPrimeRef('DS/HD 60364-4-43 \u00a7434.5.2'));
+  });
+  h += '</div>';
+
+  // =====================================================================
+  //  OPGAVE 3 — REGLER (20%)
+  // =====================================================================
+  h += '<div class="card fade-in"><div class="card-title">\uD83D\uDCD8 ' + tx('OPGAVE 3 \u2014 Regler (20%)', 'OPGAVE 3 \u2014 Regulations (20%)') + '</div>';
+  h += '<div class="info-row">' + tx('Relevante DS/HD 60364-bestemmelser for denne dimensionering og det specifikke krav hver stiller:', 'Relevant DS/HD 60364 clauses for this design and the specific requirement each imposes:') + '</div>';
+  var clauses = autoSolverClauses(st, R);
+  clauses.forEach(function (c) {
+    h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-wrap:wrap;gap:8px"><span>' + mcPrimeRef(c.ref) + '</span><strong>' + tx(c.title_da, c.title_en) + '</strong></div>';
+    h += '<div class="info-row" style="margin:4px 0 0">' + tx(c.req_da, c.req_en) + '</div></div>';
+  });
+  h += '<div class="info-row" style="margin-top:12px">' + tx('Konservativt l\u00f8sningsforslag. Verificer altid mod g\u00e6ldende DS/HD 60364 og Sikkerhedsstyrelsen. Ved tvivl: v\u00e6lg den sikrere l\u00f8sning.', 'Conservative solution proposal. Always verify against the current DS/HD 60364 and the Danish Safety Authority. When in doubt: choose the safer option.') + '</div>';
+  h += '</div>';
+  return h;
+}
+
+// Opgave-3 clause list — each cites the requirement it imposes on THIS design.
+function autoSolverClauses(st, R) {
+  var earth = st.earthing || 'TN';
+  return [
+    { ref: 'DS/HD 60364-4-41', title_da: 'Beskyttelse mod elektrisk st\u00f8d (\u00a7411)', title_en: 'Protection against electric shock (\u00a7411)',
+      req_da: 'Automatisk afbrydelse: I' + 'k,min ved hvert punkt skal udl\u00f8se beskyttelsen inden for ' + (earth === 'TT' ? '0,2s (slutkreds) / 1s (fordeling) i TT' : '0,4s (slutkreds \u226432A) / 5s (fordeling) i TN') + '. Krav: I_k,min \u2265 I_a.',
+      req_en: 'Automatic disconnection: I_k,min at each point must trip protection within ' + (earth === 'TT' ? '0.2s (final) / 1s (distribution) for TT' : '0.4s (final \u226432A) / 5s (distribution) for TN') + '. Requirement: I_k,min \u2265 I_a.' },
+    { ref: 'DS/HD 60364-4-43', title_da: 'Overstr\u00f8msbeskyttelse (\u00a7433/434)', title_en: 'Overcurrent protection (\u00a7433/434)',
+      req_da: 'Overlast: I_B \u2264 I_n \u2264 I_z. Kortslutning: brydeevne I_cu \u2265 I_k3,max (her ' + (R.Ik3_bus / 1000).toFixed(1) + ' kA ved skinne) og adiabatisk I\u00b2t \u2264 k\u00b2S\u00b2.',
+      req_en: 'Overload: I_B \u2264 I_n \u2264 I_z. Short-circuit: breaking capacity I_cu \u2265 I_k3,max (here ' + (R.Ik3_bus / 1000).toFixed(1) + ' kA at busbar) and adiabatic I\u00b2t \u2264 k\u00b2S\u00b2.' },
+    { ref: 'DS/HD 60364-5-52', title_da: 'Valg af kabel og installation (\u00a7523/525)', title_en: 'Selection of wiring & installation (\u00a7523/525)',
+      req_da: 'Str\u00f8mv\u00e6rdi I_z efter alle korrektionsfaktorer (temperatur, gruppering) skal b\u00e6re I_n; sp\u00e6ndingsfald \u2264 4% (\u2264 3% for belysning).',
+      req_en: 'Current-carrying capacity I_z after all correction factors (temperature, grouping) must carry I_n; voltage drop \u2264 4% (\u2264 3% for lighting).' },
+    { ref: 'DS/HD 60364-6', title_da: 'Verifikation (\u00a7641/643)', title_en: 'Verification (\u00a7641/643)',
+      req_da: 'F\u00f8r idrifts\u00e6ttelse: visuel kontrol, m\u00e5ling af isolationsmodstand, kontinuitet af beskyttelsesledere og m\u00e5ling/beregning af jordfejlssl\u00f8jfeimpedans Z_s.',
+      req_en: 'Before commissioning: visual inspection, insulation resistance measurement, continuity of protective conductors, and measurement/calculation of earth-fault loop impedance Z_s.' }
+  ];
+}
+
+// ============================================================================
+//  FEATURE 16 — COMPLEX-IMPEDANCE VECTOR (ARGAND / PHASOR) CANVAS
+// ============================================================================
+let vektorState = { showZ: true, showI: false, showSum: true, headToTail: true, I_mag: 100, cosPhi: 0.85 };
+
+function vekToggle(field) { vektorState[field] = !vektorState[field]; renderModule('vektordiagram'); }
+function vekSet(field, val) { vektorState[field] = val; renderModule('vektordiagram'); }
+
+// Generic Argand renderer. Each vector: {label, z, color, from:{re,im}, dashed}.
+// "from" lets a vector start at another vector's tip (head-to-tail).
+function asRenderArgand(vectors, title, w, h) {
+  w = w || 480; h = h || 380;
+  var cx = w / 2, cy = h / 2;
+  var maxR = 1;
+  vectors.forEach(function (v) {
+    var fx = v.from ? v.from.re : 0, fy = v.from ? v.from.im : 0;
+    maxR = Math.max(maxR, Math.abs(fx + v.z.re), Math.abs(fy + v.z.im), Math.abs(fx), Math.abs(fy));
+  });
+  var scale = (Math.min(w, h) / 2 - 50) / maxR;
+  var svg = '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="background:var(--bg-card);border-radius:8px;display:block;max-width:' + w + 'px;margin:0 auto" role="img">';
+  // axes
+  svg += '<line x1="14" y1="' + cy + '" x2="' + (w - 14) + '" y2="' + cy + '" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<line x1="' + cx + '" y1="14" x2="' + cx + '" y2="' + (h - 14) + '" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<text x="' + (w - 22) + '" y="' + (cy - 6) + '" font-size="11" fill="var(--text-muted)">+Re</text>';
+  svg += '<text x="' + (cx + 6) + '" y="22" font-size="11" fill="var(--text-muted)">+jIm</text>';
+  // markers (one per colour used)
+  var seen = {};
+  vectors.forEach(function (v, i) { if (!seen[v.color]) { seen[v.color] = 'mk' + i; svg += '<defs><marker id="mk' + i + '" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0,0 10,4 0,8" fill="' + v.color + '"/></marker></defs>'; } });
+  // vectors
+  vectors.forEach(function (v, i) {
+    var fx = cx + (v.from ? v.from.re : 0) * scale, fy = cy - (v.from ? v.from.im : 0) * scale;
+    var ex = cx + ((v.from ? v.from.re : 0) + v.z.re) * scale, ey = cy - ((v.from ? v.from.im : 0) + v.z.im) * scale;
+    var dash = v.dashed ? ' stroke-dasharray="6 4"' : '';
+    svg += '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + v.color + '" stroke-width="2.6"' + dash + ' marker-end="url(#' + seen[v.color] + ')"/>';
+    svg += '<text x="' + (ex + 6).toFixed(0) + '" y="' + (ey - 5).toFixed(0) + '" font-size="11" fill="' + v.color + '" font-weight="bold">' + v.label + '</text>';
+  });
+  if (title) svg += '<text x="' + (w / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="10" fill="var(--text-muted)">' + title + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderVektordiagram() {
+  var st = vektorState;
+  var R = autoSolverSolve(autoSolverState);
+  // Cable total = sum of cable impedances across the cascade (positive sequence).
+  var Zcable = cxRect(0, 0);
+  R.nodes.forEach(function (nd) { Zcable = cxAdd(Zcable, nd.Zc); });
+  var Znet = R.Znet_minF, Ztrafo = R.Ztrafo;
+  var Ztotal = cxAdd(cxAdd(Znet, Ztrafo), Zcable);
+
+  var h = '<div class="card fade-in"><div class="card-title">\uD83E\uDDED ' + tx('Kompleks-impedans vektordiagram', 'Complex-impedance vector diagram') + '</div>';
+  h += '<div class="info-row">' + tx('Interaktivt Argand-/visediagram. Impedanserne deler samme sandhed som auto-l\u00f8seren. Z vises fra origo, og vektorsummen demonstreres hoved-til-hale. Klik for at v\u00e6lge st\u00f8rrelser.', 'Interactive Argand/phasor diagram. The impedances share the same truth as the auto-solver. Z drawn from origin, and the vector sum shown head-to-tail. Click to choose quantities.') + '</div>';
+
+  // toggle controls
+  h += '<div class="select-group"><div class="select-label">' + tx('Vis', 'Show') + '</div><div class="select-grid">';
+  h += '<button class="sel-btn' + (st.showZ ? ' selected' : '') + '" onclick="vekToggle(\'showZ\')">Z ' + tx('impedanser', 'impedances') + '</button>';
+  h += '<button class="sel-btn' + (st.showSum ? ' selected' : '') + '" onclick="vekToggle(\'showSum\')">\u03A3 Z<sub>total</sub></button>';
+  h += '<button class="sel-btn' + (st.headToTail ? ' selected' : '') + '" onclick="vekToggle(\'headToTail\')">' + tx('Hoved-til-hale', 'Head-to-tail') + '</button>';
+  h += '<button class="sel-btn' + (st.showI ? ' selected' : '') + '" onclick="vekToggle(\'showI\')">I ' + tx('str\u00f8mme (3-faset)', 'currents (3-phase)') + '</button>';
+  h += '</div></div>';
+  if (st.showI) {
+    h += '<div class="select-group"><div class="select-label">|I| (A) / cos\u03C6</div><div class="select-grid">';
+    [25, 50, 100, 200, 400].forEach(function (v) { h += '<button class="sel-btn' + (st.I_mag == v ? ' selected' : '') + '" onclick="vekSet(\'I_mag\',' + v + ')">' + v + 'A</button>'; });
+    [0.7, 0.85, 0.95, 1.0].forEach(function (v) { h += '<button class="sel-btn' + (st.cosPhi == v ? ' selected' : '') + '" onclick="vekSet(\'cosPhi\',' + v + ')">' + asDa(v) + '</button>'; });
+    h += '</div></div>';
+  }
+
+  // ---- impedance diagram ----
+  if (st.showZ) {
+    var vecs = [];
+    vecs.push({ label: 'Z_net', z: Znet, color: '#42a5f5' });
+    vecs.push({ label: 'Z_T', z: Ztrafo, color: '#66bb6a' });
+    vecs.push({ label: 'Z_kabel', z: Zcable, color: '#ffa726' });
+    if (st.headToTail) {
+      vecs.push({ label: '', z: Ztrafo, color: '#90a4ae', from: { re: Znet.re, im: Znet.im }, dashed: true });
+      vecs.push({ label: '', z: Zcable, color: '#90a4ae', from: { re: Znet.re + Ztrafo.re, im: Znet.im + Ztrafo.im }, dashed: true });
+    }
+    if (st.showSum) vecs.push({ label: 'Z_total', z: Ztotal, color: '#ef5350' });
+    h += '<div class="card" style="margin-top:12px">' + asRenderArgand(vecs, tx('Impedansvektorer (m\u03A9, LV)', 'Impedance vectors (m\u03A9, LV)')) + '</div>';
+    h += '<div class="result-box" style="margin-top:10px;font-family:\'Cambria Math\',serif">';
+    h += mcPrimeLine('Z<sub>net</sub>', '=', '', asZdual(Znet, 3, 'm\u03A9'), '', '');
+    h += mcPrimeLine('Z<sub>T</sub>', '=', '', asZdual(Ztrafo, 3, 'm\u03A9'), '', '');
+    h += mcPrimeLine('Z<sub>kabel</sub>', '=', '', asZdual(Zcable, 3, 'm\u03A9'), '', '');
+    h += mcPrimeLine('Z<sub>total</sub>', '= Z<sub>net</sub>+Z<sub>T</sub>+Z<sub>kabel</sub> =', '', asZdual(Ztotal, 3, 'm\u03A9'), '', tx('vektorsum', 'vector sum'));
+    h += '</div>';
+  }
+
+  // ---- current phasors (balanced 3-phase, 120 deg apart) ----
+  if (st.showI) {
+    var phi = -Math.acos(st.cosPhi) * 180 / Math.PI; // lagging
+    var I1 = cxPolar(st.I_mag, phi);
+    var I2 = cxPolar(st.I_mag, phi - 120);
+    var I3 = cxPolar(st.I_mag, phi + 120);
+    var ivecs = [
+      { label: 'I_L1', z: I1, color: '#ef5350' },
+      { label: 'I_L2', z: I2, color: '#ab47bc' },
+      { label: 'I_L3', z: I3, color: '#26c6da' }
+    ];
+    h += '<div class="card" style="margin-top:12px">' + asRenderArgand(ivecs, tx('Str\u00f8mvektorer (A), 120\u00b0 forskudt', 'Current phasors (A), 120\u00b0 apart')) + '</div>';
+    h += '<div class="result-box" style="margin-top:10px;font-family:\'Cambria Math\',serif">';
+    h += mcPrimeLine('I<sub>L1</sub>', '=', '', asDa(st.I_mag.toFixed(1)) + ' A \u2220' + asDa(phi.toFixed(1)) + '\u00b0', '', '');
+    h += mcPrimeLine('I<sub>L2</sub>', '=', '', asDa(st.I_mag.toFixed(1)) + ' A \u2220' + asDa((phi - 120).toFixed(1)) + '\u00b0', '', '');
+    h += mcPrimeLine('I<sub>L3</sub>', '=', '', asDa(st.I_mag.toFixed(1)) + ' A \u2220' + asDa((phi + 120).toFixed(1)) + '\u00b0', '', tx('balanceret system', 'balanced system'));
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ============================================================================
+//  FEATURE 18 — "CRITICAL MIND" ADVERSARIAL WORST-CASE REVIEW
+// ============================================================================
+// Severity from margin: critical if it fails, warning if it passes but the
+// margin is < 15% (never optimistic), ok otherwise.
+function asMarginSev(pass, margin) {
+  if (!pass) return 'critical';
+  if (margin < 0.15) return 'warning';
+  return 'ok';
+}
+
+// Pure adversarial analysis over the SAME solve result. Returns worst-case
+// margins + the dangerous edge case + clause + conservative recommendation.
+function kritiskReviewAnalyze(R, st) {
+  st = st || autoSolverState;
+  var findings = [];
+  R.nodes.forEach(function (nd) {
+    var lv = nd.lv;
+    var nm = tx(lv.name_da, lv.name_en);
+
+    // 1. Zs disconnection at 0,95*U0 (minimum-voltage worst case)
+    var zsMargin = (nd.u0min > 0) ? (nd.u0min - nd.zsIa) / nd.u0min : -1;
+    findings.push({
+      sev: asMarginSev(nd.fbZsOk, zsMargin), node: nm,
+      title_da: 'Udkobling ved 0,95\u00b7U\u2080 (Z\u209b\u00b7I\u2090 \u2264 U\u2080)', title_en: 'Disconnection at 0.95\u00b7U\u2080 (Z\u209b\u00b7I\u2090 \u2264 U\u2080)',
+      detail_da: 'V\u00e6rst tilf\u00e6lde lav sp\u00e6nding: Z\u209b\u00b7I\u2090 = ' + asDa(nd.zsIa.toFixed(0)) + ' V mod U\u2080 = ' + asDa(nd.u0min.toFixed(0)) + ' V',
+      detail_en: 'Worst-case low voltage: Z\u209b\u00b7I\u2090 = ' + nd.zsIa.toFixed(0) + ' V vs U\u2080 = ' + nd.u0min.toFixed(0) + ' V',
+      margin: zsMargin, clause: 'DS/HD 60364-4-41 \u00a7411.4.4',
+      rec_da: 'St\u00f8rre kabel (lavere Z\u209b), hurtigere/mere f\u00f8lsom afbryder eller tilf\u00f8j HPFI.',
+      rec_en: 'Larger cable (lower Z\u209b), faster/more sensitive device, or add an RCD.'
+    });
+
+    // 2. Ik,min >= Ia (magnetic trip threshold)
+    var iaMargin = (nd.ia.Ia > 0) ? (nd.Ik1min - nd.ia.Ia) / nd.ia.Ia : -1;
+    findings.push({
+      sev: asMarginSev(nd.fbOk, iaMargin), node: nm,
+      title_da: 'I_k,min \u2265 I_a (magnetisk udl\u00f8ser)', title_en: 'I_k,min \u2265 I_a (magnetic trip)',
+      detail_da: 'I_k,min = ' + nd.Ik1min.toFixed(0) + ' A mod I_a = ' + nd.ia.Ia.toFixed(0) + ' A (' + nd.ia.basis + ')',
+      detail_en: 'I_k,min = ' + nd.Ik1min.toFixed(0) + ' A vs I_a = ' + nd.ia.Ia.toFixed(0) + ' A (' + nd.ia.basis + ')',
+      margin: iaMargin, clause: 'DS/HD 60364-4-41 \u00a7411.3.2',
+      rec_da: 'V\u00e6lg apparat med lavere magnetudl\u00f8sning (B-kurve), kortere/st\u00f8rre kabel.',
+      rec_en: 'Choose a device with lower magnetic trip (B-curve), shorter/larger cable.'
+    });
+
+    // 3. Iz after derating vs In (overload margin)
+    var izMargin = (nd.Iz > 0) ? (nd.Iz - lv.In) / nd.Iz : -1;
+    findings.push({
+      sev: asMarginSev(nd.obOk, izMargin), node: nm,
+      title_da: 'I_z (derateret) \u2265 I_n \u2265 I_B', title_en: 'I_z (derated) \u2265 I_n \u2265 I_B',
+      detail_da: 'I_B=' + asDa(nd.IB.toFixed(1)) + ' / I_n=' + lv.In + ' / I_z=' + asDa(nd.Iz.toFixed(1)) + ' A',
+      detail_en: 'I_B=' + nd.IB.toFixed(1) + ' / I_n=' + lv.In + ' / I_z=' + nd.Iz.toFixed(1) + ' A',
+      margin: izMargin, clause: 'DS/HD 60364-4-43 \u00a7433.1',
+      rec_da: 'St\u00f8rre tv\u00e6rsnit eller lavere ompgivelses-/grupperingsbelastning.',
+      rec_en: 'Larger cross-section or lower ambient/grouping load.'
+    });
+
+    // 4. I2t let-through vs k2S2 cable withstand
+    var kbMargin = (nd.kb.k2S2 > 0) ? (nd.kb.k2S2 - nd.kb.I2t) / nd.kb.k2S2 : -1;
+    findings.push({
+      sev: asMarginSev(nd.kb.ok, kbMargin), node: nm,
+      title_da: 'I\u00b2t \u2264 k\u00b2S\u00b2 (adiabatisk)', title_en: 'I\u00b2t \u2264 k\u00b2S\u00b2 (adiabatic)',
+      detail_da: 'I\u00b2t=' + (nd.kb.I2t / 1e6).toFixed(2) + ' mod k\u00b2S\u00b2=' + (nd.kb.k2S2 / 1e6).toFixed(2) + ' \u00d710\u2076 A\u00b2s',
+      detail_en: 'I\u00b2t=' + (nd.kb.I2t / 1e6).toFixed(2) + ' vs k\u00b2S\u00b2=' + (nd.kb.k2S2 / 1e6).toFixed(2) + ' \u00d710\u2076 A\u00b2s',
+      margin: kbMargin, clause: 'DS/HD 60364-4-43 \u00a7434.5.2',
+      rec_da: 'St\u00f8rre tv\u00e6rsnit eller hurtigere (str\u00f8mbegr\u00e6nsende) afbryder.',
+      rec_en: 'Larger cross-section or a faster (current-limiting) device.'
+    });
+  });
+
+  // 5. Selectivity between cascaded devices (current grading rule of thumb >= 1.6)
+  for (var i = 0; i < R.nodes.length - 1; i++) {
+    var up = R.nodes[i], dn = R.nodes[i + 1];
+    var ratio = (dn.lv.In > 0) ? up.lv.In / dn.lv.In : 0;
+    var selOk = ratio >= 1.6;
+    var selMargin = (ratio - 1.6) / 1.6;
+    findings.push({
+      sev: selOk ? (selMargin < 0.15 ? 'warning' : 'ok') : 'critical', node: tx(up.lv.name_da, up.lv.name_en) + ' \u2192 ' + tx(dn.lv.name_da, dn.lv.name_en),
+      title_da: 'Selektivitet (I_n forhold \u2265 1,6)', title_en: 'Selectivity (I_n ratio \u2265 1.6)',
+      detail_da: 'Forhold = ' + lv_ratio(up.lv.In) + '/' + dn.lv.In + ' = ' + asDa(ratio.toFixed(2)),
+      detail_en: 'Ratio = ' + up.lv.In + '/' + dn.lv.In + ' = ' + ratio.toFixed(2),
+      margin: selMargin, clause: 'DS/HD 60364-5-53 \u00a7536',
+      rec_da: 'Forstr\u00f8r afstanden mellem apparat-st\u00f8rrelser eller brug tidsforsinkelse / str\u00f8mbegr\u00e6nsning.',
+      rec_en: 'Increase the gap between device sizes or use time grading / current limiting.'
+    });
+  }
+
+  // verdict: worst severity wins
+  var verdict = 'ok';
+  findings.forEach(function (f) { if (f.sev === 'critical') verdict = 'critical'; else if (f.sev === 'warning' && verdict !== 'critical') verdict = 'warning'; });
+  return { verdict: verdict, findings: findings };
+}
+function lv_ratio(v) { return v; } // tiny helper kept for symmetry/readability
+
+function renderKritiskReview() {
+  var R = autoSolverSolve(autoSolverState);
+  var rev = kritiskReviewAnalyze(R, autoSolverState);
+  var meta = {
+    critical: { c: '#ef5350', icon: '\u26D4', da: 'KRITISK \u2014 farlig', en: 'CRITICAL \u2014 dangerous' },
+    warning: { c: '#ffa726', icon: '\u26A0\uFE0F', da: 'ADVARSEL \u2014 lav margin', en: 'WARNING \u2014 low margin' },
+    ok: { c: '#66bb6a', icon: '\u2705', da: 'OK \u2014 robust margin', en: 'OK \u2014 robust margin' }
+  };
+  var vm = meta[rev.verdict];
+
+  var h = '<div class="card fade-in"><div class="card-title">\uD83E\uDDE0 ' + tx('Kritisk Hjerne \u2014 modstandsdygtig review', 'Critical Mind \u2014 adversarial review') + '</div>';
+  h += '<div class="info-row">' + tx('Pr\u00f8ver bevidst at finde fejltilstande i det aktuelle design (auto-l\u00f8serens kaskade). For hver kontrol beregnes det V\u00c6RSTE tilf\u00e6lde og marginen rapporteres. Margin < 15% flages som advarsel selv om den teknisk best\u00e5r. Aldrig optimistisk \u2014 ved tvivl anbefales den sikrere l\u00f8sning.', 'Deliberately tries to find failure modes in the current design (the auto-solver cascade). For each check the WORST case is computed and the margin reported. Margin < 15% is flagged as a warning even when it technically passes. Never optimistic \u2014 when in doubt the safer option is recommended.') + '</div>';
+  h += '<div class="result-box" style="border-left:6px solid ' + vm.c + ';margin-top:8px"><div class="result-title" style="color:' + vm.c + '">' + vm.icon + ' ' + tx('Konklusion', 'Verdict') + ': ' + tx(vm.da, vm.en) + '</div></div>';
+  h += '</div>';
+
+  // grouped by severity: critical, warning, ok
+  ['critical', 'warning', 'ok'].forEach(function (sev) {
+    var group = rev.findings.filter(function (f) { return f.sev === sev; });
+    if (!group.length) return;
+    var m = meta[sev];
+    h += '<div class="card fade-in" style="font-family:\'Cambria Math\',serif;border-left:4px solid ' + m.c + '"><div class="card-title" style="font-family:sans-serif;color:' + m.c + '">' + m.icon + ' ' + tx(m.da, m.en) + ' (' + group.length + ')</div>';
+    group.forEach(function (f) {
+      var pct = (f.margin * 100);
+      var pctStr = (isFinite(pct) ? (pct >= 0 ? '+' : '') + asDa(pct.toFixed(0)) + '%' : '\u2014');
+      h += '<div class="result-box" style="margin-top:8px;border-left:4px solid ' + m.c + '">';
+      h += '<div class="result-row" style="flex-wrap:wrap;gap:8px"><strong>' + f.node + '</strong><span>' + tx(f.title_da, f.title_en) + '</span><span style="margin-left:auto;font-weight:800;color:' + m.c + '">' + tx('margin', 'margin') + ' ' + pctStr + '</span></div>';
+      h += '<div class="info-row" style="margin:4px 0 0">' + tx(f.detail_da, f.detail_en) + '</div>';
+      h += '<div style="margin-top:4px">' + mcPrimeRef(f.clause) + '</div>';
+      h += '<div class="info-row" style="margin:4px 0 0;font-style:italic">\uD83D\uDD27 ' + tx(f.rec_da, f.rec_en) + '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+
 function renderImpedans() {
   var res = impedansCalcAll(impedansState);
   var html = '<div class="card fade-in">';
