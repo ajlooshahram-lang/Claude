@@ -11985,7 +11985,6 @@ function renderBid() {
         </div>
       </div>
       ${bidState.laborMode === 'akkord' ? `
-      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-row"><span class="label">${tx('Montagetid i alt', 'Total install time')}</span><span class="value">${Math.round(totalMinutes)} min = ${akkordHours.toFixed(1)} t</span></div>
         <div class="result-row"><span class="label" style="font-size:0.72rem;color:var(--text-muted)">${tx('Beregnet automatisk fra akkord-tider', 'Auto-derived from akkord times')}</span></div>
       </div>` : `
@@ -12179,7 +12178,6 @@ function renderKalkulation() {
     '<div class="card-title">\uD83E\uDDEE ' + tx('Kalkulation / Tilbud', 'Calculation / Tender') + '</div>' +
     '<div class="info-row">' + tx('Automatisk materialeoptag direkte fra dit enstregede diagram (sldTree = \u00E9n sandhedskilde). Materialer, arbejdsl\u00F8n (akkord), generalomkostninger, avance og moms 25% beregnes ud fra den dimensionerede installation \u2014 ingen genindtastning.', 'Automatic material take-off straight from your single-line diagram (sldTree = single source of truth). Materials, labour (akkord), overhead, margin and 25% VAT are computed from the dimensioned installation \u2014 no re-typing.') + '</div>' +
     '<div class="info-row" style="font-size:0.72rem;color:var(--text-muted)">' + tx('Konkurrent til EG Sigma GC / Calcia GC \u2014 men koblet direkte til installationen. Kabler dimensioneret iht. DS/HD 60364-5-52, overstr\u00F8m 4-43, fejlbeskyttelse 4-41.', 'A competitor to EG Sigma GC / Calcia GC \u2014 but wired directly to the installation. Cables sized per DS/HD 60364-5-52, overcurrent 4-43, fault protection 4-41.') + '</div>' +
-    '<div class="result-box" style="margin-top:8px">' +
       '<div class="result-row"><span class="label">' + tx('Kredse/tavler l\u00E6st fra installationen', 'Circuits/boards read from installation') + '</span><span class="value">' + circuits + '</span></div>' +
       '<div class="result-row"><span class="label">' + tx('Unikke varelinjer', 'Unique line items') + '</span><span class="value">' + takeoff.length + '</span></div>' +
     '</div>' +
@@ -20488,6 +20486,12 @@ function renderShev() {
   html += '</div></div>';
 
   // Results
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Ventilation (SHEV)','Smoke Ventilation (SHEV)') + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 12101') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 12101 + BR18 §100</div>';
 
@@ -20620,6 +20624,12 @@ function renderAccess() {
   html += '</div></div>';
 
   // Results
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Adgangskontrol','Access Control') + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 60839') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 50133</div>';
   html += '<div class="result-row"><span class="label">' + tx('Strøm per dør', 'Current per Door') + '</span><span class="value">' + perDoor + ' mA</span></div>';
@@ -41566,6 +41576,13 @@ function renderDiversity() {
 
   // Show added loads
   if (s.loads.length > 0) {
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Diversitetsberegning','Diversity Calculation') + '</div>';
+  html += mcPrimeLine('P<sub>dim</sub>', ':= \u2211(P\u00B7d<sub>f</sub>) =', '', diversityCalcState.resultKw.toFixed(1), 'kW', tx('Dimensionerende effekt','Design power'));
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/HD 60364-5-52') + ' ' + mcPrimeRef('F\u00E6llesregulativet') + '</div>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('Belastninger', 'Loads') + '</div>';
     s.loads.forEach(function(load, idx) {
       var cat = DIVERSITY_CATEGORIES.filter(function(c) { return c.id === load.catId; })[0];
