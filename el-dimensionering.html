@@ -11572,7 +11572,7 @@ function axGenInstallation(rng, b, tier) {
   };
 }
 
-function axTasksInstallation(d, tier, maxTasks) {
+function axTasksInstallation(d, tier, maxTasks, rng) {
   var tasks = [];
   var kTemp = TEMP_FACTORS[d.ambient] || 1;
   var kGroup = GROUP_FACTORS[d.grouping] || 1;
@@ -11602,7 +11602,27 @@ function axTasksInstallation(d, tier, maxTasks) {
   var Ia = 10 * endIn; var U0 = 230; var zsMax = axZsMax(U0, Ia);
   var n7 = axNumOpts(Math.round(zsMax * 100) / 100, [Math.round(zsMax * 1.5 * 100) / 100, Math.round(zsMax * 0.6 * 100) / 100, Math.round(zsMax * 2 * 100) / 100]);
   tasks.push({ id: 't_zs', kind: 'zs', prompt: { da: 'Bestem den maksimalt tilladte sl\u00f8jfeimpedans Zs for en endegruppe beskyttet af en C' + endIn + ' automatsikring (Ia = 10\u00b7In, U0 = 230 V).', en: 'Determine the maximum permissible loop impedance Zs for a final circuit protected by a C' + endIn + ' MCB (Ia = 10\u00b7In, U0 = 230 V).' }, given: { U0: U0, Ia: Ia, endIn: endIn }, answer: Math.round(zsMax * 100) / 100, opts: n7.opts, ci: n7.ci, unit: '\u03a9', clause: 'DS/HD 60364-4-41 \u00a7411.4.4', cat: 'fault' });
-  return tasks.slice(0, Math.max(2, Math.min(maxTasks, tasks.length)));
+  // T8: dimension a specific group circuit (largest motor/EV load), routed alone (kGroup=1)
+  var bigLoad = null; d.loads.forEach(function (l) { if ((l.type === 'motor' || l.type === 'ev') && (!bigLoad || l.IB > bigLoad.IB)) bigLoad = l; });
+  if (!bigLoad) bigLoad = d.loads[d.loads.length - 1];
+  var gIn = axDeviceRating(bigLoad.IB); var gSel = axSelectCable(gIn, 'Cu', d.stik.insulation, kTemp, 1, 1); var gCsa = gSel ? gSel.csa : 16;
+  tasks.push({ id: 't_grp', kind: 'cable', prompt: { da: 'Dimensionér gruppeledningen til \u201e' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201c (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) i kobber/' + d.stik.insulation + ' ved ' + d.ambient + ' \u00b0C, egen f\u00f8ringsvej.', en: 'Size the group circuit to \u201c' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201d (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) in copper/' + d.stik.insulation + ' at ' + d.ambient + ' \u00b0C, own routing.' }, given: { In: gIn, material: 'Cu', insulation: d.stik.insulation, kTemp: kTemp, kGroup: 1, kInstall: 1 }, answer: gCsa, opts: csaList, ci: csaList.indexOf(gCsa), unit: 'mm\u00b2', clause: 'DS/HD 60364-5-52 \u00a7523', cat: 'cable' });
+  // T9: RCD type selection (EV => Type B unless built-in 6 mA DC; otherwise Type A 30 mA)
+  var hasEV = d.loads.some(function (l) { return l.type === 'ev'; });
+  var rcdOpts = [{ da: 'Type A, 30 mA', en: 'Type A, 30 mA' }, { da: 'Type B, 30 mA', en: 'Type B, 30 mA' }, { da: 'Type AC, 30 mA', en: 'Type AC, 30 mA' }, { da: 'Ingen HPFI n\u00f8dvendig', en: 'No RCD needed' }];
+  var rcdCi = hasEV ? 1 : 0;
+  tasks.push({ id: 't_rcd', kind: 'rcd', prompt: { da: 'V\u00e6lg korrekt HPFI-type for ' + (hasEV ? 'elbilladekredsen' : 'stikkredsene') + ' (systemjording ' + d.earthing + ').', en: 'Choose the correct RCD type for the ' + (hasEV ? 'EV charging circuit' : 'socket circuits') + ' (earthing ' + d.earthing + ').' }, given: { hasEV: hasEV, earthing: d.earthing }, answer: rcdCi, opts: rcdOpts, ci: rcdCi, unit: '', clause: 'DS/HD 60364-7-722 \u00a7722.531 / -4-41', cat: 'fault' });
+  // T10: TT earth-electrode resistance requirement (only meaningful for TT)
+  if (d.earthing === 'TT') {
+    var IDn = 0.03, UL = 50; var raMax = Math.round(UL / IDn);
+    var nRa = axNumOpts(raMax, [Math.round(raMax / 3), Math.round(raMax * 2), Math.round(raMax / 10)]);
+    tasks.push({ id: 't_ra', kind: 'earthing', prompt: { da: 'Bestem den maksimalt tilladte udbredelsesmodstand RA for jordelektroden i TT-systemet (HPFI I\u0394n = 30 mA, UL = 50 V).', en: 'Determine the maximum permissible earth-electrode resistance RA in the TT system (RCD I\u0394n = 30 mA, UL = 50 V).' }, given: { IDn: IDn, UL: UL }, answer: raMax, opts: nRa.opts, ci: nRa.ci, unit: '\u03a9', clause: 'DS/HD 60364-4-41 \u00a7411.5.3', cat: 'fault' });
+  }
+  // Keep the core chain (IB -> In -> cable) first; deterministically vary the rest.
+  var core = tasks.slice(0, 3); var rest = tasks.slice(3);
+  if (rng) { for (var qi = rest.length - 1; qi > 0; qi--) { var rj = Math.floor(rng() * (qi + 1)); var tmp = rest[qi]; rest[qi] = rest[rj]; rest[rj] = tmp; } }
+  var ordered = core.concat(rest);
+  return ordered.slice(0, Math.max(2, Math.min(maxTasks, ordered.length)));
 }
 
 function axGenForsyning(rng, b, tier) {
@@ -11662,7 +11682,7 @@ function axGenerate(seed, buildingId, tierId, modeId) {
       opgaver.push({ num: num, type: 'forsyning', weightPct: weights.forsyning, title: { da: 'Forsyningsanl\u00e6g', en: 'Supply installation' }, data: f.data, tasks: f.tasks.slice(0, tasksPerPart) });
     } else if (part === 'installation') {
       var d = axGenInstallation(rng, b, tier);
-      var it = axTasksInstallation(d, tier, tasksPerPart);
+      var it = axTasksInstallation(d, tier, tasksPerPart, rng);
       opgaver.push({ num: num, type: 'installation', weightPct: weights.installation, title: { da: 'Bygningsinstallation', en: 'Building installation' }, data: d, tasks: it });
     } else {
       var st = axGenSpoergsmaal(rng, tier, tasksPerPart);
@@ -11811,6 +11831,24 @@ function axSolveTask(task, opgave) {
     sol.verification = S('Kr\u00e6ver at hovedets udl\u00f8sekurve (incl. korttidsforsinkelse) ligger over afgangens i HELE fejlomr\u00e5det op til Ik,max. Bekr\u00e6ftes mod fabrikantens selektivitetstabel.', 'Requires the main trip curve (incl. short-time delay) to sit above the feeder curve across the WHOLE fault range up to Ik,max. Confirm against the manufacturer selectivity table.');
     sol.compliance = [S('DS/HD 60364-5-53 \u00a7536.', 'DS/HD 60364-5-53 \u00a7536.')];
     sol.conclusion = S(task.opts[task.ci].da, task.opts[task.ci].en);
+  } else if (task.kind === 'rcd') {
+    var corr = task.opts[task.ci];
+    sol.assumptions = [S('Stikkredse og elbilladning skal beskyttes med fejlstr\u00f8msafbryder (HPFI 30 mA). Elbilladere uden indbygget 6 mA DC-detektion kr\u00e6ver Type B.', 'Socket circuits and EV charging must be protected by a 30 mA RCD. EV chargers without built-in 6 mA DC detection require Type B.')];
+    sol.formula = 'I\u0394n \u2264 30 mA';
+    sol.result = { value: task.answer, unit: '', da: corr.da, en: corr.en };
+    sol.verification = g.hasEV ? S('En elbillader kan give glatte DC-fejlstr\u00f8mme der \u201eblinder\u201c en Type A. Uden indbygget 6 mA DC-beskyttelse skal der derfor anvendes Type B.', 'An EV charger can produce smooth DC residual currents that \u201cblind\u201d a Type A. Without built-in 6 mA DC protection a Type B is therefore required.') : S('Type A d\u00e6kker pulserende DC-komponenter fra moderne elektronik; Type AC er ikke tilstr\u00e6kkelig til almindelige stikkredse.', 'Type A covers pulsating DC components from modern electronics; Type AC is not sufficient for general socket circuits.');
+    sol.compliance = [S(task.clause, task.clause)];
+    sol.conclusion = S('V\u00e6lg ' + corr.da + '.', 'Choose ' + corr.en + '.');
+  } else if (task.kind === 'earthing') {
+    var raMax = Math.round(g.UL / g.IDn);
+    sol.assumptions = [S('I TT-systemer rydder HPFI\'en jordfejl. Elektrodemodstanden skal sikre at ber\u00f8ringssp\u00e6ndingen holdes under UL = 50 V ved udl\u00f8sestr\u00f8mmen.', 'In TT systems the RCD clears earth faults. The electrode resistance must keep the touch voltage below UL = 50 V at the trip current.')];
+    sol.formula = 'R_A \u2264 U_L / I\u0394n';
+    sol.substitution = 'R_A = ' + g.UL + ' / ' + axFmt(g.IDn, 2) + ' = ' + raMax + ' \u03a9';
+    sol.steps = [{ da: 'Maks. udbredelsesmodstand', en: 'Max electrode resistance', expr: g.UL + ' / ' + axFmt(g.IDn, 2), result: raMax + ' \u03a9' }];
+    sol.result = { value: raMax, unit: '\u03a9', da: 'RA,max', en: 'RA,max' };
+    sol.verification = S('Den m\u00e5lte RA skal v\u00e6re \u2264 ' + raMax + ' \u03a9. En lavere v\u00e6rdi giver st\u00f8rre sikkerhedsmargin; en h\u00f8jere er ikke tilladt i TT.', 'The measured RA must be \u2264 ' + raMax + ' \u03a9. A lower value gives more safety margin; a higher one is not permitted in TT.');
+    sol.compliance = [S(task.clause, task.clause)];
+    sol.conclusion = S('RA skal v\u00e6re \u2264 ' + raMax + ' \u03a9.', 'RA must be \u2264 ' + raMax + ' \u03a9.');
   } else { // reg / fallback
     var optTxt = (function (o) { return (typeof o === 'string') ? { da: o, en: o } : o; })(task.opts[task.ci]);
     sol.assumptions = [S('Regelsp\u00f8rgsm\u00e5l \u2014 svar iht. g\u00e6ldende DS/HD 60364 og dansk lovgivning.', 'Regulatory question \u2014 answer per current DS/HD 60364 and Danish law.')];
