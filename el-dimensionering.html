@@ -4473,7 +4473,7 @@ function sldCalcNodeIk(tree, nodeId) {
 }
 
 function sldPropagateAll(tree) {
-  if (!tree || !tree.rootId) return;
+  if (!tree || !tree.rootId || !tree.nodes) return;
   // Two-pass propagation:
   // Pass 1 (leaf-to-root): aggregate power_kW so parent boards reflect children's actual load.
   // Pass 2 (root-to-leaf): compute Zs, Vdrop, and Ik which depend on upstream impedance.
@@ -5217,8 +5217,8 @@ const CABLE3D_CONTAINMENT = {
 const CABLE3D_OUTER_DIA = [7.2, 8.4, 9.8, 10.8, 13.0, 15.4, 18.2, 20.6];
 
 let cable3dState = {
-  conduitDia: null,
-  trayWidth: null,
+  conduitDia: 20,
+  trayWidth: 100,
   selectedCables: []
 };
 
@@ -8472,6 +8472,16 @@ function applyLoadPreset(key) {
 // ===== FUSE MODULE (Mathcad Prime Math Style) =====
 function renderFuse() {
   const holder = FUSE_HOLDERS[fuseState.holder];
+  if (!holder) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Smeltesikring (gG)', 'Fuse (gG)') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Sikringsholder', 'Fuse holder') + '</div><div class="select-grid">';
+    Object.keys(FUSE_HOLDERS).forEach(function(h) {
+      html += '<button class="sel-btn' + (fuseState.holder===h?' selected':'') + '" onclick="fuseState.holder=\'' + h + '\';fuseState.size=null;renderModule(\'fuse\')">' + h + '</button>';
+    });
+    html += '</div></div></div>';
+    return html;
+  }
   const sizes = holder.sizes;
   const ib = calcIB();
   const i5s = FUSE_5S[fuseState.size] || 0;
@@ -8530,6 +8540,16 @@ function renderFuse() {
 // ===== MCB MODULE (Mathcad Prime Math Style) =====
 function renderMCB() {
   const mcb = MCB_TYPES[mcbState.type];
+  if (!mcb) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Automatsikring (MCB)', 'Miniature Circuit Breaker (MCB)') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Type','Type') + '</div><div class="select-grid">';
+    Object.keys(MCB_TYPES).forEach(function(tp) {
+      html += '<button class="sel-btn' + (mcbState.type===tp?' selected':'') + '" onclick="mcbState.type=\'' + tp + '\';mcbState.rating=null;renderModule(\'mcb\')">' + tp + '</button>';
+    });
+    html += '</div></div></div>';
+    return html;
+  }
   const curve = MCB_CURVES[mcbState.curve];
   const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
   const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : 0;
@@ -8604,6 +8624,16 @@ function renderMCB() {
 // ===== MCCB MODULE (Mathcad Prime Math Style) =====
 function renderMCCB() {
   const frame = MCCB_FRAMES[mccbState.frame];
+  if (!frame) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Maksimalafbryder (MCCB)', 'MCCB') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Ramme','Frame') + '</div><div class="select-grid">';
+    Object.keys(MCCB_FRAMES).forEach(function(f) {
+      html += '<button class="sel-btn' + (mccbState.frame===f?' selected':'') + '" onclick="mccbState.frame=\'' + f + '\';mccbState.inVal=MCCB_FRAMES[\'' + f + '\'].inOptions[0];renderModule(\'mccb\')">' + f + '</button>';
+    });
+    html += '</div></div></div>';
+    return html;
+  }
   const icu = MCCB_TRIPS[mccbState.trip];
   const io = mccbState.inVal * mccbState.ioMult;
   const isdCalc = io * mccbState.isdMult;
@@ -11591,8 +11621,8 @@ function renderAiElectrician() {
         <div class="select-label">${tx('Emne', 'Topic')}</div>
         <div class="select-grid">
           <button class="sel-btn ${aiTopic === 'all' ? 'selected' : ''}" onclick="aiTopic='all';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${tx('Alle', 'All')}</button>
-          ${Object.keys(AI_TOPICS).map(tp =>
-            `<button class="sel-btn ${aiTopic === tp ? 'selected' : ''}" onclick="aiTopic='${tp}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[tp].icon} ${tp(AI_TOPICS[tp])}</button>`
+          ${Object.keys(AI_TOPICS).map(topicKey =>
+            `<button class="sel-btn ${aiTopic === topicKey ? 'selected' : ''}" onclick="aiTopic='${topicKey}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[topicKey].icon} ${tp(AI_TOPICS[topicKey])}</button>`
           ).join('')}
         </div>
       </div>
@@ -12858,7 +12888,7 @@ function sldMotor(x,y){ // motor: circle with M
   return `<g><circle cx="${x}" cy="${y}" r="14" fill="${SLD_C.face}" stroke="${SLD_C.cond}" stroke-width="2"/>`
     +`<text x="${x}" y="${y+5}" text-anchor="middle" font-size="13" font-weight="800" fill="${SLD_C.cond}">M</text></g>`;
 }
-function sldLoad(x,y){ // generic load: crossed square
+function sldLoadSymbol(x,y){ // generic load: crossed square
   return `<g><rect x="${x-13}" y="${y-13}" width="26" height="26" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.load}" stroke-width="2"/>`
     +`<line x1="${x-13}" y1="${y-13}" x2="${x+13}" y2="${y+13}" stroke="${SLD_C.load}" stroke-width="1.2"/></g>`;
 }
@@ -12999,7 +13029,7 @@ function buildSLD(){
       + `<line x1="${x}" y1="${busY}" x2="${x}" y2="${yMcb-16}" stroke="${SLD_C.cond}" stroke-width="2" class="sld-flow"/>`
       + sldBreaker(x, yMcb, mcbLbl)
       + `<line x1="${x}" y1="${yMcb+16}" x2="${x}" y2="${yLoad-14}" stroke="${SLD_C.cond}" stroke-width="2" class="sld-flow sld-flow-slow"/>`
-      + (isMotor ? sldMotor(x,yLoad) : sldLoad(x,yLoad));
+      + (isMotor ? sldMotor(x,yLoad) : sldLoadSymbol(x,yLoad));
     circuits += `<text x="${x}" y="${yCab}" text-anchor="middle" font-size="9" fill="${SLD_C.dim}">${cableLbl}</text>`
       + `<text x="${x}" y="${yCab+12}" text-anchor="middle" font-size="9" fill="${SLD_C.dim}">${ph} \u00B7 ${cIb.toFixed(1)} A</text>`
       + (izLbl ? `<text x="${x}" y="${yCab+24}" text-anchor="middle" font-size="8.5" fill="${SLD_C.dim}">${izLbl}</text>` : '')
@@ -15005,7 +15035,7 @@ function renderSLD() {
   if (!sldTree) sldInit();
   sldPropagateAll(sldTree);
 
-  const selNode = sldTree.nodes[sldSelectedId];
+  const selNode = sldSelectedId ? sldTree.nodes[sldSelectedId] : null;
   const canAddSubBoard = selNode && (selNode.type === 'main_board' || selNode.type === 'sub_board');
   const canAddCircuit = selNode && (selNode.type === 'main_board' || selNode.type === 'sub_board');
   const canRemove = selNode && sldSelectedId !== sldTree.rootId && !(selNode.type === 'main_board' && sldTree.nodes[sldTree.rootId].childIds.length <= 1);
@@ -17926,16 +17956,16 @@ var BUSBAR_INSTALL_DERATING = {
 };
 
 var busbarState = {
-  systemType: null,
-  ratedCurrent: null,
-  brand: null,
-  ambientTemp: null,
-  installMethod: null,
-  ipRating: null,
-  tapOffCount: null,
-  tapOffRating: null,
-  sections: null,
-  upstreamIk: null
+  systemType: 'feeder',
+  ratedCurrent: 250,
+  brand: 'schneider',
+  ambientTemp: 35,
+  installMethod: 'horizontal_flat',
+  ipRating: 54,
+  tapOffCount: 4,
+  tapOffRating: 63,
+  sections: 3,
+  upstreamIk: 25
 };
 
 // Calculate combined derating factor
@@ -17989,6 +18019,7 @@ function busbarCheckThermal(systemLoad, effectiveCapacity) {
   return {
     systemLoad: systemLoad,
     effectiveCapacity: effectiveCapacity,
+    deratedCurrent: effectiveCapacity,
     loadRatio: Math.ceil(loadRatio * 100),
     ok: systemLoad <= effectiveCapacity,
     clause: 'IEC 61439-6 cl.10.10'
@@ -40561,8 +40592,8 @@ function renderReverseMultiSVG(result) {
 // ============================================================================
 
 function selMatrixGetPairs(tree) {
-  if (!tree || !tree.rootId) return [];
-  sldPropagateAll(tree);
+  if (!tree || !tree.rootId || !tree.nodes) return [];
+  try { sldPropagateAll(tree); } catch(e) { return []; }
   var pairs = [];
   var nodeIds = Object.keys(tree.nodes);
   var protectedNodes = [];
@@ -41000,6 +41031,13 @@ function powerFlowRenderSVG(tree, mode) {
 function renderPowerFlow() {
   var tree = sldTree || sldCreateTree();
   var result = powerFlowRenderSVG(tree, powerFlowState.mode);
+  if (!result || typeof result !== 'object' || typeof result.totalP === 'undefined') {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Effektflow Animation', 'Power Flow Animation') + '</div>';
+    html += '<div class="info-row">' + tx('Ingen data tilgaengelig. Opret en installation i SLD-modulet foerst.', 'No data available. Create an installation in the SLD module first.') + '</div>';
+    html += '</div>';
+    return html;
+  }
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Effektflow Animation', 'Power Flow Animation') + '</div>';
   html += '<p style="color:#aaa;font-size:0.85em;">' + tx('Animeret visning af effektflow gennem installationen. Partiklfarve: groen=cosfi 1, gul=0.8, roed=0.5. Stoerrelse proportional med effekt.', 'Animated display of power flow through the installation. Particle color: green=PF 1, yellow=0.8, red=0.5. Size proportional to power.') + '</p>';
@@ -41051,7 +41089,7 @@ function renderPowerFlow() {
 
 function renderLiveInstallation() {
   var tree = sldTree || sldCreateTree();
-  sldPropagateAll(tree);
+  try { sldPropagateAll(tree); } catch(e) {}
   if (!sldTree) sldTree = tree;
 
   var mode = liveState.mode || 'live';
@@ -41558,7 +41596,7 @@ let tjekaltState = { lastResult: null };
 function tjekaltRunCheck() {
   var checks = [];
   var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
-  var nodes = tree ? tree.nodes : {};
+  var nodes = (tree && tree.nodes) ? tree.nodes : {};
   var finals = [];
   var hasMainSwitch = false;
   var hasSPD = false;
@@ -42553,7 +42591,7 @@ let sundhedState = { lastScore: null };
 
 function sundhedCalcScore() {
   var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
-  var nodes = tree ? tree.nodes : {};
+  var nodes = (tree && tree.nodes) ? tree.nodes : {};
   var finals = [];
   Object.keys(nodes).forEach(function(nid) {
     var n = nodes[nid];
@@ -42908,7 +42946,7 @@ const FEJLVAGT_MISTAKES = [
 function fejlvagtScan() {
   var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
   var results = [];
-  var nodes = tree ? tree.nodes : {};
+  var nodes = (tree && tree.nodes) ? tree.nodes : {};
 
   FEJLVAGT_MISTAKES.forEach(function(mistake) {
     var found = false;
