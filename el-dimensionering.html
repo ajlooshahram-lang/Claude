@@ -5764,6 +5764,11 @@ function renderPDF() {
   html += '<button class="sel-btn" onclick="pdfPrintPackage()">' + tx('Udskriv','Print') + '</button>';
   html += '</div></div>';
   if (pkg) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 P D F</span>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('Genereret','Generated') + ': ' + pkg.generatedAt + '</div>';
     html += '<div class="result-row"><span class="label">' + tx('Sektioner','Sections') + '</span><span class="value">7</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">DS/HD 60364-6-61</span></div></div>';
@@ -9630,6 +9635,11 @@ function renderTrafoPowerSolve() {
   html += '<div class="info-row">' + tx('Finjust\u00E9r med trinknapperne (\u2212\u2212 / \u2212 / + / ++) for at ramme en hvilken som helst v\u00E6rdi \u2014 helt uden indtastning.', 'Fine-tune with the step buttons (\u2212\u2212 / \u2212 / + / ++) to reach any value \u2014 entirely without typing.') + '</div>';
 
   if (res.sufficient) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Trafo Power Solve</span>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('Resultat (udledt)', 'Result (derived)') + '</div>';
     html += row(tx('Fasesystem', 'Phase system'), res.phase === '3' ? tx('3-faset', '3-phase') : tx('1-faset', '1-phase'));
     html += row('S', fmtVal(res.S, 'kVA', 1000, 3));
@@ -9897,6 +9907,11 @@ function renderTrafoVectorGroup() {
   html += '<div class="select-group"><div class="select-label">' + tx('Vektorgruppe', 'Vector Group') + '</div><div class="select-grid">';
   groups.forEach(function(g) { html += '<button class="sel-btn' + (trafoState.vecGroup === g ? ' selected' : '') + '" onclick="trafoState.vecGroup=\'' + g + '\';renderModule(\'trafo\')">' + g + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Trafo Vector Group</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + trafoState.vecGroup + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Primaer', 'Primary') + '</span><span class="value">' + vg.primary + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Sekundaer', 'Secondary') + '</span><span class="value">' + vg.secondary + '</span></div>';
@@ -15798,6 +15813,11 @@ function renderBrain() {
 
     // Summary card
     html += '<div class="card"><div class="card-title">' + tx('Resultat: Installationsoversigt', 'Result: Installation Summary') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Brain</span>';
+  html += '</div>';
+
     html += '<div class="result-box">';
     html += '<div class="info-row">' + tx('Transformer', 'Transformer') + ': <strong>' + (trafoNode ? trafoNode.power_kVA : '?') + ' kVA</strong></div>';
     html += '<div class="info-row">' + tx('Antal kredse', 'Circuit count') + ': <strong>' + circuitCount + '</strong></div>';
@@ -20821,6 +20841,11 @@ function renderGenerator() {
   html += '</div></div>';
 
   // Results
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Generator</span>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - IEC 62034 + DS/HD 60364-5-56</div>';
   html += '<div class="result-row"><span class="label">' + tx('Total belastning (med diversitet)', 'Total Load (with diversity)') + '</span><span class="value">' + totalKw.toFixed(1) + ' kW</span></div>';
@@ -21775,6 +21800,11 @@ function renderConstruction() {
   html += '<div class="select-group"><div class="select-label">' + tx('Samtidighedsfaktor', 'Diversity Factor') + '</div><div class="select-grid">';
   [0.5, 0.7, 1.0].forEach(function(d) { html += '<button class="sel-btn' + (constructionState.diversityFactor === d ? ' selected' : '') + '" onclick="constructionState.diversityFactor=' + d + ';renderModule(\'construction\')">' + d + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Construction</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Belastning', 'Load') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Total', 'Total') + '</span><span class="value">' + load.totalKW + ' kW</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Diversificeret', 'Diversified') + '</span><span class="value">' + load.diversifiedKW.toFixed(1) + ' kW</span></div>';
@@ -21899,6 +21929,11 @@ function renderAgri() {
   html += '<div class="select-group"><div class="select-label">' + tx('Kritiske laster', 'Essential Loads') + '</div><div class="select-grid">';
   [true, false].forEach(function(v) { html += '<button class="sel-btn' + (agriState.hasEssentialLoads === v ? ' selected' : '') + '" onclick="agriState.hasEssentialLoads=' + v + ';renderModule(\'agri\')">' + (v ? tx('Ja','Yes') : tx('Nej','No')) + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Agri</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Saerlige farer', 'Special Hazards') + '</div>';
   if (bt && bt.hazards.length > 0) { bt.hazards.forEach(function(h) { var hz = AGRI_HAZARDS[h]; if(hz) html += '<div class="result-row"><span class="label">\u26A0\uFE0F</span><span class="value">' + tx(hz.da, hz.en) + '</span></div>'; }); }
   else { html += '<div class="result-row"><span class="label">\u2705</span><span class="value">' + tx('Ingen saerlige farer', 'No special hazards') + '</span></div>'; }
@@ -21988,6 +22023,11 @@ function renderArcFlash() {
   html += '<div class="select-group"><div class="select-label">' + tx('Arbejdsafstand [mm]', 'Working Distance [mm]') + '</div><div class="select-grid">';
   [{v:300,l:'300 (LV)'},{v:455,l:'455 (MV)'},{v:610,l:'610 (open)'}].forEach(function(d) { html += '<button class="sel-btn' + (arcflashState.workingDistance === d.v ? ' selected' : '') + '" onclick="arcflashState.workingDistance=' + d.v + ';renderModule(\'arcflash\')">' + d.l + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Arc Flash</span>';
+  html += '</div>';
+
   html += '<div class="result-box" style="border-left:4px solid ' + ppe.color + '"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Incident energi', 'Incident Energy') + '</span><span class="value" style="font-size:1.3em;color:' + ppe.color + '">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('PPE', 'PPE') + '</span><span class="value" style="color:' + ppe.color + '">' + tx(ppe.da, ppe.en) + '</span></div>';
@@ -22112,6 +22152,11 @@ function renderCableLife() {
   html += '<div class="select-group"><div class="select-label">' + tx('Alder [aar]', 'Age [years]') + '</div><div class="select-grid">';
   [0, 5, 10, 15, 20, 25, 30, 35, 40, 50].forEach(function(a) { html += '<button class="sel-btn' + (cablelifeState.cableAge === a ? ' selected' : '') + '" onclick="cablelifeState.cableAge=' + a + ';renderModule(\'cablelife\')">' + a + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Cable Life</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Arrhenius-model', 'Arrhenius Model') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Maks temp', 'Rated temp') + '</span><span class="value">' + cableData.maxTemp + '\u00B0C</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Designlevetid', 'Design life') + '</span><span class="value">' + cableData.designLife + ' ' + tx('aar','yr') + '</span></div>';
@@ -22245,6 +22290,11 @@ function renderBESS() {
   [1, 2, 3, 4, 5, 6, 8, 10].forEach(function(h) { html += '<button class="sel-btn' + (bessState.dischargeHours === h ? ' selected' : '') + '" onclick="bessState.dischargeHours=' + h + ';renderModule(\'bess\')">' + h + 'h</button>'; });
   html += '</div></div>';
   // Results - Inverter
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 B E S S</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Inverter', 'Inverter') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Inverter stoerrelse', 'Inverter Size') + '</span><span class="value">' + inv.kW + ' kW</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('DC stroem', 'DC Current') + '</span><span class="value">' + dcI.current + ' A</span></div>';
@@ -22390,6 +22440,11 @@ function renderEMC() {
   EMC_CABLE_CATEGORIES.forEach(function(c) { html += '<button class="sel-btn' + (emcState.cableCatB === c.id ? ' selected' : '') + '" onclick="emcState.cableCatB=\'' + c.id + '\';renderModule(\'emc\')">' + tx(c.da, c.en) + '</button>'; });
   html += '</div></div>';
   // Results - Separation
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 E M C</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Kabeladskillelse', 'Cable Separation') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Min. afstand', 'Min. Separation') + '</span><span class="value">' + sep.distance_mm + ' mm</span></div>';
   html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + sep.clause + '</span></div>';
@@ -22528,6 +22583,11 @@ function renderMetering() {
   METERING_NUM_OPTIONS.forEach(function(n) { html += '<button class="sel-btn' + (meteringState.numMeters === n ? ' selected' : '') + '" onclick="meteringState.numMeters=' + n + ';renderModule(\'metering\')">' + n + '</button>'; });
   html += '</div></div>';
   // Results
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Metering</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Specifikation', 'Specification') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kraevet klasse', 'Required Class') + '</span><span class="value">' + reqAcc.accuracy + ' (' + reqAcc.clause + ')</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Maalertype', 'Meter Type') + '</span><span class="value">' + (isCT ? 'CT: ' + meteringState.ctRatio + ' A' : tx('Direkte','Direct') + ' <= 63A') + '</span></div>';
@@ -22680,6 +22740,11 @@ function renderATEX() {
   });
   html += '</div></div>';
   // Results
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 A T E X</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Klassificering', 'Classification') + '</div>';
   html += '<div class="result-row"><span class="label">EPL</span><span class="value">' + epl.epl + ' (' + epl.clause + ')</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Min. IP', 'Min. IP') + '</span><span class="value">' + ipReq.rating + ' (' + ipReq.clause + ')</span></div>';
@@ -22809,6 +22874,11 @@ function renderSmartGrid() {
   [0.30, 0.40, 0.50, 0.60, 0.70, 0.80].forEach(function(s) { html += '<button class="sel-btn' + (smartgridState.tariffSpread === s ? ' selected' : '') + '" onclick="smartgridState.tariffSpread=' + s + ';renderModule(\'smartgrid\')">' + s.toFixed(2) + '</button>'; });
   html += '</div></div>';
   // Results - Tariff
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Smart Grid</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Dansk tarifstruktur (Energinet 2024)', 'Danish Tariff Structure (Energinet 2024)') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.peak.da, SMARTGRID_TARIFF.peak.en) + '</span><span class="value">' + SMARTGRID_TARIFF.peak.rate.toFixed(2) + ' DKK/kWh</span></div>';
   html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.shoulder.da, SMARTGRID_TARIFF.shoulder.en) + '</span><span class="value">' + SMARTGRID_TARIFF.shoulder.rate.toFixed(2) + ' DKK/kWh</span></div>';
@@ -28532,6 +28602,11 @@ function renderTrefase() {
 
   if (trefaseState.loadType === 'symStar') {
     var r = trefaseCalcSymStar(trefaseState.UL, trefaseState.Z, trefaseState.phi);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Trefase</span>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('Symmetrisk stjerneforbindelse','Symmetric Star Connection') + '</div>';
     html += '<div class="result-row"><span class="label">U<sub>p</sub></span><span class="value">' + r.Up.toFixed(1) + ' V</span></div>';
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">U<sub>p</sub> = U<sub>L</sub>/\u221A3 = ' + trefaseState.UL + '/\u221A3 = ' + r.Up.toFixed(1) + ' V</span></div>';
@@ -28886,6 +28961,11 @@ function renderMotorteori() {
   var res = motorteoriCalcAll(motorteoriState);
   html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat','Results') + '</div>';
 
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Motorteori</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Grunddata','Basic Data') + '</div>';
   html += '<div class="result-row"><span class="label">n<sub>s</sub></span><span class="value">' + res.ns.toFixed(0) + ' rpm</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">n<sub>s</sub> = 120\u00B7f/p = 120\u00D7'+motorteoriState.f+'/'+motorteoriState.poles+' = '+res.ns.toFixed(0)+' rpm</span></div>';
@@ -29161,6 +29241,11 @@ function renderRelay() {
   html += '</div></div>';
 
   // Results
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Relay</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Beregningsresultater', 'Calculation Results') + '</div>';
   html += '<div class="result-row"><span class="label">I<sub>1N</sub> (' + tx('primaer nominel', 'primary nominal') + ')</span><span class="value">' + I1N.toFixed(2) + ' A</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">I<sub>1N</sub> = S / (√3 · U<sub>1</sub>) = ' + relayState.trafoKVA + ' / (√3 · ' + relayState.primaryKV + ') = ' + I1N.toFixed(2) + ' A</span></div>';
@@ -29479,6 +29564,11 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     var tn = faultCalcTN(faultState.zsValue, Ia, faultState.voltage);
     var dev = FAULT_DEVICE_TYPES[faultState.deviceType];
 
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Fault Loop</span>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('TN-system: Zs \u00B7 Ia \u2264 U0', 'TN system: Zs \u00B7 Ia \u2264 U0') + '</div>';
     html += '<div class="result-row"><span class="label">Ia (' + tx('frakoblingsstroem', 'disconnection current') + ')</span><span class="value">' + Ia.toFixed(1) + ' A';
     if (dev && dev.factor > 0) html += ' = ' + dev.factor + ' \u00D7 ' + faultState.deviceIn;
@@ -29605,6 +29695,11 @@ function renderFaultCSA() {
   var Smin = faultCalcMinCSA(I, t, k);
   var SminLarge = faultCalcMinCSA(I, t, kLarge);
   var I2t = I * I * t;
+
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Fault C S A</span>';
+  html += '</div>';
 
   html += '<div class="result-box"><div class="result-title">' + tx('Min. beskyttelsesleder-tvaersnit', 'Min. Protective Conductor Cross-section') + '</div>';
   html += '<div class="result-row"><span class="label">I</span><span class="value">' + I + ' A</span></div>';
@@ -32014,6 +32109,11 @@ function renderDCOhm() {
   }
   // Result
   var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Ohm</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U (' + tx('Spaending', 'Voltage') + ')</span><span class="value">' + res.U.toFixed(4) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">R (' + tx('Modstand', 'Resistance') + ')</span><span class="value">' + dcFmtR(res.R) + '</span></div>';
@@ -32045,6 +32145,11 @@ function renderDCResistivity() {
   // Result
   var mat = DC_MATERIALS[dcState.resMaterial];
   var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Resistivity</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R</span><span class="value">' + R.toFixed(4) + ' \u03A9</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R = \u03C1 \u00D7 l / S = ' + mat.rho + ' \u00D7 ' + dcState.resLength + ' / ' + dcState.resCrossSection + ' = ' + R.toFixed(4) + ' \u03A9</span></div>';
@@ -32076,6 +32181,11 @@ function renderDCTemperature() {
   var mat = DC_MATERIALS[dcState.tempMaterial];
   var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
   var deltaR = RT - dcState.tempR20;
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Temperature</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R<sub>T</sub> (' + tx('ved', 'at') + ' ' + dcState.tempT + '\u00B0C)</span><span class="value">' + RT.toFixed(4) + ' \u03A9</span></div>';
   html += '<div class="result-row"><span class="label">\u0394R</span><span class="value">' + deltaR.toFixed(4) + ' \u03A9 (' + (deltaR >= 0 ? '+' : '') + ((deltaR / dcState.tempR20) * 100).toFixed(1) + '%)</span></div>';
@@ -32108,6 +32218,11 @@ function renderDCSeriesParallel() {
   html += '</div></div>';
   // Result
   var Rtotal = (dcState.spMode === 'series') ? dcCalcSeries(dcState.spResistors) : dcCalcParallel(dcState.spResistors);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Series Parallel</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R<sub>total</sub></span><span class="value" style="font-weight:700">' + dcFmtR(Rtotal) + '</span></div>';
   var formula = dcState.spResistors.join(' + ');
@@ -32152,6 +32267,11 @@ function renderDCDivider() {
   html += '</div>';
   // Voltage divider result
   var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Divider</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Spaendingsdeler', 'Voltage Divider') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>out</sub></span><span class="value" style="font-weight:700">' + Uout.toFixed(4) + ' V</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U<sub>out</sub> = U<sub>in</sub> \u00D7 R2/(R1+R2) = ' + dcState.vdUin + ' \u00D7 ' + dcState.vdR2 + '/(' + dcState.vdR1 + '+' + dcState.vdR2 + ') = ' + Uout.toFixed(4) + ' V</span></div>';
@@ -32203,6 +32323,11 @@ function renderDCPower() {
   }
   // Result
   var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Power</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">P (' + tx('Effekt', 'Power') + ')</span><span class="value" style="font-weight:700">' + res.P.toFixed(2) + ' W</span></div>';
   if (res.P >= 1000) html += '<div class="result-row"><span class="label">P</span><span class="value">' + (res.P / 1000).toFixed(3) + ' kW</span></div>';
@@ -32240,6 +32365,11 @@ function renderDCEnergy() {
   var tSec = dcTimeToSeconds(dcState.enT, dcState.enTunit);
   var W = dcCalcEnergy(dcState.enP, tSec);
   var kWh = dcCalcEnergyKWh(dcState.enP, tSec);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Energy</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W (' + tx('Energi', 'Energy') + ')</span><span class="value" style="font-weight:700">' + W.toFixed(0) + ' Ws (J)</span></div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value">' + kWh.toFixed(4) + ' kWh</span></div>';
@@ -32271,6 +32401,11 @@ function renderDCEmf() {
   html += '</div>';
   // Result
   var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 D C Emf</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>kl</sub> (' + tx('Klemmesp\u00E6nding', 'Terminal Voltage') + ')</span><span class="value" style="font-weight:700">' + res.Uterminal.toFixed(3) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Sp\u00E6ndingsfald over Ri', 'Voltage drop across Ri') + '</span><span class="value">' + (res.I * res.Ri).toFixed(3) + ' V</span></div>';
@@ -32454,6 +32589,11 @@ function renderLysLumen() {
   html += '</div>';
   html += valStep(lysState, 'mf', 'lys', { step: 0.05, fmt: function(v){ return v.toFixed(2); }, clamp: { min: 0, max: 1 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Lys Lumen</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kraevet belysning', 'Required illuminance') + '</span><span class="value">' + room.lux + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Areal', 'Area') + '</span><span class="value">' + area + ' m\u00B2</span></div>';
@@ -32497,6 +32637,11 @@ function renderLysPoint() {
   html += '</div>';
   html += valStep(lysState, 'ptAngle', 'lys', { step: 1, fmt: function(v){ return v + '\u00B0'; }, clamp: { min: 0, max: 89 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Lys Point</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">r</span><span class="value">' + r.toFixed(2) + ' m</span></div>';
@@ -32603,6 +32748,11 @@ function renderMagnetMMF() {
   html += '</div>';
   html += valStep(magnetState, 'mmfI', 'magnet', { step: 0.1, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet M M F</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Fm</span><span class="value" style="font-weight:700">' + Fm + ' A</span></div></div>';
   html += calcDetail({ name: 'MMF', formula: 'Fm = N \u00D7 I', variables: [{ name: 'N', symbol: 'N', value: magnetState.mmfN, unit: tx('vindinger', 'turns') }, { name: 'I', symbol: 'I', value: magnetState.mmfI, unit: 'A' }], substitution: magnetState.mmfN + ' \u00D7 ' + magnetState.mmfI, result: { value: Fm, unit: 'A' }, reference: 'Opgavesamling Kap. 5' });
@@ -32628,6 +32778,11 @@ function renderMagnetFlux() {
   html += '</div>';
   html += valStep(magnetState, 'fluxArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Flux</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">B</span><span class="value" style="font-weight:700">' + B.toFixed(3) + ' T</span></div>';
   html += '<div class="result-row"><span class="label">H</span><span class="value">' + H.toFixed(1) + ' A/m</span></div></div>';
@@ -32666,6 +32821,11 @@ function renderMagnetReluctance() {
   html += '</div>';
   html += valStep(magnetState, 'relGap', 'magnet', { step: 0.0005, fmt: function(v){ return v === 0 ? '0' : (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Reluctance</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rm_core</span><span class="value">' + Rm_core.toExponential(2) + ' A/Wb</span></div>';
   if (magnetState.relGap > 0) html += '<div class="result-row"><span class="label">Rm_gap</span><span class="value">' + Rm_gap.toExponential(2) + ' A/Wb</span></div>';
@@ -32685,6 +32845,11 @@ function renderMagnetInduction() {
   var eFaraday = magnetCalcFaradayEMF(magnetState.indN, magnetState.indDphiDt);
   var eMotional = magnetCalcMotionalEMF(magnetState.indB, magnetState.indL, magnetState.indV);
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Induktion', 'Induction') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Induction</span>';
+  html += '</div>';
+
   html += '<div class="result-box" style="background:var(--primary-glow)"><div class="result-title">Faraday: e = N*d\u03A6/dt</div>';
   html += '<div class="select-group"><div class="select-label">N</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indN === v ? ' selected' : '') + '" onclick="magnetState.indN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
@@ -32745,6 +32910,11 @@ function renderMagnetInductance() {
   html += '</div>';
   html += valStep(magnetState, 'inductArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Inductance</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
   html += '<div class="result-row"><span class="label">XL (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
@@ -32775,6 +32945,11 @@ function renderMagnetForce() {
   html += '</div>';
   html += valStep(magnetState, 'forceL', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Force</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + F.toFixed(3) + ' N</span></div></div>';
   html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + '*' + magnetState.forceI + '*' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
@@ -32797,6 +32972,11 @@ function renderMagnetEnergy() {
   html += '</div>';
   html += valStep(magnetState, 'energyI', 'magnet', { step: 0.5, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Magnet Energy</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
   html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
@@ -32900,6 +33080,11 @@ function renderKapacitorC() {
   html += valStep(kapacitorState, 'dist', 'kapacitor', { step: 0.0001, fmt: function(v){ return (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0.00001 }, prec: 9 });
   html += '</div>';
   var XC50 = kapacitorCalcXC(50, C);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kapacitor C</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('X_C ved 50 Hz (link til impedans)', 'X_C at 50 Hz (link to impedance)') + '</span><span class="value">' + (isFinite(XC50) ? XC50.toExponential(3) + ' \u03A9' : '\u221E') + '</span></div></div>';
@@ -32925,6 +33110,11 @@ function renderKapacitorCharge() {
   html += '</div>';
   html += valStep(kapacitorState, 'U', 'kapacitor', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kapacitor Charge</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + kapacitorFmtQ(Q) + '</span></div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(3) + ' J' : (W * 1000).toFixed(3) + ' mJ') + '</span></div></div>';
@@ -32956,6 +33146,11 @@ function renderKapacitorCombo() {
     html += valStep(kapacitorState, key, 'kapacitor', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
     html += '</div>';
   });
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kapacitor Combo</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C_total</span><span class="value" style="font-weight:700">' + impedansFmtC(Cres) + '</span></div></div>';
   var subParts = arr.map(function(c) { return impedansFmtC(c); }).join(kapacitorState.combo === 'series' ? ' , ' : ' + ');
@@ -32997,6 +33192,11 @@ function renderKapacitorRC() {
   html += valStep(kapacitorState, 't', 'kapacitor', { step: 0.0001, fmt: function(v){ return v >= 1 ? v + ' s' : (v*1000).toFixed(2) + ' ms'; }, clamp: { min: 0 }, prec: 9 });
   html += '</div>';
   var nTau = (tau > 0) ? kapacitorState.t / tau : 0;
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kapacitor R C</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03C4 (' + tx('tidskonstant', 'time constant') + ')</span><span class="value" style="font-weight:700">' + impedansFmtEng(tau, 's') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('t/\u03C4', 't/\u03C4') + '</span><span class="value">' + nTau.toFixed(3) + '</span></div>';
@@ -33027,6 +33227,11 @@ function renderKapacitorCoulomb() {
   html += '</div>';
   html += valStep(kapacitorState, 'r', 'kapacitor', { step: 0.01, fmt: function(v){ return v + ' m'; }, clamp: { min: 0.001 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kapacitor Coulomb</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + impedansFmtEng(F, 'N') + '</span></div></div>';
   html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 ' + PHYS_CONST.EPS0.value + ' \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
@@ -33179,6 +33384,11 @@ function renderVarmeUValue() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('U-v\u00E6rdi: U = 1/R_total', 'U-value: U = 1/R_total') + '</div>';
   html = varmeRenderLayerSelectors(html);
   var u = varmeUCalcDetail();
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Varme U Value</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R_total</span><span class="value">' + u.Rtot.toFixed(3) + ' m\u00B2K/W</span></div>';
   html += '<div class="result-row"><span class="label">U</span><span class="value" style="font-weight:700">' + u.U.toFixed(3) + ' W/m\u00B2K</span></div></div>';
@@ -33212,6 +33422,11 @@ function renderVarmeTransmission() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Varme Transmission</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + Q.toFixed(1) + ' W</span></div></div>';
@@ -33249,6 +33464,11 @@ function renderVarmeVentilation() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Varme Ventilation</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value" style="font-weight:700">' + Qv.toFixed(1) + ' W</span></div></div>';
@@ -33290,6 +33510,11 @@ function renderVarmeTotal() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Varme Total</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q_trans</span><span class="value">' + Qtrans.toFixed(1) + ' W</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value">' + Qvent.toFixed(1) + ' W</span></div>';
@@ -33334,6 +33559,11 @@ function renderVarmeEnergy() {
   html += '</div>';
   html += valStep(varmeState, 'Pheat', 'varme', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Varme Energy</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + (Q / 1000).toFixed(1) + ' kJ (' + Q.toFixed(0) + ' J)</span></div>';
   html += '<div class="result-row"><span class="label">t</span><span class="value">' + tHeat.toFixed(0) + ' s (' + (tHeat / 60).toFixed(1) + ' min)</span></div>';
@@ -33468,6 +33698,11 @@ function renderDcmaskineGenerator() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Generator: E = U + Ia\u00B7Ra + Ub', 'Generator: E = U + Ia\u00B7Ra + Ub') + '</div>';
   html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
   if (dcmaskineState.type === 'shunt' || dcmaskineState.type === 'separate') html = dcmaskineCommonSelectors(html, ['Rf']);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Dcmaskine Generator</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (' + tx('indre EMK', 'internal EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
   if (If > 0) html += '<div class="result-row"><span class="label">If (' + tx('feltstr\u00F8m', 'field current') + ')</span><span class="value">' + If.toFixed(3) + ' A</span></div></div>';
@@ -33484,6 +33719,11 @@ function renderDcmaskineMotor() {
   var Pmech = E * dcmaskineState.Ia;
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Motor: U = E + Ia\u00B7Ra + Ub', 'Motor: U = E + Ia\u00B7Ra + Ub') + '</div>';
   html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Dcmaskine Motor</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (' + tx('modEMK', 'back-EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">P_mek = E\u00B7Ia</span><span class="value">' + Pmech.toFixed(0) + ' W</span></div></div>';
@@ -33510,6 +33750,11 @@ function renderDcmaskineTorque() {
   html += '</div>';
   html += valStep(dcmaskineState, 'n', 'dcmaskine', { step: 10, fmt: function(v){ return v + ' o/min'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Dcmaskine Torque</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">M</span><span class="value" style="font-weight:700">' + M.toFixed(2) + ' Nm</span></div></div>';
   html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }, { name: tx('Momentkonstant', 'Torque constant'), symbol: PHYS_CONST.TORQUE_K.symbol, value: PHYS_CONST.TORQUE_K.value, unit: PHYS_CONST.TORQUE_K.unit, source: PHYS_CONST.TORQUE_K.source }], substitution: PHYS_CONST.TORQUE_K.value + ' \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
@@ -33529,6 +33774,11 @@ function renderDcmaskineStarter() {
   html += '</div>';
   html += valStep(dcmaskineState, 'E', 'dcmaskine', { step: 1, fmt: function(v){ return v + ' V'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Dcmaskine Starter</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rs</span><span class="value" style="font-weight:700">' + Rs.toFixed(3) + ' \u03A9</span></div></div>';
   html += calcDetail({ name: tx('Startmodstand', 'Starting resistor'), formula: 'Rs = (U \u2212 E)/Ia', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'E', symbol: 'E', value: E, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }], substitution: '(' + dcmaskineState.U + ' \u2212 ' + E + ') / ' + dcmaskineState.Ia, result: { value: Rs, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 10' });
@@ -33552,6 +33802,11 @@ function renderDcmaskineEfficiency() {
   html += '</div>';
   html += valStep(dcmaskineState, 'Pin', 'dcmaskine', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
   html += '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Dcmaskine Efficiency</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700">' + (eta * 100).toFixed(2) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + losses.toFixed(0) + ' W</span></div></div>';
@@ -33930,6 +34185,11 @@ function renderFaktorer() {
   var knownKeys = Object.keys(faktorState.quantities).filter(function(k) { return faktorState.quantities[k] !== null; });
   if (knownKeys.length > 0) {
     html += '<div class="card fade-in"><div class="card-title">' + tx('Kendte v\u00e6rdier', 'Known Values') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Faktorer</span>';
+  html += '</div>';
+
     html += '<div class="result-box">';
     knownKeys.forEach(function(k) {
       var def = FAKTOR_QUANTITIES[k];
@@ -36705,6 +36965,11 @@ function renderAutorisationReview() {
   var f = det.forsyningsdata || {};
   var fk = Object.keys(f);
   if (fk.length > 0) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Autorisation Review</span>';
+  html += '</div>';
+
     html += '<div class="result-box"><div class="result-title">' + tx('Forsyningsdata fundet', 'Supply data found') + '</div>';
     var labels = {
       skMax_MVA: 'Sk,max [MVA]', skMin_MVA: 'Sk,min [MVA]', un_kV: 'Un [kV]',
@@ -36990,6 +37255,11 @@ function renderAnalyzerResults() {
   var pct = comp.total > 0 ? Math.round((comp.solved / comp.total) * 100) : 0;
   html += '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Analyseresultat', 'Analysis Result') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Analyzer Results</span>';
+  html += '</div>';
+
   html += '<div class="result-box" style="margin-bottom:12px">';
   html += '<div class="result-title">' + tx('Komplethed', 'Completeness') + ': ' + pct + '% (' + comp.solved + '/' + comp.total + ')</div>';
   html += '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin:6px 0"><div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:4px"></div></div>';
@@ -37836,6 +38106,11 @@ function renderElPlan() {
   html += svg;
 
   // Summary
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 El Plan</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Installationsoversigt', 'Installation Summary') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kredsgrupper', 'Circuits') + '</span><span class="value">4</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Lysudtag', 'Lighting Points') + '</span><span class="value">4</span></div>';
@@ -37958,6 +38233,11 @@ function renderControlPanel() {
   html += svg;
 
   // Summary
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Control Panel</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Styringsoversigt', 'Control Summary') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Digitale indgange', 'Digital Inputs') + '</span><span class="value">3 (DI)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Analoge indgange', 'Analog Inputs') + '</span><span class="value">3 (AI)</span></div>';
@@ -40019,6 +40299,11 @@ function renderReverse() {
   if (st.result) {
     var r = st.result;
     if (r.success === false && r.error) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Reverse</span>';
+  html += '</div>';
+
       html += '<div class="result-box" style="border-color:#f44336"><div class="result-title" style="color:#f44336">' + tx('Fejl', 'Error') + '</div>';
       html += '<p style="color:#f44336">' + r.error + '</p></div>';
     } else {
@@ -40405,6 +40690,11 @@ function renderSelMatrix() {
   }
   html += '</div></div>';
   // Summary
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Sel Matrix</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Oversigt', 'Summary') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Par analyseret', 'Pairs analyzed') + '</span><span class="value">' + pairs.length + '</span></div>';
   html += '<div class="result-row"><span class="label" style="color:#4a4">' + tx('Fuld selektivitet', 'Full selectivity') + '</span><span class="value">' + fullCount + '</span></div>';
@@ -40560,6 +40850,11 @@ function renderAutoCoord() {
   html += '<p style="color:#aaa;font-size:0.85em;">' + tx('Finder optimal kombination af beskyttelsesenheder for fuld selektivitet, laveste pris og overholdelse af DS/HD 60364.', 'Finds optimal combination of protection devices for full selectivity, lowest cost and DS/HD 60364 compliance.') + '</p>';
   html += '<div class="select-group"><button class="sel-btn selected" onclick="autoCoordState.solutions=null;autoCoordState.applied=null;renderModule(\'autocoord\')">' + tx('Genberegn', 'Recalculate') + '</button></div>';
   if (autoCoordState.applied !== null) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Auto Coord</span>';
+  html += '</div>';
+
     html += '<div class="result-box" style="border-left:3px solid #4a4"><div class="result-row"><span class="label" style="color:#4a4">' + tx('Anvendt loesning', 'Applied solution') + '</span><span class="value">#' + (autoCoordState.applied + 1) + '</span></div></div>';
   }
   var solutions = autoCoordState.solutions || [];
@@ -40726,6 +41021,11 @@ function renderPowerFlow() {
   if (powerFlowState.selectedCable && tree.nodes[powerFlowState.selectedCable]) {
     var nd = tree.nodes[powerFlowState.selectedCable];
     var pf = powerFlowCalcNode(nd, tree, powerFlowState.mode);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Power Flow</span>';
+  html += '</div>';
+
     html += '<div class="result-box" style="border-left:3px solid #3b82f6">';
     html += '<div class="result-title">' + tx('Kabeldetaljer', 'Cable Details') + ': ' + sldNodeName(nd) + '</div>';
     html += '<div class="result-row"><span class="label">P</span><span class="value">' + pf.P.toFixed(2) + ' kW</span></div>';
@@ -40766,6 +41066,11 @@ function renderLiveInstallation() {
 
   // Mode-specific controls
   if (mode === 'fault') {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Live Installation</span>';
+  html += '</div>';
+
     html += '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + tx('Fejltilstand', 'Fault Mode') + '</div>';
     html += '<div class="result-row"><span class="label">' + tx('Klik paa en komponent for at injicere fejl', 'Click a component to inject a fault') + '</span></div>';
     if (liveState.faultResult) {
@@ -41032,6 +41337,11 @@ function renderErklaering() {
   html += '</div></div>';
 
   // Declaration statement
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Erklaering</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Erklæring', 'Declaration statement') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Installationen er udført i overensstemmelse med Installationsbekendtgørelsen og DS/HD 60364', 'The installation complies with Installationsbekendtgørelsen and DS/HD 60364') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Firma', 'Company') + ':</span><span class="value">' + ERKL_COMPANIES[s.companyPreset] + '</span></div>';
@@ -41224,6 +41534,11 @@ function renderTestprotokol() {
     totalFailed += (tested - passed);
   });
   var verdict = totalFailed === 0 && totalTested > 0;
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Testprotokol</span>';
+  html += '</div>';
+
   html += '<div class="result-box ' + (verdict ? '' : 'error') + '">';
   html += '<div class="result-row"><span class="label">' + tx('Kredse testet', 'Circuits tested') + '</span><span class="value">' + s.circuits.length + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Målinger i alt', 'Total measurements') + '</span><span class="value">' + totalTested + '</span></div>';
@@ -41347,6 +41662,11 @@ function renderTjekAlt() {
   var greys = checks.filter(function(c) { return c.status === 'grey'; }).length;
   var applicable = total - greys;
   var pct = applicable > 0 ? Math.round((greens / applicable) * 100) : 0;
+
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Tjek Alt</span>';
+  html += '</div>';
 
   html += '<div class="result-box"><div class="result-title">' + tx('Din installation er', 'Your installation is') + ' ' + pct + '% ' + tx('komplet', 'complete') + '</div>';
   html += '<div style="background:var(--border);border-radius:8px;height:12px;margin:8px 0;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + (pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:8px;transition:width 0.3s"></div></div>';
@@ -41486,6 +41806,11 @@ function renderFejlfinding() {
     var result = fejlfindingGetResult(s.symptom, s.scope, s.context);
     var safetyColor = result.safety === 'FARLIG' ? 'var(--danger)' : result.safety === 'VIGTIG' ? 'var(--warning)' : 'var(--success)';
     var safetyLabel = result.safety === 'FARLIG' ? tx('FARLIG — øjeblikkelig handling','DANGEROUS — immediate action') : result.safety === 'VIGTIG' ? tx('VIGTIG — udbedres snart','IMPORTANT — fix soon') : tx('NORMAL — planlagt reparation','NORMAL — scheduled repair');
+
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Fejlfinding</span>';
+  html += '</div>';
 
     html += '<div class="result-box ' + (result.safety === 'FARLIG' ? 'error' : 'warning') + '">';
     html += '<div class="result-title" style="color:' + safetyColor + '">' + (result.safety === 'FARLIG' ? '🚨' : result.safety === 'VIGTIG' ? '⚠️' : 'ℹ️') + ' ' + safetyLabel + '</div>';
@@ -41838,6 +42163,11 @@ function renderVdrop3D() {
   html += '</div></div>';
 
   var gradients = vdrop3dCalcGradient(tree);
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Vdrop3 D</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + vdrop3dRenderSVG(gradients, s.viewAngle) + '</div>';
 
   // Data table
@@ -41945,6 +42275,11 @@ function renderGroundDesign() {
     var rLimit = 20;
     var ok = R <= rLimit;
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Ground Design</span>';
+  html += '</div>';
+
     html += '<div class="result-box">';
     html += '<div class="result-row"><span class="label">' + tx('Jordresistivitet \u03C1', 'Soil resistivity \u03C1') + '</span><span class="value">' + soil.rho + ' \u03A9\u00B7m</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Beregnet jordingsmodstand R\u2091', 'Calculated earth resistance R\u2091') + '</span><span class="value" style="font-weight:700;color:' + (ok ? 'var(--success)' : 'var(--danger)') + '">' + R.toFixed(1) + ' \u03A9</span></div>';
@@ -42030,6 +42365,11 @@ function renderEftersyn() {
   var pct = applicable > 0 ? Math.round((done / applicable) * 100) : 0;
 
   // Progress
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Eftersyn</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Fremdrift', 'Progress') + ': ' + pct + '% (' + done + '/' + applicable + ')</div>';
   html += '<div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + (pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:8px"></div></div></div>';
 
@@ -42184,6 +42524,11 @@ function renderTavleErkl() {
     var bt = TAVLE_BOARD_TYPES.filter(function(x) { return x.id === s.boardType; })[0];
     var today = new Date().toISOString().slice(0, 10);
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('Genereret Tavleerkl\u00E6ring', 'Generated Panel Declaration') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Tavle Erkl</span>';
+  html += '</div>';
+
     html += '<div class="result-box">';
     html += '<div class="result-row" style="font-weight:700;font-size:1.1em;text-align:center;padding:8px 0">' + tx('TAVLEERKL\u00C6RING per DS/EN 61439', 'PANEL DECLARATION per DS/EN 61439') + '</div>';
     html += '<div class="result-row"><span class="label">' + tx('Tavletype', 'Board type') + '</span><span class="value">' + tx(bt.da, bt.en) + '</span></div>';
@@ -42277,6 +42622,11 @@ function renderSundhed() {
   html += sundhedRenderGaugeSVG(score.total);
 
   // Breakdown
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Sundhed</span>';
+  html += '</div>';
+
   html += '<div class="result-box" style="margin-top:12px">';
   var cats = [
     { label: tx('Sikkerhed (40%)', 'Safety (40%)'), val: score.safety },
@@ -42378,6 +42728,11 @@ function renderFremtid() {
     var result = fremtidAnalyze(s.scenario);
     if (result) {
       html += '</div><div class="card fade-in"><div class="card-title">' + tx('Analyse', 'Analysis') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Fremtid</span>';
+  html += '</div>';
+
       html += '<div class="result-box">';
       html += '<div class="result-row"><span class="label">' + tx('\u00D8nsket tilf\u00F8jelse', 'Desired addition') + '</span><span class="value">' + tx(result.scenario.da, result.scenario.en) + ' (' + result.scenario.kw + ' kW)</span></div>';
       html += '<div class="result-row"><span class="label">' + tx('Nuv\u00E6rende belastning', 'Current load') + '</span><span class="value">' + result.currentLoad.toFixed(1) + ' kW</span></div>';
@@ -42503,6 +42858,11 @@ function renderQRKode() {
 
     var grid = qrGenerateMatrix(text);
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('QR-kode', 'QR Code') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Q R Kode</span>';
+  html += '</div>';
+
     html += '<div class="result-box" style="text-align:center">' + qrRenderSVG(grid) + '</div>';
     html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Kodet indhold', 'Encoded content') + '</div>';
     html += '<div class="result-row"><span class="label">' + text + '</span></div></div>';
@@ -42586,6 +42946,11 @@ function renderFejlvagt() {
   var filtered = s.filter === 'all' ? results : results.filter(function(r) { return r.severity === parseInt(s.filter); });
 
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultater', 'Results') + ' (' + filtered.length + '/' + FEJLVAGT_MISTAKES.length + ' ' + tx('regler tjekket', 'rules checked') + ')</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Fejlvagt</span>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   if (filtered.length === 0) {
     html += '<div class="result-row" style="color:var(--success)">\u2705 ' + tx('Ingen fejl fundet!', 'No mistakes found!') + '</div>';
@@ -42683,6 +43048,11 @@ function renderStemme() {
     if (s.reportGenerated && s.details.length > 0) {
       var report = stemmeGenerateReport();
       html += '</div><div class="card fade-in"><div class="card-title">' + tx('Servicerapport', 'Service Report') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Stemme</span>';
+  html += '</div>';
+
       html += '<div class="result-box"><pre style="white-space:pre-wrap;font-family:inherit;margin:0">' + report + '</pre></div>';
     }
   }
@@ -42765,6 +43135,11 @@ function renderMatopt() {
   savings.forEach(function(sav) { totalDKK += sav.savingDKK; });
 
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Besparelser fundet', 'Savings found') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Matopt</span>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-row" style="font-size:1.3em;font-weight:700"><span class="label">' + tx('Total besparelse', 'Total savings') + '</span><span class="value" style="color:var(--success)">' + totalDKK.toLocaleString() + ' DKK</span></div>';
   html += '</div>';
@@ -42866,6 +43241,11 @@ function renderMester() {
   if (s.scenario) {
     var sc = MESTER_SCENARIOS.filter(function(x) { return x.id === s.scenario; })[0];
     if (sc) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Mester</span>';
+  html += '</div>';
+
       html += '</div><div class="card fade-in"><div class="card-title">\uD83D\uDCA1 ' + tx(sc.da, sc.en) + '</div><div class="result-box">';
       sc.tips.forEach(function(tip, idx) {
         html += '<div class="result-row" style="padding:8px 0;border-bottom:1px solid var(--border)"><span class="label"><strong>' + (idx + 1) + '.</strong> ' + tx(tip.da, tip.en) + '</span></div>';
@@ -42954,6 +43334,11 @@ function renderTidslinje() {
   var result = tidslinjeCalc(s.projectType, s.teamSize);
   if (result) {
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('Tidsestimat', 'Time Estimate') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Tidslinje</span>';
+  html += '</div>';
+
     html += '<div class="result-box">' + tidslinjeRenderBarSVG(result.phases) + '</div>';
     html += '<div class="result-box" style="margin-top:8px">';
     result.phases.forEach(function(p) {
@@ -43068,6 +43453,11 @@ function renderBenchmark() {
     var ref = BENCHMARK_REFERENCES.filter(function(r) { return r.id === s.reference; })[0];
     var current = benchmarkGetCurrent();
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('Radardiagram', 'Radar Chart') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Benchmark</span>';
+  html += '</div>';
+
     html += '<div class="result-box">' + benchmarkRenderRadarSVG(current, ref) + '</div>';
     html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Detaljer', 'Details') + '</div>';
     html += '<div class="result-row"><span class="label">' + tx('Kredse', 'Circuits') + '</span><span class="value">' + current.circuits + ' / ' + ref.circuits + ' (' + tx('ref.','ref.') + ')</span></div>';
@@ -43195,6 +43585,11 @@ function renderKundportal() {
   // Score card
   html += '<div class="card fade-in"><div class="card-title">' + tx('Installationsscore', 'Installation Score') + '</div>';
   var scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kundportal</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><svg width="120" height="120" viewBox="0 0 120 120">';
   html += '<circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="10"/>';
   var pct = score / 100 * 314;
@@ -43350,6 +43745,11 @@ function renderInstall3d() {
 
   // SVG view
   html += '<div class="card fade-in"><div class="card-title">' + tx('Isometrisk bygningssnit', 'Isometric Building Section') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Install3d</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + install3dRenderSVG(components, s.viewMode) + '</div></div>';
 
   // Component list
@@ -43424,6 +43824,11 @@ function renderKundevis() {
 
   // Infographic
   html += '<div class="card fade-in"><div class="card-title">' + tx('Sikkerhedsfordele', 'Safety Benefits') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kundevis</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + kundevisRenderInfographic() + '</div></div>';
 
   // Plain language summary
@@ -43592,6 +43997,11 @@ function renderFilm() {
 
   // Frame display
   html += '<div class="card fade-in"><div class="card-title">' + tx('Trin', 'Step') + ' ' + (s.frame + 1) + ': ' + tx(FILM_FRAMES[s.frame].da, FILM_FRAMES[s.frame].en) + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Film</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + filmRenderFrame(s.frame) + '</div>';
 
   // Controls
@@ -43672,6 +44082,11 @@ function renderVedligehold() {
 
   // Component status traffic lights
   html += '<div class="card fade-in"><div class="card-title">' + tx('Komponentstatus', 'Component Status') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Vedligehold</span>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   VEDLIGEHOLD_COMPONENTS.forEach(function(comp) {
     var status = vedlikeholdGetStatus(comp, s.installAge);
@@ -43857,6 +44272,11 @@ function renderTidsrejse() {
 
   // Timeline
   html += '<div class="card fade-in"><div class="card-title">' + tx('Forudsagte vedligeholdsvinduer', 'Predicted maintenance windows') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Tidsrejse</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + tidsrejseTimelineSVG(circuits) + '</div></div>';
 
   // Circuit selector
@@ -43939,6 +44359,11 @@ function renderUdvidelse() {
   if (s.scenario) {
     var r = udvidelseAnalyze(s.scenario);
     if (r) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Udvidelse</span>';
+  html += '</div>';
+
       html += '<div class="card fade-in"><div class="card-title">' + tx('Gennemf\u00F8rlighed', 'Feasibility') + '</div><div class="result-box">';
       html += '<div class="result-row"><span class="label">' + tx('Scenarie', 'Scenario') + '</span><span class="value">' + tx(r.sc.da, r.sc.en) + ' (' + r.sc.kw + ' kW)</span></div>';
       html += '<div class="result-row"><span class="label">' + tx('Nuv\u00E6rende belastning', 'Current load') + '</span><span class="value">' + r.load.toFixed(1) + ' kW</span></div>';
@@ -44007,6 +44432,11 @@ function renderRisikotjek() {
   var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF1F ' + tx('Fredag eftermiddag-detektor', 'Friday Afternoon Detector') + '</div>';
   html += '<p class="info-text">' + tx('Sp\u00E6nder over fejludsatte forhold (mange kredse, sn\u00E6vre selektivitetsmarginer, blandede RCD-typer, manglende dokumentation) og giver en risikoscore.', 'Scans for error-prone conditions (many circuits, tight selectivity margins, mixed RCD types, missing docs) and produces a risk score.') + '</p>';
   var col = a.risk >= 60 ? '#ef4444' : a.risk >= 40 ? '#f59e0b' : '#22c55e';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Risikotjek</span>';
+  html += '</div>';
+
   html += '<div class="result-box"><svg width="120" height="120" viewBox="0 0 120 120">';
   html += '<circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="10"/>';
   html += '<circle cx="60" cy="60" r="50" fill="none" stroke="' + col + '" stroke-width="10" stroke-dasharray="' + (a.risk / 100 * 314) + ' 314" transform="rotate(-90 60 60)"/>';
@@ -44069,6 +44499,11 @@ function renderKundetillid() {
   html += '</div></div>';
 
   // Trust facts
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kundetillid</span>';
+  html += '</div>';
+
   html += '<div class="card fade-in"><div class="card-title">' + tx('N\u00F8gletal', 'Key facts') + '</div><div class="result-box">';
   html += '<div class="result-row"><span class="label">' + tx('Antal sikrede kredse', 'Protected circuits') + '</span><span class="value">' + circuits.length + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Beståede normkontroller', 'Passed standard checks') + '</span><span class="value" style="color:' + (passRate >= 80 ? 'var(--success)' : 'var(--warning)') + '">' + passRate + '%</span></div>';
@@ -44177,6 +44612,11 @@ function renderHukommelse() {
   html += '</div>';
 
   // Log
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Hukommelse</span>';
+  html += '</div>';
+
   html += '<div class="card fade-in"><div class="card-title">' + tx('Vidensbank', 'Knowledge log') + ' (' + s.entries.length + ')</div><div class="result-box">';
   if (s.entries.length === 0) {
     html += '<p class="info-text">' + tx('Ingen poster endnu.', 'No entries yet.') + '</p>';
@@ -44288,6 +44728,11 @@ function renderRegassist() {
   if (s.topic) {
     var t = REGASSIST_TOPICS.filter(function(x) { return x.id === s.topic; })[0];
     if (t) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Regassist</span>';
+  html += '</div>';
+
       html += '<div class="card fade-in"><div class="card-title">' + tx(t.da, t.en) + ' \u2014 ' + t.clause + '</div><div class="result-box">';
       html += '<p class="info-text">' + tx(t.expDa, t.expEn) + '</p>';
       html += '<div class="result-row"><span class="label">' + tx('P\u00E5virkede moduler', 'Affected modules') + '</span><span class="value">' + t.modules.join(', ') + '</span></div>';
@@ -44340,6 +44785,11 @@ function renderInspeksim() {
   var s = inspeksimState;
   var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD75\uFE0F ' + tx('Inspektionssimulator', 'Inspection Simulator') + '</div>';
   html += '<p class="info-text">' + tx('Spil rollen som Sikkerhedsstyrelsens inspekt\u00F8r. Besvar sp\u00F8rgsm\u00E5lene med klik for at få din inspektionsparathed. Reference: DS/HD 60364-6.', 'Role-play a Sikkerhedsstyrelsen inspector. Click-answer the questions to get your inspection readiness. Reference: DS/HD 60364-6.') + '</p>';
+
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Inspeksim</span>';
+  html += '</div>';
 
   html += '<div class="result-box">';
   INSPEKSIM_QUESTIONS.forEach(function(q) {
@@ -44435,6 +44885,11 @@ function renderKvalitet() {
   html += '<div class="result-row" style="font-size:1.3em;font-weight:700"><span class="label">' + tx('Samlet kvalitetsscore', 'Overall quality score') + '</span><span class="value" style="color:' + col + '">' + avg + '/100</span></div></div>';
 
   html += '<div class="card fade-in"><div class="card-title">' + tx('Profil (radar)', 'Profile (radar)') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.8rem">\uD83D\uDCD0 Kvalitet</span>';
+  html += '</div>';
+
   html += '<div class="result-box">' + kvalitetRadarSVG(metrics) + '</div></div>';
 
   html += '<div class="card fade-in"><div class="card-title">' + tx('Detaljer', 'Breakdown') + '</div><div class="result-box">';
