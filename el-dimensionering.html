@@ -18072,7 +18072,27 @@ function renderBusbar() {
   });
   html += '</div></div>';
 
-  // Results - Derating
+  // ═══ MATHCAD PRIME SUMMARY ═══
+  html += '<div class="card fade-in" style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:16px 20px">';
+  html += '<div class="card-title" style="font-family:sans-serif">\uD83D\uDCD0 ' + tx('Skinnesystem', 'Busbar Trunking') + '</div>';
+  html += mcPrimeDefLine([
+    { sym: 'I<sub>n</sub>', val: busbarState.ratedCurrent, unit: 'A' },
+    { sym: 'L', val: busbarState.sections * 3, unit: 'm' },
+    { sym: tx('Aftag','Tap-offs'), val: busbarState.tapOffCount, unit: tx('stk','pcs') }
+  ]);
+  html += mcPrimeLine('I<sub>z,korr</sub>', ':= I<sub>n</sub> \u00B7 k<sub>T</sub> \u00B7 k<sub>IP</sub> \u00B7 k<sub>inst</sub> =', '', calc.thermal.deratedCurrent, 'A', calc.thermal.ok ? mcPrimeRef('IEC 61439-6') : '');
+  html += mcPrimeLine('\u0394U%', '=', '', calc.vdrop.vdropPercent, '%', calc.vdrop.ok ? '' : '<strong style="color:var(--danger)">> 1%</strong>');
+  html += '<div style="margin:8px 0;font-size:0.95rem">';
+  html += tx('Termisk','Thermal') + ': ' + (calc.thermal.ok ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
+  html += '\u0394U: ' + (calc.vdrop.ok ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
+  html += 'I<sub>cw</sub>: ' + (calc.sc.ok ? mcPrimeOk() : mcPrimeFail());
+  html += '</div>';
+  html += mcPrimeResult('I<sub>z,korr</sub>', calc.thermal.deratedCurrent, 'A');
+  html += '<div style="font-family:sans-serif">' + mcPrimeRef('IEC 61439-6') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
+  html += '</div>';
+
+  // Results - Derating (detailed)
+  html += '<details class="eng-advanced"><summary>\uD83D\uDCE6 ' + tx('Detaljeret beregning', 'Detailed calculation') + '</summary><div class="eng-advanced-body">';
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Dereringsfaktorer', 'Derating Factors') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Temperaturfaktor', 'Temperature Factor') + '</span><span class="value">' + calc.derating.tempFactor + '</span></div>';
@@ -18126,6 +18146,7 @@ function renderBusbar() {
   }
 
   // Simulator
+  html += '</div></details>'; // close eng-advanced
   html += renderBusbarSim(busbarState.ratedCurrent, busbarState.tapOffCount, calc.thermal.loadRatio, busbarState.sections, busbarState.ambientTemp);
 
   // Verdict
