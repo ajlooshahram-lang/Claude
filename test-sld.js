@@ -13797,6 +13797,63 @@ test('autoexam: Diagram tab renders (plain + graded) in da and en; dashboard sho
   assert.ok(d.indexOf('axApplyAdaptive') >= 0, 'adaptive button present');
 });
 
+// ----- Batch 4: continuous-learning ingestion -----
+var AX_SAMPLE_EXAM = 'El-autorisationsprove. Vaegtning: Opgave 1 = 20 % Opgave 2 = 60 % Opgave 3 = 20 %. Opgave 1 Forsyningsanlaeg paa et hospital, tre transformerstationer paa en 10 kV-ringforbindelse. Kortslutningseffekt. Overbelastningsbeskyttet. Beregn Ikmax. Opgave 2 Bygningsinstallation, hoejhus til kontorlejemaal, systemjording TT, dimensioner stikledningen, samtidighedsfaktor, sp\u00e6ndingsfald, HPFI, DS/HD 60364-5-52, BEK 1082, Faellesregulativet, brydeevne Icu, slojfeimpedans Zs. 6 timers prove.';
+test('autoexam/ingest: extracts topics, buildings, clauses, weighting, HV and duration', function () {
+  var f = axIngestText(AX_SAMPLE_EXAM);
+  assert.ok(f.ok && f.words > 30, 'enough text');
+  assert.ok(f.topics.shortcircuit >= 1 && f.topics.fault >= 1 && f.topics.vdrop >= 1, 'topics: ' + JSON.stringify(f.topics));
+  assert.ok(f.buildings.hospital >= 1 && f.buildings.kontor >= 1, 'buildings: ' + JSON.stringify(f.buildings));
+  assert.ok(f.clauses['DS/HD 60364-5-52'] >= 1 && f.clauses['BEK 1082'] >= 1, 'clauses');
+  assert.strictEqual(f.hv, true, 'HV detected');
+  assert.strictEqual(f.durationHint, 6, '6-hour exam');
+  assert.deepStrictEqual(f.weighting, [20, 60, 20], 'weighting parsed');
+});
+test('autoexam/ingest: rejects junk text (ok=false) and is deterministic', function () {
+  assert.strictEqual(axIngestText('hello world').ok, false);
+  assert.strictEqual(JSON.stringify(axIngestText(AX_SAMPLE_EXAM)), JSON.stringify(axIngestText(AX_SAMPLE_EXAM)));
+});
+test('autoexam/ingest: vdrop matches the \u00e6-folded ASCII spelling too', function () {
+  assert.ok(axIngestText('spaendingsfald paa stikledningen og spaendingsfald').topics.vdrop >= 1, 'ascii spaendingsfald');
+  assert.ok(axIngestText('sp\u00e6ndingsfald').topics.vdrop >= 1, 'proper sp\u00e6ndingsfald');
+});
+test('autoexam/ingest: profile merge accumulates counts across documents', function () {
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  p = axProfileMerge(p, axIngestText(AX_SAMPLE_EXAM + ' fabrik produktionshal maskinhal.'));
+  assert.strictEqual(p.ingested, 2);
+  assert.strictEqual(p.hvCount, 2);
+  assert.ok(p.buildings.hospital === 2 && p.buildings.fabrik >= 1, 'cumulative buildings: ' + JSON.stringify(p.buildings));
+});
+test('autoexam/ingest: bias is null without a profile, computed with one', function () {
+  assert.strictEqual(axProfileBias(null), null);
+  assert.strictEqual(axProfileBias({ ingested: 0 }), null);
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  var b = axProfileBias(p);
+  assert.ok(b && b.topBuilding && typeof b.buildingWeights === 'object', 'bias computed');
+  var sum = 0; Object.keys(b.buildingWeights).forEach(function (k) { sum += b.buildingWeights[k]; });
+  assert.ok(Math.abs(sum - 1) < 1e-6, 'building weights normalised to 1');
+});
+test('autoexam/ingest: biased building pick is always a valid building id and favours seen types', function () {
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  for (var i = 0; i < 50; i++) { var id = axBiasedBuilding(p, axRngMake(i + 1)); assert.ok(AX_BUILDINGS.some(function (b) { return b.id === id; }), 'valid id ' + id); }
+  // count distribution over many seeds: hospital/kontor (seen) should appear
+  var seen = {}; for (var s = 0; s < 300; s++) { var id2 = axBiasedBuilding(p, axRngMake(s * 7 + 1)); seen[id2] = (seen[id2] || 0) + 1; }
+  assert.ok((seen.hospital || 0) + (seen.kontor || 0) > 0, 'seen buildings appear');
+});
+test('autoexam: Laering tab renders in da and en (with and without a profile)', function () {
+  var prev = lang;
+  axProfileClear();
+  ['da', 'en'].forEach(function (lg) { lang = lg; autoexamState.tab = 'laering'; var out = renderAutoExam(); assert.ok(out.indexOf('axIngestFile') >= 0 && out.indexOf('undefined') < 0, 'empty laering ' + lg); });
+  axProfileSave(axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM)));
+  ['da', 'en'].forEach(function (lg) { lang = lg; autoexamState.tab = 'laering'; var out = renderAutoExam(); assert.ok(out.indexOf('<svg') >= 0 && out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'profiled laering ' + lg); });
+  axProfileClear();
+  lang = prev;
+});
+test('autoexam: tab bar includes the Laering tab', function () {
+  autoexamState.tab = 'opgave'; var out = renderAutoExam();
+  assert.ok(out.indexOf("axUITab('laering')") >= 0, 'Laering tab present');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
