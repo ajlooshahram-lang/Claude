@@ -19056,6 +19056,174 @@ test('examgen module exists in both language translation objects', function() {
   assert(T.en.modules.examgen, 'English examgen translation missing');
 });
 
+// =====================================================================
+// EXAM LEARNING SYSTEM TESTS (examgrade / kompetence / repetition)
+// =====================================================================
+console.log('\n=== Exam Learning System Tests ===\n');
+
+function _modelChoices(ex) { var ch = {}; ex.circuits.forEach(function (c, i) { ch[i] = { In: c.In, mm2: c.S_mm2 }; }); return ch; }
+
+test('gradeExam: fully-correct (model) choices score 100% for all types x difficulties', function() {
+  ['A', 'B', 'C', 'D', 'E'].forEach(function(t) {
+    ['standard', 'avanceret', 'ekspert'].forEach(function(d) {
+      var ex = generateAuthExam(t, d, (t.charCodeAt(0) * 7) + d.length * 13 + 5);
+      var res = gradeExam(ex, _modelChoices(ex));
+      assert(Math.abs(res.pct - 100) < 1e-9, t + '/' + d + ': model choices must score 100%, got ' + res.pct.toFixed(2));
+      assert(res.passed, t + '/' + d + ': the model solution must be a pass');
+      res.circuits.forEach(function(g) {
+        g.criteria.forEach(function(cr) { assert(cr.ok, t + '/' + d + ': criterion ' + cr.topic + ' must be ok for the model choice'); });
+      });
+    });
+  });
+});
+
+test('gradeExam: a grossly undersized cable is detected and loses points', function() {
+  var ex = generateAuthExam('C', 'ekspert', 4242);
+  var maxi = 0; ex.circuits.forEach(function(c, i) { if (c.In > ex.circuits[maxi].In) maxi = i; });
+  var ch = _modelChoices(ex);
+  ch[maxi] = { In: ex.circuits[maxi].In, mm2: 1.5 }; // 1.5 mm^2 under a high-current breaker
+  var res = gradeExam(ex, ch);
+  var cable = res.circuits[maxi].criteria.find(function(cr) { return cr.topic === 'cable'; });
+  assert(cable.ok === false, 'undersized cable criterion must fail');
+  assert(cable.score === 0, 'undersized cable must score 0 points');
+  assert(res.pct < 100, 'overall score must drop below 100% with a bad cable, got ' + res.pct.toFixed(1));
+});
+
+test('gradeExam: enforces I_B <= I_n (an I_n below I_B fails overload and scores 0)', function() {
+  var ex = generateAuthExam('B', 'standard', 777);
+  var ch = _modelChoices(ex);
+  ch[0] = { In: 0.5, mm2: ex.circuits[0].S_mm2 }; // device far below the load current
+  var res = gradeExam(ex, ch);
+  var ov = res.circuits[0].criteria.find(function(cr) { return cr.topic === 'overload'; });
+  assert(ov.ok === false, 'I_n < I_B must fail the overload criterion');
+  assert(ov.score === 0, 'I_n < I_B must score 0 on overload');
+});
+
+test('gradeExam: a valid but oversized device earns partial (not full) credit', function() {
+  var ex = generateAuthExam('A', 'standard', 2024);
+  var idx = 0, c = ex.circuits[idx];
+  var opts = examGradeInOptions(c).filter(function(v) { return v > c.In; });
+  if (opts.length) {
+    var ch = _modelChoices(ex);
+    ch[idx] = { In: opts[0], mm2: 240 }; // bigger device on a generous cable so I_z still carries it
+    var res = gradeExam(ex, ch);
+    var ov = res.circuits[idx].criteria.find(function(cr) { return cr.topic === 'overload'; });
+    assert(ov.ok === true, 'an oversized but valid In should still be ok');
+    assert(ov.score > 0 && ov.score < ov.max, 'oversized In should earn partial credit, got ' + ov.score + '/' + ov.max);
+  }
+});
+
+test('examgrade/repetition/kompetence module keys exist in both language objects', function() {
+  ['examgrade', 'repetition', 'kompetence'].forEach(function(k) {
+    assert(T.da.modules[k], 'Danish ' + k + ' translation missing');
+    assert(T.en.modules[k], 'English ' + k + ' translation missing');
+  });
+});
+
+test('renderExamGrade returns substantial HTML (da + en) with a graded exam', function() {
+  var prevLang = lang;
+  var prev = { type: examGradeState.type, exam: examGradeState.exam, choices: examGradeState.choices, graded: examGradeState.graded, result: examGradeState.result };
+  try {
+    var ex = generateAuthExam('A', 'standard', 31337);
+    examGradeState.type = 'A'; examGradeState.exam = ex; examGradeState.choices = _modelChoices(ex);
+    examGradeState.result = gradeExam(ex, examGradeState.choices); examGradeState.graded = true;
+    lang = 'da'; var hDa = renderExamGrade();
+    assert(typeof hDa === 'string' && hDa.length > 1500, 'da grader HTML should be substantial, got ' + hDa.length);
+    assert(hDa.indexOf('Modell\u00F8sning') >= 0, 'da grader should show the model-solution panel');
+    assert(hDa.indexOf('undefined') < 0, 'da grader must not contain "undefined"');
+    assert(hDa.indexOf('433.1') >= 0 && hDa.indexOf('411.3.2') >= 0, 'da grader must cite DS/HD 60364 clauses');
+    lang = 'en'; var hEn = renderExamGrade();
+    assert(typeof hEn === 'string' && hEn.length > 1500, 'en grader HTML should be substantial, got ' + hEn.length);
+    assert(hEn.indexOf('Model solution') >= 0, 'en grader should localize the model-solution panel');
+  } finally {
+    lang = prevLang; examGradeState.type = prev.type; examGradeState.exam = prev.exam;
+    examGradeState.choices = prev.choices; examGradeState.graded = prev.graded; examGradeState.result = prev.result;
+  }
+});
+
+test('kompetenceAggregate + kompetenceRecommend behave correctly on a synthetic log', function() {
+  var log = [{ ts: 1, type: 'A', difficulty: 'standard', seed: 1, totalPct: 50, criteria: [
+    { circuitKey: 'x', topic: 'overload', ref: EXAM_TOPICS.overload.ref, score: 30, max: 30, ok: true },
+    { circuitKey: 'x', topic: 'cable', ref: EXAM_TOPICS.cable.ref, score: 0, max: 25, ok: false }
+  ] }];
+  var agg = kompetenceAggregate(log);
+  assert.strictEqual(agg.exams, 1, 'one logged exam');
+  assert.strictEqual(agg.topics.overload.pct, 100, 'overload should aggregate to 100%');
+  assert.strictEqual(agg.topics.overload.level, 4, 'overload should be mastered (level 4)');
+  assert.strictEqual(agg.topics.cable.pct, 0, 'cable should aggregate to 0%');
+  assert.strictEqual(agg.topics.cable.level, 1, 'cable should be weak (level 1)');
+  assert.strictEqual(agg.topics.fault.attempts, 0, 'fault should be untested');
+  var rec = kompetenceRecommend(agg);
+  assert(rec && rec.reason === 'untested', 'should recommend an untested topic first');
+  var fullLog = [{ ts: 2, type: 'A', difficulty: 'standard', seed: 2, totalPct: 60, criteria: EXAM_TOPIC_ORDER.map(function(tk) {
+    return { circuitKey: 'y', topic: tk, ref: EXAM_TOPICS[tk].ref, score: (tk === 'shortcircuit' ? 0 : EXAM_GRADE_WEIGHTS[tk]), max: EXAM_GRADE_WEIGHTS[tk], ok: (tk !== 'shortcircuit') };
+  }) }];
+  var rec2 = kompetenceRecommend(kompetenceAggregate(fullLog));
+  assert(rec2 && rec2.topic === 'shortcircuit' && rec2.reason === 'lowest', 'should recommend the weakest tested topic when all are tested');
+});
+
+test('renderKompetence returns HTML for empty and populated logs (da + en)', function() {
+  var prevLang = lang;
+  try {
+    mockStorage['examgrade_log'] = JSON.stringify([]);
+    lang = 'da'; var empty = renderKompetence();
+    assert(empty.length > 200 && empty.indexOf('Ingen data') >= 0, 'empty map should prompt the user for data');
+    mockStorage['examgrade_log'] = JSON.stringify([{ ts: 1, type: 'A', difficulty: 'standard', seed: 1, totalPct: 70, criteria: [
+      { circuitKey: 'x', topic: 'overload', ref: EXAM_TOPICS.overload.ref, score: 18, max: 30, ok: true },
+      { circuitKey: 'x', topic: 'fault', ref: EXAM_TOPICS.fault.ref, score: 0, max: 20, ok: false }
+    ] }]);
+    lang = 'da'; var hDa = renderKompetence();
+    assert(hDa.length > 400 && hDa.indexOf('Kompetencekort') >= 0, 'da populated map should render');
+    assert(hDa.indexOf('cl.433.1') >= 0, 'map should list the graded clauses');
+    lang = 'en'; var hEn = renderKompetence();
+    assert(hEn.length > 400 && hEn.indexOf('Competency map') >= 0, 'en populated map should render');
+  } finally { lang = prevLang; delete mockStorage['examgrade_log']; }
+});
+
+test('repetition Leitner mechanics: seed, due, advance and demote', function() {
+  mockStorage['repetition_cards'] = JSON.stringify([]);
+  var cards = repetitionSeedDefaults([]);
+  assert(cards.length >= 6, 'seed deck should have at least 6 cards, got ' + cards.length);
+  repetitionSave(cards);
+  assert(repetitionDue(cards).length === cards.length, 'all freshly-seeded cards (due=0) must be due now');
+  repetitionAnswer('seed-433-ob', true);
+  var c = repetitionLoad().find(function(x) { return x.id === 'seed-433-ob'; });
+  assert(c.box === 2, '"knew it" should advance the card to box 2');
+  assert(c.due > Date.now(), 'an advanced card should be scheduled in the future');
+  repetitionAnswer('seed-433-ob', false);
+  c = repetitionLoad().find(function(x) { return x.id === 'seed-433-ob'; });
+  assert(c.box === 1, '"didn\'t" should demote the card back to box 1');
+  delete mockStorage['repetition_cards'];
+});
+
+test('repetitionSyncFromGrader adds a focused card for each missed topic only', function() {
+  mockStorage['repetition_cards'] = JSON.stringify([]);
+  mockStorage['examgrade_log'] = JSON.stringify([{ ts: 1, type: 'A', difficulty: 'standard', seed: 1, totalPct: 40, criteria: [
+    { circuitKey: 'x', topic: 'cable', ref: EXAM_TOPICS.cable.ref, score: 0, max: 25, ok: false },
+    { circuitKey: 'x', topic: 'overload', ref: EXAM_TOPICS.overload.ref, score: 30, max: 30, ok: true }
+  ] }]);
+  var cards = repetitionSyncFromGrader();
+  assert(cards.some(function(c) { return c.id === 'miss-cable'; }), 'a card for the missed cable topic must be added');
+  assert(!cards.some(function(c) { return c.id === 'miss-overload'; }), 'no card for a topic answered correctly');
+  delete mockStorage['repetition_cards']; delete mockStorage['examgrade_log'];
+});
+
+test('renderRepetition returns a flashcard UI in both da and en', function() {
+  var prevLang = lang, prev = { revealed: repetitionState.revealed, currentId: repetitionState.currentId };
+  try {
+    mockStorage['repetition_cards'] = JSON.stringify([]); mockStorage['examgrade_log'] = JSON.stringify([]);
+    repetitionState.revealed = false; repetitionState.currentId = null;
+    lang = 'da'; var hDa = renderRepetition();
+    assert(hDa.length > 400 && hDa.indexOf('Repetitionstr\u00E6ner') >= 0, 'da trainer should render');
+    assert(hDa.indexOf('Vis svar') >= 0, 'da trainer should offer to reveal the answer');
+    repetitionState.revealed = true; var hRev = renderRepetition();
+    assert(hRev.indexOf('Kunne jeg') >= 0, 'a revealed card should show the knew/didn\'t buttons');
+    repetitionState.revealed = false; repetitionState.currentId = null;
+    lang = 'en'; var hEn = renderRepetition();
+    assert(hEn.length > 400 && hEn.indexOf('Spaced-repetition') >= 0, 'en trainer should render');
+  } finally { lang = prevLang; repetitionState.revealed = prev.revealed; repetitionState.currentId = prev.currentId; delete mockStorage['repetition_cards']; delete mockStorage['examgrade_log']; }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

@@ -1544,6 +1544,9 @@ const T = {
       vektordiagram: '\uD83E\uDDED Vektordiagram',
       kritisk_review: '\uD83E\uDDE0 Kritisk Review',
       examgen: '\uD83C\uDF93 Eksamen-generator',
+      examgrade: '\uD83C\uDFAF Eksamensretter',
+      repetition: '\uD83D\uDD01 Repetitionstr\u00E6ner',
+      kompetence: '\uD83E\uDDE0 Kompetencekort',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
@@ -1757,6 +1760,9 @@ const T = {
       vektordiagram: '\uD83E\uDDED Vector Diagram',
       kritisk_review: '\uD83E\uDDE0 Critical Review',
       examgen: '\uD83C\uDF93 Exam Generator',
+      examgrade: '\uD83C\uDFAF Exam Grader',
+      repetition: '\uD83D\uDD01 Spaced Repetition',
+      kompetence: '\uD83E\uDDE0 Competency Map',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
@@ -5017,7 +5023,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap', 'autosolver', 'vektordiagram', 'kritisk_review', 'examgen']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap', 'autosolver', 'vektordiagram', 'kritisk_review', 'examgen', 'examgrade', 'repetition', 'kompetence']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -7781,6 +7787,9 @@ function renderModule(mod) {
     case 'reversedesc': content = renderReverseDesc(); break;
     case 'roadmap': content = renderRoadmap(); break;
     case 'examgen': content = renderExamGen(); break;
+    case 'examgrade': content = renderExamGrade(); break;
+    case 'repetition': content = renderRepetition(); break;
+    case 'kompetence': content = renderKompetence(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -29063,6 +29072,615 @@ function renderExamGen() {
   h += examGenOpgave1(ex);
   h += examGenOpgave2(ex);
   h += examGenOpgave3(ex);
+  return h;
+}
+
+// ============================================================================
+//  EXAM LEARNING SYSTEM — closes the loop on the exam generator.
+//  Three coherent modules that share ONE persistence layer (the grader log):
+//    examgrade  — interactive, click-only grader (Viggo complex-impedance)
+//    kompetence — competency / mastery map derived from grader results
+//    repetition — Leitner spaced-repetition trainer fed by missed items
+//  All physics is reused from the auto-solver / examgen engine. No new physics.
+// ============================================================================
+
+// Canonical competency topics. The plain-text keys + clause refs are STABLE
+// (tests, the grader log and the aggregation all key off them); only the
+// *_da / *_en labels are display strings (always via tx()).
+var EXAM_TOPICS = {
+  overload:     { ref: 'DS/HD 60364-4-43 cl.433.1',  da: 'Overbelastningsbeskyttelse (I_B \u2264 I_n \u2264 I_z)', en: 'Overload protection (I_B \u2264 I_n \u2264 I_z)' },
+  cable:        { ref: 'DS/HD 60364-5-52 cl.523',     da: 'Kabeldimensionering (korrigeret I_z)',              en: 'Cable sizing (corrected I_z)' },
+  fault:        { ref: 'DS/HD 60364-4-41 cl.411.3.2', da: 'Fejlbeskyttelse (Z_s / frakoblingstid)',           en: 'Fault protection (Z_s / disconnection)' },
+  shortcircuit: { ref: 'DS/HD 60364-4-43 cl.434.5.2', da: 'Kortslutningsbeskyttelse (I\u00B2t \u2264 k\u00B2S\u00B2)', en: 'Short-circuit protection (I\u00B2t \u2264 k\u00B2S\u00B2)' },
+  voltagedrop:  { ref: 'DS/HD 60364-5-52 cl.525',     da: 'Sp\u00E6ndingsfald (\u0394U)',                      en: 'Voltage drop (\u0394U)' }
+};
+var EXAM_TOPIC_ORDER = ['overload', 'cable', 'fault', 'shortcircuit', 'voltagedrop'];
+
+// Per-criterion weights (sum = 100 per circuit). Plain numbers — not display.
+var EXAM_GRADE_WEIGHTS = { overload: 30, cable: 25, fault: 20, shortcircuit: 15, voltagedrop: 10 };
+
+// ---- Shared persistence: the grader log feeds the map AND the trainer -------
+function examLogLoad() {
+  try { var v = JSON.parse(localStorage.getItem('examgrade_log')); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function examLogSave(log) { try { localStorage.setItem('examgrade_log', JSON.stringify(log.slice(-200))); } catch (e) {} }
+function examLogAppend(entry) { var log = examLogLoad(); log.push(entry); examLogSave(log); return log; }
+
+// ----------------------------------------------------------------------------
+//  GRADER ENGINE (pure) — recompute a circuit from the student's two choices
+//  (device rating I_n and cable CSA) using the SAME complex-impedance engine
+//  as examSolveExam, then score each life-safety criterion. The model solution
+//  is the answer key: matching it scores 100%. Because the model uses a
+//  conservative full-disconnection-time KB check (which it often "fails"), the
+//  Z_s / KB / \u0394U criteria are graded "meet-or-exceed the model" so a correct
+//  design is never penalised for an over-conservative model, while a dangerous
+//  deviation (under-sized cable, I_n below I_B, etc.) always loses points.
+// ----------------------------------------------------------------------------
+function examGradeRecompute(exam, idx, In, mm2) {
+  var s = exam.supply, U = 400, U0 = 230;
+  var c = exam.circuits[idx];
+  var rx = AS_CABLE_RX[mm2] || { r: c.r, x: c.x };
+  var ins = c.ins || 'PVC', mat = c.mat || 'Cu', n = c.n || 1;
+  var sz = cxCableSizing(In, 'C', s.ambientC || 30, s.grouping || 1, mm2, mat, ins);
+  var Iz = sz.Iz_corr;
+  var is3 = (c.phases !== '1x230');
+  var Zc = cxScale(cxCableImpedanceMOhm(c.len_m, rx.r, rx.x), 1 / n);
+  var Z1 = cxAdd(exam.sol.Zsup_max, Zc);
+  var ZcWarm = cxScale(cxCableImpedanceMOhm(c.len_m, rx.r * 1.24, rx.x), 1 / n);
+  var Zloop = cxAdd(exam.sol.Zsup_min, cxScale(ZcWarm, 2));
+  var Ik3max = asIk3(U, Z1, 1.05);
+  var Ikmin = asIk1(U0, Zloop, 0.95);
+  var cos = c.cosPhi, sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+  var dv = is3
+    ? (Math.sqrt(3) * c.IB * (c.len_m / 1000) * (rx.r * cos + rx.x * sin) / U * 100)
+    : (2 * c.IB * (c.len_m / 1000) * (rx.r * cos + rx.x * sin) / U0 * 100);
+  var ia = asDeviceIa({ In: In, device: c.device, curve: c.curve, isdMult: c.isdMult });
+  var fbOk = (s.earthing === 'TT') ? (c.rcd ? true : false) : (Ikmin >= ia.Ia);
+  var kb = cxKBKontrol(Ik3max, ia.t, mm2, mat, ins);
+  var obOk = (c.IB <= In + 1e-9) && (In <= Iz + 1e-9);
+  var vdLimit = (c.key === 'lighting' || c.key === 'reslight' || c.key === 'barnlight') ? 3 : 4;
+  return {
+    In: In, mm2: mm2, Iz: Iz, r: rx.r, x: rx.x, is3: is3, Zc: Zc, Z1: Z1, Zloop: Zloop,
+    Ik3max: Ik3max, Ikmin: Ikmin, vdrop: dv, vdLimit: vdLimit, ia: ia, fbOk: fbOk, kb: kb,
+    obOk: obOk, vdOk: dv <= vdLimit
+  };
+}
+
+// Grade a single circuit. choice = { In, mm2 } (either may be missing).
+function examGradeCircuit(exam, idx, choice) {
+  var c = exam.circuits[idx];
+  var model = exam.sol.circuits[idx];
+  var inSel = (choice && choice.In != null) ? choice.In : null;
+  var mmSel = (choice && choice.mm2 != null) ? choice.mm2 : null;
+  var W = EXAM_GRADE_WEIGHTS;
+  var crit = [];
+  var R = (inSel != null && mmSel != null) ? examGradeRecompute(exam, idx, inSel, mmSel) : null;
+
+  // 1) Overload protection: I_B <= I_n <= I_z  (cl.433.1)
+  (function () {
+    var score = 0, ok = false, note_da, note_en;
+    if (inSel == null) { note_da = 'Intet apparat valgt.'; note_en = 'No device selected.'; }
+    else if (inSel < c.IB - 1e-9) {
+      note_da = 'I_n = ' + inSel + ' A < I_B = ' + c.IB.toFixed(1) + ' A \u2014 apparatet udl\u00F8ser p\u00E5 normal last (overbelastning).';
+      note_en = 'I_n = ' + inSel + ' A < I_B = ' + c.IB.toFixed(1) + ' A \u2014 device trips on normal load (overload).';
+    } else if (R && inSel > R.Iz + 1e-9) {
+      note_da = 'I_n = ' + inSel + ' A > I_z = ' + R.Iz.toFixed(1) + ' A \u2014 apparatet beskytter ikke kablet.';
+      note_en = 'I_n = ' + inSel + ' A > I_z = ' + R.Iz.toFixed(1) + ' A \u2014 device does not protect the cable.';
+    } else if (inSel === c.In) {
+      score = W.overload; ok = true;
+      note_da = 'Korrekt: mindste standardv\u00E6rdi der opfylder I_B \u2264 I_n \u2264 I_z.';
+      note_en = 'Correct: smallest standard value satisfying I_B \u2264 I_n \u2264 I_z.';
+    } else {
+      score = Math.round(W.overload * 0.6); ok = true;
+      note_da = 'Gyldigt (I_B \u2264 I_n \u2264 I_z), men ikke den mindste standardv\u00E6rdi (' + c.In + ' A).';
+      note_en = 'Valid (I_B \u2264 I_n \u2264 I_z), but not the smallest standard value (' + c.In + ' A).';
+    }
+    crit.push({ topic: 'overload', ref: EXAM_TOPICS.overload.ref, max: W.overload, score: score, ok: ok,
+      student: (inSel != null) ? (inSel + ' A') : '\u2013', model: c.In + ' A', note_da: note_da, note_en: note_en });
+  })();
+
+  // 2) Cable cross-section: derated I_z >= I_n  (cl.523)
+  (function () {
+    var score = 0, ok = false, note_da, note_en;
+    if (mmSel == null || inSel == null) { note_da = 'Apparat og kabel skal v\u00E6lges.'; note_en = 'Device and cable must be chosen.'; }
+    else if (R.Iz < inSel - 1e-9) {
+      note_da = 'I_z,korr = ' + R.Iz.toFixed(1) + ' A < I_n = ' + inSel + ' A \u2014 kablet er underdimensioneret.';
+      note_en = 'I_z,corr = ' + R.Iz.toFixed(1) + ' A < I_n = ' + inSel + ' A \u2014 cable is undersized.';
+    } else if (mmSel === c.S_mm2) {
+      score = W.cable; ok = true;
+      note_da = 'Korrekt tv\u00E6rsnit: ' + asDa(mmSel) + ' mm\u00B2 (I_z,korr = ' + R.Iz.toFixed(1) + ' A \u2265 I_n).';
+      note_en = 'Correct cross-section: ' + asDa(mmSel) + ' mm\u00B2 (I_z,corr = ' + R.Iz.toFixed(1) + ' A \u2265 I_n).';
+    } else {
+      score = Math.round(W.cable * 0.6); ok = true;
+      note_da = 'Gyldigt (I_z \u2265 I_n), men st\u00F8rre end n\u00F8dvendigt (' + asDa(c.S_mm2) + ' mm\u00B2 r\u00E6kker).';
+      note_en = 'Valid (I_z \u2265 I_n), but larger than required (' + asDa(c.S_mm2) + ' mm\u00B2 is enough).';
+    }
+    crit.push({ topic: 'cable', ref: EXAM_TOPICS.cable.ref, max: W.cable, score: score, ok: ok,
+      student: (mmSel != null) ? (asDa(mmSel) + ' mm\u00B2') : '\u2013', model: asDa(c.S_mm2) + ' mm\u00B2', note_da: note_da, note_en: note_en });
+  })();
+
+  // 3) Fault protection Z_s — meet or exceed the model (cl.411.3.2)
+  (function () {
+    var score = 0, ok = false, note_da, note_en, target = model.fbOk;
+    if (R == null) { note_da = 'Kr\u00E6ver apparat + kabel.'; note_en = 'Requires device + cable.'; }
+    else {
+      ok = R.fbOk || !target; score = ok ? W.fault : 0;
+      if (exam.supply.earthing === 'TT') {
+        note_da = R.fbOk ? '30 mA HPFI sikrer frakobling (R_A\u00B7I\u0394n \u2264 50 V).' : 'Mangler 30 mA HPFI til fejlbeskyttelse i TT.';
+        note_en = R.fbOk ? '30 mA RCD ensures disconnection (R_A\u00B7I\u0394n \u2264 50 V).' : 'Missing 30 mA RCD for fault protection in TT.';
+      } else {
+        note_da = 'I_k,min = ' + R.Ikmin.toFixed(0) + ' A vs I_a = ' + R.ia.Ia.toFixed(0) + ' A \u2014 ' + (R.fbOk ? 'frakobler \u2264 ' + asDa(R.ia.t) + ' s.' : 'frakobler IKKE i tide.');
+        note_en = 'I_k,min = ' + R.Ikmin.toFixed(0) + ' A vs I_a = ' + R.ia.Ia.toFixed(0) + ' A \u2014 ' + (R.fbOk ? 'disconnects \u2264 ' + asDa(R.ia.t) + ' s.' : 'does NOT disconnect in time.');
+        if (!target && !R.fbOk) { note_da += ' (Modellen frakobler heller ikke her \u2014 ikke tr\u00E6kt fra.)'; note_en += ' (The model does not disconnect here either \u2014 not penalised.)'; }
+      }
+    }
+    crit.push({ topic: 'fault', ref: EXAM_TOPICS.fault.ref, max: W.fault, score: score, ok: ok,
+      student: R ? (R.Ikmin.toFixed(0) + ' A') : '\u2013', model: model.Ikmin.toFixed(0) + ' A', note_da: note_da, note_en: note_en });
+  })();
+
+  // 4) Short-circuit protection I\u00B2t <= k\u00B2S\u00B2 — meet or exceed the model (cl.434.5.2)
+  (function () {
+    var score = 0, ok = false, note_da, note_en, target = model.kb.ok;
+    if (R == null) { note_da = 'Kr\u00E6ver apparat + kabel.'; note_en = 'Requires device + cable.'; }
+    else {
+      ok = R.kb.ok || !target; score = ok ? W.shortcircuit : 0;
+      note_da = 'I\u00B2t = ' + (R.kb.I2t / 1e6).toFixed(2) + ' vs k\u00B2S\u00B2 = ' + (R.kb.k2S2 / 1e6).toFixed(2) + ' \u00D710\u2076 A\u00B2s (k=' + R.kb.k + ').';
+      note_en = 'I\u00B2t = ' + (R.kb.I2t / 1e6).toFixed(2) + ' vs k\u00B2S\u00B2 = ' + (R.kb.k2S2 / 1e6).toFixed(2) + ' \u00D710\u2076 A\u00B2s (k=' + R.kb.k + ').';
+      if (!target && !R.kb.ok) { note_da += ' (Modellen er heller ikke beskyttet ved t_sik \u2014 ikke tr\u00E6kt fra.)'; note_en += ' (The model is not protected at t_sik either \u2014 not penalised.)'; }
+    }
+    crit.push({ topic: 'shortcircuit', ref: EXAM_TOPICS.shortcircuit.ref, max: W.shortcircuit, score: score, ok: ok,
+      student: R ? ((R.kb.I2t / 1e6).toFixed(2)) : '\u2013', model: (model.kb.I2t / 1e6).toFixed(2), note_da: note_da, note_en: note_en });
+  })();
+
+  // 5) Voltage drop \u0394U — meet or exceed the model (cl.525)
+  (function () {
+    var score = 0, ok = false, note_da, note_en, target = model.vdOk;
+    if (R == null) { note_da = 'Kr\u00E6ver apparat + kabel.'; note_en = 'Requires device + cable.'; }
+    else {
+      ok = R.vdOk || !target; score = ok ? W.voltagedrop : 0;
+      note_da = '\u0394U = ' + asDa(R.vdrop.toFixed(2)) + '% (gr\u00E6nse ' + R.vdLimit + '%).';
+      note_en = '\u0394U = ' + asDa(R.vdrop.toFixed(2)) + '% (limit ' + R.vdLimit + '%).';
+    }
+    crit.push({ topic: 'voltagedrop', ref: EXAM_TOPICS.voltagedrop.ref, max: W.voltagedrop, score: score, ok: ok,
+      student: R ? (asDa(R.vdrop.toFixed(2)) + '%') : '\u2013', model: asDa(model.vdrop.toFixed(2)) + '%', note_da: note_da, note_en: note_en });
+  })();
+
+  var sumS = 0, sumM = 0;
+  crit.forEach(function (x) { sumS += x.score; sumM += x.max; });
+  return { idx: idx, def: c, model: model, R: R, inSel: inSel, mmSel: mmSel, criteria: crit,
+    score: sumS, max: sumM, pct: sumM ? (sumS / sumM * 100) : 0, complete: (inSel != null && mmSel != null) };
+}
+
+// Grade a whole exam against a choices map { idx: { In, mm2 } }.
+function gradeExam(exam, choices) {
+  choices = choices || {};
+  var circuits = exam.circuits.map(function (c, i) { return examGradeCircuit(exam, i, choices[i]); });
+  var sumS = 0, sumM = 0;
+  circuits.forEach(function (g) { sumS += g.score; sumM += g.max; });
+  var pct = sumM ? (sumS / sumM * 100) : 0;
+  return { circuits: circuits, score: sumS, max: sumM, pct: pct, passed: pct >= 80 - 1e-9,
+    allComplete: circuits.every(function (g) { return g.complete; }) };
+}
+
+// ----------------------------------------------------------------------------
+//  GRADER — STATE + click-only handlers
+// ----------------------------------------------------------------------------
+let examGradeState = { type: null, difficulty: 'standard', exam: null, choices: {}, graded: false, result: null };
+
+function examGradeSelectType(t) { examGradeState.type = t; examGradeNew(); }
+function examGradeSetDifficulty(d) { examGradeState.difficulty = d; if (examGradeState.type) examGradeNew(); else renderModule('examgrade'); }
+function examGradeNew() {
+  var t = examGradeState.type || 'A';
+  examGradeState.type = t;
+  examGradeState.exam = generateAuthExam(t, examGradeState.difficulty);
+  examGradeState.choices = {};
+  examGradeState.graded = false;
+  examGradeState.result = null;
+  renderModule('examgrade');
+}
+function examGradeSetChoice(idx, field, val) {
+  if (!examGradeState.choices[idx]) examGradeState.choices[idx] = {};
+  examGradeState.choices[idx][field] = val;
+  examGradeState.graded = false; examGradeState.result = null;
+  renderModule('examgrade');
+}
+function examGradeReset() { examGradeState.choices = {}; examGradeState.graded = false; examGradeState.result = null; renderModule('examgrade'); }
+function examGradeSubmit() {
+  var ex = examGradeState.exam; if (!ex) return;
+  var res = gradeExam(ex, examGradeState.choices);
+  examGradeState.result = res;
+  examGradeState.graded = true;
+  var entry = { ts: Date.now(), type: ex.type, difficulty: ex.difficulty, seed: ex.seed, totalPct: +res.pct.toFixed(1), criteria: [] };
+  res.circuits.forEach(function (g) {
+    g.criteria.forEach(function (cr) {
+      entry.criteria.push({ circuitKey: g.def.key, topic: cr.topic, ref: cr.ref, score: cr.score, max: cr.max, ok: cr.ok });
+    });
+  });
+  examLogAppend(entry);
+  repetitionSyncFromGrader(); // feed missed items into the trainer
+  renderModule('examgrade');
+}
+
+// Option windows: a few standard values bracketing the model answer so the
+// student can also pick a (dangerous) under-/over-sized value by clicking.
+function examGradeInOptions(c) {
+  var base = c.device === 'fuse' ? EXAM_IN_FUSE : c.device === 'MCCB' ? EXAM_IN_MCCB : EXAM_IN_MCB;
+  var started = -1, i;
+  for (i = 0; i < base.length; i++) { if (base[i] >= c.In) { started = i; break; } }
+  if (started < 0) started = base.length - 1;
+  var lo = Math.max(0, started - 2), hi = Math.min(base.length - 1, started + 2), out = [];
+  for (i = lo; i <= hi; i++) out.push(base[i]);
+  if (out.indexOf(c.In) < 0) out.push(c.In);
+  out.sort(function (a, b) { return a - b; });
+  return out;
+}
+function examGradeCableOptions(c) {
+  var started = -1, i;
+  for (i = 0; i < EXAM_XS.length; i++) { if (EXAM_XS[i] >= c.S_mm2) { started = i; break; } }
+  if (started < 0) started = EXAM_XS.length - 1;
+  var lo = Math.max(0, started - 2), hi = Math.min(EXAM_XS.length - 1, started + 2), out = [];
+  for (i = lo; i <= hi; i++) out.push(EXAM_XS[i]);
+  if (out.indexOf(c.S_mm2) < 0) out.push(c.S_mm2);
+  out.sort(function (a, b) { return a - b; });
+  return out;
+}
+
+// ----------------------------------------------------------------------------
+//  GRADER — RENDER
+// ----------------------------------------------------------------------------
+function examGradeBadge(pct) {
+  var col = pct >= 80 ? '#43a047' : pct >= 50 ? '#f9a825' : '#e53935';
+  return '<span style="display:inline-block;padding:3px 10px;border-radius:12px;background:' + col + ';color:#fff;font-weight:700">' + pct.toFixed(0) + '%</span>';
+}
+
+function examGradeWorkedPanel(title, c, S, color) {
+  var h = '<div style="flex:1;min-width:260px">';
+  h += mcPrimeHeader(title, color);
+  h += '<div style="font-family:\'Cambria Math\',serif">';
+  h += asMcS(engSym('In'), '=', '', S.In, 'A', null);
+  h += asMcS(engSym('Iz'), ':= I_z,korr =', '', S.Iz.toFixed(1), 'A', null);
+  h += mcPrimeLine(tx('OB', 'OL'), engSym('IB') + ' \u2264 ' + engSym('In') + ' \u2264 ' + engSym('Iz') + ' =',
+    asDa(c.IB.toFixed(1)) + ' \u2264 ' + S.In + ' \u2264 ' + asDa(S.Iz.toFixed(1)), (S.obOk ? mcPrimeOk() : mcPrimeFail()), '', mcPrimeRef('cl.433.1'));
+  h += asMcZ('Z<sub>s</sub>', ':= Z<sub>fors,min</sub>+2\u00B7Z<sub>W</sub> =', '', S.Zloop, 'm\u03A9', null);
+  h += asMcS(engSym('Ik,min'), ':= 0,95\u00B7U\u2080/|Z<sub>s</sub>| =', '', S.Ikmin.toFixed(0), 'A', null);
+  h += mcPrimeLine(tx('FB', 'FP'), engSym('Ik,min') + ' \u2265 ' + engSym('Ia') + ' =',
+    S.Ikmin.toFixed(0) + ' \u2265 ' + S.ia.Ia.toFixed(0) + ' A', (S.fbOk ? mcPrimeOk() : mcPrimeFail()), '', mcPrimeRef('cl.411.3.2'));
+  h += mcPrimeLine(tx('KB', 'SC'), 'I\u00B2t \u2264 k\u00B2S\u00B2 =',
+    (S.kb.I2t / 1e6).toFixed(2) + ' \u2264 ' + (S.kb.k2S2 / 1e6).toFixed(2) + ' \u00D710\u2076', (S.kb.ok ? mcPrimeOk() : mcPrimeFail()), '', mcPrimeRef('cl.434.5.2'));
+  h += mcPrimeLine('\u0394U', '=', asDa(S.vdrop.toFixed(2)) + '% (\u2264' + S.vdLimit + '%)', (S.vdOk ? mcPrimeOk() : mcPrimeFail()), '', mcPrimeRef('cl.525'));
+  h += '</div></div>';
+  return h;
+}
+function examGradeWorked(g) {
+  if (!g.R) return '';
+  var c = g.def, model = g.model;
+  var M = { In: c.In, mm2: c.S_mm2, Iz: c.Iz, Ik3max: model.Ik3max, Ikmin: model.Ikmin, vdrop: model.vdrop,
+    vdLimit: model.vdLimit, ia: model.ia, fbOk: model.fbOk, kb: model.kb, obOk: model.obOk, Zloop: model.Zloop };
+  var h = '<div class="card" style="margin-top:8px;background:var(--bg)"><div class="result-row" style="display:flex;flex-wrap:wrap;gap:16px">';
+  h += examGradeWorkedPanel(tx('Din l\u00F8sning', 'Your solution'), c, g.R, null);
+  h += examGradeWorkedPanel(tx('Modell\u00F8sning (Viggo)', 'Model solution (Viggo)'), c, M, 'green');
+  h += '</div></div>';
+  return h;
+}
+function examGradeCircuitResult(g) {
+  var h = '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">';
+  h += '<div class="result-row" style="gap:10px;align-items:center"><strong>' + tx('Resultat', 'Result') + ':</strong> ' + examGradeBadge(g.pct) + ' <span>(' + g.score + '/' + g.max + ' ' + tx('point', 'points') + ')</span></div>';
+  g.criteria.forEach(function (cr) {
+    var topic = EXAM_TOPICS[cr.topic];
+    h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-wrap:wrap;gap:8px;align-items:center">';
+    h += (cr.ok ? mcPrimeOk() : mcPrimeFail(tx('Afvigelse', 'Deviation'))) + ' <strong>' + tx(topic.da, topic.en) + '</strong> ' + mcPrimeRef(cr.ref);
+    h += ' <span style="margin-left:auto">' + cr.score + '/' + cr.max + '</span></div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:18px;margin-top:4px">';
+    h += '<span>' + tx('Dit valg', 'Your choice') + ': <strong>' + cr.student + '</strong></span>';
+    h += '<span>' + tx('Model', 'Model') + ': <strong>' + cr.model + '</strong></span></div>';
+    h += '<div class="info-row" style="margin-top:4px">' + tx(cr.note_da, cr.note_en) + '</div></div>';
+  });
+  h += examGradeWorked(g);
+  h += '</div>';
+  return h;
+}
+function examGradeCircuitCard(idx) {
+  var ex = examGradeState.exam, c = ex.circuits[idx];
+  var ch = examGradeState.choices[idx] || {};
+  var h = '<div class="card fade-in"><div class="card-title">-K' + (idx + 1) + ' \u00B7 ' + tx(c.name_da, c.name_en) + '</div>';
+  h += '<div class="result-box"><div class="result-row" style="flex-wrap:wrap;gap:14px">';
+  h += '<span>' + (c.phases === '1x230' ? '1~ 230 V' : '3~ 400 V') + '</span>';
+  h += '<span>P = ' + asDa(c.P_kW) + ' kW</span>';
+  h += '<span>cos\u03C6 = ' + asDa(c.cosPhi) + '</span>';
+  h += '<span>L = ' + c.len_m + ' m</span>';
+  h += '<span>' + engSym('IB') + ' = ' + asDa(c.IB.toFixed(1)) + ' A</span>';
+  h += '<span>' + tx('Apparat', 'Device') + ': ' + (c.device === 'MCB' ? ('MCB ' + c.curve) : c.device) + (c.rcd ? (' + ' + c.rcd + ' mA') : '') + '</span>';
+  h += '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('V\u00E6lg apparatets m\u00E6rkestr\u00F8m', 'Choose device rating') + ' ' + engSym('In') + '</div><div class="select-grid">';
+  examGradeInOptions(c).forEach(function (v) {
+    h += '<button class="sel-btn' + (ch.In === v ? ' selected' : '') + '" onclick="examGradeSetChoice(' + idx + ',\'In\',' + v + ')">' + v + ' A</button>';
+  });
+  h += '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('V\u00E6lg kabeltv\u00E6rsnit', 'Choose cable cross-section') + ' (' + c.ins + ')</div><div class="select-grid">';
+  examGradeCableOptions(c).forEach(function (v) {
+    h += '<button class="sel-btn' + (ch.mm2 === v ? ' selected' : '') + '" onclick="examGradeSetChoice(' + idx + ',\'mm2\',' + v + ')">' + asDa(v) + ' mm\u00B2</button>';
+  });
+  h += '</div></div>';
+  if (examGradeState.graded && examGradeState.result) h += examGradeCircuitResult(examGradeState.result.circuits[idx]);
+  h += '</div>';
+  return h;
+}
+function renderExamGrade() {
+  var st = examGradeState;
+  var h = '';
+  h += '<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ' + tx('Interaktiv eksamensretter', 'Interactive exam grader') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Arbejd dig gennem en genereret autorisationsopgave \u2014 100% klik. V\u00E6lg apparatets m\u00E6rkestr\u00F8m og kabeltv\u00E6rsnit for hver kreds. Appen retter mod modell\u00F8sningen (Viggo kompleks-impedansmetode), giver delpoint og viser pr\u00E6cis hvor du afveg \u2014 med DS/HD 60364-henvisninger og side-om-side udregning i Mathcad Prime-stil.',
+    'Work through a generated authorization exercise \u2014 100% click. Choose the device rating and cable cross-section for each circuit. The app grades against the model solution (Viggo complex-impedance method), awards partial credit and shows exactly where you deviated \u2014 with DS/HD 60364 references and a side-by-side worked solution in Mathcad Prime style.') + '</div></div>';
+  h += '<div class="card fade-in"><div class="card-title">' + tx('1) V\u00E6lg opgavetype', '1) Choose exercise type') + '</div><div class="select-grid">';
+  ['A', 'B', 'C', 'D', 'E'].forEach(function (t) {
+    var tpl = EXAM_GEN_TEMPLATES[t];
+    h += '<button class="sel-btn' + (st.type === t ? ' selected' : '') + '" onclick="examGradeSelectType(\'' + t + '\')">' + tpl.icon + ' ' + tx('Type ' + t + ' \u00B7 ' + tpl.name_da, 'Type ' + t + ' \u00B7 ' + tpl.name_en) + '</button>';
+  });
+  h += '</div>';
+  h += '<div class="select-group" style="margin-top:10px"><div class="select-label">' + tx('Sv\u00E6rhedsgrad', 'Difficulty') + '</div><div class="select-grid">';
+  [['standard', tx('Standard', 'Standard')], ['avanceret', tx('Avanceret', 'Advanced')], ['ekspert', tx('Ekspert', 'Expert')]].forEach(function (d) {
+    h += '<button class="sel-btn' + (st.difficulty === d[0] ? ' selected' : '') + '" onclick="examGradeSetDifficulty(\'' + d[0] + '\')">' + d[1] + '</button>';
+  });
+  h += '</div></div>';
+  h += '<div style="margin-top:12px"><button class="sel-btn selected" onclick="examGradeNew()">\uD83C\uDFB2 ' + tx('Ny opgave', 'New exercise') + '</button>';
+  if (st.exam) h += ' <button class="sel-btn" onclick="examGradeReset()">\u267B\uFE0F ' + tx('Nulstil valg', 'Reset choices') + '</button>';
+  h += '</div></div>';
+  if (!st.exam) { h += '<div class="card fade-in"><div class="info-row">' + tx('V\u00E6lg en type og tryk \u201ENy opgave\u201C.', 'Choose a type and press \u201CNew exercise\u201D.') + '</div></div>'; return h; }
+  var ex = st.exam;
+  h += examGenSupplyCard(ex);
+  if (st.graded && st.result) {
+    var r = st.result;
+    h += '<div class="card fade-in"><div class="card-title">' + tx('Samlet resultat', 'Overall result') + ' ' + examGradeBadge(r.pct) + '</div>';
+    h += '<div class="info-row">' + r.score + '/' + r.max + ' ' + tx('point', 'points') + ' \u2014 ' + (r.passed ? tx('Best\u00E5et (\u2265 80%)', 'Passed (\u2265 80%)') : tx('Ikke best\u00E5et (krav \u2265 80%)', 'Not passed (requires \u2265 80%)')) + '</div>';
+    h += '<div class="info-row">' + tx('Missede emner er sendt til repetitionstr\u00E6neren og indg\u00E5r i kompetencekortet.', 'Missed topics have been sent to the spaced-repetition trainer and feed the competency map.') + '</div>';
+    h += '<div style="margin-top:8px"><button class="sel-btn" onclick="switchModule(\'kompetence\')">\uD83E\uDDE0 ' + tx('Se kompetencekort', 'Open competency map') + '</button> <button class="sel-btn" onclick="switchModule(\'repetition\')">\uD83D\uDD01 ' + tx('Repetitionstr\u00E6ner', 'Spaced repetition') + '</button></div></div>';
+  }
+  ex.circuits.forEach(function (c, i) { h += examGradeCircuitCard(i); });
+  var complete = ex.circuits.every(function (c, i) { var cch = st.choices[i]; return cch && cch.In != null && cch.mm2 != null; });
+  h += '<div class="card fade-in"><div class="result-row" style="gap:12px;flex-wrap:wrap;align-items:center">';
+  h += '<button class="sel-btn selected" style="font-size:1.05rem;padding:12px 22px" onclick="examGradeSubmit()">\u2705 ' + tx('Ret opgave', 'Grade exercise') + '</button>';
+  if (!complete) h += '<span class="info-row">' + tx('Tip: v\u00E6lg I_n og kabel for alle kredse (ikke-valgte t\u00E6ller som 0).', 'Tip: choose I_n and cable for every circuit (unselected count as 0).') + '</span>';
+  h += '</div></div>';
+  return h;
+}
+
+// ============================================================================
+//  COMPETENCY / MASTERY MAP  (module key: kompetence)
+// ============================================================================
+var KOMP_LEVEL_COLORS = ['#455a64', '#e53935', '#fb8c00', '#fdd835', '#43a047'];
+function kompLevelLabel(l) {
+  return [tx('Ikke testet', 'Untested'), tx('Svag', 'Weak'), tx('Under udvikling', 'Developing'), tx('\u00D8vet', 'Proficient'), tx('Mestret', 'Mastered')][l];
+}
+function kompLevelFromPct(pct, attempts) {
+  if (!attempts) return 0;
+  if (pct >= 90) return 4;
+  if (pct >= 75) return 3;
+  if (pct >= 50) return 2;
+  return 1;
+}
+function kompetenceAggregate(log) {
+  log = log || examLogLoad();
+  var topics = {}, clauses = {}, exams = 0, lastTs = 0;
+  EXAM_TOPIC_ORDER.forEach(function (k) { topics[k] = { key: k, ref: EXAM_TOPICS[k].ref, attempts: 0, sum: 0, max: 0 }; });
+  log.forEach(function (e) {
+    exams++; if (e.ts > lastTs) lastTs = e.ts;
+    (e.criteria || []).forEach(function (cr) {
+      var t = topics[cr.topic];
+      if (t) { t.attempts++; t.sum += cr.score; t.max += cr.max; }
+      if (!clauses[cr.ref]) clauses[cr.ref] = { ref: cr.ref, attempts: 0, sum: 0, max: 0 };
+      clauses[cr.ref].attempts++; clauses[cr.ref].sum += cr.score; clauses[cr.ref].max += cr.max;
+    });
+  });
+  var totS = 0, totM = 0;
+  EXAM_TOPIC_ORDER.forEach(function (k) {
+    var t = topics[k]; t.pct = t.max ? (t.sum / t.max * 100) : 0; t.level = kompLevelFromPct(t.pct, t.attempts);
+    totS += t.sum; totM += t.max;
+  });
+  Object.keys(clauses).forEach(function (r) {
+    var c = clauses[r]; c.pct = c.max ? (c.sum / c.max * 100) : 0; c.level = kompLevelFromPct(c.pct, c.attempts);
+  });
+  return { topics: topics, clauses: clauses, exams: exams, lastTs: lastTs, overallPct: totM ? (totS / totM * 100) : 0 };
+}
+function kompetenceRecommend(agg) {
+  var untested = EXAM_TOPIC_ORDER.filter(function (k) { return agg.topics[k].attempts === 0; });
+  if (untested.length) return { topic: untested[0], reason: 'untested' };
+  var best = null;
+  EXAM_TOPIC_ORDER.forEach(function (k) { var t = agg.topics[k]; if (!best || t.pct < best.pct) best = t; });
+  return best ? { topic: best.key, reason: 'lowest' } : null;
+}
+function renderKompetence() {
+  var agg = kompetenceAggregate();
+  var h = '';
+  h += '<div class="card fade-in"><div class="card-title">\uD83E\uDDE0 ' + tx('Kompetencekort', 'Competency map') + '</div>';
+  h += '<div class="info-row">' + tx('Oversigt over din mestring af eksamensemner og DS/HD 60364-bestemmelser, udledt af dine retteresultater. 100% klik.', 'Overview of your mastery of exam topics and DS/HD 60364 clauses, derived from your grading results. 100% click.') + '</div>';
+  if (agg.exams === 0) {
+    h += '<div class="info-row" style="margin-top:8px">' + tx('Ingen data endnu. G\u00E5 til \u201EEksamensretter\u201C, ret en opgave, og kom tilbage.', 'No data yet. Go to \u201CExam grader\u201D, grade an exercise and return.') + '</div>';
+    h += '<div style="margin-top:10px"><button class="sel-btn selected" onclick="switchModule(\'examgrade\')">\uD83C\uDFAF ' + tx('\u00C5bn eksamensretter', 'Open exam grader') + '</button></div></div>';
+    return h;
+  }
+  h += '<div class="result-row" style="gap:14px;flex-wrap:wrap;margin-top:6px"><span><strong>' + tx('Rettede opgaver', 'Graded exercises') + ':</strong> ' + agg.exams + '</span><span><strong>' + tx('Samlet', 'Overall') + ':</strong> ' + examGradeBadge(agg.overallPct) + '</span></div></div>';
+  h += '<div class="card fade-in"><div class="card-title">' + tx('Emner', 'Topics') + '</div><div style="display:flex;flex-direction:column;gap:8px">';
+  EXAM_TOPIC_ORDER.forEach(function (k) {
+    var t = agg.topics[k], top = EXAM_TOPICS[k], col = KOMP_LEVEL_COLORS[t.level];
+    var w = t.attempts ? Math.max(4, t.pct) : 0;
+    h += '<div class="result-box"><div class="result-row" style="flex-wrap:wrap;gap:8px;align-items:center"><strong>' + tx(top.da, top.en) + '</strong> ' + mcPrimeRef(top.ref);
+    h += '<span style="margin-left:auto;display:inline-block;padding:2px 8px;border-radius:10px;background:' + col + ';color:#fff;font-size:0.78rem">' + kompLevelLabel(t.level) + '</span></div>';
+    h += '<div style="height:12px;background:var(--border);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:' + w + '%;background:' + col + '"></div></div>';
+    h += '<div class="info-row" style="margin-top:4px">' + (t.attempts ? (t.pct.toFixed(0) + '% \u00B7 ' + t.attempts + ' ' + tx('kriterier rettet', 'criteria graded')) : tx('ikke testet', 'untested')) + '</div></div>';
+  });
+  h += '</div></div>';
+  var rec = kompetenceRecommend(agg);
+  if (rec) {
+    var rt = EXAM_TOPICS[rec.topic];
+    h += '<div class="card fade-in"><div class="card-title">\uD83D\uDCA1 ' + tx('Anbefalet n\u00E6ste emne', 'Recommended next topic') + '</div>';
+    h += '<div class="info-row"><strong>' + tx(rt.da, rt.en) + '</strong> ' + mcPrimeRef(rt.ref) + '</div>';
+    h += '<div class="info-row">' + (rec.reason === 'untested' ? tx('Dette emne har du endnu ikke \u00F8vet \u2014 start her.', 'You have not practised this topic yet \u2014 start here.') : tx('Dette er dit svageste emne lige nu \u2014 fokus\u00E9r her.', 'This is your weakest topic right now \u2014 focus here.')) + '</div>';
+    h += '<div style="margin-top:10px"><button class="sel-btn selected" onclick="switchModule(\'examgrade\')">\uD83C\uDFAF ' + tx('\u00D8v i eksamensretter', 'Practice in exam grader') + '</button> <button class="sel-btn" onclick="switchModule(\'repetition\')">\uD83D\uDD01 ' + tx('Repetitionstr\u00E6ner', 'Spaced repetition') + '</button></div></div>';
+  }
+  var clauseKeys = Object.keys(agg.clauses);
+  if (clauseKeys.length) {
+    h += '<div class="card fade-in"><div class="card-title">' + tx('DS/HD 60364-bestemmelser', 'DS/HD 60364 clauses') + '</div><div style="display:flex;flex-direction:column;gap:6px">';
+    clauseKeys.forEach(function (r) {
+      var c = agg.clauses[r], col = KOMP_LEVEL_COLORS[c.level];
+      h += '<div class="result-row" style="gap:10px;align-items:center">' + mcPrimeRef(r) + '<span style="flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:' + Math.max(4, c.pct) + '%;background:' + col + '"></span></span><span style="width:46px;text-align:right">' + c.pct.toFixed(0) + '%</span></div>';
+    });
+    h += '</div></div>';
+  }
+  return h;
+}
+
+// ============================================================================
+//  SPACED-REPETITION TRAINER (Leitner)  (module key: repetition)
+// ============================================================================
+// Box review intervals in days, indexed by box (1..5). Box 1 = same session.
+var REPETITION_INTERVALS = [0, 0, 1, 3, 7, 16];
+var REPETITION_DAY_MS = 86400000;
+
+// Seed deck: key DS/HD 60364 clauses (plain-text refs/keys stable; labels via tx()).
+var REPETITION_SEED_CARDS = [
+  { id: 'seed-433-ob', topic: 'overload', ref: 'DS/HD 60364-4-43 cl.433.1',
+    q_da: 'Hvilken grundregel sikrer overbelastningsbeskyttelse?', q_en: 'Which golden rule ensures overload protection?',
+    a_da: 'I_B \u2264 I_n \u2264 I_z: lasten \u2264 apparatets m\u00E6rkestr\u00F8m \u2264 kablets korrigerede str\u00F8mv\u00E6rdi.', a_en: 'I_B \u2264 I_n \u2264 I_z: load \u2264 device rating \u2264 cable corrected current capacity.' },
+  { id: 'seed-523-iz', topic: 'cable', ref: 'DS/HD 60364-5-52 cl.523',
+    q_da: 'Hvilke korrektionsfaktorer p\u00E5virker kablets I_z?', q_en: 'Which correction factors affect the cable I_z?',
+    a_da: 'Temperatur (k_t) og gruppering (k_s), evt. jordl\u00E6gning. I_z,korr = I_z,tabel\u00B7k_t\u00B7k_s \u2265 I_n.', a_en: 'Temperature (k_t) and grouping (k_s), plus burial where relevant. I_z,corr = I_z,table\u00B7k_t\u00B7k_s \u2265 I_n.' },
+  { id: 'seed-411-disc', topic: 'fault', ref: 'DS/HD 60364-4-41 cl.411.3.2',
+    q_da: 'Hvad er de maksimale frakoblingstider i et TN-system?', q_en: 'What are the maximum disconnection times in a TN system?',
+    a_da: '0,4 s for slutkredse \u226432 A og 5 s for fordelingskredse. Kravet er I_k,min \u2265 I_a.', a_en: '0.4 s for final circuits \u226432 A and 5 s for distribution circuits. Requirement: I_k,min \u2265 I_a.' },
+  { id: 'seed-411-tt', topic: 'fault', ref: 'DS/HD 60364-4-41 cl.411.5',
+    q_da: 'Hvordan opn\u00E5s fejlbeskyttelse i et TT-system?', q_en: 'How is fault protection achieved in a TT system?',
+    a_da: 'Med fejlstr\u00F8msafbryder (HPFI): R_A\u00B7I\u0394n \u2264 50 V. En 30 mA HPFI giver et meget lempeligt R_A-krav.', a_en: 'With an RCD: R_A\u00B7I\u0394n \u2264 50 V. A 30 mA RCD gives a very relaxed R_A requirement.' },
+  { id: 'seed-434-kb', topic: 'shortcircuit', ref: 'DS/HD 60364-4-43 cl.434.5.2',
+    q_da: 'Hvordan kontrolleres kortslutningsbeskyttelse adiabatisk?', q_en: 'How is short-circuit protection checked adiabatically?',
+    a_da: 'I\u00B2t \u2264 k\u00B2S\u00B2, hvor k afh\u00E6nger af leder/isolation (Cu/PVC=115, Cu/XLPE=143).', a_en: 'I\u00B2t \u2264 k\u00B2S\u00B2, where k depends on conductor/insulation (Cu/PVC=115, Cu/XLPE=143).' },
+  { id: 'seed-525-du', topic: 'voltagedrop', ref: 'DS/HD 60364-5-52 cl.525',
+    q_da: 'Hvordan beregnes sp\u00E6ndingsfald for en 3-faset kreds?', q_en: 'How is voltage drop calculated for a 3-phase circuit?',
+    a_da: '\u0394U = \u221A3\u00B7I_B\u00B7l\u00B7(r\u00B7cos\u03C6 + x\u00B7sin\u03C6); typisk gr\u00E6nse 4% (3% for belysning).', a_en: '\u0394U = \u221A3\u00B7I_B\u00B7l\u00B7(r\u00B7cos\u03C6 + x\u00B7sin\u03C6); typical limit 4% (3% for lighting).' }
+];
+
+function repetitionTopicRule(topic, l) {
+  var m = {
+    overload: ['I_B \u2264 I_n \u2264 I_z: v\u00E6lg mindste standard-I_n \u2265 I_B, og kabel s\u00E5 I_z,korr \u2265 I_n.', 'I_B \u2264 I_n \u2264 I_z: pick the smallest standard I_n \u2265 I_B, and a cable so I_z,corr \u2265 I_n.'],
+    cable: ['Dimension\u00E9r kablet s\u00E5 I_z,korr = I_z,tabel\u00B7k_t\u00B7k_s \u2265 I_n.', 'Size the cable so I_z,corr = I_z,table\u00B7k_t\u00B7k_s \u2265 I_n.'],
+    fault: ['Sikr I_k,min \u2265 I_a (TN) eller 30 mA HPFI (TT) for frakobling i tide.', 'Ensure I_k,min \u2265 I_a (TN) or a 30 mA RCD (TT) for timely disconnection.'],
+    shortcircuit: ['Kontroll\u00E9r I\u00B2t \u2264 k\u00B2S\u00B2 \u2014 st\u00F8rre tv\u00E6rsnit \u00F8ger k\u00B2S\u00B2.', 'Check I\u00B2t \u2264 k\u00B2S\u00B2 \u2014 a larger cross-section increases k\u00B2S\u00B2.'],
+    voltagedrop: ['Hold \u0394U under gr\u00E6nsen (4%, 3% for belysning) \u2014 \u00F8g tv\u00E6rsnit eller reducer l\u00E6ngde.', 'Keep \u0394U under the limit (4%, 3% for lighting) \u2014 increase cross-section or reduce length.']
+  };
+  return (m[topic] || ['', ''])[l === 'da' ? 0 : 1];
+}
+function repetitionLoad() {
+  var cards;
+  try { cards = JSON.parse(localStorage.getItem('repetition_cards')); } catch (e) { cards = null; }
+  if (!Array.isArray(cards)) cards = [];
+  return cards;
+}
+function repetitionSave(cards) { try { localStorage.setItem('repetition_cards', JSON.stringify(cards)); } catch (e) {} }
+function repetitionSeedDefaults(cards) {
+  cards = cards || repetitionLoad();
+  var have = {}; cards.forEach(function (c) { have[c.id] = true; });
+  REPETITION_SEED_CARDS.forEach(function (s) {
+    if (!have[s.id]) cards.push({ id: s.id, topic: s.topic, ref: s.ref, q_da: s.q_da, q_en: s.q_en, a_da: s.a_da, a_en: s.a_en, box: 1, due: 0, seed: true });
+  });
+  return cards;
+}
+function repetitionSyncFromGrader() {
+  var cards = repetitionSeedDefaults(repetitionLoad());
+  var have = {}; cards.forEach(function (c) { have[c.id] = true; });
+  examLogLoad().forEach(function (e) {
+    (e.criteria || []).forEach(function (cr) {
+      if (cr.ok) return;
+      var id = 'miss-' + cr.topic; // one focused card per missed topic
+      if (have[id]) return; have[id] = true;
+      var top = EXAM_TOPICS[cr.topic] || { da: cr.topic, en: cr.topic };
+      cards.push({ id: id, topic: cr.topic, ref: cr.ref || top.ref, box: 1, due: 0, fromGrader: true,
+        q_da: 'Du tabte point i: ' + top.da + '. Hvad er reglen?', q_en: 'You lost points in: ' + top.en + '. What is the rule?',
+        a_da: repetitionTopicRule(cr.topic, 'da'), a_en: repetitionTopicRule(cr.topic, 'en') });
+    });
+  });
+  repetitionSave(cards);
+  return cards;
+}
+function repetitionDue(cards, now) {
+  now = now || Date.now();
+  return (cards || repetitionLoad()).filter(function (c) { return (c.due || 0) <= now; });
+}
+function repetitionAnswer(id, knew) {
+  var cards = repetitionLoad(), now = Date.now();
+  for (var i = 0; i < cards.length; i++) {
+    if (cards[i].id === id) {
+      cards[i].box = knew ? Math.min(5, (cards[i].box || 1) + 1) : 1;
+      cards[i].due = now + (REPETITION_INTERVALS[cards[i].box] || 0) * REPETITION_DAY_MS;
+      cards[i].last = now;
+      break;
+    }
+  }
+  repetitionSave(cards);
+  return cards;
+}
+function repetitionStats(cards) {
+  cards = cards || repetitionLoad();
+  var boxes = [0, 0, 0, 0, 0, 0];
+  cards.forEach(function (c) { boxes[Math.min(5, Math.max(1, c.box || 1))]++; });
+  return { total: cards.length, boxes: boxes, due: repetitionDue(cards).length };
+}
+function repetitionPickNext(cards) {
+  var due = repetitionDue(cards);
+  if (!due.length) return null;
+  due.sort(function (a, b) { return ((a.box || 1) - (b.box || 1)) || ((a.due || 0) - (b.due || 0)); });
+  return due[0].id;
+}
+
+let repetitionState = { revealed: false, currentId: null };
+function repetitionInit() { var cards = repetitionSyncFromGrader(); return cards; }
+function repetitionReveal() { repetitionState.revealed = true; renderModule('repetition'); }
+function repetitionRespond(knew) {
+  if (repetitionState.currentId) repetitionAnswer(repetitionState.currentId, knew);
+  repetitionState.revealed = false;
+  repetitionState.currentId = null;
+  renderModule('repetition');
+}
+function repetitionResetDeck() {
+  var cards = repetitionLoad();
+  cards.forEach(function (c) { c.due = 0; });
+  repetitionSave(cards);
+  repetitionState.revealed = false; repetitionState.currentId = null;
+  renderModule('repetition');
+}
+function renderRepetition() {
+  var cards = repetitionInit();
+  var stats = repetitionStats(cards);
+  var h = '';
+  h += '<div class="card fade-in"><div class="card-title">\uD83D\uDD01 ' + tx('Repetitionstr\u00E6ner (Leitner)', 'Spaced-repetition trainer (Leitner)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Flashcards bygget af dine missede retteopgaver og centrale DS/HD 60364-bestemmelser. Kort flytter sig gennem 5 Leitner-bokse: \u201EKunne jeg\u201C rykker frem (l\u00E6ngere interval), \u201EKunne jeg ikke\u201C sender tilbage til boks 1. Gemmes lokalt. 100% klik.',
+    'Flashcards built from your missed grading items and key DS/HD 60364 clauses. Cards move through 5 Leitner boxes: \u201CI knew it\u201D advances (longer interval), \u201CI didn\u2019t\u201D sends back to box 1. Stored locally. 100% click.') + '</div>';
+  h += '<div class="result-row" style="gap:10px;flex-wrap:wrap;margin-top:6px">';
+  for (var b = 1; b <= 5; b++) h += '<span style="display:inline-block;padding:3px 10px;border-radius:10px;background:' + KOMP_LEVEL_COLORS[Math.min(4, b - 1)] + ';color:#fff">' + tx('Boks', 'Box') + ' ' + b + ': ' + stats.boxes[b] + '</span>';
+  h += '</div>';
+  h += '<div class="info-row" style="margin-top:6px"><strong>' + tx('Forfaldne kort', 'Due cards') + ': ' + stats.due + '</strong> / ' + stats.total + '</div></div>';
+  if (!repetitionState.currentId) repetitionState.currentId = repetitionPickNext(cards);
+  var card = null, i;
+  if (repetitionState.currentId) { for (i = 0; i < cards.length; i++) { if (cards[i].id === repetitionState.currentId) { card = cards[i]; break; } } }
+  if (!card) {
+    h += '<div class="card fade-in"><div class="card-title">\u2705 ' + tx('Ingen forfaldne kort', 'No cards due') + '</div>';
+    h += '<div class="info-row">' + tx('Alt er repeteret for nu. Ret flere opgaver i eksamensretteren, eller gennemtving en ny runde.', 'Everything is reviewed for now. Grade more exercises in the exam grader, or force a new round.') + '</div>';
+    h += '<div style="margin-top:10px"><button class="sel-btn selected" onclick="repetitionResetDeck()">\uD83D\uDD04 ' + tx('Gentag hele bunken', 'Replay whole deck') + '</button> <button class="sel-btn" onclick="switchModule(\'examgrade\')">\uD83C\uDFAF ' + tx('Eksamensretter', 'Exam grader') + '</button></div></div>';
+    return h;
+  }
+  h += '<div class="card fade-in"><div class="card-title">' + tx('Kort', 'Card') + ' \u00B7 ' + tx('Boks', 'Box') + ' ' + (card.box || 1) + ' \u00B7 ' + mcPrimeRef(card.ref) + '</div>';
+  h += '<div class="result-box" style="font-size:1.05rem"><strong>' + tx(card.q_da, card.q_en) + '</strong></div>';
+  if (!repetitionState.revealed) {
+    h += '<div style="margin-top:12px"><button class="sel-btn selected" onclick="repetitionReveal()">\uD83D\uDC41\uFE0F ' + tx('Vis svar', 'Show answer') + '</button></div>';
+  } else {
+    h += '<div class="result-box" style="margin-top:10px;border-left:4px solid #43a047">' + tx(card.a_da, card.a_en) + '</div>';
+    h += '<div class="result-row" style="gap:12px;margin-top:12px;flex-wrap:wrap">';
+    h += '<button class="sel-btn selected" style="background:#43a047;border-color:#43a047" onclick="repetitionRespond(true)">\u2714\uFE0F ' + tx('Kunne jeg', 'I knew it') + '</button>';
+    h += '<button class="sel-btn" style="background:#e53935;border-color:#e53935;color:#fff" onclick="repetitionRespond(false)">\u2716\uFE0F ' + tx('Kunne jeg ikke', 'I didn\u2019t') + '</button>';
+    h += '</div>';
+  }
+  h += '</div>';
   return h;
 }
 
