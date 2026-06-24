@@ -18608,6 +18608,15 @@ function renderFireAlarm() {
   html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + calc.standard + '</span></div>';
   html += '</div>';
 
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Brandalarmsystem','Fire Alarm') + '</div>';
+  html += mcPrimeLine(tx('Kategori','Category'), ':=', '', firealarmState.category, '', mcPrimeRef('DS/EN 54'));
+  html += mcPrimeLine(tx('Detektorer','Detectors'), '=', '', calc.detectorCount, tx('stk','pcs'), '');
+  html += mcPrimeLine(tx('Sloejfer','Loops'), '=', '', calc.loops, '', '');
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 54') + ' ' + mcPrimeRef('DBI vejl. 36') + '</div>';
+  html += '</div>';
+
   // Loop Design
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Sloejfedesign', 'Loop Design') + ' - ' + loop.clause + '</div>';
@@ -18905,6 +18914,15 @@ function renderData() {
   if (!distCheck.ok) {
     html += '<div class="result-row"><span class="label">' + tx('Anbefaling', 'Recommendation') + '</span><span class="value" style="color:#dc2626">' + distCheck.recommendation + '</span></div>';
   }
+  html += '</div>';
+
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Datainstallation','Data Network') + '</div>';
+  html += mcPrimeLine('Cat.', ':=', '', dataState.category, '', mcPrimeRef('ISO/IEC 11801'));
+  html += mcPrimeLine(tx('Udtag','Outlets'), '=', '', dataState.outlets, tx('stk','pcs'), '');
+  html += mcPrimeLine(tx('Afstand','Distance'), '=', '', dataState.distance, 'm', dataState.distance > 90 ? '<span class="mc-fail">> 90m</span>' : '');
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 50174') + ' ' + mcPrimeRef('ISO/IEC 11801') + '</div>';
   html += '</div>';
 
   // Outlet Density
