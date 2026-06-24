@@ -2155,8 +2155,8 @@ test('renderThermal returns HTML with no text input fields (click-only UI)', fun
   var html = renderThermal();
   assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
   assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
-  assert.ok(html.indexOf('type="range"') >= 0, 'Should contain range sliders');
   assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
+  assert.ok(html.indexOf('mcprime') >= 0 || html.indexOf('Cambria Math') >= 0, 'Should use Mathcad Prime style');
 });
 
 // Test 123: thermalState has correct defaults
