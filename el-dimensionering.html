@@ -12253,6 +12253,84 @@ function axAdaptiveNext(log, currentTierId) {
   return { tier: order[tierIdx], focus: focus, focusName: focus ? (AX_CAT_NAME[focus] || { da: focus, en: focus }) : null, reason: reason, recentAvg: recentAvg };
 }
 
+// ============================================================================
+// ===== BATCH 4: CONTINUOUS-LEARNING INGESTION ===============================
+// ============================================================================
+// Analyze the text of an uploaded authorization exam and extract a learning
+// profile (topics, building types, cited clauses, HV presence, weighting). Pure
+// & deterministic \u2014 no DOM. Feeds axProfileBias so generation drifts toward the
+// kinds of exams the user actually trains on.
+var AX_TOPIC_PATTERNS = {
+  overload: /belastningsstr|samtidighed|overbelastning|fuldlast|\bI[\s_]?B\b|diversity|overload/i,
+  cable: /tv\u00e6rsnit|kabel|str\u00f8mb\u00e6re|dimension\w*\s*\w*kabel|ledning|cross-section|ampac|\bIz\b/i,
+  vdrop: /sp\u00e6ndingsfald|spaendingsfald|sp.ndingsfald|\u0394\s?U|voltage\s*drop/i,
+  shortcircuit: /kortslutning|brydeevne|\bIcu\b|\bIk\b|short-?circuit|breaking capacity/i,
+  fault: /sl\u00f8jfe|\bZs\b|frakobling|HPFI|fejlstr|jording|\bRCD\b|selektivit|earth|disconnection|loop imped/i
+};
+var AX_BUILDING_PATTERNS = {
+  parcelhus: /parcelhus|enfamilie|villa|detached house/i,
+  etagebolig: /etage\w*|lejlighed|boligforening|apartment/i,
+  kontor: /kontor|erhvervslejem|h\u00f8jhus til kontor|office/i,
+  skole: /\bskole\b|klasselokale|school/i,
+  landbrug: /landbrug|stald|malke|foderanl|grain|barn|agricultur/i,
+  fabrik: /fabrik|industri|produktionshal|maskinhal|factory|production hall/i,
+  hospital: /hospital|sygehus/i,
+  ev_anlaeg: /ladean|ladestand|ladepunkt|elbil|\bEV\b|charging/i,
+  solbatteri: /solcelle|batteri|\bPV\b|\bBESS\b|solar/i,
+  renovering: /renover|eksisterende installation|renovation/i
+};
+function axIngestText(text) {
+  text = String(text || '');
+  var topics = {}, buildings = {}, clauses = {};
+  Object.keys(AX_TOPIC_PATTERNS).forEach(function (c) { var m = text.match(new RegExp(AX_TOPIC_PATTERNS[c].source, 'gi')); topics[c] = m ? m.length : 0; });
+  Object.keys(AX_BUILDING_PATTERNS).forEach(function (b) { var m = text.match(new RegExp(AX_BUILDING_PATTERNS[b].source, 'gi')); if (m && m.length) buildings[b] = m.length; });
+  var cl = text.match(/DS\/HD\s*60364[\w.\-\s]*?\u00a7?\s*[\d]+(?:[.\-][\d]+)*/gi) || [];
+  cl = cl.concat(text.match(/BEK\s*\d+/gi) || []);
+  cl = cl.concat(text.match(/F\u00e6llesregulativ\w*/gi) || []);
+  cl = cl.concat(text.match(/St\u00e6rkstr\u00f8msbekendtg\w*|SB\s*6/gi) || []);
+  cl.forEach(function (c) { var k = c.replace(/\s+/g, ' ').trim(); clauses[k] = (clauses[k] || 0) + 1; });
+  var hv = /transformerstation|10\s*kV|forsyningsanl|ringforbindelse|h\u00f8jsp\u00e6nding|substation|high.?voltage/i.test(text);
+  var durMatch = text.match(/(\d+)\s*timers/i); var durHint = durMatch ? parseInt(durMatch[1], 10) : null;
+  var weights = []; var wm, wre = /Opgave\s*\d\s*=\s*(\d+)\s*%/gi; while ((wm = wre.exec(text))) weights.push(parseInt(wm[1], 10));
+  var words = (text.match(/\S+/g) || []).length;
+  return { topics: topics, buildings: buildings, clauses: clauses, hv: hv, durationHint: durHint, weighting: weights, words: words, ok: words > 30 };
+}
+// Merge a fragment into the cumulative profile.
+function axProfileMerge(profile, frag) {
+  profile = profile || { ingested: 0, topics: {}, buildings: {}, clauses: {}, hvCount: 0, words: 0, updated: 0 };
+  profile.ingested = (profile.ingested || 0) + 1;
+  ['topics', 'buildings', 'clauses'].forEach(function (key) {
+    var src = frag[key] || {}; profile[key] = profile[key] || {};
+    Object.keys(src).forEach(function (k) { profile[key][k] = (profile[key][k] || 0) + src[k]; });
+  });
+  if (frag.hv) profile.hvCount = (profile.hvCount || 0) + 1;
+  profile.words = (profile.words || 0) + (frag.words || 0);
+  profile.updated = Date.now();
+  return profile;
+}
+function axProfileLoad() { try { return JSON.parse(localStorage.getItem('autoexamProfile') || 'null'); } catch (e) { return null; } }
+function axProfileSave(p) { try { localStorage.setItem('autoexamProfile', JSON.stringify(p)); } catch (e) {} }
+function axProfileClear() { try { localStorage.removeItem('autoexamProfile'); } catch (e) {} }
+// Derive generation bias from the profile (building weights + topic emphasis).
+function axProfileBias(profile) {
+  if (!profile || !profile.ingested) return null;
+  var bw = {}; var totB = 0;
+  AX_BUILDINGS.forEach(function (b) { var c = (profile.buildings && profile.buildings[b.id]) || 0; bw[b.id] = c + 0.5; totB += bw[b.id]; });
+  Object.keys(bw).forEach(function (k) { bw[k] = bw[k] / totB; });
+  var topB = null; AX_BUILDINGS.forEach(function (b) { if (topB === null || (profile.buildings[b.id] || 0) > (profile.buildings[topB] || 0)) topB = b.id; });
+  var te = {}; var totT = 0; Object.keys(AX_TOPIC_PATTERNS).forEach(function (c) { te[c] = ((profile.topics && profile.topics[c]) || 0) + 1; totT += te[c]; });
+  Object.keys(te).forEach(function (c) { te[c] = Math.round(100 * te[c] / totT); });
+  var topClauses = Object.keys(profile.clauses || {}).sort(function (a, b) { return profile.clauses[b] - profile.clauses[a]; }).slice(0, 6);
+  return { buildingWeights: bw, topBuilding: topB, topicEmphasis: te, topClauses: topClauses, hvShare: profile.ingested ? Math.round(100 * (profile.hvCount || 0) / profile.ingested) : 0 };
+}
+// Weighted building pick from the bias (deterministic given rng).
+function axBiasedBuilding(profile, rng) {
+  var bias = axProfileBias(profile); if (!bias) return AX_BUILDINGS[0].id;
+  var r = rng(); var acc = 0; var ids = AX_BUILDINGS.map(function (b) { return b.id; });
+  for (var i = 0; i < ids.length; i++) { acc += bias.buildingWeights[ids[i]] || 0; if (r <= acc) return ids[i]; }
+  return bias.topBuilding || ids[0];
+}
+
 let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
@@ -12605,7 +12683,7 @@ function examRenderAnswerKey(){
 // ============================================================================
 // ===== AUTORISATIONSPR\u00d8VE-GENERATOR \u2014 UI (renderAutoExam) ====================
 // ============================================================================
-var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, dgProject: null, dgAnswers: {}, dgResult: null, dgReveal: false, timerOn: false, timerLeft: 0, timerSec: 0 };
+var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, dgProject: null, dgAnswers: {}, dgResult: null, dgReveal: false, ingestNotice: null, ingesting: false, timerOn: false, timerLeft: 0, timerSec: 0 };
 var autoexamTimer = null;
 function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == null ? '' : String(o)); }
 function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
@@ -12640,6 +12718,39 @@ function axDgPick(taskId, i) { autoexamState.dgAnswers[taskId] = i; renderModule
 function axDgGrade() { var p = axDgEnsure(); autoexamState.dgResult = axExamine(p, autoexamState.dgAnswers); autoexamState.dgReveal = true; axLogPush({ ts: Date.now(), building: 'diagram', tier: p.tierId, mode: 'diagram', score: autoexamState.dgResult.score, verdict: autoexamState.dgResult.verdict, catPct: autoexamState.dgResult.catPct, correctCount: autoexamState.dgResult.correctCount, totalCount: autoexamState.dgResult.totalCount }); renderModule('autoexam'); }
 // Adaptive: apply the recommended next tier + focus building, then generate.
 function axApplyAdaptive() { var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier; axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam'); }
+// Continuous learning: ingest an uploaded exam file (offline) into the profile.
+function axIngestFile(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  var file = input.files[0]; var name = (file.name || '').toLowerCase();
+  var isPdf = /\.pdf$/.test(name) || file.type === 'application/pdf';
+  var isDocx = /\.docx$/.test(name) || /wordprocessingml/.test(file.type || '');
+  var isText = /\.(txt|md|text)$/.test(name) || /^text\//.test(file.type || '');
+  function finish(text) {
+    var frag = axIngestText(text); autoexamState.ingesting = false;
+    if (!frag.ok) { autoexamState.ingestNotice = tx('Kunne ikke udtr\u00e6kke nok l\u00e6sbar tekst (m\u00e5ske en scannet PDF). Pr\u00f8v en .docx eller en tekstbaseret PDF.', 'Could not extract enough readable text (perhaps a scanned PDF). Try a .docx or a text-based PDF.'); renderModule('autoexam'); return; }
+    var prof = axProfileMerge(axProfileLoad(), frag); axProfileSave(prof);
+    autoexamState.ingestNotice = tx('L\u00e6rt fra dokumentet: ' + frag.words + ' ord, ' + Object.keys(frag.buildings).length + ' bygningstype(r), ' + Object.keys(frag.clauses).length + ' standardhenvisning(er).', 'Learned from the document: ' + frag.words + ' words, ' + Object.keys(frag.buildings).length + ' building type(s), ' + Object.keys(frag.clauses).length + ' standard reference(s).');
+    renderModule('autoexam');
+  }
+  if (isText && !isPdf && !isDocx) { var r = new FileReader(); r.onload = function (e) { finish(e.target.result); }; r.readAsText(file); return; }
+  if (isPdf || isDocx) {
+    autoexamState.ingesting = true; autoexamState.ingestNotice = null; renderModule('autoexam');
+    var br = new FileReader();
+    br.onload = function (e) { setTimeout(function () { try { var bytes = new Uint8Array(e.target.result); var text = isPdf ? analyzerExtractPdf(bytes) : analyzerExtractDocx(bytes); finish(text || ''); } catch (err) { autoexamState.ingesting = false; autoexamState.ingestNotice = tx('Filen kunne ikke l\u00e6ses.', 'The file could not be read.') + ' (' + (err && err.message ? err.message : 'error') + ')'; renderModule('autoexam'); } }, 30); };
+    br.onerror = function () { autoexamState.ingesting = false; autoexamState.ingestNotice = tx('Filen kunne ikke l\u00e6ses.', 'The file could not be read.'); renderModule('autoexam'); };
+    br.readAsArrayBuffer(file); return;
+  }
+  autoexamState.ingestNotice = tx('Filtypen underst\u00f8ttes ikke. Brug .txt, .md, .pdf eller .docx.', 'Unsupported file type. Use .txt, .md, .pdf or .docx.'); renderModule('autoexam');
+}
+function axClearProfile() { axProfileClear(); autoexamState.ingestNotice = null; renderModule('autoexam'); }
+// Generate an exam from the learned profile (biased building + adaptive tier).
+function axGenFromProfile() {
+  var prof = axProfileLoad(); if (!prof || !prof.ingested) { autoexamState.tab = 'laering'; renderModule('autoexam'); return; }
+  var rng = axRngMake((Math.floor(Math.random() * 1e9)) || 1);
+  autoexamState.building = axBiasedBuilding(prof, rng);
+  var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier;
+  axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam');
+}
 function axTimerStart() { autoexamState.timerOn = true; var end = Date.now() + autoexamState.timerLeft * 1000; if (autoexamTimer) clearInterval(autoexamTimer); autoexamTimer = setInterval(function () { autoexamState.timerLeft = Math.max(0, Math.round((end - Date.now()) / 1000)); var el = document.getElementById('axTimer'); if (el) el.textContent = axFmtTime(autoexamState.timerLeft); if (autoexamState.timerLeft <= 0) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; renderModule('autoexam'); } }, 1000); renderModule('autoexam'); }
 function axTimerPause() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } renderModule('autoexam'); }
 function axTimerReset() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } autoexamState.timerLeft = autoexamState.timerSec; renderModule('autoexam'); }
@@ -12910,6 +13021,33 @@ function axRenderDiagram() {
   return h;
 }
 
+function axRenderLaering() {
+  var prof = axProfileLoad(); var bias = axProfileBias(prof);
+  var h = '<div class="info-row">' + tx('L\u00e6r systemet at generere som DINE pr\u00f8ver: upload en autorisationspr\u00f8ve (.pdf/.docx/.txt). Teksten analyseres lokalt i din browser \u2014 ingen upload til en server, fuldt offline. Systemet udtr\u00e6kker bygningstyper, emner og standardhenvisninger og lader fremtidige pr\u00f8ver drive mod de m\u00f8nstre.', 'Teach the system to generate like YOUR exams: upload an authorization exam (.pdf/.docx/.txt). The text is analysed locally in your browser \u2014 no server upload, fully offline. It extracts building types, topics and standard references and drifts future exams toward those patterns.') + '</div>';
+  h += '<div style="margin:12px 0;text-align:center">';
+  h += '<label style="display:inline-block;padding:12px 24px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">' + tx('\uD83D\uDCC1 Upload pr\u00f8ve (.pdf/.docx/.txt)', '\uD83D\uDCC1 Upload exam (.pdf/.docx/.txt)');
+  h += '<input type="file" accept=".txt,.md,.text,.pdf,.docx" style="display:none" onchange="axIngestFile(this)"></label>';
+  h += '<div style="margin-top:4px;font-size:0.72rem;color:var(--text-muted)">' + tx('Udtr\u00e6kkes lokalt \u2014 fuldt offline.', 'Extracted locally \u2014 fully offline.') + '</div>';
+  if (autoexamState.ingesting) h += '<div style="margin-top:8px;color:var(--primary);font-weight:600">\u23F3 ' + tx('Analyserer dokument\u2026', 'Analysing document\u2026') + '</div>';
+  h += '</div>';
+  if (autoexamState.ingestNotice) h += '<div class="result-box" style="margin:8px 0"><div style="padding:6px 2px">\u2139\uFE0F ' + autoexamState.ingestNotice + '</div></div>';
+  if (!prof || !prof.ingested) {
+    h += '<div class="result-box warning"><div style="padding:6px 2px">' + tx('Ingen l\u00e6rte pr\u00f8ver endnu. N\u00e5r du uploader autorisationspr\u00f8ver, vises her hvad systemet har l\u00e6rt \u2014 og generatoren begynder at ligne dem.', 'No learned exams yet. When you upload authorization exams, what the system has learned appears here \u2014 and the generator starts to resemble them.') + '</div></div>';
+    return h;
+  }
+  h += '<div class="result-box"><div class="result-title">\uD83E\uDDE0 ' + tx('Hvad systemet har l\u00e6rt', 'What the system has learned') + '</div><div style="padding:6px 2px;line-height:1.6">';
+  h += '<div><strong>' + prof.ingested + '</strong> ' + tx('analyserede pr\u00f8ver', 'analysed exams') + ' \u00b7 ' + axFmt(prof.words || 0) + ' ' + tx('ord', 'words') + ' \u00b7 ' + tx('forsyningsanl\u00e6g i', 'supply tasks in') + ' ' + bias.hvShare + '% ' + tx('af pr\u00f8verne', 'of exams') + '</div>';
+  if (bias.topBuilding) { var tb = axBuilding(bias.topBuilding); h += '<div>' + tx('Hyppigste bygningstype', 'Most frequent building type') + ': <strong>' + tb.icon + ' ' + axL({ da: tb.da, en: tb.en }) + '</strong></div>'; }
+  h += '</div></div>';
+  var items = Object.keys(bias.topicEmphasis).map(function (c) { var nm = AX_CAT_NAME[c] || { da: c, en: c }; return { label: axL(nm), value: bias.topicEmphasis[c] }; });
+  h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Emnev\u00e6gtning i dine pr\u00f8ver', 'Topic emphasis in your exams') + '</div><div style="padding:4px 2px">' + axSvgBars(items) + '</div></div>';
+  var bItems = AX_BUILDINGS.filter(function (b) { return (prof.buildings || {})[b.id]; }).map(function (b) { return { label: axL({ da: b.da, en: b.en }), value: Math.min(100, Math.round(100 * prof.buildings[b.id] / Math.max(1, prof.ingested))) }; });
+  if (bItems.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Bygningstyper set', 'Building types seen') + '</div><div style="padding:4px 2px">' + axSvgBars(bItems) + '</div></div>';
+  if (bias.topClauses && bias.topClauses.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Hyppigste standardhenvisninger', 'Most-cited standards') + '</div><div style="padding:6px 2px;font-size:0.85rem">' + bias.topClauses.join(' \u00b7 ') + '</div></div>';
+  h += '<div style="margin-top:10px"><button class="sel-btn selected" onclick="axGenFromProfile()">\uD83C\uDFAF ' + tx('Generér pr\u00f8ve fra l\u00e6rte m\u00f8nstre', 'Generate exam from learned patterns') + '</button> <button class="sel-btn" onclick="axClearProfile()">\uD83D\uDDD1\uFE0F ' + tx('Ryd l\u00e6ring', 'Clear learning') + '</button></div>';
+  return h;
+}
+
 function renderAutoExam() {
   var p = axEnsure();
   var st = axStoreGet(); var bestKey = p.buildingId + ':' + p.tierId + ':' + p.modeId; var best = st[bestKey];
@@ -12945,6 +13083,7 @@ function renderAutoExam() {
   h += '<button class="sel-btn' + (autoexamState.tab === 'censor' ? ' selected' : '') + '" onclick="axUITab(\'censor\')">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'kompleks' ? ' selected' : '') + '" onclick="axUITab(\'kompleks\')">\uD83E\uDDEE ' + tx('Kompleks (Viggo)', 'Complex (Viggo)') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'diagram' ? ' selected' : '') + '" onclick="axUITab(\'diagram\')">\uD83D\uDCD0 ' + tx('Diagram', 'Diagram') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'laering' ? ' selected' : '') + '" onclick="axUITab(\'laering\')">\uD83D\uDCE5 ' + tx('L\u00e6ring', 'Learning') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'analyse' ? ' selected' : '') + '" onclick="axUITab(\'analyse\')">\uD83D\uDCCA ' + tx('Analyse', 'Analytics') + '</button>';
   h += '</div>';
   var body = '';
@@ -12952,6 +13091,7 @@ function renderAutoExam() {
   else if (autoexamState.tab === 'besvar') body = axRenderAnswerTab(p);
   else if (autoexamState.tab === 'kompleks') body = axRenderKompleks();
   else if (autoexamState.tab === 'diagram') body = axRenderDiagram();
+  else if (autoexamState.tab === 'laering') body = axRenderLaering();
   else if (autoexamState.tab === 'analyse') body = axRenderDashboard();
   else body = axRenderCensorTab(p);
   return h + body;
