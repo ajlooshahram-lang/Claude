@@ -1547,6 +1547,8 @@ const T = {
       examgrade: '\uD83C\uDFAF Eksamensretter',
       repetition: '\uD83D\uDD01 Repetitionstr\u00E6ner',
       kompetence: '\uD83E\uDDE0 Kompetencekort',
+      anlaegstrae: '\uD83C\uDF33 Anl\u00E6gstr\u00E6 (impedans)',
+      idrift: '\u2705 Idrifts\u00E6ttelsesattest',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
@@ -1763,6 +1765,8 @@ const T = {
       examgrade: '\uD83C\uDFAF Exam Grader',
       repetition: '\uD83D\uDD01 Spaced Repetition',
       kompetence: '\uD83E\uDDE0 Competency Map',
+      anlaegstrae: '\uD83C\uDF33 Installation Tree (impedance)',
+      idrift: '\u2705 Commissioning Certificate',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
@@ -5058,7 +5062,7 @@ const NAV_GROUPS = [
     da: 'Tavle, skinne & tegning', en: 'Panel, busbar & drawing',
     descDa: 'Saml installationen fysisk: tavle og skinnesystem, kabelbakke, og det enstregede diagram (tegning) der dokumenterer hvordan alt h\u00E6nger sammen.',
     descEn: 'Put the installation together physically: panel and busbar, cable tray, and the single-line diagram (drawing) that documents how everything connects.',
-    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel', 'live', 'install3d', 'film']
+    keys: ['panel', 'busbar', 'anlaegstrae', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel', 'live', 'install3d', 'film']
   },
   {
     id: 'theory', icon: '\uD83D\uDCD6',
@@ -5072,7 +5076,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis', 'share']
+    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'idrift', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis', 'share']
   }
 ];
 
@@ -7641,6 +7645,511 @@ function syncSharedQuantities(mod) {
   }
 }
 
+// ============================================================================
+// ===== "KOMPLET ANLAEG" BATCH =====
+// Module A: Anlaegstrae med impedans-propagering (renderAnlaegstrae)
+// Module B: Idriftsaettelsesattest (renderIdrift)
+//
+// 100% CLICK-ONLY (selects + buttons, zero text inputs). Reuses the existing
+// Viggo complex-impedance engine (cxNetImpedanceLV / cxTrafoImpedanceLV /
+// cxCableImpedanceMOhm / cxScale / cxAdd / asIk3 / asIk1) and the Mathcad-Prime
+// display helpers (mcPrime*, asMcZ, asMcS, asDa). All impedances are COMPLEX in
+// milliohm at the 400 V level and shown in BOTH rectangular and polar form.
+// ============================================================================
+
+// Real NKT (PRODUCTS.cables) copper catalog keyed by cross-section (r,x in Ohm/km, iz in A).
+var ANLAEG_CU = (function () {
+  var m = {};
+  (typeof PRODUCTS !== 'undefined' && PRODUCTS.cables ? PRODUCTS.cables : []).forEach(function (c) {
+    if (c.material === 'Cu' && m[c.mm2] === undefined) m[c.mm2] = c;
+  });
+  return m;
+})();
+var ANLAEG_MM2 = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+var ANLAEG_LEN = [2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 300];
+var ANLAEG_LOAD = [0.5, 1, 2, 3.45, 5, 7.36, 11, 15, 22, 30, 45, 63, 90, 132];
+var ANLAEG_IN = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 400];
+var ANLAEG_SK = [100, 150, 200, 250, 350, 500];
+var ANLAEG_RX = [0.05, 0.1, 0.2, 0.3, 0.5];
+var ANLAEG_SN = [100, 160, 250, 315, 400, 630, 800, 1000, 1250, 1600];
+var ANLAEG_EK = [4, 4.5, 5, 5.5, 6];
+var ANLAEG_PCU = [2000, 3250, 4600, 6500, 8400, 10500, 13000, 17000];
+
+function anlaegCable(mm2) { return ANLAEG_CU[mm2] || ANLAEG_CU[2.5] || { mm2: 2.5, r: 7.41, x: 0.105, iz: 24 }; }
+
+let anlaegtraeState = {
+  src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+  nodes: {}, rootId: null, nextId: 1, selectedId: null
+};
+(function () { try { var s = JSON.parse(localStorage.getItem('anlaegtrae') || 'null'); if (s && s.nodes && s.rootId) anlaegtraeState = s; } catch (e) { } })();
+function anlaegSave() { try { localStorage.setItem('anlaegtrae', JSON.stringify(anlaegtraeState)); } catch (e) { } }
+
+function anlaegMakeNode(type, parentId) {
+  var id = 'an_' + (anlaegtraeState.nextId++);
+  var base = { id: id, type: type, parentId: parentId, childIds: [] };
+  if (type === 'hovedtavle') { base.name_da = 'Hovedtavle'; base.name_en = 'Main board'; base.mm2 = 50; base.length_m = 10; base.nPar = 1; base.phases = '3x400'; base.In = 160; base.curve = 'C'; base.load_kW = 0; base.cosPhi = 0.9; base.kind = 'tavle'; }
+  else if (type === 'undertavle') { base.name_da = 'Undertavle'; base.name_en = 'Sub-board'; base.mm2 = 16; base.length_m = 20; base.nPar = 1; base.phases = '3x400'; base.In = 63; base.curve = 'C'; base.load_kW = 0; base.cosPhi = 0.9; base.kind = 'tavle'; }
+  else { base.name_da = 'Slutkreds'; base.name_en = 'Final circuit'; base.mm2 = 2.5; base.length_m = 25; base.nPar = 1; base.phases = '1x230'; base.In = 16; base.curve = 'B'; base.load_kW = 3.45; base.cosPhi = 0.95; base.kind = 'stik'; }
+  return base;
+}
+
+function anlaegInit() {
+  var t = anlaegtraeState;
+  if (t.rootId && t.nodes[t.rootId]) return;
+  t.nodes = {}; t.nextId = 1;
+  var root = { id: 'an_' + (t.nextId++), type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' };
+  t.nodes[root.id] = root; t.rootId = root.id;
+  var ht = anlaegMakeNode('hovedtavle', root.id); t.nodes[ht.id] = ht; root.childIds.push(ht.id);
+  var k = anlaegMakeNode('kreds', ht.id); k.name_da = 'Stikkontakter'; k.name_en = 'Sockets'; t.nodes[k.id] = k; ht.childIds.push(k.id);
+  t.selectedId = ht.id;
+}
+
+// --- The complex source impedance at the LV transformer terminals (mOhm). ---
+function anlaegSourceZ() {
+  var s = anlaegtraeState.src;
+  var znet = cxNetImpedanceLV(s.Sk_MVA, s.RX, s.Un_LV);
+  var ztr = cxTrafoImpedanceLV(s.ek_pct / 100, s.Sn_kVA * 1000, s.Pcu_W);
+  return { znet: znet, ztr: ztr, z: cxAdd(znet, ztr) };
+}
+
+// --- Complex impedance of the cable feeding a node (mOhm), with parallel factor. ---
+function anlaegCableZ(node) {
+  var c = anlaegCable(node.mm2);
+  var z = cxCableImpedanceMOhm(node.length_m || 0, c.r, c.x);
+  if (node.nPar && node.nPar > 1) z = cxScale(z, 1 / node.nPar);
+  return z;
+}
+
+function anlaegNodeIB(n) {
+  var P = (n.load_kW || 0) * 1000; var cos = n.cosPhi || 0.9;
+  if (n.phases === '3x400') return P / (Math.sqrt(3) * 400 * cos);
+  return P / (230 * cos);
+}
+
+// Trip current Ia for the device (DS/HD 60364-4-41 Table 41.1 disconnection).
+function anlaegIa(n) {
+  var In = n.In || 0;
+  var t = (n.type === 'kreds' && In <= 32) ? 0.4 : 5.0;
+  var mult = (n.type !== 'kreds') ? 10 : (n.curve === 'B' ? 5 : n.curve === 'D' ? 20 : 10);
+  return { Ia: mult * In, t: t, mult: mult };
+}
+// Conservative assumed device breaking capacity Icu (A) when no datasheet is attached.
+function anlaegAssumedIcu(n) { return (n.type === 'kreds' && (n.In || 0) <= 63) ? 6000 : 36000; }
+
+// --- THE KILLER FEATURE: downstream complex-impedance propagation. ---
+// Pass 1 (leaf->root): aggregate load. Pass 2 (root->leaf): accumulate complex Z.
+// Each child inherits the parent's ACCUMULATED source impedance and adds its own
+// cable: Z1 (phase, factor 1) for Ik3, Zs (earth loop, factor 2 on cables) for Ik1.
+function anlaegPropagate() {
+  anlaegInit();
+  var t = anlaegtraeState;
+  var src = anlaegSourceZ();
+  var order = []; var q = [t.rootId];
+  while (q.length) { var id = q.shift(); var n = t.nodes[id]; if (!n) continue; order.push(id); n.childIds.forEach(function (c) { q.push(c); }); }
+  // Pass 1: aggregate load into boards (leaf->root)
+  for (var i = order.length - 1; i >= 0; i--) {
+    var nn = t.nodes[order[i]];
+    if (nn.type === 'hovedtavle' || nn.type === 'undertavle') {
+      var sum = 0; nn.childIds.forEach(function (c) { var ch = t.nodes[c]; if (ch) sum += (ch.load_kW || 0); });
+      nn.load_kW = sum;
+    }
+  }
+  // Pass 2: accumulate complex impedance (root->leaf)
+  for (var j = 0; j < order.length; j++) {
+    var n2 = t.nodes[order[j]];
+    if (n2.type === 'forsyning') {
+      n2._znet = src.znet; n2._ztr = src.ztr; n2._cz = cxRect(0, 0);
+      n2._z1 = src.z; n2._zs = src.z;
+    } else {
+      var p = t.nodes[n2.parentId];
+      var cz = anlaegCableZ(n2);
+      n2._cz = cz;
+      n2._z1 = cxAdd(p._z1, cz);
+      n2._zs = cxAdd(p._zs, cxScale(cz, 2));
+    }
+    n2._ib = anlaegNodeIB(n2);
+    n2._ik3max = asIk3(t.src.Un_LV, n2._z1, 1.05);
+    n2._ik3min = asIk3(t.src.Un_LV, n2._z1, 0.95);
+    n2._ik1max = asIk1(t.src.U0, n2._zs, 1.05);
+    n2._ik1min = asIk1(t.src.U0, n2._zs, 0.95);
+  }
+  // Vdrop needs _ib of the whole path; compute after.
+  for (var k = 0; k < order.length; k++) { var n3 = t.nodes[order[k]]; n3._vdrop = anlaegNodeVdrop(n3); }
+}
+
+function anlaegNodeVdrop(node) {
+  var t = anlaegtraeState; var path = []; var cur = node.id;
+  while (cur) { path.unshift(cur); cur = t.nodes[cur] ? t.nodes[cur].parentId : null; }
+  var total = 0;
+  for (var i = 0; i < path.length; i++) {
+    var n = t.nodes[path[i]]; if (!n || n.type === 'forsyning') continue;
+    var c = anlaegCable(n.mm2); var ib = n._ib || 0; var cos = n.cosPhi || 0.9; var sin = Math.sqrt(1 - cos * cos);
+    var L = (n.length_m || 0) / 1000; var r = c.r / (n.nPar || 1); var x = c.x / (n.nPar || 1);
+    var dv, base;
+    if (n.phases === '3x400') { dv = Math.sqrt(3) * ib * L * (r * cos + x * sin); base = 400; }
+    else { dv = 2 * ib * L * (r * cos + x * sin); base = 230; }
+    total += dv / base * 100;
+  }
+  return total;
+}
+
+// --- Click-only mutation handlers ---
+function anlaegOpts(list, cur, fmt) {
+  return list.map(function (v) { return '<option value="' + v + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + (fmt ? fmt(v) : v) + '</option>'; }).join('');
+}
+function anlaegSet(id, field, val) {
+  var n = anlaegtraeState.nodes[id]; if (!n) return;
+  var numF = { mm2: 1, length_m: 1, nPar: 1, In: 1, load_kW: 1, cosPhi: 1 };
+  n[field] = numF[field] ? parseFloat(val) : val;
+  if (field === 'kind') { var nm = ANLAEG_KIND_NAMES[val]; if (nm) { n.name_da = nm.da; n.name_en = nm.en; } if (val === 'lys' || val === 'stik' || val === 'bad' || val === 'ude') n.phases = '1x230'; }
+  anlaegSave(); renderModule('anlaegstrae');
+}
+function anlaegSetSrc(field, val) { anlaegtraeState.src[field] = (field === 'earthing') ? val : parseFloat(val); anlaegSave(); renderModule('anlaegstrae'); }
+function anlaegAdd(parentId, type) {
+  var n = anlaegMakeNode(type, parentId);
+  anlaegtraeState.nodes[n.id] = n; anlaegtraeState.nodes[parentId].childIds.push(n.id);
+  anlaegtraeState.selectedId = n.id; anlaegSave(); renderModule('anlaegstrae');
+}
+function anlaegSelect(id) { anlaegtraeState.selectedId = id; renderModule('anlaegstrae'); }
+function anlaegRemove(id) {
+  var t = anlaegtraeState; if (id === t.rootId) return;
+  var n = t.nodes[id]; if (!n) return;
+  var stack = [id]; var del = [];
+  while (stack.length) { var x = stack.shift(); del.push(x); (t.nodes[x].childIds || []).forEach(function (c) { stack.push(c); }); }
+  var p = t.nodes[n.parentId]; if (p) p.childIds = p.childIds.filter(function (c) { return c !== id; });
+  del.forEach(function (x) { delete t.nodes[x]; });
+  t.selectedId = n.parentId; anlaegSave(); renderModule('anlaegstrae');
+}
+function anlaegReset() { anlaegtraeState.rootId = null; anlaegtraeState.nodes = {}; anlaegtraeState.nextId = 1; anlaegInit(); anlaegSave(); renderModule('anlaegstrae'); }
+
+var ANLAEG_KIND_NAMES = {
+  lys: { da: 'Belysning', en: 'Lighting' }, stik: { da: 'Stikkontakter', en: 'Sockets' },
+  bad: { da: 'Badev\u00E6relse', en: 'Bathroom' }, ude: { da: 'Udend\u00F8rs', en: 'Outdoor' },
+  motor: { da: 'Motor', en: 'Motor' }, andet: { da: 'Anden last', en: 'Other load' }
+};
+
+// --- Whole-tree inline SVG one-line diagram (enstregsdiagram). ---
+function anlaegSVG() {
+  var t = anlaegtraeState; var pos = {}; var leaf = 0; var maxD = 0;
+  function layout(id, depth) {
+    var n = t.nodes[id]; if (!n) return 0; maxD = Math.max(maxD, depth);
+    if (!n.childIds.length) { var px = leaf * 160 + 90; pos[id] = { x: px, y: depth * 110 + 46, d: depth }; leaf++; return px; }
+    var xs = n.childIds.map(function (c) { return layout(c, depth + 1); });
+    var x = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+    pos[id] = { x: x, y: depth * 110 + 46, d: depth }; return x;
+  }
+  layout(t.rootId, 0);
+  var w = Math.max(leaf * 160 + 40, 340); var h = (maxD + 1) * 110 + 40;
+  var col = { forsyning: '#6a1b9a', hovedtavle: '#1565c0', undertavle: '#00838f', kreds: '#2e7d32' };
+  var svg = '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="background:var(--bg-card);border-radius:8px;min-width:' + Math.min(w, 320) + 'px" preserveAspectRatio="xMidYMin meet" role="img">';
+  Object.keys(pos).forEach(function (id) {
+    var n = t.nodes[id]; var a = pos[id];
+    n.childIds.forEach(function (c) { var b = pos[c]; svg += '<line x1="' + a.x.toFixed(1) + '" y1="' + (a.y + 16) + '" x2="' + b.x.toFixed(1) + '" y2="' + (b.y - 16) + '" stroke="var(--border)" stroke-width="2"/>'; });
+  });
+  Object.keys(pos).forEach(function (id) {
+    var n = t.nodes[id]; var a = pos[id]; var sel = (id === t.selectedId);
+    var label = tx(n.name_da, n.name_en);
+    var ik = (n.type === 'forsyning') ? '' : (asDa((n._ik3max || 0).toFixed(0)) + ' A');
+    svg += '<g style="cursor:pointer" onclick="anlaegSelect(\'' + id + '\')">';
+    svg += '<rect x="' + (a.x - 64).toFixed(1) + '" y="' + (a.y - 16) + '" width="128" height="34" rx="6" fill="' + (col[n.type] || '#555') + '" opacity="' + (sel ? '1' : '0.82') + '" stroke="' + (sel ? '#ffd54f' : 'none') + '" stroke-width="3"/>';
+    svg += '<text x="' + a.x.toFixed(1) + '" y="' + (a.y - 1) + '" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">' + anlaegEsc(label) + '</text>';
+    svg += '<text x="' + a.x.toFixed(1) + '" y="' + (a.y + 12) + '" text-anchor="middle" font-size="9" fill="#e0e0e0">' + (n.type === 'forsyning' ? (n.name_da ? 'Net+Trafo' : '') : ('I\u2096\u2083=' + ik)) + '</text>';
+    svg += '</g>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+function anlaegEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// --- Per-node Mathcad-Prime breakdown (dual rect + polar, Danish comma). ---
+function anlaegNodeMath(n) {
+  var t = anlaegtraeState; var h = '';
+  var typeLbl = { forsyning: tx('Forsyning (net + transformer)', 'Supply (grid + transformer)'), hovedtavle: tx('Hovedtavle', 'Main board'), undertavle: tx('Undertavle', 'Sub-board'), kreds: tx('Endelig kreds', 'Final circuit') }[n.type];
+  h += mcPrimeHeader(anlaegEsc(tx(n.name_da, n.name_en)) + ' \u2014 ' + typeLbl, n.type === 'kreds' ? 'green' : null);
+  h += '<div class="eng-block" style="padding:6px 10px">';
+  if (n.type === 'forsyning') {
+    h += asMcZ('Z_net', ':=', '(U\u00B2/S_k)\u2220arccot(R/X)', n._znet, 'm\u03A9', mcPrimeRef('IEC 60909'));
+    h += asMcZ('Z_T', ':=', '(U\u00B2\u00B7e_k/S_n)\u2220arccos(P_cu/(S_n\u00B7e_k))', n._ztr, 'm\u03A9', mcPrimeRef('Bog 5 s.295'));
+    h += asMcZ('Z_kilde', '=', 'Z_net + Z_T', n._z1, 'm\u03A9', tx('Akkumuleret kildeimpedans ved trafoklemmer', 'Accumulated source impedance at transformer terminals'));
+  } else {
+    var p = t.nodes[n.parentId];
+    var c = anlaegCable(n.mm2);
+    h += mcPrimeLine('Kabel', '', '', n.mm2 + ' mm\u00B2 Cu \u00B7 ' + asDa(n.length_m) + ' m' + (n.nPar > 1 ? ' \u00B7 ' + n.nPar + '\u2225' : ''), '', mcPrimeRef('NKT NOIKLX 90'));
+    h += asMcZ('Z_kabel', ':=', 'l\u00B7(r+jx)' + (n.nPar > 1 ? '/' + n.nPar : ''), n._cz, 'm\u03A9', null);
+    h += asMcZ('Z_1', '=', 'Z_1,opstr\u00F8ms + Z_kabel', n._z1, 'm\u03A9', tx('Positiv-sekvens (akkumuleret ned ad tr\u00E6et)', 'Positive-sequence (accumulated down the tree)'));
+    h += asMcZ('Z_s', '=', 'Z_s,opstr\u00F8ms + 2\u00B7Z_kabel', n._zs, 'm\u03A9', tx('Fejlsl\u00F8jfe (faktor 2 for frem+retur)', 'Fault loop (factor 2 for go+return)'));
+  }
+  h += asMcS('I_k3,max', '=', 'c_max\u00B7U/(\u221A3\u00B7|Z_1|)', (n._ik3max || 0).toFixed(0), 'A', tx('c=1,05', 'c=1.05'));
+  h += asMcS('I_k1,min', '=', 'c_min\u00B7U_0/|Z_s|', (n._ik1min || 0).toFixed(0), 'A', tx('c=0,95 \u2014 udl\u00F8sningskontrol', 'c=0.95 \u2014 disconnection check'));
+  if (n.type !== 'forsyning') {
+    var ia = anlaegIa(n);
+    var fbOk = (n._ik1min || 0) >= ia.Ia;
+    h += mcPrimeLine('I_a', ':=', ia.mult + '\u00B7I_n', asDa(ia.Ia.toFixed(0)), 'A', tx('Udl\u00F8sestr\u00F8m ved ' + asDa(ia.t) + ' s', 'Trip current at ' + ia.t + ' s'));
+    h += '<div class="eng-step"><span class="eng-sym">' + tx('Fejlbeskyttelse', 'Fault protection') + '</span><span class="eng-formula">I_k1,min \u2265 I_a</span><span class="eng-result">' + asDa((n._ik1min || 0).toFixed(0)) + ' \u2265 ' + asDa(ia.Ia.toFixed(0)) + ' A ' + (fbOk ? mcPrimeOk() : mcPrimeFail(tx('FEJL', 'FAIL'))) + '</span>' + mcPrimeRef('DS/HD 60364-4-41 411.3.2') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderAnlaegstrae() {
+  anlaegPropagate();
+  var t = anlaegtraeState; var s = t.src;
+  var sel = t.selectedId && t.nodes[t.selectedId] ? t.nodes[t.selectedId] : t.nodes[t.rootId];
+  var html = '';
+
+  // Intro
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83C\uDF33 ' + tx('Anl\u00E6gstr\u00E6 med impedans-propagering', 'Installation tree with impedance propagation') + '</div>';
+  html += '<div class="info-row">' + tx('Byg hele anl\u00E6gget som et tr\u00E6: Forsyning \u2192 Hovedtavle \u2192 Undertavle(r) \u2192 Endelige kredse. Hver node arver for\u00E6ldrenodens AKKUMULEREDE komplekse kildeimpedans, s\u00E5 kortslutningsstr\u00F8m og Z_s i en kreds beregnes ud fra den virkelige opstr\u00F8msk\u00E6de (Viggo-metoden \u2014 komplekse impedanser hele vejen).', 'Build the whole installation as a tree: Supply \u2192 Main board \u2192 Sub-board(s) \u2192 Final circuits. Every node inherits the parent\'s ACCUMULATED complex source impedance, so the fault current and Z_s of a circuit are computed from the real upstream chain (Viggo method \u2014 complex impedances throughout).') + '</div></div>';
+
+  // Source (forsyning) configuration - all selects
+  html += '<div class="card fade-in no-print"><div class="card-title">\u26A1 ' + tx('Forsyning (net + transformer)', 'Supply (grid + transformer)') + '</div>';
+  html += '<div class="select-grid">';
+  html += anlaegSrcSel('Sk_MVA', tx('Kortslutningseffekt S_k', 'Short-circuit power S_k'), ANLAEG_SK, s.Sk_MVA, function (v) { return v + ' MVA'; });
+  html += anlaegSrcSel('RX', 'R/X', ANLAEG_RX, s.RX, function (v) { return asDa(v); });
+  html += anlaegSrcSel('Sn_kVA', tx('Transformer S_n', 'Transformer S_n'), ANLAEG_SN, s.Sn_kVA, function (v) { return v + ' kVA'; });
+  html += anlaegSrcSel('ek_pct', 'e_k', ANLAEG_EK, s.ek_pct, function (v) { return asDa(v) + ' %'; });
+  html += anlaegSrcSel('Pcu_W', 'P_cu', ANLAEG_PCU, s.Pcu_W, function (v) { return v + ' W'; });
+  html += '<div class="sel-field"><label>' + tx('Jordingssystem', 'Earthing') + '</label><select onchange="anlaegSetSrc(\'earthing\',this.value)">' + ['TN', 'TT', 'IT'].map(function (e) { return '<option value="' + e + '"' + (e === s.earthing ? ' selected' : '') + '>' + e + '</option>'; }).join('') + '</select></div>';
+  html += '</div></div>';
+
+  // Tree builder - buttons + selects on the selected node
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83D\uDD27 ' + tx('Byg tr\u00E6et', 'Build the tree') + '</div>';
+  html += '<div class="info-row">' + tx('Valgt node', 'Selected node') + ': <strong>' + anlaegEsc(tx(sel.name_da, sel.name_en)) + '</strong></div>';
+  html += '<div class="select-grid" style="margin-bottom:10px">';
+  if (sel.type === 'forsyning') html += '<button class="sel-btn selected" onclick="anlaegAdd(\'' + sel.id + '\',\'hovedtavle\')">\u2795 ' + tx('Hovedtavle', 'Main board') + '</button>';
+  if (sel.type === 'hovedtavle' || sel.type === 'undertavle') {
+    html += '<button class="sel-btn selected" onclick="anlaegAdd(\'' + sel.id + '\',\'undertavle\')">\u2795 ' + tx('Undertavle', 'Sub-board') + '</button>';
+    html += '<button class="sel-btn selected" onclick="anlaegAdd(\'' + sel.id + '\',\'kreds\')">\u2795 ' + tx('Endelig kreds', 'Final circuit') + '</button>';
+  }
+  if (sel.id !== t.rootId) html += '<button class="sel-btn" style="color:var(--danger)" onclick="anlaegRemove(\'' + sel.id + '\')">\uD83D\uDDD1\uFE0F ' + tx('Fjern node', 'Remove node') + '</button>';
+  html += '<button class="sel-btn" onclick="anlaegReset()">\u21BB ' + tx('Nulstil tr\u00E6', 'Reset tree') + '</button>';
+  html += '</div>';
+  // Edit selected node fields (skip forsyning)
+  if (sel.type !== 'forsyning') {
+    html += '<div class="select-grid">';
+    html += anlaegNodeSel(sel.id, 'kind', tx('Type', 'Type'), [['lys', tx('Belysning', 'Lighting')], ['stik', tx('Stikkontakter', 'Sockets')], ['bad', tx('Badev\u00E6relse', 'Bathroom')], ['ude', tx('Udend\u00F8rs', 'Outdoor')], ['motor', 'Motor'], ['andet', tx('Anden', 'Other')], ['tavle', tx('Tavle', 'Board')]], sel.kind);
+    html += anlaegNodeSel(sel.id, 'mm2', tx('Tv\u00E6rsnit', 'Cross-section'), ANLAEG_MM2.map(function (v) { return [v, v + ' mm\u00B2']; }), sel.mm2);
+    html += anlaegNodeSel(sel.id, 'length_m', tx('L\u00E6ngde', 'Length'), ANLAEG_LEN.map(function (v) { return [v, v + ' m']; }), sel.length_m);
+    html += anlaegNodeSel(sel.id, 'nPar', tx('Parallelle', 'Parallel'), [1, 2, 3, 4].map(function (v) { return [v, v + '\u2225']; }), sel.nPar);
+    html += anlaegNodeSel(sel.id, 'phases', tx('System', 'System'), [['3x400', '3\u00D7400 V'], ['1x230', '1\u00D7230 V']], sel.phases);
+    html += anlaegNodeSel(sel.id, 'In', tx('Afbryder I_n', 'Device I_n'), ANLAEG_IN.map(function (v) { return [v, v + ' A']; }), sel.In);
+    html += anlaegNodeSel(sel.id, 'curve', tx('Karakteristik', 'Curve'), [['B', 'B (5\u00D7)'], ['C', 'C (10\u00D7)'], ['D', 'D (20\u00D7)']], sel.curve);
+    if (sel.type === 'kreds') html += anlaegNodeSel(sel.id, 'load_kW', tx('Last', 'Load'), ANLAEG_LOAD.map(function (v) { return [v, asDa(v) + ' kW']; }), sel.load_kW);
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // One-line diagram (SVG)
+  html += '<div class="card fade-in"><div class="print-only" style="margin-bottom:8px"><h2 style="margin:0">' + tx('Anl\u00E6gstr\u00E6 \u2014 enstregsdiagram', 'Installation tree \u2014 one-line diagram') + '</h2></div>';
+  html += '<div class="card-title">\uD83D\uDCD0 ' + tx('Enstregsdiagram', 'One-line diagram') + '</div>';
+  html += '<div style="overflow-x:auto">' + anlaegSVG() + '</div></div>';
+
+  // Per-node calculations (BFS order)
+  html += '<div class="card fade-in"><div class="card-title">\uD83E\uDDEE ' + tx('Impedans-propagering pr. node', 'Impedance propagation per node') + '</div>';
+  var order = []; var q = [t.rootId];
+  while (q.length) { var id = q.shift(); var n = t.nodes[id]; if (!n) continue; order.push(id); n.childIds.forEach(function (c) { q.push(c); }); }
+  order.forEach(function (id) { html += anlaegNodeMath(t.nodes[id]); });
+  html += '</div>';
+
+  // Jump to certificate
+  html += '<div class="card fade-in no-print"><button class="sel-btn selected" onclick="switchModule(\'idrift\')">\u2705 ' + tx('Lav idrifts\u00E6ttelsesattest for dette anl\u00E6g', 'Create commissioning certificate for this installation') + '</button></div>';
+  return html;
+}
+function anlaegSrcSel(field, label, list, cur, fmt) {
+  return '<div class="sel-field"><label>' + label + '</label><select onchange="anlaegSetSrc(\'' + field + '\',this.value)">' + anlaegOpts(list, cur, fmt) + '</select></div>';
+}
+function anlaegNodeSel(id, field, label, pairs, cur) {
+  var opts = pairs.map(function (p) { var v = Array.isArray(p) ? p[0] : p; var lbl = Array.isArray(p) ? p[1] : p; return '<option value="' + v + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + lbl + '</option>'; }).join('');
+  return '<div class="sel-field"><label>' + label + '</label><select onchange="anlaegSet(\'' + id + '\',\'' + field + '\',this.value)">' + opts + '</select></div>';
+}
+
+// ============================================================================
+// MODULE B: Idriftsaettelsesattest (commissioning certificate)
+// ============================================================================
+let idriftState = { src: 'auto' };
+
+// Conservative per-circuit audit. Returns an array of check objects. Every
+// marginal/uncertain case is flagged FAIL or WARN with the safer fix recommended.
+function idriftAuditCircuit(c) {
+  var checks = [];
+  function add(rule, ref, actual, limit, ok, marginPct, fix, uncertain) {
+    checks.push({ rule: rule, ref: ref, actual: actual, limit: limit, status: uncertain ? 'warn' : (ok ? 'ok' : 'fail'), margin: (marginPct == null ? null : marginPct), fix: ok ? null : fix });
+  }
+  // 1. Overload coordination: IB <= In <= Iz (DS/HD 60364-4-43, 433.1)
+  if (c.ib != null && c.In != null && c.iz != null) {
+    var ok1 = (c.ib <= c.In) && (c.In <= c.iz);
+    var m1 = Math.min((c.In - c.ib) / Math.max(c.In, 1e-9), (c.iz - c.In) / Math.max(c.iz, 1e-9)) * 100;
+    add('I_B \u2264 I_n \u2264 I_z', 'DS/HD 60364-4-43 433.1',
+      asDa(c.ib.toFixed(1)) + ' \u2264 ' + asDa(c.In) + ' \u2264 ' + asDa(c.iz.toFixed(1)) + ' A', '433.1', ok1, m1,
+      tx('V\u00E6lg st\u00F8rre kabel eller mindre afbryder', 'Choose a larger cable or a smaller device'));
+  }
+  // 2. Disconnection / fault protection: Zs * Ia <= U0 (DS/HD 60364-4-41, 411.3.2.2/411.3.2.3)
+  if (c.zs != null && c.ia != null && c.U0 != null && !c.zsUncertain) {
+    var prod = (c.zs / 1000) * c.ia; // zs in mOhm -> Ohm
+    var ok2 = prod <= c.U0;
+    var m2 = (c.U0 - prod) / c.U0 * 100;
+    var refClause = (c.t_req != null && c.t_req <= 0.4) ? '411.3.2.2' : '411.3.2.3';
+    add('Z_s\u00B7I_a \u2264 U_0', 'DS/HD 60364-4-41 ' + refClause,
+      asDa(prod.toFixed(1)) + ' \u2264 ' + asDa(c.U0) + ' V (' + asDa(c.t_req) + ' s)', c.U0 + ' V', ok2, m2,
+      tx('Hurtigere afbryder, st\u00F8rre kabel eller tilf\u00F8j HPFI', 'Faster device, larger cable or add an RCD'));
+  } else if (c.zsUncertain) {
+    add('Z_s\u00B7I_a \u2264 U_0', 'DS/HD 60364-4-41 411.3.2.2', tx('Z_s ukendt for fladt projekt', 'Z_s unknown for flat project'), '', false, null,
+      tx('Modeller kredsen i Anl\u00E6gstr\u00E6 for fuld Z_s-kontrol', 'Model the circuit in the installation tree for a full Z_s check'), true);
+  }
+  // 3. Voltage drop: dU <= limit (DS/HD 60364-5-52, 525)
+  if (c.vdropPct != null) {
+    var lim = c.vdropLimit != null ? c.vdropLimit : 4;
+    var ok3 = c.vdropPct <= lim;
+    var m3 = (lim - c.vdropPct) / lim * 100;
+    add('\u0394U \u2264 ' + asDa(lim) + ' %', 'DS/HD 60364-5-52 525',
+      asDa(c.vdropPct.toFixed(2)) + ' % \u2264 ' + asDa(lim) + ' %', asDa(lim) + ' %', ok3, m3,
+      tx('St\u00F8rre tv\u00E6rsnit eller kortere f\u00F8ringsvej', 'Larger cross-section or shorter run'));
+  }
+  // 4. Breaking capacity: Icu >= Ik,max at the device (DS/HD 60364-4-43, 434.5.1)
+  if (c.icu != null && c.ikmax != null && !c.icuUncertain) {
+    var ok4 = c.icu >= c.ikmax;
+    var m4 = (c.icu - c.ikmax) / Math.max(c.icu, 1e-9) * 100;
+    add('I_cu \u2265 I_k,max', 'DS/HD 60364-4-43 434.5.1',
+      asDa((c.icu / 1000).toFixed(1)) + ' \u2265 ' + asDa((c.ikmax / 1000).toFixed(1)) + ' kA', asDa((c.ikmax / 1000).toFixed(1)) + ' kA', ok4, m4,
+      tx('V\u00E6lg afbryder med h\u00F8jere brydeevne', 'Choose a device with higher breaking capacity'));
+  } else if (c.icuUncertain) {
+    add('I_cu \u2265 I_k,max', 'DS/HD 60364-4-43 434.5.1', tx('I_k,max ukendt for fladt projekt', 'I_k,max unknown for flat project'), '', false, null,
+      tx('Modeller i Anl\u00E6gstr\u00E6 og bekr\u00E6ft I_cu mod datablad', 'Model in the tree and verify I_cu against datasheet'), true);
+  }
+  // 5. RCD 30 mA where required (DS/HD 60364-4-41 411.3.3 / 415.1)
+  if (c.needsRCD) {
+    var ok5 = !!c.hasRCD;
+    add('HPFI 30 mA', 'DS/HD 60364-4-41 411.3.3 / 415.1',
+      ok5 ? tx('30 mA HPFI til stede', '30 mA RCD present') : tx('Mangler 30 mA HPFI', 'Missing 30 mA RCD'), '\u226430 mA', ok5, null,
+      tx('Tilf\u00F8j 30 mA HPFI (stikkontakter \u226432A, bad, udend\u00F8rs)', 'Add a 30 mA RCD (sockets \u226432A, bathrooms, outdoor)'));
+  }
+  // 6. Short-circuit (adiabatic) protection: S >= sqrt(Ik^2 t)/k (DS/HD 60364-4-43, 434.5.2)
+  if (c.cableS != null && c.ikmax != null && c.k != null && c.t_sc != null && !c.icuUncertain) {
+    var Smin = c.ikmax * Math.sqrt(c.t_sc) / c.k;
+    var ok6 = c.cableS >= Smin;
+    var m6 = (c.cableS - Smin) / Math.max(c.cableS, 1e-9) * 100;
+    add('S \u2265 \u221A(I\u00B2t)/k', 'DS/HD 60364-4-43 434.5.2',
+      asDa(c.cableS) + ' \u2265 ' + asDa(Smin.toFixed(1)) + ' mm\u00B2', asDa(Smin.toFixed(1)) + ' mm\u00B2', ok6, m6,
+      tx('St\u00F8rre kabeltv\u00E6rsnit eller str\u00F8mbegr\u00E6nsende afbryder', 'Larger cross-section or current-limiting device'));
+  }
+  return checks;
+}
+
+// Build normalized circuit descriptors from the installation tree.
+function idriftFromTree() {
+  anlaegPropagate();
+  var t = anlaegtraeState; var out = [];
+  var order = []; var q = [t.rootId];
+  while (q.length) { var id = q.shift(); var n = t.nodes[id]; if (!n) continue; order.push(id); n.childIds.forEach(function (c) { q.push(c); }); }
+  order.forEach(function (id) {
+    var n = t.nodes[id]; if (n.type === 'forsyning') return;
+    var cab = anlaegCable(n.mm2);
+    var ia = anlaegIa(n);
+    var isLight = n.kind === 'lys';
+    var isSock = n.kind === 'stik';
+    var needsRCD = (isSock && (n.In || 0) <= 32) || n.kind === 'bad' || n.kind === 'ude';
+    out.push({
+      name: tx(n.name_da, n.name_en), nodeType: n.type, phases: n.phases, U0: t.src.U0,
+      ib: n._ib || 0, In: n.In, iz: (cab.iz || 0) * (n.nPar || 1),
+      ikmax: n._ik3max || 0, ikmin: n._ik1min || 0, zs: cxMag(n._zs), ia: ia.Ia, t_req: ia.t,
+      vdropPct: n._vdrop || 0, vdropLimit: isLight ? 3 : 4,
+      icu: anlaegAssumedIcu(n), icuAssumed: true,
+      needsRCD: needsRCD, hasRCD: needsRCD ? false : true,
+      cableS: n.mm2 * (n.nPar || 1), k: 115, t_sc: ((n._ik3max || 0) >= ia.Ia ? 0.1 : ia.t)
+    });
+  });
+  return out;
+}
+
+// Build normalized circuit descriptors from the flat projectState.circuits list.
+function idriftFromProject() {
+  var out = [];
+  (typeof projectState !== 'undefined' && projectState.circuits ? projectState.circuits : []).forEach(function (c) {
+    var inM = (c.protection || '').match(/(\d+(?:[.,]\d+)?)\s*A?\s*$/);
+    var In = inM ? parseFloat(inM[1].replace(',', '.')) : null;
+    var mmM = (c.cable || '').match(/([\d.,]+)\s*mm/);
+    var S = mmM ? parseFloat(mmM[1].replace(',', '.')) : null;
+    var iz = (S != null && ANLAEG_CU[S]) ? ANLAEG_CU[S].iz : null;
+    var nameL = ((c.name || '')).toLowerCase();
+    var isLight = nameL.indexOf('belys') >= 0 || nameL.indexOf('light') >= 0 || nameL.indexOf('lys') >= 0;
+    var isSock = nameL.indexOf('stik') >= 0 || nameL.indexOf('socket') >= 0;
+    var isBad = nameL.indexOf('bad') >= 0 || nameL.indexOf('bath') >= 0;
+    var isUde = nameL.indexOf('ude') >= 0 || nameL.indexOf('outdoor') >= 0;
+    var needsRCD = (isSock && (In || 99) <= 32) || isBad || isUde;
+    out.push({
+      name: c.name || tx('Kreds', 'Circuit'), nodeType: 'kreds', phases: c.voltage, U0: 230,
+      ib: c.ib, In: In, iz: iz,
+      zs: null, zsUncertain: true, ia: null, t_req: (In != null && In <= 32) ? 0.4 : 5,
+      ikmax: null, icuUncertain: true,
+      vdropPct: c.vdrop, vdropLimit: isLight ? 3 : 4,
+      needsRCD: needsRCD, hasRCD: false,
+      cableS: S, k: 115, t_sc: (In != null && In <= 32) ? 0.4 : 5
+    });
+  });
+  return out;
+}
+
+function idriftCircuits() {
+  anlaegInit();
+  var hasTree = anlaegtraeState.rootId && Object.keys(anlaegtraeState.nodes).some(function (k) { return anlaegtraeState.nodes[k].type === 'kreds' || anlaegtraeState.nodes[k].type === 'undertavle'; });
+  if (hasTree) return { src: 'tree', list: idriftFromTree() };
+  return { src: 'project', list: idriftFromProject() };
+}
+
+function idriftOverall(circuits) {
+  var anyFail = false, anyWarn = false, total = 0;
+  circuits.forEach(function (c) {
+    var checks = idriftAuditCircuit(c);
+    checks.forEach(function (chk) { total++; if (chk.status === 'fail') anyFail = true; else if (chk.status === 'warn') anyWarn = true; });
+  });
+  return { status: anyFail ? 'fail' : (anyWarn ? 'warn' : 'pass'), checks: total };
+}
+
+function renderIdrift() {
+  var data = idriftCircuits();
+  var circuits = data.list;
+  var overall = idriftOverall(circuits);
+  var html = '';
+
+  html += '<div class="card fade-in no-print"><div class="card-title">\u2705 ' + tx('Idrifts\u00E6ttelsesattest', 'Commissioning certificate') + '</div>';
+  html += '<div class="info-row">' + tx('Konservativ kontrol af HVER kreds i anl\u00E6gget. Enhver usikker eller marginal sag markeres som ADVARSEL eller FEJL med det sikreste forslag. Hver linje citerer den konkrete klausul i DS/HD 60364.', 'Conservative audit of EVERY circuit in the installation. Any uncertain or marginal case is flagged WARN or FAIL with the safer fix. Every line cites the specific DS/HD 60364 clause.') + '</div>';
+  html += '<div class="info-row" style="font-size:0.8rem;color:var(--text-muted)">' + tx('Datakilde', 'Data source') + ': <strong>' + (data.src === 'tree' ? tx('Anl\u00E6gstr\u00E6 (fuld impedans)', 'Installation tree (full impedance)') : tx('Projekt (flad gruppeliste)', 'Project (flat circuit list)')) + '</strong></div>';
+  html += '<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv attest / PDF', 'Print certificate / PDF') + '</button>';
+  html += '<button class="sel-btn" onclick="switchModule(\'anlaegstrae\')">\uD83C\uDF33 ' + tx('Rediger anl\u00E6gstr\u00E6', 'Edit installation tree') + '</button></div></div>';
+
+  // Certificate (printable)
+  html += '<div class="card fade-in">';
+  html += '<div class="print-only" style="margin-bottom:10px"><h2 style="margin:0">' + tx('Idrifts\u00E6ttelsesattest', 'Commissioning Certificate') + '</h2><div style="font-size:0.8rem;color:#666">DS/HD 60364 \u00B7 ' + new Date().toLocaleDateString('da-DK') + '</div></div>';
+  var ov = overall.status === 'pass' ? { c: 'var(--success)', t: tx('GODKENDT \u2014 alle kredse best\u00E5r alle kontroller', 'PASS \u2014 every circuit passes every check') }
+    : overall.status === 'warn' ? { c: '#f57f17', t: tx('BETINGET \u2014 manglende data, kontroller p\u00E5kr\u00E6vet', 'CONDITIONAL \u2014 missing data, review required') }
+      : { c: 'var(--danger)', t: tx('IKKE GODKENDT \u2014 mindst \u00E9n kontrol fejler', 'FAIL \u2014 at least one check fails') };
+  html += '<div class="result-box" style="border-left:6px solid ' + ov.c + '"><div class="result-title" style="color:' + ov.c + '">' + ov.t + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal kredse', 'Circuits') + '</span><span class="value">' + circuits.length + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal kontroller', 'Checks') + '</span><span class="value">' + overall.checks + '</span></div></div>';
+
+  if (!circuits.length) {
+    html += '<div class="info-row">' + tx('Ingen kredse fundet. Byg et anl\u00E6gstr\u00E6 eller tilf\u00F8j grupper i Projekt-modulet.', 'No circuits found. Build an installation tree or add circuits in the Project module.') + '</div>';
+  }
+
+  circuits.forEach(function (c) {
+    var checks = idriftAuditCircuit(c);
+    var cf = checks.some(function (k) { return k.status === 'fail'; });
+    var cw = checks.some(function (k) { return k.status === 'warn'; });
+    var badge = cf ? mcPrimeFail(tx('FEJL', 'FAIL')) : (cw ? '<span class="mc-ref">' + tx('ADVARSEL', 'WARN') + '</span>' : mcPrimeOk());
+    html += mcPrimeHeader(anlaegEsc(c.name) + ' \u2014 ' + (c.phases === '3x400' ? '3\u00D7400 V' : '1\u00D7230 V') + ' &nbsp; ' + badge, cf ? null : 'green');
+    html += '<div class="eng-block" style="padding:6px 10px">';
+    checks.forEach(function (chk) {
+      var b = chk.status === 'ok' ? mcPrimeOk() : (chk.status === 'warn' ? '<span class="mc-ref">' + tx('ADVARSEL', 'WARN') + '</span>' : mcPrimeFail(tx('FEJL', 'FAIL')));
+      var marginTxt = (chk.margin != null && isFinite(chk.margin)) ? ' <span style="color:var(--text-muted);font-size:0.8rem">(' + tx('margin', 'margin') + ' ' + asDa(chk.margin.toFixed(0)) + '%)</span>' : '';
+      html += '<div class="eng-step"><span class="eng-sym">' + chk.rule + '</span><span class="eng-result">' + chk.actual + ' ' + b + marginTxt + '</span>' + mcPrimeRef(chk.ref) + '</div>';
+      if (chk.fix) html += '<div class="eng-step"><span class="eng-note" style="padding-left:0;color:var(--danger)">\u21B3 ' + chk.fix + '</span></div>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 function renderModule(mod) {
   if (typeof takeSnapshot === 'function') takeSnapshot(); // Diff view: snapshot before render
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
@@ -7790,6 +8299,8 @@ function renderModule(mod) {
     case 'examgrade': content = renderExamGrade(); break;
     case 'repetition': content = renderRepetition(); break;
     case 'kompetence': content = renderKompetence(); break;
+    case 'anlaegstrae': content = renderAnlaegstrae(); break;
+    case 'idrift': content = renderIdrift(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);

@@ -19224,6 +19224,106 @@ test('renderRepetition returns a flashcard UI in both da and en', function() {
   } finally { lang = prevLang; repetitionState.revealed = prev.revealed; repetitionState.currentId = prev.currentId; delete mockStorage['repetition_cards']; delete mockStorage['examgrade_log']; }
 });
 
+// ============================================================================
+// === "Komplet Anlaeg" batch: Module A (anlaegstrae) + Module B (idrift) ===
+// ============================================================================
+console.log('\n=== Komplet Anlaeg batch tests ===\n');
+
+test('anlaeg: complex source impedance accumulates strictly down the tree (Z up, Ik down)', function() {
+  var prev = JSON.stringify(anlaegtraeState);
+  try {
+    var t = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' }, nodes: {}, rootId: null, nextId: 1, selectedId: null };
+    anlaegtraeState = t;
+    var root = { id: 'an_' + (t.nextId++), type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' };
+    t.nodes[root.id] = root; t.rootId = root.id;
+    var ht = anlaegMakeNode('hovedtavle', root.id); ht.mm2 = 50; ht.length_m = 10; t.nodes[ht.id] = ht; root.childIds.push(ht.id);
+    var ut = anlaegMakeNode('undertavle', ht.id); ut.mm2 = 16; ut.length_m = 30; t.nodes[ut.id] = ut; ht.childIds.push(ut.id);
+    var kr = anlaegMakeNode('kreds', ut.id); kr.mm2 = 2.5; kr.length_m = 25; kr.load_kW = 3.45; t.nodes[kr.id] = kr; ut.childIds.push(kr.id);
+    anlaegPropagate();
+    var zR = cxMag(root._z1), zH = cxMag(ht._z1), zU = cxMag(ut._z1), zK = cxMag(kr._z1);
+    assert(zR < zH && zH < zU && zU < zK, 'positive-seq |Z1| must strictly grow downstream: ' + [zR, zH, zU, zK].map(function(v){return v.toFixed(2);}).join(' < '));
+    assert(root._ik3max > ht._ik3max && ht._ik3max > ut._ik3max && ut._ik3max > kr._ik3max, 'Ik3,max must strictly drop downstream: ' + [root._ik3max, ht._ik3max, ut._ik3max, kr._ik3max].map(function(v){return v.toFixed(0);}).join(' > '));
+    assert(cxMag(root._zs) < cxMag(kr._zs), 'earth-loop Zs must accumulate downstream');
+    assert(root._ik1min > kr._ik1min, 'Ik1,min must drop at the deeper node');
+    assert(zR > 8 && zR < 14, 'source |Z| ~ Znet+Ztrafo in a plausible mOhm band, got ' + zR.toFixed(2));
+    assert(isFinite(kr._z1.re) && isFinite(kr._z1.im) && kr._z1.re > 0, 'accumulated Z is a finite complex number');
+  } finally { anlaegtraeState = JSON.parse(prev); }
+});
+
+test('renderAnlaegstrae returns the tree UI with dual-form impedance markers (da + en, no leaks)', function() {
+  var prevLang = lang, prev = JSON.stringify(anlaegtraeState);
+  try {
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' }, nodes: {}, rootId: null, nextId: 1, selectedId: null };
+    lang = 'da'; var hDa = renderAnlaegstrae();
+    assert(hDa.length > 800 && hDa.indexOf('Anl\u00E6gstr\u00E6') >= 0, 'da tree renders');
+    assert(hDa.indexOf('Z_1') >= 0 && hDa.indexOf('Z_s') >= 0, 'shows accumulated Z1 and Zs');
+    assert(hDa.indexOf('\u2220') >= 0, 'shows polar (angle) form of complex impedance');
+    assert(hDa.indexOf('<svg') >= 0, 'renders an inline SVG one-line diagram');
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en'; var hEn = renderAnlaegstrae();
+    assert(hEn.length > 800 && hEn.indexOf('Installation tree') >= 0, 'en tree renders');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { lang = prevLang; anlaegtraeState = JSON.parse(prev); }
+});
+
+test('idriftAuditCircuit FAILS a dangerously undersized circuit with the correct DS/HD clauses', function() {
+  var bad = { name: 'Stik', phases: '1x230', U0: 230, ib: 25, In: 16, iz: 17.5,
+    zs: 3000, ia: 80, t_req: 0.4, ikmax: 9000, icu: 6000, vdropPct: 7.5, vdropLimit: 4,
+    needsRCD: true, hasRCD: false, cableS: 1.5, k: 115, t_sc: 0.4 };
+  var checks = idriftAuditCircuit(bad);
+  function byRule(sub) { return checks.filter(function(c) { return c.rule.indexOf(sub) >= 0; })[0]; }
+  function byRef(sub) { return checks.filter(function(c) { return c.ref.indexOf(sub) >= 0; })[0]; }
+  assert(byRule('I_B').status === 'fail' && byRule('I_B').ref.indexOf('433.1') >= 0, 'IB<=In<=Iz fails citing 433.1 (IB=25>In=16)');
+  assert(byRule('Z_s').status === 'fail' && byRule('Z_s').ref.indexOf('411.3.2.2') >= 0, 'disconnection fails citing 411.3.2.2 (3 ohm*80A=240>230V)');
+  assert(byRef('525').status === 'fail', 'voltage drop fails citing 525 (7.5%>4%)');
+  assert(byRule('I_cu').status === 'fail' && byRule('I_cu').ref.indexOf('434.5.1') >= 0, 'breaking capacity fails citing 434.5.1 (6kA<9kA)');
+  assert(byRule('HPFI').status === 'fail' && byRule('HPFI').ref.indexOf('411.3.3') >= 0, 'missing RCD fails citing 411.3.3/415.1');
+  assert(byRef('434.5.2').status === 'fail', 'adiabatic KB fails citing 434.5.2 (Smin~49.5mm2>1.5mm2)');
+  assert(idriftOverall([bad]).status === 'fail', 'overall verdict is FAIL when any check fails');
+});
+
+test('idriftAuditCircuit PASSES a correctly dimensioned circuit (every check OK)', function() {
+  var good = { name: 'Belysning', phases: '1x230', U0: 230, ib: 6, In: 10, iz: 17.5,
+    zs: 400, ia: 50, t_req: 0.4, ikmax: 800, icu: 6000, vdropPct: 1.2, vdropLimit: 3,
+    needsRCD: false, hasRCD: true, cableS: 2.5, k: 115, t_sc: 0.1 };
+  var checks = idriftAuditCircuit(good);
+  assert(checks.length >= 4, 'produces multiple checks, got ' + checks.length);
+  assert(checks.every(function(c) { return c.status === 'ok'; }), 'every check passes; statuses=' + checks.map(function(c){return c.rule+':'+c.status;}).join(', '));
+  var z = checks.filter(function(c) { return c.rule.indexOf('Z_s') >= 0; })[0];
+  assert(z && z.status === 'ok' && z.ref.indexOf('411.3.2.2') >= 0, 'disconnection passes with 411.3.2.2 citation (0.4 ohm*50A=20<=230V)');
+  assert(idriftOverall([good]).status === 'pass', 'overall verdict is PASS when all checks pass');
+});
+
+test('idriftFromProject parses In/cross-section/RCD-need from flat circuits and stays conservative', function() {
+  var prevP = JSON.stringify(typeof projectState !== 'undefined' ? projectState : null);
+  try {
+    projectState = { name: 'T', circuits: [ { name: 'Stikkontakter', voltage: '1x230', power: 3.45, cosPhi: 0.95, ib: 15, cable: 'NOIKLX 5G 2.5mm\u00B2', length: 25, vdrop: 3.1, protection: 'MCB C16' } ] };
+    var list = idriftFromProject();
+    assert(list.length === 1, 'one circuit parsed');
+    assert(list[0].In === 16, 'In parsed from protection string, got ' + list[0].In);
+    assert(list[0].iz === 24, 'Iz looked up from 2.5mm2 NKT catalog, got ' + list[0].iz);
+    assert(list[0].needsRCD === true, 'sockets <=32A require a 30 mA RCD');
+    assert(list[0].zsUncertain === true && list[0].icuUncertain === true, 'Zs and Icu are uncertain for a flat project (conservative)');
+    var checks = idriftAuditCircuit(list[0]);
+    assert(checks.some(function(c) { return c.status === 'warn' && c.ref.indexOf('411.3.2') >= 0; }), 'disconnection becomes WARN due to unknown Zs');
+    assert(checks.some(function(c) { return c.status === 'warn' && c.ref.indexOf('434.5.1') >= 0; }), 'breaking capacity becomes WARN due to unknown Ik,max');
+  } finally { if (prevP !== 'null') projectState = JSON.parse(prevP); }
+});
+
+test('renderIdrift returns a conservative certificate citing DS/HD 60364 (da + en, no leaks)', function() {
+  var prevLang = lang, prev = JSON.stringify(anlaegtraeState);
+  try {
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' }, nodes: {}, rootId: null, nextId: 1, selectedId: null };
+    lang = 'da'; var hDa = renderIdrift();
+    assert(hDa.indexOf('Idrifts\u00E6ttelsesattest') >= 0, 'da certificate title present');
+    assert(hDa.indexOf('DS/HD 60364') >= 0, 'cites the standard family');
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en'; var hEn = renderIdrift();
+    assert(hEn.indexOf('Commissioning') >= 0, 'en certificate title present');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { lang = prevLang; anlaegtraeState = JSON.parse(prev); }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
