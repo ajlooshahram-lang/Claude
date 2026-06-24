@@ -13854,6 +13854,30 @@ test('autoexam: tab bar includes the Laering tab', function () {
   assert.ok(out.indexOf("axUITab('laering')") >= 0, 'Laering tab present');
 });
 
+// ----- Batch 5: MathML typesetting of worked solutions -----
+test('autoexam/mathml: worked-solution cards typeset formulas as MathML and preserve raw text', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var cable = null; axSolve(p).forEach(function (op) { op.tasks.forEach(function (s) { if (s.kind === 'cable') cable = s; }); });
+  assert.ok(cable, 'a cable solution exists');
+  var card = axRenderSolutionCard(cable);
+  assert.ok(card.indexOf('<math') >= 0, 'formula rendered as MathML');
+  assert.ok(card.indexOf('alttext') >= 0, 'MathML carries alttext for accessibility/search');
+  assert.ok(card.indexOf('Iz_tab') >= 0, 'raw ASCII formula preserved (searchable)');
+});
+test('autoexam/mathml: rendering solution cards never throws and leaks no undefined/NaN', function () {
+  var bad = 0, cards = 0;
+  function scan(p) { axSolve(p).forEach(function (op) { op.tasks.forEach(function (s) { cards++; var html; try { html = axRenderSolutionCard(s); } catch (e) { bad++; return; } if (html.indexOf('undefined') >= 0 || html.indexOf('NaN') >= 0) bad++; }); }); }
+  scan(axGenerate(2024, 'fabrik', 'kandidat', 'fuld'));
+  scan(axGenComplex(7, 'ekspert'));
+  scan(axGenDiagram(9, 'kandidat'));
+  assert.ok(cards > 15 && bad === 0, cards + ' cards, ' + bad + ' bad');
+});
+test('autoexam/mathml: mathml() falls back gracefully on prose (never throws)', function () {
+  var out = mathml('I_n = mindste standard \u2265 I_B');
+  assert.ok(typeof out === 'string' && out.length > 0, 'returns a string');
+  assert.ok(out.indexOf('mathml-fallback') >= 0 || out.indexOf('<math') >= 0, 'either typeset or graceful fallback');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
