@@ -27543,29 +27543,30 @@ function analyzerNormalize(text) {
 
 // Segment text by Opgave/sub-task structure
 function analyzerSegment(text) {
-  var segments = [];
-  // Split by Opgave headers: "Opgave 1", "Opgave 2", etc.
+  // Split at every "Opgave N" occurrence, then MERGE fragments that share the
+  // same number. Real exams print "Opgave 1" several times (the weighting list
+  // "Opgave 1 = 20 %", the contents, and the actual heading), which previously
+  // produced duplicate, mostly-empty Opgave blocks. Merging by id collapses
+  // them into one segment per Opgave so questions are detected in the real body.
   var parts = text.split(/(?=Opgave\s+\d+)/i);
+  var byId = {}; var order = [];
   for (var i = 0; i < parts.length; i++) {
-    var part = parts[i].trim();
+    var part = (parts[i] || '').trim();
     if (!part) continue;
-    var headerMatch = part.match(/^Opgave\s+(\d+)[^\n]*/i);
-    var segId = headerMatch ? parseInt(headerMatch[1]) : 0;
-    var title = headerMatch ? headerMatch[0] : 'Generelt';
-    // Split sub-questions within each Opgave
-    var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
-    var subQuestions = [];
-    for (var j = 0; j < subParts.length; j++) {
-      var sub = subParts[j].trim();
-      if (sub && sub !== title) subQuestions.push(sub);
-    }
-    segments.push({
-      id: segId,
-      title: title,
-      text: part,
-      subQuestions: subQuestions.length > 0 ? subQuestions : [part]
-    });
+    var headerMatch = part.match(/^Opgave\s+(\d+)/i);
+    var segId = headerMatch ? parseInt(headerMatch[1], 10) : 0;
+    if (!byId[segId]) { byId[segId] = { id: segId, title: segId ? ('Opgave ' + segId) : 'Generelt', text: '' }; order.push(segId); }
+    byId[segId].text += (byId[segId].text ? '\n' : '') + part;
   }
+  // Order: Generelt (0) first, then Opgave 1, 2, 3 ...
+  var ids = order.slice().sort(function (a, b) { return a - b; });
+  var segments = ids.map(function (id) {
+    var s = byId[id];
+    var subParts = s.text.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+    var subQuestions = [];
+    for (var j = 0; j < subParts.length; j++) { var sub = subParts[j].trim(); if (sub && sub !== s.title) subQuestions.push(sub); }
+    return { id: s.id, title: s.title, text: s.text, subQuestions: subQuestions.length ? subQuestions : [s.text] };
+  });
   if (segments.length === 0) {
     segments.push({ id: 0, title: 'Analyse', text: text, subQuestions: [text] });
   }
@@ -27897,7 +27898,19 @@ function analyzerDetectQuestions(text) {
     { re: /(?:kondensator|kapacitor)\b|(?:beregn|bestem|find).{0,12}kapacitans|kondensatorens\s+(?:ladning|energi)/i, type: 'kapacitor', label: 'Kondensatorberegning', module: 'kapacitor' },
     { re: /U-?v.{1,2}rdi|varmetab|transmissionstab|varmebehov|isoleringskrav/i, type: 'varme', label: 'U-v\u00e6rdi/varmetab', module: 'varme' },
     { re: /(?:j.{1,2}vnstr.{1,2}ms?)(?:maskine|motor|generator)|ankerstr.{1,2}m|mod-?EMK|tv.{1,2}rmagnetisering/i, type: 'dcmaskine', label: 'DC-maskine', module: 'dcmaskine' },
-    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
+    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' },
+    // === AUTORISATIONSPR\u00d8VE IMPERATIVES (forsyning + installation) ===========
+    // The real prover phrase sub-tasks as imperatives ("Kontroll\u00e9r om ...",
+    // "Bestem st\u00f8rrelse af ...", "Dimensioner ... jordingsanl\u00e6g") that the
+    // verb+symbol patterns above miss. Map them to the right module.
+    { re: /kontroll?er\s+(?:om|at)?[^.\n]{0,80}overbelastningsbeskyttet/i, type: 'coord', label: 'Kontrol: overbelastningsbeskyttelse', module: 'mcb' },
+    { re: /kontroll?er\s+(?:om|at)?[^.\n]{0,80}kortslutningsbeskyttet/i, type: 'thermal', label: 'Kontrol: kortslutningsbeskyttelse', module: 'thermal' },
+    { re: /(?:beregn|bestem|find)[^.\n]{0,30}(?:Ik\s*,?\s*max|Ikmax|st.{1,2}rste[^.\n]{0,24}kortslutningsstr|mindste[^.\n]{0,24}kortslutningsstr)/i, type: 'ik', label: 'Beregn Ik,max/Ik,min', module: 'scircuit' },
+    { re: /dimensioner[^.\n]{0,50}(?:jordingsanl|jordelektrode|\bBJ\b|\bDJ\b|beskyttende\s+jord|driftsm.{1,2}ssig[^.\n]{0,12}jord)/i, type: 'earth', label: 'Dimensioner jordingsanl\u00e6g', module: 'earthsys' },
+    { re: /(?:bestem|find|beregn)[^.\n]{0,30}str.{1,2}mtransformer|konstanttidsrel.{1,2}[^.\n]{0,20}indstilling/i, type: 'relay', label: 'Str\u00f8mtransformer/rel\u00e6indstilling', module: 'relay' },
+    { re: /kapacitiv[^.\n]{0,18}jordfejlstr/i, type: 'fault', label: 'Kapacitiv jordfejlstr\u00f8m', module: 'fault' },
+    { re: /(?:har|kan)[^.\n]{0,70}(?:tilstr.{1,2}kkelig\s+)?kortslutningsholdbarhed/i, type: 'thermal', label: 'Kortslutningsholdbarhed', module: 'thermal' },
+    { re: /dimensioner[^.\n]{0,40}(?:stikledning|gruppeledning|hovedledning|stigeledning)/i, type: 'cable', label: 'Dimensioner ledning', module: 'cable' }
   ];
   for (var i = 0; i < patterns.length; i++) {
     if (patterns[i].re.test(text)) {
@@ -27913,7 +27926,38 @@ function analyzerDetectQuestions(text) {
     seenType[questions[d].type] = true;
     deduped.push(questions[d]);
   }
+  // GENERIC FALLBACK: if no pattern matched, surface the imperative/yes-no
+  // sub-questions verbatim so the exam never shows "no detected questions" when
+  // it clearly contains tasks. These carry their own text (qtext) and have no
+  // mapped module (the user opens the relevant calculator manually).
+  if (deduped.length === 0) {
+    var gens = analyzerGenericQuestions(text);
+    for (var gi = 0; gi < gens.length; gi++) deduped.push(gens[gi]);
+  }
   return deduped;
+}
+// Extract imperative / yes-no sub-questions (Beregn.../Bestem.../Kontroll\u00e9r.../
+// Dimensioner.../Har.../Er.../Kan...) as verbatim question text.
+function analyzerGenericQuestions(text) {
+  var VERBS = { beregn: 1, bestem: 1, find: 1, udregn: 1, angiv: 1, vis: 1, tegn: 1, forklar: 1, vurder: 1, opstil: 1, skitser: 1, eftervis: 1, har: 1, er: 1, kan: 1, hvad: 1, hvilken: 1, hvilket: 1, hvilke: 1, hvor: 1, hvorfor: 1 };
+  var STEMS = ['beregn', 'bestem', 'dimensioner', 'dimensionér', 'kontroll', 'redeg', 'udregn', 'angiv', 'forklar', 'vurder', 'eftervis', 'opstil', 'skitser', 'v\u00e6lg', 'vaelg'];
+  function looksLikeQuestion(s) {
+    var first = (s.split(/\s+/)[0] || '').toLowerCase().replace(/[.,:;)]+$/, '');
+    if (VERBS[first]) return true;
+    for (var k = 0; k < STEMS.length; k++) { if (first.indexOf(STEMS[k]) === 0) return true; }
+    return /\?\s*$/.test(s); // any sentence ending in a question mark
+  }
+  var lines = String(text || '').split(/[\n\r]+/);
+  var out = []; var seen = {};
+  for (var i = 0; i < lines.length && out.length < 8; i++) {
+    var s = lines[i].replace(/^\s*(?:\d+(?:[.\)]\d+)*[.\):]?|[a-f][.\)])\s*/, '').replace(/\s+/g, ' ').trim();
+    if (s.length < 12) continue;
+    if (/^Opgave\s+\d/i.test(s)) continue;
+    if (!looksLikeQuestion(s)) continue;
+    var key = s.slice(0, 40).toLowerCase(); if (seen[key]) continue; seen[key] = true;
+    out.push({ type: 'gen' + out.length, label: tx('Sp\u00f8rgsm\u00e5l', 'Question'), module: null, source: 'generic', qtext: s.length > 240 ? s.slice(0, 240) + '\u2026' : s });
+  }
+  return out;
 }
 
 // Map extracted data + questions to calculation results
@@ -29278,6 +29322,17 @@ var EXAM_SOLUTION_RESULT_ALIAS = {
 // Find the most relevant question-text excerpt for a detected type inside a segment.
 function examFindQuestionText(seg, type) {
   if (!seg) return '';
+  // Prefer the precise line that triggers this question type (merged segments
+  // often have no 1.1/a) sub-markers, so scan line-by-line).
+  var lines = String(seg.text || '').split(/[\n\r]+/);
+  for (var li = 0; li < lines.length; li++) {
+    var line = (lines[li] || '').replace(/^\s*(?:\d+(?:[.\)]\d+)*[.\):]?|[a-f][.\)])\s*/, '').replace(/\s+/g, ' ').trim();
+    if (line.length < 6 || /^Opgave\s+\d/i.test(line)) continue;
+    var lq = analyzerDetectQuestions(line);
+    for (var lj = 0; lj < lq.length; lj++) {
+      if (lq[lj].type === type) return line.length > 260 ? line.slice(0, 260) + '\u2026' : line;
+    }
+  }
   var subs = (seg.subQuestions && seg.subQuestions.length) ? seg.subQuestions : [seg.text || ''];
   for (var i = 0; i < subs.length; i++) {
     var qs = analyzerDetectQuestions(subs[i] || '');
@@ -29364,7 +29419,7 @@ function examBuildSolution(state) {
         type: q.type,
         label: q.label,
         module: q.module,
-        questionText: examFindQuestionText(seg, q.type),
+        questionText: q.qtext || examFindQuestionText(seg, q.type),
         calcLabel: res ? res.label : null,
         calcHtml: res ? (res.html || '') : '',
         value: res ? res.value : null,

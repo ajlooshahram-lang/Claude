@@ -13401,6 +13401,51 @@ test('Ingestion: PDF quality gate rejects non-readable (high-byte) dominated out
 });
 
 
+// ----- Legacy analyzer fixes: segment de-dup + broader question detection -----
+var ANALYZER_SAMPLE = ['El-autorisationsprove August 2018', 'Vaegtning:', 'Opgave 1 = 20 %', 'Opgave 2 = 60 %', 'Opgave 3 = 20 %', 'Opgavesaettet er opdelt i 3 opgaver:',
+  'Opgave 1', 'Forsyningsanlaeg', 'Paa et hospital er tre transformerstationer paa en 10 kV-ringforbindelse.',
+  'Kontroller om kablerne er overbelastningsbeskyttet af relaebeskyttelserne.',
+  'Beregn Ikmax paa lavspaendingssiden af transformerne i station 4.',
+  'Har neozed-sikringer en tilstraekkelig kortslutningsholdbarhed?',
+  'Opgave 2', 'Bygningsinstallation', 'Systemjording TT.',
+  'Dimensioner stikledningen til tavle A1.', 'Beregn spaendingsfaldet paa stikledningen.',
+  'Dimensioner transformerstationens beskyttende jordingsanlaeg (BJ) og driftsmaessige jordingsanlaeg (DJ).',
+  'Opgave 3', 'Spoergsmaal til staerkstroemsbekendtgoerelserne.', 'Redegoer for kravene til automatisk frakobling.'].join('\n');
+test('analyzer: segmentation merges repeated "Opgave N" into one block per number', function () {
+  var segs = analyzerSegment(ANALYZER_SAMPLE);
+  var ids = segs.map(function (s) { return s.id; });
+  assert.strictEqual(ids.length, 4, 'Generelt + 3 unique opgaver (no duplicates), got ' + ids.join(','));
+  var uniq = {}; ids.forEach(function (i) { uniq[i] = 1; });
+  assert.strictEqual(Object.keys(uniq).length, 4, 'no duplicate opgave ids');
+  assert.deepStrictEqual(ids, [0, 1, 2, 3], 'Generelt first, then 1,2,3 in order');
+});
+test('analyzer: detects imperative/yes-no questions the old patterns missed', function () {
+  var q1 = analyzerDetectQuestions('Kontroller om kablerne er overbelastningsbeskyttet af relaebeskyttelserne.');
+  assert.ok(q1.some(function (q) { return q.type === 'coord'; }), 'Kontroller overbelastning => coord');
+  var q2 = analyzerDetectQuestions('Dimensioner transformerstationens beskyttende jordingsanlaeg (BJ) og driftsmaessige (DJ).');
+  assert.ok(q2.some(function (q) { return q.type === 'earth'; }), 'jordingsanlaeg => earth');
+  var q3 = analyzerDetectQuestions('Beregn Ikmax paa lavspaendingssiden.');
+  assert.ok(q3.some(function (q) { return q.type === 'ik'; }), 'Ikmax => ik');
+});
+test('analyzer: generic fallback surfaces a verbatim question when nothing maps (incl. ASCII redegoer)', function () {
+  var qs = analyzerDetectQuestions('Redegoer for kravene til automatisk frakobling.');
+  assert.ok(qs.length >= 1, 'a generic question is produced');
+  assert.ok(qs[0].qtext && qs[0].qtext.indexOf('Redegoer') >= 0, 'carries the verbatim sentence');
+  assert.strictEqual(analyzerDetectQuestions('Dette er en helt almindelig beskrivende saetning uden opgave.').length, 0, 'plain prose yields no question');
+});
+test('analyzer: full exam build finds questions per opgave (no all-empty wall)', function () {
+  var state = { segments: analyzerSegment(ANALYZER_SAMPLE), rawText: ANALYZER_SAMPLE, extracted: analyzerExtract(ANALYZER_SAMPLE), results: [] };
+  var sol = examBuildSolution(state);
+  assert.strictEqual(sol.opgaver.length, 4, '4 opgave blocks');
+  var total = 0; sol.opgaver.forEach(function (o) { total += o.questions.length; });
+  assert.ok(total >= 6, 'detects several questions overall, got ' + total);
+  var op1 = sol.opgaver.filter(function (o) { return o.id === 1; })[0];
+  assert.ok(op1 && op1.questions.length >= 2, 'Opgave 1 has multiple questions');
+  var hasPrecise = op1.questions.some(function (q) { return (q.questionText || '').length < 120 && /Beregn|Kontroller/i.test(q.questionText || ''); });
+  assert.ok(hasPrecise, 'question text is the precise triggering sentence');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
