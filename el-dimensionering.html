@@ -1599,7 +1599,11 @@ const T = {
       presets: 'Installations Presets',
       rapport: 'Projektrapport',
       recommend: 'Komponent-anbefaling',
-      diffview: 'Hvad ændrede sig?'
+      diffview: 'Hvad ændrede sig?',
+      viggo: '\uD83C\uDF93 Viggos Arkiv',
+      share: '\uD83D\uDD17 Del Projekt',
+      reversedesc: '\uD83D\uDD27 Tavlebeskrivelse',
+      roadmap: '\uD83D\uDDFA\uFE0F Roadmap'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1804,7 +1808,11 @@ const T = {
       presets: 'Installation Presets',
       rapport: 'Project Report',
       recommend: 'Component Recommendation',
-      diffview: 'What Changed?'
+      diffview: 'What Changed?',
+      viggo: '\uD83C\uDF93 Viggo\'s Archive',
+      share: '\uD83D\uDD17 Share Project',
+      reversedesc: '\uD83D\uDD27 Board Description',
+      roadmap: '\uD83D\uDDFA\uFE0F Roadmap'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -5001,7 +5009,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -5050,7 +5058,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis']
+    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis', 'share']
   }
 ];
 
@@ -7757,6 +7765,10 @@ function renderModule(mod) {
     case 'rapport': content = renderRapport(); break;
     case 'recommend': content = renderRecommend(); break;
     case 'diffview': content = renderDiffView(); break;
+    case 'viggo': content = renderViggo(); break;
+    case 'share': content = renderShare(); break;
+    case 'reversedesc': content = renderReverseDesc(); break;
+    case 'roadmap': content = renderRoadmap(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -43434,7 +43446,8 @@ function stemmeGenerateReport() {
 
 function renderStemme() {
   var s = stemmeState;
-  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF99\uFE0F ' + tx('Stemme-til-Dokumentation', 'Voice-to-Documentation') + '</div>';
+  var html = renderVoicePanel();
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF99\uFE0F ' + tx('Stemme-til-Dokumentation', 'Voice-to-Documentation') + '</div>';
   html += '<p class="info-text">' + tx('Klik-baseret rapport-komponist. V\u00E6lg skabelon, klik detaljer, f\u00E5 professionel dansk servicerapport.', 'Click-based report composer. Select template, click details, get professional Danish service report.') + '</p>';
 
   // Template selection
@@ -46579,7 +46592,684 @@ function generateFullProject(presetId) {
   renderModule('oneclick');
 }
 
+// ============================================================================
+// ===== GENIUS FEATURE 11: VIGGO'S EXAM ARCHIVE — INTERACTIVE SOLUTIONS ======
+// ============================================================================
+var viggoState = { expanded: null, hiddenSteps: {} };
+
+var VIGGO_SOLUTIONS = [
+  {
+    year: 2019, opgave: 1, title_da: 'Belastningsberegning og kabeldimensionering',
+    title_en: 'Load calculation and cable sizing',
+    summary_da: 'En bolig med komfur 7.4kW, vaskemaskine 2.3kW og 10 stikkontakter. Beregn IB, vaelg MCB og kabel.',
+    summary_en: 'A residence with cooker 7.4kW, washer 2.3kW and 10 sockets. Calculate IB, select MCB and cable.',
+    steps: [
+      { label_da: 'Trin 1: Bestem samlet effekt', label_en: 'Step 1: Determine total power',
+        formula: 'P_total = P_komfur + P_vaske + P_stik', sub: '7400 + 2300 + 10x200 = 11700 W',
+        result: '11.7 kW', ref: 'DS/HD 60364-5-52' },
+      { label_da: 'Trin 2: Samtidighedsfaktor', label_en: 'Step 2: Simultaneity factor',
+        formula: 'P_dim = P_total x S_f', sub: '11700 x 0.6 = 7020 W',
+        result: '7.02 kW', ref: 'DS/HD 60364-5-52 Tabel B.1' },
+      { label_da: 'Trin 3: Beregn IB', label_en: 'Step 3: Calculate IB',
+        formula: 'IB = P / (U x cos\u03C6)', sub: '7020 / (230 x 0.95) = 32.1 A',
+        result: '32.1 A', ref: 'DS/HD 60364-4-43 \u00A7433.1' },
+      { label_da: 'Trin 4: Vaelg MCB', label_en: 'Step 4: Select MCB',
+        formula: 'In >= IB', sub: 'In = 40A (B40)',
+        result: 'MCB B40', ref: 'DS/HD 60364-4-43' },
+      { label_da: 'Trin 5: Vaelg kabel', label_en: 'Step 5: Select cable',
+        formula: 'Iz >= In (metode C, 30\u00B0C)', sub: 'Iz(10mm\u00B2) = 57A >= 40A',
+        result: '5G10 mm\u00B2 Cu/PVC', ref: 'DS/HD 60364-5-52 Tabel B.52.2' }
+    ]
+  },
+
+  {
+    year: 2020, opgave: 3, title_da: 'Spaendingsfald i forsyningskabel',
+    title_en: 'Voltage drop in supply cable',
+    summary_da: 'Et 50m forsyningskabel 4x16mm\u00B2 Cu forsyner en 22kW 3-faset last. Beregn spaendingsfaldet.',
+    summary_en: 'A 50m supply cable 4x16mm\u00B2 Cu feeds a 22kW 3-phase load. Calculate the voltage drop.',
+    steps: [
+      { label_da: 'Trin 1: Beregn IB (3-faset)', label_en: 'Step 1: Calculate IB (3-phase)',
+        formula: 'IB = P / (\u221A3 x U x cos\u03C6)', sub: '22000 / (1.732 x 400 x 0.85) = 37.4 A',
+        result: '37.4 A', ref: 'IEC 60909' },
+      { label_da: 'Trin 2: Find kabelmodstand', label_en: 'Step 2: Find cable resistance',
+        formula: 'r = 1.15 \u03A9/km (16mm\u00B2 Cu)', sub: 'R = r x L = 1.15 x 0.05 = 0.0575 \u03A9',
+        result: '57.5 m\u03A9', ref: 'DS/HD 60364-5-52' },
+      { label_da: 'Trin 3: Beregn \u0394U', label_en: 'Step 3: Calculate \u0394U',
+        formula: '\u0394U = \u221A3 x IB x (R cos\u03C6 + X sin\u03C6) x L', sub: '1.732 x 37.4 x (1.15x0.85 + 0.08x0.527) x 0.05 = 3.38V',
+        result: '3.38 V (0.85%)', ref: 'DS/HD 60364-5-52 \u00A7525' },
+      { label_da: 'Trin 4: Kontroller graense', label_en: 'Step 4: Check limit',
+        formula: '\u0394U% <= 4% (DS/HD 60364)', sub: '0.85% < 4%',
+        result: 'OK \u2714', ref: 'DS/HD 60364-5-52 Annex G' }
+    ]
+  },
+  {
+    year: 2021, opgave: 2, title_da: 'Kortslutningsberegning og Icu-kontrol',
+    title_en: 'Short-circuit calculation and Icu check',
+    summary_da: 'Beregn Ik,max ved en undertavle. Trafo 400kVA, uk=4%. Kabel 35mm\u00B2, 15m.',
+    summary_en: 'Calculate Ik,max at a sub-board. Transformer 400kVA, uk=4%. Cable 35mm\u00B2, 15m.',
+    steps: [
+      { label_da: 'Trin 1: Trafoimpedans', label_en: 'Step 1: Transformer impedance',
+        formula: 'Zt = (uk/100) x U\u00B2/Sn', sub: '(4/100) x 160000/400000 = 0.016 \u03A9',
+        result: '16 m\u03A9', ref: 'IEC 60909-0 \u00A76' },
+      { label_da: 'Trin 2: Kabelimpedans', label_en: 'Step 2: Cable impedance',
+        formula: 'Zk = \u221A(R\u00B2+X\u00B2) x L', sub: '\u221A(0.524\u00B2+0.08\u00B2) x 0.015 = 7.95 m\u03A9',
+        result: '7.95 m\u03A9', ref: 'IEC 60909' },
+      { label_da: 'Trin 3: Samlet impedans', label_en: 'Step 3: Total impedance',
+        formula: 'Z1 = Zt + Zk', sub: '16 + 7.95 = 23.95 m\u03A9',
+        result: '23.95 m\u03A9', ref: 'IEC 60909-0' },
+      { label_da: 'Trin 4: Ik,max', label_en: 'Step 4: Ik,max',
+        formula: 'Ik = c x U / (\u221A3 x Z1)', sub: '1.05 x 400 / (1.732 x 0.02395) = 10.12 kA',
+        result: '10.12 kA', ref: 'IEC 60909-0 \u00A77' },
+      { label_da: 'Trin 5: Icu-kontrol', label_en: 'Step 5: Icu check',
+        formula: 'Icu >= Ik,max', sub: 'NSX 160 Icu=25kA >= 10.12kA',
+        result: 'OK \u2714', ref: 'DS/HD 60364-4-43 \u00A7434.3' }
+    ]
+  },
+
+  {
+    year: 2022, opgave: 4, title_da: 'RCD-beskyttelse og fejlsloejfeimpedans',
+    title_en: 'RCD protection and fault loop impedance',
+    summary_da: 'Kontroller at 30mA RCD kan afbryde inden 0.4s. Zs maalt=1.2\u03A9, TN-S system.',
+    summary_en: 'Verify that 30mA RCD can disconnect within 0.4s. Zs measured=1.2\u03A9, TN-S system.',
+    steps: [
+      { label_da: 'Trin 1: Krav til afbrydelse', label_en: 'Step 1: Disconnection requirement',
+        formula: 'ta <= 0.4s (slutkreds \u226432A, TN)', sub: 'DS/HD 60364-4-41 Tabel 41.1',
+        result: '0.4 s', ref: 'DS/HD 60364-4-41 \u00A7411.3.2' },
+      { label_da: 'Trin 2: Beregn fejlstroem', label_en: 'Step 2: Calculate fault current',
+        formula: 'If = U0 / Zs', sub: '230 / 1.2 = 191.7 A',
+        result: '191.7 A', ref: 'DS/HD 60364-4-41 \u00A7411.4' },
+      { label_da: 'Trin 3: MCB B16 magnetudloesning', label_en: 'Step 3: MCB B16 magnetic trip',
+        formula: 'Ia = 5 x In (kurve B)', sub: 'Ia = 5 x 16 = 80A',
+        result: '80 A', ref: 'IEC 60898-1' },
+      { label_da: 'Trin 4: Kontrol uden RCD', label_en: 'Step 4: Check without RCD',
+        formula: 'If >= Ia?', sub: '191.7A >= 80A',
+        result: 'OK uden RCD \u2714', ref: 'DS/HD 60364-4-41' },
+      { label_da: 'Trin 5: RCD som ekstra beskyttelse', label_en: 'Step 5: RCD as additional protection',
+        formula: 'I\u0394n x Zs <= 50V', sub: '0.03 x 1.2 = 0.036V << 50V',
+        result: 'RCD 30mA OK \u2714', ref: 'DS/HD 60364-4-41 \u00A7411.3.3' }
+    ]
+  },
+  {
+    year: 2018, opgave: 5, title_da: 'Termisk kabelbelastning med korrektionsfaktorer',
+    title_en: 'Thermal cable loading with correction factors',
+    summary_da: 'Et 4mm\u00B2 kabel i roer (metode B1) ved 40\u00B0C med 3 belastede kredse. Find korrigeret Iz.',
+    summary_en: 'A 4mm\u00B2 cable in conduit (method B1) at 40\u00B0C with 3 loaded circuits. Find corrected Iz.',
+    steps: [
+      { label_da: 'Trin 1: Iz,tabel (B1)', label_en: 'Step 1: Iz,table (B1)',
+        formula: 'Iz,tabel = 27A (4mm\u00B2 Cu, PVC, B1)', sub: 'DS/HD 60364-5-52 Tabel B.52.3',
+        result: '27 A', ref: 'DS/HD 60364-5-52' },
+      { label_da: 'Trin 2: Temperaturfaktor', label_en: 'Step 2: Temperature factor',
+        formula: 'kt = \u221A((Tmax-Ta)/(Tmax-30))', sub: '\u221A((70-40)/(70-30)) = 0.87',
+        result: 'kt = 0.87', ref: 'DS/HD 60364-5-52 Tabel B.52.14' },
+      { label_da: 'Trin 3: Grupperingsfaktor', label_en: 'Step 3: Grouping factor',
+        formula: 'kg (3 kredse i roer)', sub: 'Tabel B.52.17: kg = 0.70',
+        result: 'kg = 0.70', ref: 'DS/HD 60364-5-52 Tabel B.52.17' },
+      { label_da: 'Trin 4: Korrigeret Iz', label_en: 'Step 4: Corrected Iz',
+        formula: 'Iz = Iz,tabel x kt x kg', sub: '27 x 0.87 x 0.70 = 16.4 A',
+        result: '16.4 A', ref: 'DS/HD 60364-5-52 \u00A7523' },
+      { label_da: 'Trin 5: MCB kontrol', label_en: 'Step 5: MCB check',
+        formula: 'In <= Iz', sub: 'In=16A <= 16.4A',
+        result: 'Marginalt OK (anbefal 6mm\u00B2)', ref: 'DS/HD 60364-4-43 \u00A7433.1' }
+    ]
+  },
+
+  {
+    year: 2023, opgave: 2, title_da: 'Selektivitet mellem hovedsikring og gruppesikring',
+    title_en: 'Selectivity between main fuse and group MCB',
+    summary_da: 'Kontroller selektivitet mellem 63A gL sikring og B16 MCB. Ik=3.5kA.',
+    summary_en: 'Check selectivity between 63A gL fuse and B16 MCB. Ik=3.5kA.',
+    steps: [
+      { label_da: 'Trin 1: MCB B16 karakteristik', label_en: 'Step 1: MCB B16 characteristic',
+        formula: 'Ia = 5 x 16 = 80A (magnetisk)', sub: 'Termisk: 1.13-1.45 x In',
+        result: 'Ia = 80A', ref: 'IEC 60898-1' },
+      { label_da: 'Trin 2: 63A gL sikring t/I', label_en: 'Step 2: 63A gL fuse t/I',
+        formula: 't(3500A) fra smeltekurve', sub: 'ca. 0.01s ved 3500A',
+        result: 't = 10 ms', ref: 'IEC 60269-1' },
+      { label_da: 'Trin 3: MCB B16 ved Ik', label_en: 'Step 3: MCB B16 at Ik',
+        formula: 't(3500A) for B16', sub: 'Magnetisk instant: < 5ms',
+        result: 't < 5 ms', ref: 'IEC 60898-1' },
+      { label_da: 'Trin 4: Energigennemgang I\u00B2t', label_en: 'Step 4: Energy let-through I\u00B2t',
+        formula: 'I\u00B2t_MCB < I\u00B2t_pre-arc_fuse', sub: 'MCB: ~4000 A\u00B2s < Fuse pre-arc: ~15000 A\u00B2s',
+        result: 'Selektiv \u2714', ref: 'DS/HD 60364-4-43 \u00A7435' },
+      { label_da: 'Trin 5: Selektivitetsgraense', label_en: 'Step 5: Selectivity limit',
+        formula: 'Is (selektivitetsgraense)', sub: 'Is \u2248 4.5 kA > Ik=3.5 kA',
+        result: 'Fuld selektivitet \u2714', ref: 'IEC 60947-2 Annex A' }
+    ]
+  }
+];
+
+function viggoToggle(idx) {
+  viggoState.expanded = (viggoState.expanded === idx) ? null : idx;
+  if (!viggoState.hiddenSteps[idx]) viggoState.hiddenSteps[idx] = {};
+  renderModule('viggo');
+}
+function viggoToggleStep(solIdx, stepIdx) {
+  if (!viggoState.hiddenSteps[solIdx]) viggoState.hiddenSteps[solIdx] = {};
+  viggoState.hiddenSteps[solIdx][stepIdx] = !viggoState.hiddenSteps[solIdx][stepIdx];
+  renderModule('viggo');
+}
+function viggoTryMode(solIdx) {
+  // Hide all step results for this solution
+  if (!viggoState.hiddenSteps[solIdx]) viggoState.hiddenSteps[solIdx] = {};
+  var sol = VIGGO_SOLUTIONS[solIdx];
+  var allHidden = true;
+  for (var i = 0; i < sol.steps.length; i++) {
+    if (!viggoState.hiddenSteps[solIdx][i]) { allHidden = false; break; }
+  }
+  for (var j = 0; j < sol.steps.length; j++) {
+    viggoState.hiddenSteps[solIdx][j] = !allHidden;
+  }
+  renderModule('viggo');
+}
+
+function renderViggo() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF93 ' + tx("Viggos Eksamensarkiv", "Viggo's Exam Archive") + '</div>';
+  html += '<p class="info-text">' + tx(
+    'Interaktive loesninger fra el-installatoer eksamener. Klik for at se trin-for-trin loesninger i Mathcad Prime stil. Brug "Proev selv" for at skjule svar og teste dig selv.',
+    'Interactive solutions from electrical installer exams. Click to see step-by-step solutions in Mathcad Prime style. Use "Try yourself" to hide answers and test yourself.'
+  ) + '</p>';
+
+  for (var i = 0; i < VIGGO_SOLUTIONS.length; i++) {
+    var sol = VIGGO_SOLUTIONS[i];
+    var isExp = (viggoState.expanded === i);
+    html += '<div style="margin:8px 0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+    html += '<button class="sel-btn' + (isExp ? ' selected' : '') + '" style="width:100%;text-align:left;border-radius:0;justify-content:space-between" onclick="viggoToggle(' + i + ')">';
+    html += '<span>\uD83D\uDCDD ' + sol.year + ' Opg.' + sol.opgave + ': ' + tx(sol.title_da, sol.title_en) + '</span>';
+    html += '<span>' + (isExp ? '\u25B2' : '\u25BC') + '</span></button>';
+    if (isExp) {
+      html += '<div style="padding:12px;background:var(--bg-secondary)">';
+      html += '<p style="margin:0 0 8px;font-style:italic;color:var(--text-muted)">' + tx(sol.summary_da, sol.summary_en) + '</p>';
+      html += '<button class="sel-btn" onclick="viggoTryMode(' + i + ')">\uD83E\uDDE0 ' + tx('Proev selv (skjul/vis svar)', 'Try yourself (hide/show answers)') + '</button>';
+      html += '<div style="margin-top:12px">';
+      for (var s = 0; s < sol.steps.length; s++) {
+        var step = sol.steps[s];
+        var hidden = viggoState.hiddenSteps[i] && viggoState.hiddenSteps[i][s];
+        html += '<div style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:8px 14px;margin:6px 0;border-left:3px solid var(--primary);background:var(--bg-card);border-radius:0 var(--radius-sm) var(--radius-sm) 0">';
+        html += '<div style="font-weight:700;font-size:0.85rem;color:var(--primary)">' + tx(step.label_da, step.label_en) + '</div>';
+        html += '<div style="margin:4px 0;font-family:monospace">' + step.formula + '</div>';
+        if (hidden) {
+          html += '<div style="margin:4px 0"><button class="sel-btn" onclick="viggoToggleStep(' + i + ',' + s + ')">? ' + tx('Klik for svar', 'Click for answer') + '</button></div>';
+        } else {
+          html += '<div style="margin:4px 0;color:var(--text-muted)">' + step.sub + '</div>';
+          html += '<div style="font-weight:700;color:var(--success,#22c55e)">\u2192 ' + step.result + '</div>';
+          html += '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">\uD83D\uDCD6 ' + step.ref + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== GENIUS FEATURE 12: MULTI-USER COLLABORATION (URL STATE SHARING) ======
+// ============================================================================
+var shareState = { lastUrl: null, showNotification: false, notifMsg: '' };
+
+function exportProjectURL() {
+  var state = {
+    load: typeof loadState !== 'undefined' ? loadState : {},
+    mcb: typeof mcbState !== 'undefined' ? mcbState : {},
+    cable: typeof cableState !== 'undefined' ? cableState : {},
+    vdrop: typeof vdropState !== 'undefined' ? vdropState : {},
+    scircuit: typeof scircuitState !== 'undefined' ? scircuitState : {},
+    sld: (typeof sldTree !== 'undefined' && sldTree) ? sldToJSON(sldTree) : null
+  };
+  try {
+    var json = JSON.stringify(state);
+    var encoded = btoa(unescape(encodeURIComponent(json)));
+    var url = window.location.href.split('#')[0] + '#proj=' + encoded;
+    shareState.lastUrl = url;
+    return url;
+  } catch (e) {
+    shareState.lastUrl = null;
+    return '';
+  }
+}
+
+function importProjectURL() {
+  var hash = window.location.hash || '';
+  if (hash.indexOf('#proj=') !== 0) return false;
+  var encoded = hash.substring(6);
+  try {
+    var json = decodeURIComponent(escape(atob(encoded)));
+    var state = JSON.parse(json);
+    if (state.load && typeof loadState !== 'undefined') {
+      var lk = Object.keys(state.load);
+      for (var i = 0; i < lk.length; i++) loadState[lk[i]] = state.load[lk[i]];
+    }
+    if (state.mcb && typeof mcbState !== 'undefined') {
+      var mk = Object.keys(state.mcb);
+      for (var j = 0; j < mk.length; j++) mcbState[mk[j]] = state.mcb[mk[j]];
+    }
+    if (state.cable && typeof cableState !== 'undefined') {
+      var ck = Object.keys(state.cable);
+      for (var k = 0; k < ck.length; k++) cableState[ck[k]] = state.cable[ck[k]];
+    }
+    if (state.vdrop && typeof vdropState !== 'undefined') {
+      var vk = Object.keys(state.vdrop);
+      for (var v = 0; v < vk.length; v++) vdropState[vk[v]] = state.vdrop[vk[v]];
+    }
+    if (state.scircuit && typeof scircuitState !== 'undefined') {
+      var sk = Object.keys(state.scircuit);
+      for (var s = 0; s < sk.length; s++) scircuitState[sk[s]] = state.scircuit[sk[s]];
+    }
+    if (state.sld) { sldTree = sldFromJSON(state.sld); }
+    shareState.showNotification = true;
+    shareState.notifMsg = tx('Projekt indlaest fra delt link!', 'Project loaded from shared link!');
+    return true;
+  } catch (e) { return false; }
+}
+
+function shareProject() {
+  var url = exportProjectURL();
+  shareState.lastUrl = url;
+  renderModule('share');
+}
+function shareCopyLink() {
+  if (shareState.lastUrl && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareState.lastUrl);
+    shareState.notifMsg = tx('Link kopieret!', 'Link copied!');
+    shareState.showNotification = true;
+  }
+  renderModule('share');
+}
+
+function renderShare() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD17 ' + tx('Del Projekt (URL-deling)', 'Share Project (URL Sharing)') + '</div>';
+  html += '<p class="info-text">' + tx(
+    'Del dit projekt via et enkelt link. Alle beregningsvaerdier og SLD-traeet serialiseres i URL\'en, saa en kollega kan aabne det direkte.',
+    'Share your project via a single link. All calculation values and the SLD tree are serialized in the URL, so a colleague can open it directly.'
+  ) + '</p>';
+  // Generate button
+  html += '<div class="param-group">';
+  html += '<button class="sel-btn selected" onclick="shareProject()">\uD83D\uDCE4 ' + tx('Generer delingslink', 'Generate sharing link') + '</button>';
+  html += '</div>';
+  // Show URL if generated
+  if (shareState.lastUrl) {
+    html += '<div class="result-box" style="word-break:break-all;font-size:0.8rem;max-height:100px;overflow:auto">' + shareState.lastUrl.substring(0, 200) + (shareState.lastUrl.length > 200 ? '...' : '') + '</div>';
+    html += '<div class="param-group">';
+    html += '<button class="sel-btn" onclick="shareCopyLink()">\uD83D\uDCCB ' + tx('Kopier link', 'Copy link') + '</button>';
+    html += '</div>';
+  }
+  // Notification
+  if (shareState.showNotification) {
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(34,197,94,0.1);border:1px solid var(--success,#22c55e);border-radius:var(--radius-sm);color:var(--success,#22c55e);font-weight:600">';
+    html += '\u2714 ' + shareState.notifMsg;
+    html += '</div>';
+    shareState.showNotification = false;
+  }
+  // Info about how sharing works
+  html += '<div style="margin-top:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.85rem">';
+  html += '<div style="font-weight:700;margin-bottom:6px">' + tx('Saadan virker det:', 'How it works:') + '</div>';
+  html += '<div>\u2022 ' + tx('Klik "Generer delingslink" for at oprette et link med alle dine data', 'Click "Generate sharing link" to create a link with all your data') + '</div>';
+  html += '<div>\u2022 ' + tx('Send linket til en kollega', 'Send the link to a colleague') + '</div>';
+  html += '<div>\u2022 ' + tx('Naar de aabner linket, indlaeses alle vaerdier automatisk', 'When they open the link, all values load automatically') + '</div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== GENIUS FEATURE 13: VOICE-DRIVEN OPERATION (with click fallback) ======
+// ============================================================================
+var voiceState = { listening: false, supported: false, lastCommand: '', transcript: '', recognition: null };
+
+function voiceInit() {
+  var SpeechRecognition = (typeof window !== 'undefined') ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  if (SpeechRecognition) {
+    voiceState.supported = true;
+    try {
+      voiceState.recognition = new SpeechRecognition();
+      voiceState.recognition.lang = 'da-DK';
+      voiceState.recognition.continuous = false;
+      voiceState.recognition.interimResults = false;
+      voiceState.recognition.onresult = function(event) {
+        var transcript = event.results[0][0].transcript.toLowerCase().trim();
+        voiceState.transcript = transcript;
+        voiceState.listening = false;
+        voiceProcessCommand(transcript);
+        renderModule('stemme');
+      };
+      voiceState.recognition.onerror = function() {
+        voiceState.listening = false;
+        renderModule('stemme');
+      };
+      voiceState.recognition.onend = function() {
+        voiceState.listening = false;
+      };
+    } catch (e) { voiceState.supported = false; }
+  }
+}
+
+function voiceStartListening() {
+  if (!voiceState.supported || !voiceState.recognition) return;
+  voiceState.listening = true;
+  voiceState.transcript = '';
+  try { voiceState.recognition.start(); } catch (e) { voiceState.listening = false; }
+  renderModule('stemme');
+}
+
+function voiceStopListening() {
+  if (voiceState.recognition) { try { voiceState.recognition.stop(); } catch(e){} }
+  voiceState.listening = false;
+  renderModule('stemme');
+}
+
+function voiceProcessCommand(text) {
+  var cmd = text.toLowerCase();
+  voiceState.lastCommand = text;
+  // Parse Danish commands
+  if (cmd.indexOf('tilf') >= 0 && cmd.indexOf('b16') >= 0) {
+    mcbState.rating = 16; mcbState.curve = 'B';
+    switchModule('mcb');
+  } else if (cmd.indexOf('tilf') >= 0 && cmd.indexOf('b10') >= 0) {
+    mcbState.rating = 10; mcbState.curve = 'B';
+    switchModule('mcb');
+  } else if (cmd.indexOf('tilf') >= 0 && cmd.indexOf('c16') >= 0) {
+    mcbState.rating = 16; mcbState.curve = 'C';
+    switchModule('mcb');
+  } else if (cmd.indexOf('v\u00e6lg') >= 0 && cmd.indexOf('2.5') >= 0) {
+    cableState.mm2 = 2.5; switchModule('cable');
+  } else if (cmd.indexOf('v\u00e6lg') >= 0 && cmd.indexOf('1.5') >= 0) {
+    cableState.mm2 = 1.5; switchModule('cable');
+  } else if (cmd.indexOf('v\u00e6lg') >= 0 && cmd.indexOf('4') >= 0 && cmd.indexOf('mm') >= 0) {
+    cableState.mm2 = 4; switchModule('cable');
+  } else if (cmd.indexOf('beregn') >= 0 && cmd.indexOf('sp\u00e6nding') >= 0) {
+    switchModule('vdrop');
+  } else if (cmd.indexOf('beregn') >= 0 && cmd.indexOf('kortslutning') >= 0) {
+    switchModule('scircuit');
+  } else if (cmd.indexOf('beregn') >= 0 && cmd.indexOf('belastning') >= 0) {
+    switchModule('load');
+  } else if (cmd.indexOf('vis') >= 0 && cmd.indexOf('sld') >= 0) {
+    switchModule('sld');
+  } else if (cmd.indexOf('guide') >= 0 || cmd.indexOf('hj\u00e6lp') >= 0) {
+    switchModule('guide');
+  }
+}
+
+// Voice panel rendered as part of the stemme module (enhancement)
+function renderVoicePanel() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF99\uFE0F ' + tx('Stemmestyring (Web Speech API)', 'Voice Control (Web Speech API)') + '</div>';
+  if (!voiceState.supported) {
+    html += '<div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:var(--radius-sm);margin-bottom:12px">';
+    html += '\u26A0\uFE0F ' + tx('Stemmestyring er ikke underst\u00F8ttet i denne browser. Brug klik-knapperne nedenfor.', 'Voice control is not supported in this browser. Use the click buttons below.');
+    html += '</div>';
+  } else {
+    html += '<p class="info-text">' + tx(
+      'Klik mikrofonen og sig en kommando paa dansk: "tilfoej B16", "vaelg 2.5 mm kabel", "beregn spaendingsfald"',
+      'Click the microphone and say a command in Danish: "tilfoej B16", "vaelg 2.5 mm kabel", "beregn spaendingsfald"'
+    ) + '</p>';
+    html += '<div style="text-align:center;margin:16px 0">';
+    if (voiceState.listening) {
+      html += '<button class="sel-btn selected" onclick="voiceStopListening()" style="font-size:2rem;padding:16px 24px;border-radius:50%;animation:fpulse 1s infinite">\uD83D\uDD34</button>';
+      html += '<div style="margin-top:8px;font-weight:600;color:var(--primary)">' + tx('Lytter...', 'Listening...') + '</div>';
+    } else {
+      html += '<button class="sel-btn" onclick="voiceStartListening()" style="font-size:2rem;padding:16px 24px;border-radius:50%">\uD83C\uDF99\uFE0F</button>';
+      html += '<div style="margin-top:8px;color:var(--text-muted)">' + tx('Klik for at starte', 'Click to start') + '</div>';
+    }
+    html += '</div>';
+    if (voiceState.lastCommand) {
+      html += '<div style="margin:8px 0;padding:8px;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.85rem">';
+      html += '<span style="font-weight:600">' + tx('Sidst h\u00F8rt:', 'Last heard:') + '</span> "' + voiceState.lastCommand + '"';
+      html += '</div>';
+    }
+  }
+  // Click fallback commands - always shown
+  html += '<div class="param-group"><div class="param-label">' + tx('Hurtige kommandoer (klik)', 'Quick commands (click)') + '</div><div class="btn-group">';
+  var cmds = [
+    { da: 'Tilfoej B16', en: 'Add B16', action: "mcbState.rating=16;mcbState.curve='B';switchModule('mcb')" },
+    { da: 'Tilfoej C16', en: 'Add C16', action: "mcbState.rating=16;mcbState.curve='C';switchModule('mcb')" },
+    { da: 'Vaelg 2.5mm\u00B2', en: 'Select 2.5mm\u00B2', action: "cableState.mm2=2.5;switchModule('cable')" },
+    { da: 'Beregn spaendingsfald', en: 'Calc voltage drop', action: "switchModule('vdrop')" },
+    { da: 'Beregn kortslutning', en: 'Calc short circuit', action: "switchModule('scircuit')" },
+    { da: 'Vis SLD', en: 'Show SLD', action: "switchModule('sld')" }
+  ];
+  for (var c = 0; c < cmds.length; c++) {
+    html += '<button class="sel-btn" onclick="' + cmds[c].action + '">' + tx(cmds[c].da, cmds[c].en) + '</button>';
+  }
+  html += '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== GENIUS FEATURE 14: REVERSE ENGINEER FROM BOARD DESCRIPTION ===========
+// ============================================================================
+var reverseDescState = {
+  mainSwitch: null, groups: null, hasRcd: null, earthSystem: null, buildingType: null,
+  generated: false
+};
+
+function reverseDescSelect(field, value) {
+  reverseDescState[field] = value;
+  reverseDescState.generated = false;
+  // Auto-generate if enough chips are clicked
+  if (reverseDescState.mainSwitch && reverseDescState.groups && reverseDescState.earthSystem) {
+    reverseDescGenerate();
+  } else {
+    renderModule('reversedesc');
+  }
+}
+
+function reverseFromDescription(config) {
+  sldNextId = 1;
+  sldTree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  sldTree.nodes[trafo.id] = trafo; sldTree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id, { protectionIn: config.mainSwitch });
+  sldTree.nodes[mb.id] = mb; trafo.childIds.push(mb.id);
+  // Create groups based on building type and count
+  var numGroups = config.groups;
+  var isResidential = (config.buildingType === 'residential');
+  var isCommercial = (config.buildingType === 'commercial');
+  var templates = [];
+  if (isResidential) {
+    templates = [
+      { name_da: 'Belysning', name_en: 'Lighting', kW: 1.2, phases: '1x230', cable: 1.5, mcb: 10 },
+      { name_da: 'Stikkontakter', name_en: 'Sockets', kW: 3.45, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Koekken', name_en: 'Kitchen', kW: 3.68, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Komfur', name_en: 'Cooker', kW: 7.4, phases: '3x400', cable: 6, mcb: 16 },
+      { name_da: 'Vaskemaskine', name_en: 'Washing machine', kW: 2.3, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Badevaerelse', name_en: 'Bathroom', kW: 2.0, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Varmepumpe', name_en: 'Heat pump', kW: 5.5, phases: '3x400', cable: 4, mcb: 16 },
+      { name_da: 'Elbil-lader', name_en: 'EV charger', kW: 11, phases: '3x400', cable: 6, mcb: 20 }
+    ];
+  } else if (isCommercial) {
+    templates = [
+      { name_da: 'Belysning L1', name_en: 'Lighting L1', kW: 2.0, phases: '1x230', cable: 1.5, mcb: 10 },
+      { name_da: 'Belysning L2', name_en: 'Lighting L2', kW: 2.0, phases: '1x230', cable: 1.5, mcb: 10 },
+      { name_da: 'Stik kontor', name_en: 'Office sockets', kW: 3.45, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Server', name_en: 'Server', kW: 5.0, phases: '1x230', cable: 4, mcb: 25 },
+      { name_da: 'Ventilation', name_en: 'Ventilation', kW: 4.0, phases: '3x400', cable: 2.5, mcb: 10 },
+      { name_da: 'Elevator', name_en: 'Elevator', kW: 15, phases: '3x400', cable: 10, mcb: 25 },
+      { name_da: 'Koeling', name_en: 'Cooling', kW: 8.0, phases: '3x400', cable: 4, mcb: 16 },
+      { name_da: 'Brandalarm', name_en: 'Fire alarm', kW: 0.5, phases: '1x230', cable: 1.5, mcb: 6 }
+    ];
+  } else {
+    templates = [
+      { name_da: 'Motor 1', name_en: 'Motor 1', kW: 11, phases: '3x400', cable: 4, mcb: 25 },
+      { name_da: 'Motor 2', name_en: 'Motor 2', kW: 22, phases: '3x400', cable: 10, mcb: 40 },
+      { name_da: 'Kompressor', name_en: 'Compressor', kW: 15, phases: '3x400', cable: 6, mcb: 32 },
+      { name_da: 'Belysning hal', name_en: 'Hall lighting', kW: 4.0, phases: '3x400', cable: 2.5, mcb: 10 },
+      { name_da: 'Stik vaerksted', name_en: 'Workshop sockets', kW: 3.68, phases: '1x230', cable: 2.5, mcb: 16 },
+      { name_da: 'Svejser', name_en: 'Welder', kW: 8, phases: '3x400', cable: 6, mcb: 20 },
+      { name_da: 'Kran', name_en: 'Crane', kW: 30, phases: '3x400', cable: 16, mcb: 50 },
+      { name_da: 'Noedbelysning', name_en: 'Emergency lighting', kW: 0.5, phases: '1x230', cable: 1.5, mcb: 6 }
+    ];
+  }
+
+  for (var gi = 0; gi < numGroups && gi < templates.length; gi++) {
+    var tmpl = templates[gi % templates.length];
+    var cableObj = PRODUCTS.cables.find(function(c){ return c.mm2 === tmpl.cable && c.material === 'Cu'; });
+    var mcbObj = PRODUCTS.mcbs.find(function(m){ return m.rating === tmpl.mcb && m.curve === (tmpl.kW > 5 ? 'C' : 'B'); });
+    if (!mcbObj) mcbObj = PRODUCTS.mcbs.find(function(m){ return m.rating === tmpl.mcb; });
+    var fc = sldCreateNode('final_circuit', mb.id, {
+      name_da: tmpl.name_da, name_en: tmpl.name_en,
+      power_kW: tmpl.kW, cosPhi: 0.95,
+      phases: tmpl.phases, voltage: tmpl.phases === '3x400' ? 400 : 230,
+      installMethod: 'C', length_m: 20,
+      cable: cableObj, protection: mcbObj, protectionIn: tmpl.mcb
+    });
+    sldTree.nodes[fc.id] = fc; mb.childIds.push(fc.id);
+  }
+  // If more groups needed than templates, repeat
+  for (var extra = templates.length; extra < numGroups; extra++) {
+    var xt = templates[extra % templates.length];
+    var xCable = PRODUCTS.cables.find(function(c){ return c.mm2 === xt.cable && c.material === 'Cu'; });
+    var xMcb = PRODUCTS.mcbs.find(function(m){ return m.rating === xt.mcb; });
+    var xfc = sldCreateNode('final_circuit', mb.id, {
+      name_da: xt.name_da + ' (' + (extra+1) + ')', name_en: xt.name_en + ' (' + (extra+1) + ')',
+      power_kW: xt.kW, cosPhi: 0.95,
+      phases: xt.phases, voltage: xt.phases === '3x400' ? 400 : 230,
+      installMethod: 'C', length_m: 20,
+      cable: xCable, protection: xMcb, protectionIn: xt.mcb
+    });
+    sldTree.nodes[xfc.id] = xfc; mb.childIds.push(xfc.id);
+  }
+  sldPropagateAll(sldTree);
+  return sldTree;
+}
+
+function reverseDescGenerate() {
+  var config = {
+    mainSwitch: reverseDescState.mainSwitch,
+    groups: reverseDescState.groups,
+    hasRcd: reverseDescState.hasRcd,
+    earthSystem: reverseDescState.earthSystem,
+    buildingType: reverseDescState.buildingType || 'residential'
+  };
+  reverseFromDescription(config);
+  reverseDescState.generated = true;
+  renderModule('reversedesc');
+}
+
+function renderReverseDesc() {
+  var st = reverseDescState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD27 ' + tx('Omvendt Tavlebeskrivelse', 'Reverse Board Description') + '</div>';
+  html += '<p class="info-text">' + tx(
+    'Beskriv din tavle med chips \u2014 vaelg hovedafbryder, antal grupper, RCD, jordsystem og bygningstype. SLD genereres automatisk.',
+    'Describe your board with chips \u2014 select main switch, number of groups, RCD, earth system and building type. SLD is generated automatically.'
+  ) + '</p>';
+
+  // Main switch chips
+  html += '<div class="param-group"><div class="param-label">' + tx('Hovedafbryder', 'Main switch') + '</div><div class="btn-group">';
+  var mainSwitches = [25, 40, 63, 80, 100];
+  for (var m = 0; m < mainSwitches.length; m++) {
+    html += '<button class="sel-btn' + (st.mainSwitch === mainSwitches[m] ? ' selected' : '') + '" onclick="reverseDescSelect(\'mainSwitch\',' + mainSwitches[m] + ')">' + mainSwitches[m] + 'A</button>';
+  }
+  html += '</div></div>';
+  // Number of groups
+  html += '<div class="param-group"><div class="param-label">' + tx('Antal grupper', 'Number of groups') + '</div><div class="btn-group">';
+  var groupCounts = [4, 6, 8, 10, 12, 16, 20];
+  for (var g = 0; g < groupCounts.length; g++) {
+    html += '<button class="sel-btn' + (st.groups === groupCounts[g] ? ' selected' : '') + '" onclick="reverseDescSelect(\'groups\',' + groupCounts[g] + ')">' + groupCounts[g] + '</button>';
+  }
+  html += '</div></div>';
+  // Has RCD
+  html += '<div class="param-group"><div class="param-label">' + tx('RCD (HPFI)', 'RCD') + '</div><div class="btn-group">';
+  var rcdOpts = [{v:'30mA',da:'Ja 30mA',en:'Yes 30mA'},{v:'300mA',da:'Ja 300mA',en:'Yes 300mA'},{v:'no',da:'Nej',en:'No'}];
+  for (var r = 0; r < rcdOpts.length; r++) {
+    html += '<button class="sel-btn' + (st.hasRcd === rcdOpts[r].v ? ' selected' : '') + '" onclick="reverseDescSelect(\'hasRcd\',\'' + rcdOpts[r].v + '\')">' + tx(rcdOpts[r].da, rcdOpts[r].en) + '</button>';
+  }
+  html += '</div></div>';
+  // Earth system
+  html += '<div class="param-group"><div class="param-label">' + tx('Jordsystem', 'Earth system') + '</div><div class="btn-group">';
+  var earthOpts = ['TN-S', 'TN-C-S', 'TT'];
+  for (var e = 0; e < earthOpts.length; e++) {
+    html += '<button class="sel-btn' + (st.earthSystem === earthOpts[e] ? ' selected' : '') + '" onclick="reverseDescSelect(\'earthSystem\',\'' + earthOpts[e] + '\')">' + earthOpts[e] + '</button>';
+  }
+  html += '</div></div>';
+  // Building type
+  html += '<div class="param-group"><div class="param-label">' + tx('Bygningstype', 'Building type') + '</div><div class="btn-group">';
+  var bldgOpts = [{v:'residential',da:'Bolig',en:'Residential'},{v:'commercial',da:'Erhverv',en:'Commercial'},{v:'industrial',da:'Industri',en:'Industrial'}];
+  for (var b = 0; b < bldgOpts.length; b++) {
+    html += '<button class="sel-btn' + (st.buildingType === bldgOpts[b].v ? ' selected' : '') + '" onclick="reverseDescSelect(\'buildingType\',\'' + bldgOpts[b].v + '\')">' + tx(bldgOpts[b].da, bldgOpts[b].en) + '</button>';
+  }
+  html += '</div></div>';
+  // Show generated SLD summary
+  if (st.generated && sldTree && sldTree.rootId) {
+    html += '</div><div class="card fade-in"><div class="card-title">\u2705 ' + tx('Genereret SLD', 'Generated SLD') + '</div>';
+    var nodeCount = Object.keys(sldTree.nodes).length;
+    var root = sldTree.nodes[sldTree.rootId];
+    var mbId = root.childIds[0];
+    var mainB = sldTree.nodes[mbId];
+    html += '<div class="result-box">';
+    html += '<div>' + tx('Noder i alt:', 'Total nodes:') + ' <strong>' + nodeCount + '</strong></div>';
+    html += '<div>' + tx('Grupper:', 'Groups:') + ' <strong>' + mainB.childIds.length + '</strong></div>';
+    html += '<div>' + tx('Samlet effekt:', 'Total power:') + ' <strong>' + (mainB.power_kW||0).toFixed(1) + ' kW</strong></div>';
+    html += '<div>' + tx('Jordsystem:', 'Earth system:') + ' <strong>' + (st.earthSystem||'TN-S') + '</strong></div>';
+    html += '</div>';
+    html += '<div class="param-group"><button class="sel-btn selected" onclick="switchModule(\'sld\')">\uD83D\uDCC8 ' + tx('Se fuldt SLD-diagram', 'View full SLD diagram') + '</button></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== GENIUS FEATURE 15: FUTURE ROADMAP (AR placeholder + summary) =========
+// ============================================================================
+var ROADMAP_ITEMS = [
+  { icon: '\u2705', title_da: 'Belastningsberegning', title_en: 'Load calculation', desc_da: 'IB beregning med samtidighed', desc_en: 'IB calculation with diversity', status: 'done' },
+  { icon: '\u2705', title_da: 'MCB/MCCB dimensionering', title_en: 'MCB/MCCB sizing', desc_da: 'Automatisk valg af beskyttelse', desc_en: 'Automatic protection selection', status: 'done' },
+  { icon: '\u2705', title_da: 'Kabeldimensionering', title_en: 'Cable sizing', desc_da: 'Iz med korrektionsfaktorer', desc_en: 'Iz with correction factors', status: 'done' },
+  { icon: '\u2705', title_da: 'Spaendingsfald', title_en: 'Voltage drop', desc_da: '3D visualisering af spaendingsfald', desc_en: '3D voltage drop visualization', status: 'done' },
+  { icon: '\u2705', title_da: 'Kortslutning (IEC 60909)', title_en: 'Short circuit (IEC 60909)', desc_da: 'Ik,max/Ik,min beregning', desc_en: 'Ik,max/Ik,min calculation', status: 'done' },
+  { icon: '\u2705', title_da: 'SLD Installation Model', title_en: 'SLD Installation Model', desc_da: 'Interaktivt installationsdiagram', desc_en: 'Interactive installation diagram', status: 'done' },
+  { icon: '\u2705', title_da: 'TCC Kaskadediagram', title_en: 'TCC Cascade Diagram', desc_da: 'Animeret selektivitetsanalyse', desc_en: 'Animated selectivity analysis', status: 'done' },
+  { icon: '\u2705', title_da: 'AI Projektanalysator', title_en: 'AI Project Analyzer', desc_da: 'Upload opgave og faa analyse', desc_en: 'Upload problem and get analysis', status: 'done' },
+  { icon: '\u2705', title_da: 'Termisk simulation', title_en: 'Thermal simulation', desc_da: 'Kabellevetid og temperatur', desc_en: 'Cable lifetime and temperature', status: 'done' },
+  { icon: '\u2705', title_da: 'Stemme-rapport', title_en: 'Voice report', desc_da: 'Klik-baseret servicerapport', desc_en: 'Click-based service report', status: 'done' },
+  { icon: '\u2705', title_da: 'Fejl-animation', title_en: 'Fault animation', desc_da: 'Visuel fejludbredelse i SLD', desc_en: 'Visual fault propagation in SLD', status: 'done' },
+  { icon: '\u2705', title_da: 'One-click projekt', title_en: 'One-click project', desc_da: 'Foruddefinerede bygningstyper', desc_en: 'Predefined building types', status: 'done' },
+  { icon: '\u2705', title_da: 'Eksamenssimulator', title_en: 'Exam simulator', desc_da: 'Tilfaeldige el-eksamensopgaver', desc_en: 'Random electrical exam problems', status: 'done' },
+  { icon: '\u2705', title_da: 'URL-deling af projekt', title_en: 'URL project sharing', desc_da: 'Del dit projekt via et link', desc_en: 'Share your project via a link', status: 'done' },
+  { icon: '\uD83D\uDFE1', title_da: 'AR Kabelfoering', title_en: 'AR Cable Routing', desc_da: 'Augmented Reality kabelplanlaegging paa mobil (kamera-baseret)', desc_en: 'Augmented Reality cable planning on mobile (camera-based)', status: 'planned' },
+  { icon: '\uD83D\uDFE1', title_da: 'BIM Integration', title_en: 'BIM Integration', desc_da: 'Import/eksport til IFC og Revit modeller', desc_en: 'Import/export to IFC and Revit models', status: 'planned' },
+  { icon: '\uD83D\uDFE1', title_da: 'Cloud Sync', title_en: 'Cloud Sync', desc_da: 'Gem projekter i skyen og synkroniser paa tvaers af enheder', desc_en: 'Save projects in the cloud and sync across devices', status: 'planned' }
+];
+
+function renderRoadmap() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDDFA\uFE0F ' + tx('Fremtidig Roadmap', 'Future Roadmap') + '</div>';
+  html += '<p class="info-text">' + tx(
+    'Oversigt over implementerede og planlagte funktioner. Denne app er et nul-afhaengigheder single-file vaerktoj bygget til danske el-installatoerer.',
+    'Overview of implemented and planned features. This app is a zero-dependency single-file tool built for Danish electrical installers.'
+  ) + '</p>';
+
+  // Stats
+  var doneCount = ROADMAP_ITEMS.filter(function(x){return x.status==='done';}).length;
+  var plannedCount = ROADMAP_ITEMS.filter(function(x){return x.status==='planned';}).length;
+  html += '<div style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap">';
+  html += '<div style="padding:8px 16px;background:rgba(34,197,94,0.1);border:1px solid var(--success,#22c55e);border-radius:var(--radius-sm);font-weight:700;color:var(--success,#22c55e)">\u2705 ' + doneCount + ' ' + tx('Implementeret', 'Implemented') + '</div>';
+  html += '<div style="padding:8px 16px;background:rgba(234,179,8,0.1);border:1px solid #eab308;border-radius:var(--radius-sm);font-weight:700;color:#eab308">\uD83D\uDFE1 ' + plannedCount + ' ' + tx('Planlagt', 'Planned') + '</div>';
+  html += '</div>';
+  // Timeline
+  html += '<div style="margin-top:16px;border-left:3px solid var(--border);padding-left:16px">';
+  for (var i = 0; i < ROADMAP_ITEMS.length; i++) {
+    var item = ROADMAP_ITEMS[i];
+    var bgColor = item.status === 'done' ? 'rgba(34,197,94,0.05)' : 'rgba(234,179,8,0.05)';
+    var borderColor = item.status === 'done' ? 'var(--success,#22c55e)' : '#eab308';
+    html += '<div style="margin:8px 0;padding:10px 14px;background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);position:relative">';
+    html += '<div style="position:absolute;left:-26px;top:14px;width:12px;height:12px;border-radius:50%;background:' + borderColor + '"></div>';
+    html += '<div style="font-weight:700;font-size:0.9rem">' + item.icon + ' ' + tx(item.title_da, item.title_en);
+    html += ' <span style="font-size:0.75rem;padding:2px 8px;background:' + borderColor + ';color:#fff;border-radius:10px;font-weight:400">' + item.status + '</span></div>';
+    html += '<div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">' + tx(item.desc_da, item.desc_en) + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
 // ===== INIT =====
+if (window.location.hash.length > 10) importProjectURL();
+voiceInit();
 guideLoadProgress();
 renderNav();
 renderStatusBar();
