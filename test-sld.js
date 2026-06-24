@@ -18961,6 +18961,101 @@ test('cxBelastningsskema: simultaneity factor reduces current', function() {
   assert(half.IB < full.IB * 0.6, 'Sf=0.5 should halve the current');
 });
 
+// =====================================================================
+// AUTHORIZATION EXAM GENERATOR TESTS (examgen module)
+// =====================================================================
+console.log('\n=== Authorization Exam Generator Tests ===\n');
+
+test('generateAuthExam returns a valid exam for all 5 types', function() {
+  ['A', 'B', 'C', 'D', 'E'].forEach(function(t) {
+    var ex = generateAuthExam(t, 'standard', 4242);
+    assert(ex, 'type ' + t + ' should return an exam');
+    assert.strictEqual(ex.type, t, 'exam.type should equal ' + t);
+    assert(ex.supply && ex.supply.Sn_kVA > 0, 'type ' + t + ' must have supply data');
+    assert(ex.supply.Sk_min_MVA < ex.supply.Sk_max_MVA, 'Sk_min must be < Sk_max for ' + t);
+    assert(Array.isArray(ex.circuits) && ex.circuits.length >= 3, 'type ' + t + ' must have >=3 circuits');
+    assert(ex.sol && ex.sol.circuits.length === ex.circuits.length, 'solution must cover every circuit for ' + t);
+    assert(Array.isArray(ex.clauses) && ex.clauses.length >= 3, 'type ' + t + ' must have Opgave-3 clauses');
+  });
+});
+
+test('generateAuthExam handles all 3 difficulties (more circuits when harder)', function() {
+  var std = generateAuthExam('B', 'standard', 7);
+  var avg = generateAuthExam('B', 'avanceret', 7);
+  var exp = generateAuthExam('B', 'ekspert', 7);
+  assert(std.circuits.length <= avg.circuits.length, 'avanceret has >= standard circuits');
+  assert(avg.circuits.length <= exp.circuits.length, 'ekspert has >= avanceret circuits');
+});
+
+test('generateAuthExam is deterministic for a fixed seed', function() {
+  var a = generateAuthExam('C', 'avanceret', 999);
+  var b = generateAuthExam('C', 'avanceret', 999);
+  assert.strictEqual(a.supply.Sn_kVA, b.supply.Sn_kVA, 'same seed -> same transformer');
+  assert.strictEqual(a.circuits.length, b.circuits.length, 'same seed -> same circuit count');
+  assert.strictEqual(a.sol.Ikmax_bus.toFixed(3), b.sol.Ikmax_bus.toFixed(3), 'same seed -> same Ik,max');
+});
+
+test('I_k,max sanity for a fixed exam (busbar fault current is realistic)', function() {
+  var ex = generateAuthExam('A', 'standard', 12345);
+  var ik = ex.sol.Ikmax_bus;
+  assert(isFinite(ik) && ik > 0, 'Ik,max must be a positive finite number');
+  // A residential transformer feed should produce a few kA up to ~60 kA at the busbar.
+  assert(ik > 1000 && ik < 60000, 'Ik,max should be 1\u201360 kA, got ' + (ik / 1000).toFixed(1) + ' kA');
+  // The minimum fault current must be lower than the maximum.
+  assert(ex.sol.Ikmin_bus < ex.sol.Ikmax_bus, 'Ik,min must be < Ik,max at the busbar');
+  // Every circuit fault current must not exceed the busbar value (impedance only grows).
+  ex.sol.circuits.forEach(function(nd) {
+    assert(nd.Ik3max <= ex.sol.Ikmax_bus + 1, 'circuit Ik,max must be <= busbar Ik,max');
+  });
+});
+
+test('IB <= In <= Iz holds in every generated circuit (all types x difficulties)', function() {
+  ['A', 'B', 'C', 'D', 'E'].forEach(function(t) {
+    ['standard', 'avanceret', 'ekspert'].forEach(function(d) {
+      var seed;
+      for (seed = 1; seed <= 8; seed++) {
+        var ex = generateAuthExam(t, d, seed * 131);
+        ex.circuits.forEach(function(c) {
+          assert(c.IB <= c.In + 1e-6, t + '/' + d + ': IB(' + c.IB.toFixed(2) + ') must be <= In(' + c.In + ') for ' + c.key);
+          assert(c.In <= c.Iz + 1e-6, t + '/' + d + ': In(' + c.In + ') must be <= Iz(' + c.Iz.toFixed(1) + ') for ' + c.key);
+        });
+        // and the solver agrees the OB check passes
+        ex.sol.circuits.forEach(function(nd) {
+          assert(nd.obOk, t + '/' + d + ': solver OB-check must pass for ' + nd.def.key);
+        });
+      }
+    });
+  });
+});
+
+test('renderExamGen returns non-empty HTML in da and en (with an active exam)', function() {
+  var prevLang = lang;
+  var prevState = examGenState.currentExam;
+  examGenState.type = 'A';
+  examGenState.currentExam = generateAuthExam('A', 'standard', 555);
+  examGenState.showSolution = { 1: true, 2: true, 3: true };
+  try {
+    lang = 'da';
+    var hDa = renderExamGen();
+    assert(typeof hDa === 'string' && hDa.length > 800, 'da render should be substantial, got ' + hDa.length);
+    assert(hDa.indexOf('OPGAVE 1') >= 0 && hDa.indexOf('OPGAVE 2') >= 0 && hDa.indexOf('OPGAVE 3') >= 0, 'da render must contain all 3 parts');
+    lang = 'en';
+    var hEn = renderExamGen();
+    assert(typeof hEn === 'string' && hEn.length > 800, 'en render should be substantial, got ' + hEn.length);
+    assert(hEn.indexOf('Supply') >= 0, 'en render should localize the supply heading');
+    assert(hDa.indexOf('undefined') < 0, 'da render must not contain "undefined"');
+  } finally {
+    lang = prevLang;
+    examGenState.currentExam = prevState;
+    examGenState.showSolution = { 1: false, 2: false, 3: false };
+  }
+});
+
+test('examgen module exists in both language translation objects', function() {
+  assert(T.da.modules.examgen, 'Danish examgen translation missing');
+  assert(T.en.modules.examgen, 'English examgen translation missing');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

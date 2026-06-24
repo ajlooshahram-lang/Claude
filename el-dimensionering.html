@@ -1543,6 +1543,7 @@ const T = {
       autosolver: '\uD83C\uDF93 Eksamen Auto-l\u00f8ser',
       vektordiagram: '\uD83E\uDDED Vektordiagram',
       kritisk_review: '\uD83E\uDDE0 Kritisk Review',
+      examgen: '\uD83C\uDF93 Eksamen-generator',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
@@ -1755,6 +1756,7 @@ const T = {
       autosolver: '\uD83C\uDF93 Exam Auto-Solver',
       vektordiagram: '\uD83E\uDDED Vector Diagram',
       kritisk_review: '\uD83E\uDDE0 Critical Review',
+      examgen: '\uD83C\uDF93 Exam Generator',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
@@ -5015,7 +5017,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap', 'autosolver', 'vektordiagram', 'kritisk_review']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets', 'viggo', 'reversedesc', 'roadmap', 'autosolver', 'vektordiagram', 'kritisk_review', 'examgen']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -7778,6 +7780,7 @@ function renderModule(mod) {
     case 'share': content = renderShare(); break;
     case 'reversedesc': content = renderReverseDesc(); break;
     case 'roadmap': content = renderRoadmap(); break;
+    case 'examgen': content = renderExamGen(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -28482,6 +28485,585 @@ function autoSolverClauses(st, R) {
       req_da: 'F\u00f8r idrifts\u00e6ttelse: visuel kontrol, m\u00e5ling af isolationsmodstand, kontinuitet af beskyttelsesledere og m\u00e5ling/beregning af jordfejlssl\u00f8jfeimpedans Z_s.',
       req_en: 'Before commissioning: visual inspection, insulation resistance measurement, continuity of protective conductors, and measurement/calculation of earth-fault loop impedance Z_s.' }
   ];
+}
+
+// ============================================================================
+//  AUTHORIZATION EXAM EXERCISE GENERATOR  (autorisationsprove-generator)
+//  Generates UNLIMITED realistic Danish authorization-exam exercises for
+//  practice. 5 types x 3 difficulties. Each exam has 3 linked parts:
+//    Opgave 1 (Forsyning 20%), Opgave 2 (Bygningsinstallation 60%),
+//    Opgave 3 (Regler 20%).
+//  Every exam carries randomized-yet-realistic parameters AND a fully
+//  pre-computed solution using the exact complex-impedance engine that the
+//  auto-solver uses (cxNetImpedanceLV / cxTrafoImpedanceLV / asIk3 / asIk1 /
+//  cxCableSizing / cxKBKontrol / asDeviceIa). 100% click-only, dual rect+polar
+//  display, Danish decimal comma, conservative (life-safety) rounding.
+// ============================================================================
+
+// --- Seedable PRNG (mulberry32) so generated exams are reproducible in tests.
+function examRng(seed) {
+  var s = (seed >>> 0) || 1;
+  return function () {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function examPick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+function examRange(rng, lo, hi, step) {
+  step = step || 1;
+  var n = Math.floor((hi - lo) / step + 1e-9) + 1;
+  return lo + step * Math.floor(rng() * n);
+}
+function examRangeF(rng, lo, hi, step) {
+  step = step || 0.1;
+  var n = Math.round((hi - lo) / step) + 1;
+  return +(lo + step * Math.floor(rng() * n)).toFixed(2);
+}
+function examShuffle(rng, arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+// Realistic transformer load loss P_Cu (W) for a given rated power (kVA).
+function examTrafoPcu(Sn_kVA) {
+  var map = { 100: 1750, 160: 2350, 200: 2850, 250: 3250, 315: 3900, 400: 4600,
+    630: 6500, 800: 8400, 1000: 10500, 1250: 13000, 1600: 17000, 2000: 21000, 2500: 26000 };
+  if (map[Sn_kVA]) return map[Sn_kVA];
+  // fallback ~1.0-1.1% load loss
+  return Math.round(Sn_kVA * 10.4);
+}
+
+// Difficulty profiles. Harder = more circuits + extra regulatory themes.
+var EXAM_DIFFICULTY = {
+  standard: { id: 'standard', nCircuits: 4, subBoard: false, pfc: false, selectivity: false, harmonics: false },
+  avanceret: { id: 'avanceret', nCircuits: 6, subBoard: true, pfc: false, selectivity: true, harmonics: false },
+  ekspert: { id: 'ekspert', nCircuits: 8, subBoard: true, pfc: true, selectivity: true, harmonics: true }
+};
+
+// Standard device rating ranges per device family.
+var EXAM_IN_MCB = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125];
+var EXAM_IN_FUSE = [16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+var EXAM_IN_MCCB = [16, 25, 40, 63, 80, 100, 125, 160, 200, 250, 400, 630];
+var EXAM_XS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+
+// ----------------------------------------------------------------------------
+//  THE 5 EXAM TEMPLATES (param ranges + circuit pools)
+// ----------------------------------------------------------------------------
+var EXAM_GEN_TEMPLATES = {
+  A: {
+    id: 'A', icon: '\uD83C\uDFE0', name_da: 'Bolig', name_en: 'Residential',
+    desc_da: 'Enfamiliehus p\u00E5 TN-C-S. Belysning, stikkontakter, komfur, badev\u00E6relse med 30 mA HPFI og elbil-lader. Korte kabler (10\u201340 m), sm\u00E5 tv\u00E6rsnit (1,5\u20136 mm\u00B2).',
+    desc_en: 'Single-family house on TN-C-S. Lighting, sockets, cooker, bathroom with 30 mA RCD and EV charger. Short cables (10\u201340 m), small cross-sections (1.5\u20136 mm\u00B2).',
+    earthing: 'TN', Un_HV_kV: 10, Sk_max: [100, 120, 150, 180, 200], skMinFrac: [0.5, 0.6, 0.7],
+    Sn: [100, 160, 200, 250, 400, 630], ek: [4, 4.5, 6], RX: [0.1, 0.2, 0.3],
+    pool: [
+      { key: 'lighting', required: true, name_da: 'Belysning', name_en: 'Lighting', phases: '1x230', P: [0.8, 2.0], cos: 1.0, dev: 'MCB', curve: 'B', In: [10], min_mm2: 1.5, len: [10, 30], ins: 'PVC' },
+      { key: 'sockets', required: true, name_da: 'Stikkontakter', name_en: 'Sockets', phases: '1x230', P: [1.5, 3.5], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [10, 30], ins: 'PVC' },
+      { key: 'bathroom', required: true, name_da: 'Badev\u00E6relse', name_en: 'Bathroom', phases: '1x230', P: [1.5, 3.0], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [8, 20], ins: 'PVC', rcd: 30, zone: true },
+      { key: 'cooker', name_da: 'Komfur', name_en: 'Cooker', phases: '3x400', P: [7, 11], cos: 0.95, dev: 'MCB', curve: 'B', In: [20, 25], min_mm2: 6, len: [5, 15], ins: 'PVC' },
+      { key: 'ev', name_da: 'Elbil-lader', name_en: 'EV charger', phases: '3x400', P: [7.4, 22], cos: 0.95, dev: 'MCB', curve: 'C', In: [32, 40], min_mm2: 6, len: [10, 40], ins: 'XLPE', rcd: 30, evB: true },
+      { key: 'heatpump', name_da: 'Varmepumpe', name_en: 'Heat pump', phases: '3x400', P: [3, 9], cos: 0.9, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [10, 30], ins: 'PVC' },
+      { key: 'dryer', name_da: 'T\u00F8rretumbler', name_en: 'Tumble dryer', phases: '1x230', P: [2, 3], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [10, 25], ins: 'PVC' }
+    ]
+  },
+  B: {
+    id: 'B', icon: '\uD83C\uDFE2', name_da: 'Erhverv', name_en: 'Commercial',
+    desc_da: 'Erhvervsbygning p\u00E5 TN-S med undertavler. HVAC-motorer, serverrum og elevator. MCCB\'er, mellemlange kabler (25\u2013100 m).',
+    desc_en: 'Commercial building on TN-S with sub-boards. HVAC motors, server room and elevator. MCCBs, medium-length cables (25\u2013100 m).',
+    earthing: 'TN', Un_HV_kV: 10, Sk_max: [150, 200, 300, 400, 500], skMinFrac: [0.5, 0.6, 0.7],
+    Sn: [200, 250, 400, 630, 800, 1000], ek: [4, 4.5, 6], RX: [0.1, 0.2],
+    pool: [
+      { key: 'lighting', required: true, name_da: 'Belysning erhverv', name_en: 'Commercial lighting', phases: '3x400', P: [4, 12], cos: 0.95, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [25, 60], ins: 'XLPE' },
+      { key: 'sockets', required: true, name_da: 'Stikkredse', name_en: 'Socket circuits', phases: '1x230', P: [2, 3.5], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [20, 50], ins: 'PVC' },
+      { key: 'hvac', required: true, name_da: 'HVAC-motor', name_en: 'HVAC motor', phases: '3x400', P: [7.5, 30], cos: 0.85, dev: 'MCCB', min_mm2: 4, len: [25, 70], ins: 'XLPE', motor: true },
+      { key: 'server', name_da: 'Serverrum', name_en: 'Server room', phases: '3x400', P: [10, 40], cos: 0.9, dev: 'MCCB', min_mm2: 6, len: [25, 60], ins: 'XLPE' },
+      { key: 'elevator', name_da: 'Elevator', name_en: 'Elevator', phases: '3x400', P: [7.5, 15], cos: 0.8, dev: 'MCCB', min_mm2: 4, len: [30, 80], ins: 'XLPE', motor: true },
+      { key: 'subfeed', name_da: 'Undertavle-stik', name_en: 'Sub-board feeder', phases: '3x400', P: [20, 60], cos: 0.9, dev: 'MCCB', min_mm2: 16, len: [25, 100], ins: 'XLPE', feeder: true },
+      { key: 'kitchen', name_da: 'K\u00F8kken', name_en: 'Kitchen', phases: '3x400', P: [6, 18], cos: 0.95, dev: 'MCCB', min_mm2: 4, len: [20, 50], ins: 'XLPE' }
+    ]
+  },
+  C: {
+    id: 'C', icon: '\uD83C\uDFED', name_da: 'Industri', name_en: 'Industry',
+    desc_da: 'Industrianl\u00E6g p\u00E5 TN-S med skinnesystem og frekvensomformer-motorer (VFD). Store tv\u00E6rsnit (25\u2013240 mm\u00B2), fasekompensering, selektivitet og ATEX-zoner.',
+    desc_en: 'Industrial plant on TN-S with busbar trunking and VFD motors. Large cross-sections (25\u2013240 mm\u00B2), power-factor correction, selectivity and ATEX zones.',
+    earthing: 'TN', Un_HV_kV: 10, Sk_max: [250, 400, 600, 800, 1000], skMinFrac: [0.5, 0.6, 0.7],
+    Sn: [400, 630, 800, 1000, 1250, 1600, 2000, 2500], ek: [4, 4.5, 6], RX: [0.1],
+    pool: [
+      { key: 'vfd1', required: true, name_da: 'VFD-motor 1', name_en: 'VFD motor 1', phases: '3x400', P: [30, 110], cos: 0.88, dev: 'MCCB', min_mm2: 25, len: [25, 80], ins: 'XLPE', motor: true, vfd: true },
+      { key: 'busbar', required: true, name_da: 'Skinnefordeling', name_en: 'Busbar distribution', phases: '3x400', P: [80, 250], cos: 0.9, dev: 'MCCB', min_mm2: 95, len: [25, 60], ins: 'XLPE', feeder: true, busbar: true },
+      { key: 'vfd2', name_da: 'VFD-motor 2', name_en: 'VFD motor 2', phases: '3x400', P: [22, 90], cos: 0.88, dev: 'MCCB', min_mm2: 16, len: [25, 70], ins: 'XLPE', motor: true, vfd: true },
+      { key: 'compressor', name_da: 'Kompressor', name_en: 'Compressor', phases: '3x400', P: [15, 55], cos: 0.86, dev: 'MCCB', min_mm2: 10, len: [25, 60], ins: 'XLPE', motor: true },
+      { key: 'pfc', name_da: 'Fasekompensering', name_en: 'PF correction bank', phases: '3x400', P: [10, 40], cos: 0.99, dev: 'MCCB', min_mm2: 6, len: [10, 30], ins: 'XLPE', pfc: true },
+      { key: 'atex', name_da: 'ATEX-zone forsyning', name_en: 'ATEX zone supply', phases: '3x400', P: [5, 18], cos: 0.85, dev: 'MCCB', min_mm2: 4, len: [25, 60], ins: 'XLPE', atex: true },
+      { key: 'lighting', name_da: 'Hallys', name_en: 'Hall lighting', phases: '3x400', P: [6, 20], cos: 0.95, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [30, 90], ins: 'XLPE' }
+    ]
+  },
+  D: {
+    id: 'D', icon: '\uD83D\uDEDC', name_da: 'Landbrug', name_en: 'Agriculture',
+    desc_da: 'Landbrug p\u00E5 TT-system med svagt net og lang lavsp\u00E6ndingskabel. Korntrr, malkerobot, udend\u00F8rs stik. 30 mA HPFI overalt, IP-krav og udligningsforbindelser.',
+    desc_en: 'Farm on a TT system with a weak grid and a long LV feeder. Grain dryer, milking robot, outdoor sockets. 30 mA RCD everywhere, IP requirements and bonding.',
+    earthing: 'TT', Un_HV_kV: 10, Sk_max: [50, 60, 80, 100], skMinFrac: [0.5, 0.6],
+    Sn: [100, 160, 200, 250, 400], ek: [4, 4.5, 6], RX: [0.2, 0.3],
+    pool: [
+      { key: 'feeder', required: true, name_da: 'Lang stikledning', name_en: 'Long LV feeder', phases: '3x400', P: [20, 60], cos: 0.9, dev: 'MCCB', min_mm2: 16, len: [60, 150], ins: 'XLPE', feeder: true, outdoor: true },
+      { key: 'dryer', required: true, name_da: 'Korntrr', name_en: 'Grain dryer', phases: '3x400', P: [15, 45], cos: 0.85, dev: 'MCCB', min_mm2: 10, len: [30, 120], ins: 'XLPE', motor: true },
+      { key: 'robot', required: true, name_da: 'Malkerobot', name_en: 'Milking robot', phases: '3x400', P: [5, 15], cos: 0.9, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [20, 60], ins: 'XLPE', rcd: 30 },
+      { key: 'outsock', required: true, name_da: 'Udend\u00F8rs stik', name_en: 'Outdoor sockets', phases: '1x230', P: [1, 3], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [15, 50], ins: 'XLPE', rcd: 30, outdoor: true },
+      { key: 'barnlight', name_da: 'Staldbelysning', name_en: 'Barn lighting', phases: '1x230', P: [1, 3], cos: 1.0, dev: 'MCB', curve: 'B', In: [10], min_mm2: 1.5, len: [15, 60], ins: 'XLPE', rcd: 30 },
+      { key: 'vent', name_da: 'Ventilation', name_en: 'Ventilation', phases: '3x400', P: [3, 11], cos: 0.85, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [20, 60], ins: 'XLPE', motor: true, rcd: 30 },
+      { key: 'feedmix', name_da: 'Foderblander', name_en: 'Feed mixer', phases: '3x400', P: [4, 15], cos: 0.86, dev: 'MCCB', min_mm2: 4, len: [25, 80], ins: 'XLPE', motor: true }
+    ]
+  },
+  E: {
+    id: 'E', icon: '\u26A1', name_da: 'Blandet', name_en: 'Mixed',
+    desc_da: 'Blandet bolig + v\u00E6rksted med elbil-lader, solceller (PV) og batteri. TN-S. Tilbagef\u00F8dningsbeskyttelse og nettilslutning er centrale temaer.',
+    desc_en: 'Mixed residential + workshop with EV charging, solar PV and battery. TN-S. Back-feed protection and grid connection are central themes.',
+    earthing: 'TN', Un_HV_kV: 10, Sk_max: [120, 150, 200, 300], skMinFrac: [0.5, 0.6, 0.7],
+    Sn: [160, 200, 250, 400, 630], ek: [4, 4.5, 6], RX: [0.1, 0.2],
+    pool: [
+      { key: 'reslight', required: true, name_da: 'Bolig belysning', name_en: 'Residential lighting', phases: '1x230', P: [0.8, 2.0], cos: 1.0, dev: 'MCB', curve: 'B', In: [10], min_mm2: 1.5, len: [10, 30], ins: 'PVC' },
+      { key: 'workshop', required: true, name_da: 'V\u00E6rkstedsmotor', name_en: 'Workshop motor', phases: '3x400', P: [5, 22], cos: 0.85, dev: 'MCCB', min_mm2: 4, len: [20, 60], ins: 'XLPE', motor: true },
+      { key: 'ev', required: true, name_da: 'Elbil-lader', name_en: 'EV charger', phases: '3x400', P: [11, 22], cos: 0.95, dev: 'MCB', curve: 'C', In: [32, 40], min_mm2: 6, len: [10, 40], ins: 'XLPE', rcd: 30, evB: true },
+      { key: 'pv', required: true, name_da: 'Solcelle-inverter', name_en: 'Solar PV inverter', phases: '3x400', P: [5, 15], cos: 1.0, dev: 'MCB', curve: 'B', min_mm2: 2.5, len: [10, 40], ins: 'XLPE', backfeed: true },
+      { key: 'battery', name_da: 'Batteri (BESS)', name_en: 'Battery (BESS)', phases: '3x400', P: [5, 10], cos: 1.0, dev: 'MCB', curve: 'B', min_mm2: 2.5, len: [10, 30], ins: 'XLPE', backfeed: true },
+      { key: 'sockets', name_da: 'Stikkontakter', name_en: 'Sockets', phases: '1x230', P: [1.5, 3.5], cos: 0.95, dev: 'MCB', curve: 'B', In: [16], min_mm2: 2.5, len: [10, 30], ins: 'PVC' },
+      { key: 'heatpump', name_da: 'Varmepumpe', name_en: 'Heat pump', phases: '3x400', P: [3, 9], cos: 0.9, dev: 'MCB', curve: 'C', min_mm2: 2.5, len: [10, 30], ins: 'XLPE' }
+    ]
+  }
+};
+
+// --- Choose the rated device current In: smallest standard >= IB (conservative).
+function examPickIn(IB, dev, c) {
+  var base = dev === 'fuse' ? EXAM_IN_FUSE : dev === 'MCCB' ? EXAM_IN_MCCB : EXAM_IN_MCB;
+  var pref = (c && c.In) ? c.In : base;
+  var i;
+  for (i = 0; i < pref.length; i++) { if (pref[i] >= IB - 1e-9) return pref[i]; }
+  for (i = 0; i < base.length; i++) { if (base[i] >= IB - 1e-9) return base[i]; }
+  return base[base.length - 1];
+}
+
+// --- Choose the cable cross-section so that derated Iz >= In (guarantees In<=Iz).
+function examPickCable(In, c, supply) {
+  var minmm = c.min_mm2 || 1.5;
+  var ins = c.ins || 'PVC';
+  for (var i = 0; i < EXAM_XS.length; i++) {
+    var mm = EXAM_XS[i];
+    if (mm < minmm) continue;
+    var rx = AS_CABLE_RX[mm];
+    var sz = cxCableSizing(In, 'C', supply.ambientC || 30, supply.grouping || 1, mm, 'Cu', ins);
+    if (sz.Iz_corr >= In) return { mm2: mm, r: rx.r, x: rx.x, Iz: sz.Iz_corr };
+  }
+  var last = EXAM_XS[EXAM_XS.length - 1], lrx = AS_CABLE_RX[last];
+  var lsz = cxCableSizing(In, 'C', 30, 1, last, 'Cu', ins);
+  return { mm2: last, r: lrx.r, x: lrx.x, Iz: lsz.Iz_corr };
+}
+
+// --- Build one fully-specified circuit (guarantees IB <= In <= Iz).
+function examBuildCircuit(rng, c, supply) {
+  var P = examRangeF(rng, c.P[0], c.P[1], c.Pstep || 0.1);
+  var cos = c.cos || 0.95;
+  var U = 400;
+  var IB = (c.phases === '1x230') ? (P * 1000 / (230 * cos)) : (P * 1000 / (Math.sqrt(3) * U * cos));
+  var In = examPickIn(IB, c.dev, c);
+  var sel = examPickCable(In, c, supply);
+  var len = examRange(rng, c.len[0], c.len[1], c.lenStep || 1);
+  return {
+    key: c.key, name_da: c.name_da, name_en: c.name_en, phases: c.phases,
+    P_kW: +P.toFixed(2), cosPhi: cos, IB: IB, In: In,
+    device: c.dev, curve: c.curve || 'C', isdMult: c.isdMult || 10,
+    S_mm2: sel.mm2, r: sel.r, x: sel.x, Iz: sel.Iz, ins: c.ins || 'PVC', mat: 'Cu',
+    len_m: len, rcd: c.rcd || null, n: 1,
+    motor: !!c.motor, vfd: !!c.vfd, feeder: !!c.feeder, busbar: !!c.busbar,
+    pfc: !!c.pfc, atex: !!c.atex, outdoor: !!c.outdoor, zone: !!c.zone,
+    backfeed: !!c.backfeed, evB: !!c.evB
+  };
+}
+
+// --- The pure solver: pre-computes the entire 3-part solution with exact
+//     complex impedances. Mirrors the auto-solver methodology.
+function examSolveExam(exam) {
+  var s = exam.supply;
+  var U = 400, U0 = 230;
+  var Znet_min = cxNetImpedanceLV(s.Sk_max_MVA, s.RX, U); // smallest Z -> Ik,max
+  var Znet_max = cxNetImpedanceLV(s.Sk_min_MVA, s.RX, U); // largest Z  -> Ik,min
+  var Zt = cxTrafoImpedanceLV(s.ek_pct / 100, s.Sn_kVA * 1000, s.Pcu_W);
+  var er_pct = (s.Pcu_W / (s.Sn_kVA * 1000)) * 100;
+  var ex_pct = Math.sqrt(Math.max(0, s.ek_pct * s.ek_pct - er_pct * er_pct));
+  var Zsup_max = cxAdd(Znet_min, Zt);
+  var Zsup_min = cxAdd(Znet_max, Zt);
+  var I11 = (s.Sn_kVA * 1000) / (Math.sqrt(3) * U);
+  var Ikmax_bus = asIk3(U, Zsup_max, 1.05);
+  var Ikmin_bus = asIk1(U0, Zsup_min, 0.95);
+
+  var circuits = exam.circuits.map(function (cc) {
+    var is3 = (cc.phases !== '1x230');
+    var n = cc.n || 1;
+    // Positive-sequence cable impedance (cold) -> Ik,max at circuit end.
+    var Zc = cxScale(cxCableImpedanceMOhm(cc.len_m, cc.r, cc.x), 1 / n);
+    var Z1 = cxAdd(Zsup_max, Zc);
+    // Warm earth-fault loop: r x 1.24 (Cu 80 C), factor 2 (go + return).
+    var ZcWarm = cxScale(cxCableImpedanceMOhm(cc.len_m, cc.r * 1.24, cc.x), 1 / n);
+    var Zloop = cxAdd(Zsup_min, cxScale(ZcWarm, 2));
+    var Ik3max = asIk3(U, Z1, 1.05);
+    var Ikmin = asIk1(U0, Zloop, 0.95);
+    var cos = cc.cosPhi, sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+    var dv = is3
+      ? (Math.sqrt(3) * cc.IB * (cc.len_m / 1000) * (cc.r * cos + cc.x * sin) / U * 100)
+      : (2 * cc.IB * (cc.len_m / 1000) * (cc.r * cos + cc.x * sin) / U0 * 100);
+    var ia = asDeviceIa(cc);
+    // TT relies on the 30 mA RCD for disconnection; TN on the overcurrent device.
+    var fbOk = (s.earthing === 'TT') ? (cc.rcd ? true : false) : (Ikmin >= ia.Ia);
+    var kb = cxKBKontrol(Ik3max, ia.t, cc.S_mm2, cc.mat || 'Cu', cc.ins || 'PVC');
+    var obOk = (cc.IB <= cc.In + 1e-9) && (cc.In <= cc.Iz + 1e-9);
+    var vdLimit = (cc.key === 'lighting' || cc.key === 'reslight' || cc.key === 'barnlight') ? 3 : 4;
+    return {
+      def: cc, is3: is3, Zc: Zc, Z1: Z1, Zloop: Zloop,
+      Ik3max: Ik3max, Ikmin: Ikmin, vdrop: dv, vdLimit: vdLimit,
+      ia: ia, fbOk: fbOk, kb: kb, obOk: obOk, vdOk: dv <= vdLimit
+    };
+  });
+
+  return {
+    Znet_min: Znet_min, Znet_max: Znet_max, Zt: Zt, er_pct: er_pct, ex_pct: ex_pct,
+    Zsup_max: Zsup_max, Zsup_min: Zsup_min, I11: I11,
+    Ikmax_bus: Ikmax_bus, Ikmin_bus: Ikmin_bus, circuits: circuits
+  };
+}
+
+// --- Opgave-3 regulation clause bank, picked by exam type/difficulty/circuits.
+function examClauses(exam) {
+  var s = exam.supply, diff = EXAM_DIFFICULTY[exam.difficulty] || EXAM_DIFFICULTY.standard;
+  var hasRcd = exam.circuits.some(function (c) { return c.rcd; });
+  var hasBath = exam.circuits.some(function (c) { return c.zone; });
+  var hasOutdoor = exam.circuits.some(function (c) { return c.outdoor; });
+  var hasBackfeed = exam.circuits.some(function (c) { return c.backfeed; });
+  var hasAtex = exam.circuits.some(function (c) { return c.atex; });
+  var list = [];
+  // Always present: automatic disconnection + bonding.
+  list.push({ ref: 'DS/HD 60364-4-41 cl.411.3.2',
+    q_da: 'Hvilke maksimale frakoblingstider g\u00E6lder for slutkredse (\u226432 A) og fordelingskredse i dette ' + (s.earthing) + '-system?',
+    q_en: 'Which maximum disconnection times apply to final circuits (\u226432 A) and distribution circuits in this ' + (s.earthing) + ' system?',
+    a_da: s.earthing === 'TT' ? '0,2 s for slutkredse \u226432 A og 1 s for fordelingskredse (TT). Opn\u00E5s via 30 mA HPFI.' : '0,4 s for slutkredse \u226432 A og 5 s for fordelingskredse (TN). Krav: I_k,min \u2265 I_a.',
+    a_en: s.earthing === 'TT' ? '0.2 s for final circuits \u226432 A and 1 s for distribution circuits (TT). Achieved via 30 mA RCD.' : '0.4 s for final circuits \u226432 A and 5 s for distribution circuits (TN). Requirement: I_k,min \u2265 I_a.' });
+  list.push({ ref: 'DS/HD 60364-4-41 cl.411.3.1.2 / 415.2',
+    q_da: 'Redeg\u00F8r for kravet om beskyttende udligningsforbindelser (PE + supplerende udligning).',
+    q_en: 'Explain the requirement for protective bonding (main + supplementary equipotential bonding).',
+    a_da: 'Hovedudligning skal forbinde PE-skinne med fremmede ledende dele (vand, varme, armering). Supplerende udligning kr\u00E6ves bl.a. i s\u00E6rlige omr\u00E5der jf. cl.415.2.',
+    a_en: 'Main bonding must connect the PE bar to extraneous conductive parts (water, heating, rebar). Supplementary bonding is required e.g. in special locations per cl.415.2.' });
+  list.push({ ref: 'DS/HD 60364-5-52 cl.523',
+    q_da: 'Hvilke korrektionsfaktorer skal anvendes p\u00E5 kablernes str\u00F8mv\u00E6rdi I_z, og hvorfor?',
+    q_en: 'Which correction factors must be applied to the cable current rating I_z, and why?',
+    a_da: 'Temperatur (k_t) og gruppering (k_s), evt. jordl\u00E6gningsdybde/jordmodstand. I_z,korr = I_z,tabel \u00B7 k_t \u00B7 k_s skal stadig b\u00E6re I_n.',
+    a_en: 'Temperature (k_t) and grouping (k_s), plus burial depth/soil resistivity where relevant. I_z,corr = I_z,table \u00B7 k_t \u00B7 k_s must still carry I_n.' });
+  if (hasRcd) list.push({ ref: 'DS/HD 60364-4-41 cl.411.3.3',
+    q_da: 'Hvor kr\u00E6ves en 30 mA fejlstr\u00F8msafbryder (HPFI), og hvilken type for elbil-lader?',
+    q_en: 'Where is a 30 mA RCD required, and which type for an EV charger?',
+    a_da: 'P\u00E5 stikkontaktkredse \u226432 A, badev\u00E6relse og udend\u00F8rs. Elbil-ladere kr\u00E6ver type B (eller A + DC-fejldetektion 6 mA) pga. glatte DC-fejlstr\u00F8mme.',
+    a_en: 'On socket circuits \u226432 A, bathrooms and outdoors. EV chargers require type B (or A + 6 mA DC fault detection) due to smooth DC fault currents.' });
+  if (hasBath) list.push({ ref: 'DS/HD 60364-7-701 cl.701.32',
+    q_da: 'Beskriv zoneinddelingen i badev\u00E6relset og hvilket materiel der m\u00E5 placeres i zone 0/1/2.',
+    q_en: 'Describe the bathroom zone classification and which equipment may be placed in zone 0/1/2.',
+    a_da: 'Zone 0 (i karret): kun SELV \u226412 V. Zone 1: fastmonteret materiel beregnet til zonen. Zone 2: stikkontakter kun med SELV/30 mA HPFI. IP-krav stiger mod zone 0.',
+    a_en: 'Zone 0 (inside tub): only SELV \u226412 V. Zone 1: fixed equipment rated for the zone. Zone 2: sockets only with SELV/30 mA RCD. IP requirements increase toward zone 0.' });
+  if (hasOutdoor || s.earthing === 'TT') list.push({ ref: 'DS/HD 60364-5-51 cl.512.2',
+    q_da: 'Hvilke ydre p\u00E5virkninger (IP-kapsling) skal materiel udend\u00F8rs/i landbrug t\u00E5le?',
+    q_en: 'Which external influences (IP rating) must outdoor/agricultural equipment withstand?',
+    a_da: 'Mindst IP44 udend\u00F8rs (vandst\u00E6nk), ofte IP54/IP65 i landbrug pga. st\u00F8v, vand og mekanisk p\u00E5virkning (IK). V\u00E6lg materiel efter cl.512.2 ydre p\u00E5virkninger.',
+    a_en: 'At least IP44 outdoors (splashing), often IP54/IP65 in agriculture due to dust, water and mechanical impact (IK). Select equipment per cl.512.2 external influences.' });
+  if (diff.selectivity) list.push({ ref: 'DS/HD 60364-5-53 cl.536',
+    q_da: 'Forklar kravet om selektivitet mellem fordelingstavlens beskyttelse og slutkredsenes beskyttelse.',
+    q_en: 'Explain the requirement for selectivity between the distribution board protection and the final-circuit protection.',
+    a_da: 'Ved fejl skal kun den n\u00E6rmeste beskyttelse opstr\u00F8ms udl\u00F8se. Verificeres via TCC-overlay/fabrikanttabeller; str\u00F8m- og tidsselektivitet (typisk forhold \u22651,6:1 for gG).',
+    a_en: 'On a fault only the nearest upstream protection should trip. Verified via TCC overlay/manufacturer tables; current and time selectivity (typically ratio \u22651.6:1 for gG).' });
+  if (s.earthing === 'TT') list.push({ ref: 'DS/HD 60364-4-41 cl.411.5',
+    q_da: 'Hvordan opfyldes fejlbeskyttelse i et TT-system, og hvad er kravet til R_A \u00B7 I\u0394n?',
+    q_en: 'How is fault protection achieved in a TT system, and what is the requirement for R_A \u00B7 I\u0394n?',
+    a_da: 'Med fejlstr\u00F8msafbrydere: R_A \u00B7 I\u0394n \u2264 50 V. Med 30 mA HPFI bliver kravet til jordelektrodemodstanden R_A meget lempeligt (\u2264 1667 \u03A9).',
+    a_en: 'With RCDs: R_A \u00B7 I\u0394n \u2264 50 V. With a 30 mA RCD the requirement on the earth-electrode resistance R_A becomes very relaxed (\u2264 1667 \u03A9).' });
+  if (hasBackfeed) list.push({ ref: 'DS/HD 60364-7-712 / F\u00E6llesregulativet',
+    q_da: 'Hvilke krav stilles til tilbagef\u00F8dningsbeskyttelse og nettilslutning for solceller/batteri?',
+    q_en: 'Which requirements apply to back-feed protection and grid connection for solar/battery?',
+    a_da: 'Inverteren skal afbryde ved netbortfald (anti-\u00F8drift, LOM), og produktionsanl\u00E6gget tilmeldes netselskabet jf. F\u00E6llesregulativet. Beskyttelse mod tilbagef\u00F8dning til fejlramt net.',
+    a_en: 'The inverter must disconnect on grid loss (anti-islanding, LOM), and the generating plant must be registered with the DSO per F\u00E6llesregulativet. Protection against back-feeding a faulted grid.' });
+  if (hasAtex) list.push({ ref: 'DS/EN 60079 / ATEX',
+    q_da: 'Hvilke s\u00E6rlige krav g\u00E6lder for elinstallation i en ATEX-klassificeret zone?',
+    q_en: 'Which special requirements apply to electrical installation in an ATEX-classified zone?',
+    a_da: 'Materiel skal v\u00E6re Ex-godkendt for zonen (kategori), korrekt kabelindf\u00F8ring og potentialudligning. Dokumentation jf. eksplosionssikringsdokument.',
+    a_en: 'Equipment must be Ex-certified for the zone (category), with correct cable glands and equipotential bonding. Documentation per the explosion-protection document.' });
+  return list;
+}
+
+// ----------------------------------------------------------------------------
+//  THE PUBLIC GENERATOR — returns a complete exam object (params + solution).
+// ----------------------------------------------------------------------------
+function generateAuthExam(type, difficulty, seed) {
+  type = EXAM_GEN_TEMPLATES[type] ? type : 'A';
+  difficulty = EXAM_DIFFICULTY[difficulty] ? difficulty : 'standard';
+  if (seed == null) seed = (Math.random() * 2147483647) | 0;
+  var rng = examRng(seed);
+  var tpl = EXAM_GEN_TEMPLATES[type];
+  var diff = EXAM_DIFFICULTY[difficulty];
+
+  // ---- Supply parameters (Opgave 1 data) ----
+  var SkMax = examPick(rng, tpl.Sk_max);
+  var SkMin = Math.max(20, Math.round(SkMax * examPick(rng, tpl.skMinFrac)));
+  // Harder exams bias toward larger transformers.
+  var SnList = tpl.Sn.slice();
+  if (diff.id === 'avanceret') SnList = SnList.slice(Math.floor(SnList.length / 3));
+  else if (diff.id === 'ekspert') SnList = SnList.slice(Math.floor(SnList.length / 2));
+  var Sn = examPick(rng, SnList);
+  var supply = {
+    type: type, difficulty: difficulty,
+    Un_HV_kV: tpl.Un_HV_kV, Un_LV: 400, U0: 230,
+    Sk_max_MVA: SkMax, Sk_min_MVA: SkMin, RX: examPick(rng, tpl.RX),
+    Sn_kVA: Sn, ek_pct: examPick(rng, tpl.ek), Pcu_W: examTrafoPcu(Sn),
+    earthing: tpl.earthing, ambientC: 30, grouping: 1
+  };
+
+  // ---- Circuit selection (Opgave 2 data) ----
+  var required = tpl.pool.filter(function (c) { return c.required; });
+  var optional = examShuffle(rng, tpl.pool.filter(function (c) { return !c.required; }));
+  var target = Math.max(required.length, Math.min(tpl.pool.length, diff.nCircuits));
+  var chosen = required.slice();
+  for (var i = 0; i < optional.length && chosen.length < target; i++) chosen.push(optional[i]);
+  var circuits = chosen.map(function (c) { return examBuildCircuit(rng, c, supply); });
+
+  var exam = {
+    type: type, difficulty: difficulty, seed: seed,
+    supply: supply, circuits: circuits
+  };
+  exam.sol = examSolveExam(exam);
+  exam.clauses = examClauses(exam);
+  return exam;
+}
+
+// ----------------------------------------------------------------------------
+//  STATE  (100% click-only)
+// ----------------------------------------------------------------------------
+let examGenState = { type: null, difficulty: 'standard', currentExam: null, showSolution: { 1: false, 2: false, 3: false }, attempted: 0 };
+
+function examGenLoadStats() {
+  try { return JSON.parse(localStorage.getItem('examgen_stats')) || { total: 0, byType: {} }; }
+  catch (e) { return { total: 0, byType: {} }; }
+}
+function examGenSaveStats(st) { try { localStorage.setItem('examgen_stats', JSON.stringify(st)); } catch (e) {} }
+
+function examGenSelectType(t) {
+  examGenState.type = t;
+  examGenNew();
+}
+function examGenSetDifficulty(d) {
+  examGenState.difficulty = d;
+  if (examGenState.type) examGenNew(); else renderModule('examgen');
+}
+function examGenNew() {
+  var t = examGenState.type || 'A';
+  examGenState.type = t;
+  examGenState.currentExam = generateAuthExam(t, examGenState.difficulty);
+  examGenState.showSolution = { 1: false, 2: false, 3: false };
+  examGenState.attempted++;
+  var stats = examGenLoadStats();
+  stats.total = (stats.total || 0) + 1;
+  stats.byType[t] = (stats.byType[t] || 0) + 1;
+  examGenSaveStats(stats);
+  renderModule('examgen');
+}
+function examGenToggleSolution(part) {
+  examGenState.showSolution[part] = !examGenState.showSolution[part];
+  renderModule('examgen');
+}
+
+// ----------------------------------------------------------------------------
+//  RENDER
+// ----------------------------------------------------------------------------
+function examGenSupplyCard(exam) {
+  var s = exam.supply;
+  var h = '<div class="card fade-in"><div class="card-title">\uD83D\uDD0C ' + tx('Forsyningsdata', 'Supply data') + '</div>';
+  h += '<div class="result-box"><div class="result-row" style="flex-wrap:wrap;gap:14px">';
+  h += '<span>U<sub>n,HV</sub> = ' + asDa(s.Un_HV_kV) + ' kV</span>';
+  h += '<span>U<sub>n</sub> = ' + s.Un_LV + ' V / U<sub>0</sub> = ' + s.U0 + ' V</span>';
+  h += '<span>S<sub>k,max</sub> = ' + asDa(s.Sk_max_MVA) + ' MVA</span>';
+  h += '<span>S<sub>k,min</sub> = ' + asDa(s.Sk_min_MVA) + ' MVA</span>';
+  h += '<span>R/X = ' + asDa(s.RX) + '</span>';
+  h += '</div><div class="result-row" style="flex-wrap:wrap;gap:14px;margin-top:6px">';
+  h += '<span>S<sub>N</sub> = ' + asDa(s.Sn_kVA) + ' kVA</span>';
+  h += '<span>e<sub>k</sub> = ' + asDa(s.ek_pct) + ' %</span>';
+  h += '<span>P<sub>Cu</sub> = ' + s.Pcu_W + ' W</span>';
+  h += '<span>' + tx('Jordingssystem', 'Earthing') + ': <strong>' + s.earthing + '</strong></span>';
+  h += '</div></div></div>';
+  return h;
+}
+
+function examGenCircuitsCard(exam) {
+  var h = '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + tx('Kredsskema (belastningsgrundlag)', 'Circuit schedule (load basis)') + '</div>';
+  h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.86rem">';
+  h += '<tr style="text-align:left;border-bottom:2px solid var(--border)">';
+  ['Mrk', tx('Last', 'Load'), tx('Fase', 'Phase'), 'P [kW]', 'cos\u03C6', 'I<sub>B</sub> [A]', 'I<sub>n</sub> [A]', tx('Apparat', 'Device'), tx('Kabel', 'Cable'), 'L [m]', 'HPFI'].forEach(function (th) {
+    h += '<th style="padding:6px 8px">' + th + '</th>';
+  });
+  h += '</tr>';
+  exam.circuits.forEach(function (c, i) {
+    h += '<tr style="border-bottom:1px solid var(--border)">';
+    h += '<td style="padding:5px 8px">-K' + (i + 1) + '</td>';
+    h += '<td style="padding:5px 8px">' + tx(c.name_da, c.name_en) + '</td>';
+    h += '<td style="padding:5px 8px">' + (c.phases === '1x230' ? '1~' : '3~') + '</td>';
+    h += '<td style="padding:5px 8px">' + asDa(c.P_kW) + '</td>';
+    h += '<td style="padding:5px 8px">' + asDa(c.cosPhi) + '</td>';
+    h += '<td style="padding:5px 8px">' + asDa(c.IB.toFixed(1)) + '</td>';
+    h += '<td style="padding:5px 8px">' + c.In + '</td>';
+    h += '<td style="padding:5px 8px">' + (c.device === 'MCB' ? (c.curve + c.In) : c.device + ' ' + c.In + 'A') + '</td>';
+    h += '<td style="padding:5px 8px">' + asDa(c.S_mm2) + 'mm\u00B2 ' + c.ins + '</td>';
+    h += '<td style="padding:5px 8px">' + c.len_m + '</td>';
+    h += '<td style="padding:5px 8px">' + (c.rcd ? (c.rcd + ' mA' + (c.evB ? ' (B)' : '')) : '\u2013') + '</td>';
+    h += '</tr>';
+  });
+  h += '</table></div></div>';
+  return h;
+}
+
+function examGenSolveBtn(part) {
+  var open = examGenState.showSolution[part];
+  return '<button class="sel-btn' + (open ? ' selected' : '') + '" onclick="examGenToggleSolution(' + part + ')">' +
+    (open ? '\uD83D\uDC41\uFE0F ' + tx('Skjul l\u00F8sning', 'Hide solution') : '\uD83D\uDD0D ' + tx('Vis l\u00F8sning', 'Show solution')) + '</button>';
+}
+
+function examGenOpgave1(exam) {
+  var s = exam.supply, R = exam.sol;
+  var h = '<div class="card fade-in"><div class="card-title">\uD83D\uDCD0 ' + tx('OPGAVE 1 \u2014 Forsyning (20%)', 'OPGAVE 1 \u2014 Supply (20%)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Bestem netimpedansen (arccot R/X), transformerimpedansen (arccos e_r/e_k), den samlede forsyningsimpedans ved lavsp\u00E6ndingsskinnen, transformerens fuldlaststr\u00F8m og den maksimale 3-fasede kortslutningsstr\u00F8m I_k,max ved skinnen.',
+    'Determine the network impedance (arccot R/X), the transformer impedance (arccos e_r/e_k), the combined supply impedance at the LV busbar, the transformer full-load current, and the maximum 3-phase short-circuit current I_k,max at the busbar.') + '</div>';
+  h += '<div style="margin:10px 0">' + examGenSolveBtn(1) + '</div>';
+  if (examGenState.showSolution[1]) {
+    h += '<div style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:6px 4px">';
+    h += mcPrimeHeader(tx('NETIMPEDANS (arccot R/X)', 'NETWORK IMPEDANCE (arccot R/X)'));
+    h += asMcZ('Z<sub>net,min</sub>', ':= (U<sub>n</sub>\u00B2/S<sub>k,max</sub>) \u2220 arccot(R/X) =',
+      '(' + s.Un_LV + '\u00B2/' + s.Sk_max_MVA + '\u00B710\u2076) \u2220 arccot(' + asDa(s.RX) + ')', R.Znet_min, 'm\u03A9', tx('lille Z \u2192 I_k,max', 'small Z \u2192 I_k,max'));
+    h += asMcZ('Z<sub>net,max</sub>', ':= (U<sub>n</sub>\u00B2/S<sub>k,min</sub>) \u2220 arccot(R/X) =',
+      '(' + s.Un_LV + '\u00B2/' + s.Sk_min_MVA + '\u00B710\u2076) \u2220 arccot(' + asDa(s.RX) + ')', R.Znet_max, 'm\u03A9', tx('stor Z \u2192 I_k,min', 'large Z \u2192 I_k,min'));
+    h += mcPrimeHeader(tx('TRANSFORMERIMPEDANS (arccos e_r/e_k)', 'TRANSFORMER IMPEDANCE (arccos e_r/e_k)'));
+    h += asMcS('e<sub>r</sub>', ':= P<sub>Cu</sub>/S<sub>N</sub> =', s.Pcu_W + '/' + (s.Sn_kVA * 1000), R.er_pct.toFixed(3), '%', tx('resistiv andel', 'resistive part'));
+    h += asMcS('e<sub>x</sub>', ':= \u221A(e<sub>k</sub>\u00B2\u2212e<sub>r</sub>\u00B2) =', '\u221A(' + asDa(s.ek_pct) + '\u00B2\u2212' + asDa(R.er_pct.toFixed(3)) + '\u00B2)', R.ex_pct.toFixed(3), '%', tx('reaktiv andel', 'reactive part'));
+    h += asMcZ('Z<sub>T</sub>', ':= (U<sub>n</sub>\u00B2\u00B7e<sub>k</sub>/S<sub>N</sub>) \u2220 arccos(e<sub>r</sub>/e<sub>k</sub>) =',
+      '(' + s.Un_LV + '\u00B2\u00B7' + asDa(s.ek_pct) + '%/' + (s.Sn_kVA * 1000) + ')', R.Zt, 'm\u03A9', null);
+    h += mcPrimeHeader(tx('SAMLET FORSYNINGSIMPEDANS VED LV-SKINNE', 'COMBINED SUPPLY IMPEDANCE AT LV BUSBAR'));
+    h += asMcZ('Z<sub>fors,max</sub>', ':= Z<sub>net,min</sub> + Z<sub>T</sub> =', '', R.Zsup_max, 'm\u03A9', tx('til I_k,max', 'for I_k,max'));
+    h += asMcZ('Z<sub>fors,min</sub>', ':= Z<sub>net,max</sub> + Z<sub>T</sub> =', '', R.Zsup_min, 'm\u03A9', tx('til I_k,min', 'for I_k,min'));
+    h += asMcS('I<sub>1/1</sub>', ':= S<sub>N</sub>/(\u221A3\u00B7U<sub>n</sub>) =', (s.Sn_kVA * 1000) + '/(\u221A3\u00B7' + s.Un_LV + ')', R.I11.toFixed(1), 'A', tx('fuldlaststr\u00F8m LV', 'full-load current LV'));
+    h += asMcS('I<sub>k,max</sub>', ':= 1,05\u00B7U<sub>n</sub>/(\u221A3\u00B7|Z<sub>fors,max</sub>|) =', '', (R.Ikmax_bus / 1000).toFixed(2), 'kA', tx('3-faset ved skinne (c=1,05)', '3-phase at busbar (c=1.05)'));
+    h += asMcS('I<sub>k,min</sub>', ':= 0,95\u00B7U<sub>0</sub>/|Z<sub>fors,min</sub>| =', '', R.Ikmin_bus.toFixed(0), 'A', tx('enpolet ved skinne (c=0,95)', 'single-phase at busbar (c=0.95)'));
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function examGenOpgave2(exam) {
+  var R = exam.sol;
+  var h = '<div class="card fade-in"><div class="card-title">\uD83D\uDCD0 ' + tx('OPGAVE 2 \u2014 Bygningsinstallation (60%)', 'OPGAVE 2 \u2014 Building installation (60%)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'For hver kreds: best\u00E6m belastningsstr\u00F8m I_B, v\u00E6lg apparat I_n (I_B \u2264 I_n \u2264 I_z), dimensioner kablet, og kontroll\u00E9r sp\u00E6ndingsfald (\u0394U), kortslutningsbeskyttelse (KB) og fejlbeskyttelse (FB).',
+    'For each circuit: determine the load current I_B, select the device I_n (I_B \u2264 I_n \u2264 I_z), size the cable, and check voltage drop (\u0394U), short-circuit protection (KB) and fault protection (FB).') + '</div>';
+  h += '<div style="margin:10px 0">' + examGenSolveBtn(2) + '</div>';
+  if (examGenState.showSolution[2]) {
+    h += '<div style="font-family:\'Cambria Math\',\'Times New Roman\',serif;padding:6px 4px">';
+    R.circuits.forEach(function (nd) {
+      var c = nd.def;
+      h += mcPrimeHeader(tx(c.name_da, c.name_en) + ' \u2014 ' + asDa(c.S_mm2) + 'mm\u00B2 ' + (c.mat || 'Cu') + '/' + c.ins + ', ' + c.len_m + 'm, ' + (nd.is3 ? '3~' : '1~'));
+      h += asMcS('I<sub>B</sub>', nd.is3 ? ':= P/(\u221A3\u00B7U\u00B7cos\u03C6) =' : ':= P/(U\u2080\u00B7cos\u03C6) =', (c.P_kW * 1000) + 'W', c.IB.toFixed(1), 'A', null);
+      h += mcPrimeLine(tx('OB', 'OL'), 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>z</sub> =', asDa(c.IB.toFixed(1)) + ' \u2264 ' + c.In + ' \u2264 ' + asDa(c.Iz.toFixed(1)) + ' A', (nd.obOk ? mcPrimeOk() : mcPrimeFail(tx('Kabel for lille', 'Cable too small'))), '', mcPrimeRef('cl.433.1'));
+      h += asMcZ('Z<sub>kabel</sub>', ':= l\u00B7(r+jx) =', c.len_m + 'm\u00B7(' + asDa(c.r) + '+j' + asDa(c.x) + ')\u03A9/km', nd.Zc, 'm\u03A9', null);
+      h += asMcS('I<sub>k,max</sub>', ':= 1,05\u00B7U<sub>n</sub>/(\u221A3\u00B7|Z<sub>1</sub>|) =', '', (nd.Ik3max / 1000).toFixed(2), 'kA', tx('til brydeevne I_cu', 'for breaking capacity I_cu'));
+      h += asMcS('I<sub>k,min</sub>', ':= 0,95\u00B7U<sub>0</sub>/|Z<sub>s</sub>| =', tx('(varm r\u00D71,24, sl\u00F8jfe \u00D72)', '(warm r\u00D71.24, loop \u00D72)'), nd.Ikmin.toFixed(0), 'A', null);
+      h += mcPrimeLine('\u0394U', '=', asDa(nd.vdrop.toFixed(2)) + '% (\u2264 ' + nd.vdLimit + '%)', (nd.vdOk ? mcPrimeOk() : mcPrimeFail('>' + nd.vdLimit + '%')), '', mcPrimeRef('cl.525'));
+      if (exam.supply.earthing === 'TT') {
+        h += mcPrimeLine(tx('FB (TT)', 'FP (TT)'), '30 mA HPFI \u2192 R<sub>A</sub>\u00B7I\u0394n \u2264 50 V', '', (c.rcd ? mcPrimeOk() : mcPrimeFail(tx('Mangler HPFI', 'RCD missing'))), '', mcPrimeRef('cl.411.5'));
+      } else {
+        h += mcPrimeLine(tx('FB', 'FP'), 'I<sub>k,min</sub> \u2265 I<sub>a</sub> =', nd.Ikmin.toFixed(0) + ' \u2265 ' + nd.ia.Ia.toFixed(0) + ' A (' + nd.ia.basis + ', t\u2264' + asDa(nd.ia.t) + 's)', (nd.fbOk ? mcPrimeOk() : mcPrimeFail(tx('Udkobler ikke', 'No disconnect'))), '', mcPrimeRef('cl.411.3.2'));
+      }
+      h += mcPrimeLine(tx('KB', 'SC'), 'I\u00B2t \u2264 k\u00B2S\u00B2 =', (nd.kb.I2t / 1e6).toFixed(2) + ' \u2264 ' + (nd.kb.k2S2 / 1e6).toFixed(2) + ' \u00D710\u2076 A\u00B2s (k=' + nd.kb.k + ')', (nd.kb.ok ? mcPrimeOk() : mcPrimeFail(tx('Ikke beskyttet', 'Not protected'))), '', mcPrimeRef('cl.434.5.2'));
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function examGenOpgave3(exam) {
+  var h = '<div class="card fade-in"><div class="card-title">\uD83D\uDCD8 ' + tx('OPGAVE 3 \u2014 Regler (20%)', 'OPGAVE 3 \u2014 Regulations (20%)') + '</div>';
+  h += '<div class="info-row">' + tx('Besvar f\u00F8lgende sp\u00F8rgsm\u00E5l med henvisning til g\u00E6ldende bestemmelser i DS/HD 60364 m.fl.', 'Answer the following questions with reference to the applicable clauses of DS/HD 60364 et al.') + '</div>';
+  exam.clauses.forEach(function (c, i) {
+    h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-wrap:wrap;gap:8px"><strong>' + (i + 1) + '.</strong> <span>' + tx(c.q_da, c.q_en) + '</span></div></div>';
+  });
+  h += '<div style="margin:10px 0">' + examGenSolveBtn(3) + '</div>';
+  if (examGenState.showSolution[3]) {
+    exam.clauses.forEach(function (c, i) {
+      h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-wrap:wrap;gap:8px"><strong>' + (i + 1) + '.</strong> ' + mcPrimeRef(c.ref) + '</div>';
+      h += '<div class="info-row" style="margin:4px 0 0">' + tx(c.a_da, c.a_en) + '</div></div>';
+    });
+    h += '<div class="info-row" style="margin-top:12px">' + tx('Konservativt l\u00F8sningsforslag. Verificer altid mod g\u00E6ldende DS/HD 60364 og Sikkerhedsstyrelsen.', 'Conservative solution proposal. Always verify against the current DS/HD 60364 and the Danish Safety Authority.') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderExamGen() {
+  var st = examGenState;
+  var stats = examGenLoadStats();
+  var h = '';
+
+  // ---- intro ----
+  h += '<div class="card fade-in"><div class="card-title">\uD83C\uDF93 ' + tx('Autorisationspr\u00F8ve \u2014 opgavegenerator', 'Authorization exam \u2014 exercise generator') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Gener\u00E9r ubegr\u00E6nset antal realistiske danske autorisationspr\u00F8ver til \u00F8velse. Hver opgave har 3 sammenh\u00E6ngende dele: Opgave 1 (Forsyning 20%), Opgave 2 (Bygningsinstallation 60%) og Opgave 3 (Regler 20%) \u2014 med tilf\u00E6ldige men realistiske data og en fuldt udregnet l\u00F8sning i Mathcad Prime-stil. 100% klik.',
+    'Generate an unlimited number of realistic Danish authorization exams for practice. Each exercise has 3 linked parts: Opgave 1 (Supply 20%), Opgave 2 (Building installation 60%) and Opgave 3 (Regulations 20%) \u2014 with randomized yet realistic data and a fully worked solution in Mathcad Prime style. 100% click.') + '</div>';
+  h += '<div class="info-row"><strong>' + tx('Genererede opgaver i alt', 'Total exercises generated') + ': ' + (stats.total || 0) + '</strong>';
+  if (st.attempted > 0) h += ' \u2014 ' + tx('denne session', 'this session') + ': ' + st.attempted;
+  h += '</div></div>';
+
+  // ---- type selection ----
+  h += '<div class="card fade-in"><div class="card-title">' + tx('1) V\u00E6lg opgavetype', '1) Choose exercise type') + '</div>';
+  h += '<div class="select-grid">';
+  ['A', 'B', 'C', 'D', 'E'].forEach(function (t) {
+    var tpl = EXAM_GEN_TEMPLATES[t];
+    h += '<button class="sel-btn' + (st.type === t ? ' selected' : '') + '" onclick="examGenSelectType(\'' + t + '\')">' + tpl.icon + ' ' + tx('Type ' + t + ' \u00B7 ' + tpl.name_da, 'Type ' + t + ' \u00B7 ' + tpl.name_en) + '</button>';
+  });
+  h += '</div>';
+  if (st.type) {
+    var sel = EXAM_GEN_TEMPLATES[st.type];
+    h += '<div class="info-row" style="margin-top:8px">' + tx(sel.desc_da, sel.desc_en) + '</div>';
+  }
+  h += '</div>';
+
+  // ---- difficulty + generate ----
+  h += '<div class="card fade-in"><div class="card-title">' + tx('2) Sv\u00E6rhedsgrad', '2) Difficulty') + '</div><div class="select-grid">';
+  [['standard', tx('Standard', 'Standard')], ['avanceret', tx('Avanceret', 'Advanced')], ['ekspert', tx('Ekspert', 'Expert')]].forEach(function (d) {
+    h += '<button class="sel-btn' + (st.difficulty === d[0] ? ' selected' : '') + '" onclick="examGenSetDifficulty(\'' + d[0] + '\')">' + d[1] + '</button>';
+  });
+  h += '</div>';
+  h += '<div style="margin-top:14px"><button class="sel-btn selected" style="font-size:1.05rem;padding:12px 22px" onclick="examGenNew()">\uD83C\uDFB2 ' + tx('Gener\u00E9r ny opgave', 'Generate new exercise') + '</button></div>';
+  h += '</div>';
+
+  // ---- the exam ----
+  if (!st.currentExam) {
+    h += '<div class="card fade-in"><div class="info-row">' + tx('V\u00E6lg en type ovenfor og tryk \u201EGener\u00E9r ny opgave\u201C for at starte.', 'Choose a type above and press \u201CGenerate new exercise\u201D to start.') + '</div></div>';
+    return h;
+  }
+  var ex = st.currentExam;
+  var tpl = EXAM_GEN_TEMPLATES[ex.type];
+  h += '<div class="card fade-in"><div class="card-title">' + tpl.icon + ' ' + tx('Opgave: ' + tpl.name_da, 'Exercise: ' + tpl.name_en) + ' \u2014 ' + tx({ standard: 'Standard', avanceret: 'Avanceret', ekspert: 'Ekspert' }[ex.difficulty], { standard: 'Standard', avanceret: 'Advanced', ekspert: 'Expert' }[ex.difficulty]) + '</div>';
+  h += '<div class="info-row">' + tx('Opgavenr.', 'Exercise no.') + ' #' + ex.seed + '</div></div>';
+  h += examGenSupplyCard(ex);
+  h += examGenCircuitsCard(ex);
+  h += examGenOpgave1(ex);
+  h += examGenOpgave2(ex);
+  h += examGenOpgave3(ex);
+  return h;
 }
 
 // ============================================================================
