@@ -962,6 +962,7 @@ const T = {
       verify: 'Verifikation',
       draw: 'Tegning',
       exam: '\uD83C\uDF93 Eksamen',
+      autoexam: '\uD83C\uDFD7\uFE0F Autorisationspr\u00f8ve',
       brain: 'El-Hjerne',
       pdf: 'Dokumentation',
       thermal: 'Termisk Sim.',
@@ -1118,6 +1119,7 @@ const T = {
       verify: 'Verify',
       draw: 'Drawing',
       exam: '\uD83C\uDF93 Exam',
+      autoexam: '\uD83C\uDFD7\uFE0F Authorization Exam',
       brain: 'Brain',
       pdf: 'Documentation',
       thermal: 'Thermal Sim',
@@ -1266,6 +1268,7 @@ const T = {
       verify: 'صحت‌سنجی',
       draw: 'نقشه',
       exam: '🎓 آزمون',
+      autoexam: '🏗️ آزمون مجوز',
       brain: 'مغز برقی',
       pdf: 'مستندات',
       thermal: 'شبیه\u200Cسازی حرارتی',
@@ -5126,7 +5129,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai']
+    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'autoexam', 'ai']
   }
 ];
 
@@ -6553,6 +6556,7 @@ function renderModule(mod) {
     case 'draw': content = renderDrawing(); break;
     case 'sld': content = renderSLD(); break;
     case 'exam': content = renderExam(); break;
+    case 'autoexam': content = renderAutoExam(); break;
     case 'brain': content = renderBrain(); break;
     case 'pdf': content = renderPDF(); break;
     case 'thermal': content = renderThermal(); break;
@@ -6613,7 +6617,7 @@ function renderModule(mod) {
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','autoexam','kritisk','guide'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -11242,7 +11246,661 @@ function renderDrawing(){
   return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${tx('Tegning af installationen', 'Installation drawing')}</div><div class="info-row">${tx('Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.', 'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.')}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${tx('Enstregsdiagram', 'Single-line')}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${tx('3D-skitse', '3D scene')}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div>`;
 }
 
+// ============================================================================
+// ===== AUTORISATIONSPR\u00d8VE-GENERATOR (autoexam) =============================
+// ============================================================================
+// A generator + worked-solution engine + AI examiner that produces full Danish
+// authorization-examination ("autorisationspr\u00f8ve") projects indistinguishable in
+// structure, language, methodology and evaluation from the real exams in the repo
+// (Maskinmester el-autorisationspr\u00f8ver 2006-2023, godkendt af Sikkerhedsstyrelsen).
+//
+// LIFE-SAFETY: every number in a generated worked solution is computed by the PURE
+// helpers below (axIB, axVdrop, axIkTrafoSecondary, axAdiabatic, axSelectCable ...),
+// which mirror the verified DS/HD 60364 formulas used elsewhere in the app and share
+// the single-source Iz tables (IZ_COPPER / IZ_COPPER_XLPE / IZ_ALU / IZ_ALU_XLPE).
+// Conservative throughout: round IB up, Iz down, never accept Iz < IB, always cite
+// the governing DS/HD 60364 clause.
+//
+// CLICK-ONLY: all answer capture uses the shared valSelect/valStep pickers \u2014 no typing.
+// ============================================================================
+
+// --- Deterministic PRNG (mulberry32): identical seed => identical exam. --------
+function axRngMake(seed) {
+  var s = (seed >>> 0) || 1;
+  return function () {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function axRngInt(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1)); }
+function axRngPick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+// Pick the value of a multilingual variant array {da:[...],en:[...]} at index i.
+function axVariant(rng, n) { return Math.floor(rng() * n); }
+
+// --- Danish/English number formatting (decimal comma in da, thousands dot). ----
+function axFmt(x, dec) {
+  if (x == null || (typeof x === 'number' && !isFinite(x))) return '\u2014';
+  if (typeof x !== 'number') return String(x);
+  var neg = x < 0; var ax = Math.abs(x);
+  var s = (dec === undefined) ? String(ax) : ax.toFixed(dec);
+  // thousands separator on the integer part
+  var parts = s.split('.');
+  var intp = parts[0];
+  var grp = intp.replace(/\B(?=(\d{3})+(?!\d))/g, (typeof lang !== 'undefined' && lang === 'da') ? '.' : ',');
+  var out = grp;
+  if (parts.length > 1) out += ((typeof lang !== 'undefined' && lang === 'da') ? ',' : '.') + parts[1];
+  return (neg ? '\u2212' : '') + out;
+}
+
+// --- Standard reference data --------------------------------------------------
+// IEC standard device ratings (A) \u2014 MCB/fuse/MCCB across the full range.
+var AX_STD_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+// Adiabatic k (A\u00b7s^0.5/mm\u00b2) per IEC 60364-4-43 Table 43A.
+var AX_K = { 'Cu/PVC': 115, 'Cu/XLPE': 143, 'Al/PVC': 76, 'Al/XLPE': 94 };
+// Conductor AC resistance at operating temp (\u03a9/km) by cross-section \u2014 Cu (IEC 60228,
+// consistent with the app's NKT product r-values). Al \u2248 Cu \u00d7 1.64.
+var AX_R_CU = { 1.5: 12.1, 2.5: 7.41, 4: 4.61, 6: 3.08, 10: 1.83, 16: 1.15, 25: 0.727, 35: 0.524, 50: 0.387, 70: 0.268, 95: 0.193, 120: 0.153, 150: 0.124, 185: 0.0991, 240: 0.0754 };
+var AX_X_LV = { 1.5: 0.090, 2.5: 0.085, 4: 0.082, 6: 0.080, 10: 0.078, 16: 0.076, 25: 0.075, 35: 0.074, 50: 0.073, 70: 0.072, 95: 0.072, 120: 0.071, 150: 0.071, 185: 0.070, 240: 0.070 };
+function axCableR(csa, material) { var r = AX_R_CU[csa]; if (r == null) return null; return (material === 'Al') ? Math.round(r * 1.64 * 1e4) / 1e4 : r; }
+function axCableX(csa) { return AX_X_LV[csa] != null ? AX_X_LV[csa] : 0.08; }
+// Return the single-source Iz table for a material/insulation combination.
+function axIzTable(material, insulation) {
+  var xlpe = (insulation === 'XLPE');
+  if (material === 'Al') return xlpe ? IZ_ALU_XLPE : IZ_ALU;
+  return xlpe ? IZ_COPPER_XLPE : IZ_COPPER;
+}
+
+// --- PURE life-safety calc helpers (testable, no DOM/UI state) -----------------
+
+// Load current IB. phases: 3 (=> \u221a3\u00b7U) or 1 (=> U). eta default 1 (motors pass \u03b7).
+function axIB(P_kW, U_V, cosPhi, eta, phases) {
+  var P = P_kW * 1000; var e = (eta && eta > 0) ? eta : 1; var c = (cosPhi && cosPhi > 0) ? cosPhi : 1;
+  var den = (phases === 3) ? (Math.sqrt(3) * U_V * c * e) : (U_V * c * e);
+  return den > 0 ? P / den : 0;
+}
+// Smallest standard device rating In with In >= IB (conservative: never below IB).
+function axDeviceRating(IB) {
+  for (var i = 0; i < AX_STD_RATINGS.length; i++) { if (AX_STD_RATINGS[i] >= IB - 1e-9) return AX_STD_RATINGS[i]; }
+  return AX_STD_RATINGS[AX_STD_RATINGS.length - 1];
+}
+// Corrected ampacity Iz = Iz_table \u00b7 kTemp \u00b7 kGroup \u00b7 kInstall.
+function axCorrectedIz(csa, material, insulation, kTemp, kGroup, kInstall) {
+  var tab = axIzTable(material, insulation); var base = tab[csa];
+  if (base == null) return null;
+  var k = (kTemp || 1) * (kGroup || 1) * (kInstall || 1);
+  return Math.round(base * k * 10) / 10;
+}
+// Select the smallest cross-section whose corrected Iz >= In (=> Iz >= In >= IB).
+// Returns { csa, baseIz, izCorr, k } or null if nothing in the table is large enough.
+function axSelectCable(In, material, insulation, kTemp, kGroup, kInstall) {
+  var tab = axIzTable(material, insulation);
+  var csas = Object.keys(tab).map(Number).sort(function (a, b) { return a - b; });
+  var k = (kTemp || 1) * (kGroup || 1) * (kInstall || 1);
+  for (var i = 0; i < csas.length; i++) {
+    var csa = csas[i]; var izCorr = Math.round(tab[csa] * k * 10) / 10;
+    if (izCorr >= In - 1e-9) return { csa: csa, baseIz: tab[csa], izCorr: izCorr, k: Math.round(k * 1000) / 1000 };
+  }
+  return null;
+}
+// Voltage drop. phases 3 => \u221a3 factor & Un=400; 1 => factor 2 & Un=230 (unless given).
+function axVdrop(IB, L_m, r_ohmkm, x_ohmkm, cosPhi, phases, Un) {
+  var factor = (phases === 3) ? Math.sqrt(3) : 2;
+  var U = Un || ((phases === 3) ? 400 : 230);
+  var sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
+  var dU = factor * IB * (L_m / 1000) * (r_ohmkm * cosPhi + x_ohmkm * sinPhi);
+  return { dU: Math.round(dU * 1000) / 1000, pct: Math.round((dU / U) * 100 * 1000) / 1000, Un: U };
+}
+// Transformer secondary full-load current and conservative prospective Ik (trafo Z only).
+function axIkTrafoSecondary(SN_kVA, U_V, ek_pct) {
+  var In = (SN_kVA * 1000) / (Math.sqrt(3) * U_V);
+  var Ik = In / (ek_pct / 100);
+  return { In: Math.round(In * 10) / 10, Ik: Math.round(Ik), IkkA: Math.round(Ik / 100) / 10 };
+}
+// Adiabatic short-circuit check: conductor capability k\u00b2S\u00b2 >= I\u00b2t (let-through energy).
+// Returns { ok, Smin } where Smin = Ik\u00b7\u221at / k is the minimum permissible cross-section.
+function axAdiabatic(kVal, S_mm2, Ik_A, t_s) {
+  var Smin = (Ik_A * Math.sqrt(t_s)) / kVal;
+  return { ok: (kVal * S_mm2) >= (Ik_A * Math.sqrt(t_s)) - 1e-9, Smin: Math.round(Smin * 100) / 100, k: kVal };
+}
+// Maximum permissible loop impedance for automatic disconnection: Zs <= U0 / Ia.
+function axZsMax(U0_V, Ia_A) { return Ia_A > 0 ? Math.round((U0_V / Ia_A) * 1000) / 1000 : Infinity; }
+// Disconnection check: Zs\u00b7Ia <= U0  <=>  Zs <= Zs_max.
+function axDisconnectOK(Zs, U0_V, Ia_A) { return Zs <= axZsMax(U0_V, Ia_A) + 1e-9; }
+
 // ===== EXAM SIMULATOR (data + engine) =====
+// --- autoexam: difficulty tiers (L\u00e6rling -> Ekspert) -------------------------
+var AX_TIERS = [
+  { id: 'laerling', da: 'L\u00e6rling', en: 'Apprentice', lvl: 1, nLoads: [2, 3], feat: {}, tolPct: 6, pass: 70 },
+  { id: 'elektriker', da: 'Elektriker', en: 'Electrician', lvl: 2, nLoads: [3, 5], feat: { motor: 1 }, tolPct: 5, pass: 75 },
+  { id: 'avanceret', da: 'Avanceret', en: 'Advanced', lvl: 3, nLoads: [4, 6], feat: { motor: 1, ev: 1 }, tolPct: 4, pass: 80 },
+  { id: 'kandidat', da: 'Kandidat', en: 'Candidate', lvl: 4, nLoads: [5, 8], feat: { motor: 1, ev: 1, solar: 1, selectivity: 1 }, tolPct: 3, pass: 80 },
+  { id: 'ekspert', da: 'Ekspert', en: 'Expert', lvl: 5, nLoads: [6, 10], feat: { motor: 1, ev: 1, solar: 1, selectivity: 1, trafo: 1 }, tolPct: 2, pass: 80 }
+];
+function axTier(id) { for (var i = 0; i < AX_TIERS.length; i++) if (AX_TIERS[i].id === id) return AX_TIERS[i]; return AX_TIERS[2]; }
+
+// --- autoexam: exam modes (duration bands, like the real pr\u00f8ver) ---------------
+var AX_MODES = [
+  { id: 'mini', da: 'Mini-case (15\u201330 min)', en: 'Mini case (15\u201330 min)', min: [15, 30], sec: 1800, parts: ['installation'], maxTasks: 2 },
+  { id: 'beregning', da: 'Beregningsopgave (30\u201360 min)', en: 'Calculation assignment (30\u201360 min)', min: [30, 60], sec: 3600, parts: ['installation'], maxTasks: 4 },
+  { id: 'case', da: 'Teknisk case (1\u20132 t)', en: 'Technical case study (1\u20132 h)', min: [60, 120], sec: 7200, parts: ['installation'], maxTasks: 8 },
+  { id: 'delproeve', da: 'Delpr\u00f8ve (2\u20134 t)', en: 'Partial authorization (2\u20134 h)', min: [120, 240], sec: 14400, parts: ['forsyning', 'installation'], maxTasks: 12 },
+  { id: 'fuld', da: 'Fuld autorisationspr\u00f8ve (4\u20138 t)', en: 'Full authorization exam (4\u20138 h)', min: [240, 480], sec: 21600, parts: ['forsyning', 'installation', 'spoergsmaal'], maxTasks: 18 }
+];
+function axMode(id) { for (var i = 0; i < AX_MODES.length; i++) if (AX_MODES[i].id === id) return AX_MODES[i]; return AX_MODES[2]; }
+
+// --- autoexam: building-type templates (10 types across the real exam domains) --
+// Each load entry: { da, en, P:[loKW,hiKW], cos, eta, ph(1|3), type, sf } where type
+// drives whether a feature gate (motor/ev/solar) is required to include it.
+var AX_BUILDINGS = [
+  {
+    id: 'parcelhus', cat: 'bolig', icon: '\uD83C\uDFE0', da: 'Parcelhus', en: 'Detached house', earthing: 'TN-C-S', hasForsyning: false,
+    bg: { da: ['En familie opf\u00f8rer et nyt parcelhus p\u00e5 en byggegrund i et villakvarter.', 'En bygherre skal etablere elinstallationen i et nyopf\u00f8rt enfamiliehus.'], en: ['A family is building a new detached house on a plot in a residential area.', 'A client is establishing the electrical installation in a newly built single-family house.'] },
+    customer: { da: ['Kunden \u00f8nsker en fremtidssikret installation med plads til elbil og varmepumpe.', 'Bygherren \u00f8nsker lavt energiforbrug og forberedelse til solceller.'], en: ['The customer wants a future-proof installation with room for an EV and a heat pump.', 'The client wants low energy use and preparation for solar panels.'] },
+    expansion: { da: ['Der skal reserveres kapacitet til en 11 kW elbillader inden for 2 \u00e5r.', 'Kunden overvejer at tilf\u00f8je solceller p\u00e5 sigt.'], en: ['Capacity must be reserved for an 11 kW EV charger within 2 years.', 'The customer is considering adding solar panels later.'] },
+    loads: [
+      { da: 'Belysning, stueplan', en: 'Lighting, ground floor', P: [1.2, 2.0], cos: 0.95, eta: 1, ph: 1, type: 'light', sf: 1.0 },
+      { da: 'Stikkontaktgrupper', en: 'Socket circuits', P: [3.0, 3.7], cos: 0.95, eta: 1, ph: 1, type: 'socket', sf: 0.6 },
+      { da: 'Komfur/ovn', en: 'Cooker/oven', P: [7.5, 11], cos: 1.0, eta: 1, ph: 3, type: 'cooker', sf: 0.7 },
+      { da: 'Varmepumpe (luft/vand)', en: 'Heat pump (air/water)', P: [4, 8], cos: 0.9, eta: 1, ph: 3, type: 'hp', sf: 1.0 },
+      { da: 'Elbillader (AC)', en: 'EV charger (AC)', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 },
+      { da: 'Solcelle-inverter', en: 'Solar inverter', P: [6, 10], cos: 1.0, eta: 1, ph: 3, type: 'solar', sf: 1.0 }
+    ]
+  },
+  {
+    id: 'etagebolig', cat: 'bolig', icon: '\uD83C\uDFE2', da: 'Etageejendom', en: 'Apartment block', earthing: 'TN-C-S', hasForsyning: false,
+    bg: { da: ['En boligforening renoverer en etageejendom med flere lejligheder og f\u00e6lles installationer.', 'Et nyt etagebyggeri med lejligheder skal forsynes fra en f\u00e6lles m\u00e5lertavle.'], en: ['A housing association is renovating an apartment block with several flats and shared services.', 'A new apartment building is to be supplied from a common metering board.'] },
+    customer: { da: ['Bygherren \u00f8nsker individuel m\u00e5ling pr. lejlighed og f\u00e6lles ladeinfrastruktur i k\u00e6lderen.', 'Ejendommen skal forberedes til elbilladning i parkeringsk\u00e6lderen.'], en: ['The client wants individual metering per flat and shared EV charging in the basement.', 'The property must be prepared for EV charging in the parking basement.'] },
+    expansion: { da: ['Ladeinfrastrukturen skal kunne udvides med dynamisk laststyring.', 'Der skal afs\u00e6ttes plads til yderligere 6 ladepunkter.'], en: ['The charging infrastructure must allow expansion with dynamic load management.', 'Space must be reserved for 6 additional charging points.'] },
+    loads: [
+      { da: 'F\u00e6lles belysning + trappe', en: 'Common lighting + stairs', P: [2, 4], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 1.0 },
+      { da: 'Lejlighedsgrupper (samlet)', en: 'Apartment groups (aggregate)', P: [20, 50], cos: 0.95, eta: 1, ph: 3, type: 'socket', sf: 0.4 },
+      { da: 'Elevator', en: 'Lift', P: [7.5, 15], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.6 },
+      { da: 'Ladestander-array (AC)', en: 'EV charger array (AC)', P: [22, 44], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 },
+      { da: 'Ventilationsanl\u00e6g', en: 'Ventilation plant', P: [4, 11], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 }
+    ]
+  },
+  {
+    id: 'kontor', cat: 'erhverv', icon: '\uD83C\uDFE2', da: 'Kontorbygning', en: 'Office building', earthing: 'TN-S', hasForsyning: false,
+    bg: { da: ['En virksomhed flytter til en ny kontorbygning og skal etablere elinstallationen.', 'Et erhvervslejem\u00e5l i et kontorh\u00f8jhus skal forsynes fra en etagetavle.'], en: ['A company moves to a new office building and must establish the electrical installation.', 'A commercial tenancy in an office tower is to be supplied from a floor distribution board.'] },
+    customer: { da: ['Kunden \u00f8nsker fleksible kontorarbejdspladser, IT-rum og redundant forsyning.', 'Bygherren stiller krav om n\u00f8dbelysning og UPS til serverrum.'], en: ['The customer wants flexible workspaces, an IT room and redundant supply.', 'The client requires emergency lighting and a UPS for the server room.'] },
+    expansion: { da: ['Etagetavlen skal kunne udvides med 20% flere grupper.', 'Serverrummets effekt forventes fordoblet inden for 5 \u00e5r.'], en: ['The floor board must allow 20% more circuits.', 'The server room power is expected to double within 5 years.'] },
+    loads: [
+      { da: 'Kontorbelysning (LED)', en: 'Office lighting (LED)', P: [4, 9], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Arbejdspladsstik (IT)', en: 'Workstation sockets (IT)', P: [10, 25], cos: 0.9, eta: 1, ph: 3, type: 'socket', sf: 0.5 },
+      { da: 'Serverrum / IT-last', en: 'Server room / IT load', P: [10, 30], cos: 0.9, eta: 1, ph: 3, type: 'socket', sf: 0.8 },
+      { da: 'Ventilation / k\u00f8l (motor)', en: 'HVAC (motor)', P: [7.5, 22], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Elbilladning (g\u00e6ste-P)', en: 'EV charging (guest parking)', P: [22, 44], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 }
+    ]
+  },
+  {
+    id: 'skole', cat: 'erhverv', icon: '\uD83C\uDFEB', da: 'Skole', en: 'School', earthing: 'TN-S', hasForsyning: false,
+    bg: { da: ['En kommune udvider en skole med en ny fl\u00f8j med klasselokaler og fysik/sl\u00f8jd.', 'En skole renoverer elinstallationen i hovedbygningen.'], en: ['A municipality extends a school with a new wing with classrooms and a workshop.', 'A school renovates the electrical installation in the main building.'] },
+    customer: { da: ['Bygherren stiller krav om robuste installationer, n\u00f8dbelysning og ABA-anl\u00e6g.', 'Kunden \u00f8nsker energirigtig belysning og selektiv beskyttelse.'], en: ['The client requires robust installations, emergency lighting and a fire-alarm system.', 'The customer wants energy-efficient lighting and selective protection.'] },
+    expansion: { da: ['Sl\u00f8jdlokalet skal kunne forsyne to ekstra maskiner.', 'Der skal forberedes for et k\u00f8kken-faglokale.'], en: ['The workshop must be able to supply two extra machines.', 'Preparation is required for a kitchen teaching room.'] },
+    loads: [
+      { da: 'Klasselokale-belysning', en: 'Classroom lighting', P: [3, 7], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Stik klasselokaler', en: 'Classroom sockets', P: [6, 14], cos: 0.95, eta: 1, ph: 3, type: 'socket', sf: 0.4 },
+      { da: 'Sl\u00f8jd-maskiner (motor)', en: 'Workshop machines (motor)', P: [4, 11], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.5 },
+      { da: 'Ventilation', en: 'Ventilation', P: [5.5, 15], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Storkitchen / komfur', en: 'Canteen kitchen', P: [11, 30], cos: 1.0, eta: 1, ph: 3, type: 'cooker', sf: 0.6 }
+    ]
+  },
+  {
+    id: 'landbrug', cat: 'landbrug', icon: '\uD83D\uDEDC', da: 'Landbrug', en: 'Agricultural holding', earthing: 'TT', hasForsyning: false,
+    bg: { da: ['En landmand opf\u00f8rer en ny staldbygning med malkeanl\u00e6g og foderanl\u00e6g.', 'Et landbrug udvider med en maskinhal og kornt\u00f8rringsanl\u00e6g.'], en: ['A farmer builds a new barn with milking and feeding systems.', 'A farm extends with a machine hall and grain-drying plant.'] },
+    customer: { da: ['Kunden kr\u00e6ver robust installation i fugtige/st\u00f8vede omgivelser med korrekt IP-klasse.', 'Bygherren \u00f8nsker driftssikkerhed til motorer og foderanl\u00e6g.'], en: ['The customer requires a robust installation in damp/dusty surroundings with correct IP rating.', 'The client wants operational reliability for motors and feeding systems.'] },
+    expansion: { da: ['Maskinhallen skal forberedes til en 30 kW kornblæser.', 'Der \u00f8nskes plads til solceller p\u00e5 staldtaget.'], en: ['The machine hall must be prepared for a 30 kW grain blower.', 'Room is wanted for solar panels on the barn roof.'] },
+    loads: [
+      { da: 'Staldbelysning', en: 'Barn lighting', P: [2, 5], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Malkeanl\u00e6g (vakuumpumpe)', en: 'Milking vacuum pump', P: [5.5, 11], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Foderanl\u00e6g (motor)', en: 'Feeding system (motor)', P: [4, 15], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.7 },
+      { da: 'Kornt\u00f8rring / bl\u00e6ser', en: 'Grain drying / blower', P: [11, 30], cos: 0.86, eta: 0.92, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Gylleomr\u00f8rer (motor)', en: 'Slurry mixer (motor)', P: [7.5, 22], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.6 }
+    ]
+  },
+  {
+    id: 'fabrik', cat: 'industri', icon: '\uD83C\uDFED', da: 'Fabrik / industri', en: 'Factory / industry', earthing: 'TN-S', hasForsyning: true,
+    bg: { da: ['En virksomhed opf\u00f8rer en ny produktionshal forsynet fra egen transformerstation.', 'En fabrik udvider produktionen med nye maskinlinjer og egen 10/0,4 kV transformer.'], en: ['A company builds a new production hall supplied from its own substation.', 'A factory expands production with new machine lines and its own 10/0.4 kV transformer.'] },
+    customer: { da: ['Kunden kr\u00e6ver selektiv beskyttelse, s\u00e5 en fejl p\u00e5 \u00e9n linje ikke stopper hele fabrikken.', 'Bygherren \u00f8nsker effektiv drift med fasekompensering og lav harmonisk forvr\u00e6ngning.'], en: ['The customer requires selective protection so a fault on one line does not stop the whole factory.', 'The client wants efficient operation with power-factor correction and low harmonic distortion.'] },
+    expansion: { da: ['Transformeren skal have reserve til en ekstra produktionslinje.', 'Der skal kunne tilsluttes en 75 kW kompressor.'], en: ['The transformer must have spare capacity for an extra production line.', 'A 75 kW compressor must be connectable.'] },
+    loads: [
+      { da: 'Hallens belysning', en: 'Hall lighting', P: [6, 15], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Produktionsmaskine (DOL-motor)', en: 'Production machine (DOL motor)', P: [15, 45], cos: 0.86, eta: 0.93, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Kompressor (motor)', en: 'Compressor (motor)', P: [22, 75], cos: 0.86, eta: 0.93, ph: 3, type: 'motor', sf: 0.7 },
+      { da: 'Procesventilation', en: 'Process ventilation', P: [11, 30], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Stik / v\u00e6rkst\u00f8j', en: 'Sockets / tools', P: [8, 20], cos: 0.9, eta: 1, ph: 3, type: 'socket', sf: 0.5 }
+    ]
+  },
+  {
+    id: 'hospital', cat: 'erhverv', icon: '\uD83C\uDFE5', da: 'Hospital', en: 'Hospital', earthing: 'TN-S', hasForsyning: true,
+    bg: { da: ['Et hospital etablerer en ny fl\u00f8j forsynet via flere transformerstationer p\u00e5 et 10 kV-ringnet.', 'Et sygehus udvider med operationsafsnit med krav om n\u00f8dstr\u00f8m og medicinske omr\u00e5der.'], en: ['A hospital establishes a new wing supplied via several substations on a 10 kV ring network.', 'A hospital expands with an operating department requiring backup supply and medical locations.'] },
+    customer: { da: ['Kunden kr\u00e6ver h\u00f8j forsyningssikkerhed, n\u00f8dstr\u00f8m (generator) og IT-system i medicinske omr\u00e5der.', 'Bygherren stiller skrappe krav til selektivitet og kontinuitet i kritiske kredse.'], en: ['The customer requires high supply reliability, backup generator and an IT system in medical locations.', 'The client sets strict requirements for selectivity and continuity in critical circuits.'] },
+    expansion: { da: ['Ringnettet skal kunne indsl\u00f8jfe en yderligere transformerstation.', 'N\u00f8dstr\u00f8msanl\u00e6gget skal kunne udvides med en ekstra generator.'], en: ['The ring network must allow looping in another substation.', 'The backup plant must allow an extra generator.'] },
+    loads: [
+      { da: 'Afdelingsbelysning', en: 'Ward lighting', P: [5, 12], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Medicinsk udstyr (stik)', en: 'Medical equipment (sockets)', P: [10, 25], cos: 0.9, eta: 1, ph: 3, type: 'socket', sf: 0.6 },
+      { da: 'Ventilation / k\u00f8l', en: 'Ventilation / cooling', P: [15, 45], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Sterilcentral / autoklave', en: 'Sterilisation / autoclave', P: [11, 30], cos: 0.9, eta: 1, ph: 3, type: 'cooker', sf: 0.7 }
+    ]
+  },
+  {
+    id: 'ev_anlaeg', cat: 'erhverv', icon: '\uD83D\uDD0C', da: 'Ladeanl\u00e6g (elbil)', en: 'EV charging facility', earthing: 'TN-S', hasForsyning: false,
+    bg: { da: ['En operat\u00f8r etablerer et offentligt ladeanl\u00e6g med flere AC- og DC-ladere.', 'En p-plads skal udstyres med ladestandere og dynamisk laststyring.'], en: ['An operator establishes a public charging facility with several AC and DC chargers.', 'A car park is to be fitted with chargers and dynamic load management.'] },
+    customer: { da: ['Kunden kr\u00e6ver Type B HPFI (eller Type A + 6 mA DC) pr. ladepunkt og laststyring.', 'Bygherren \u00f8nsker maksimal udnyttelse af forsyningen via laststyring.'], en: ['The customer requires a Type B RCD (or Type A + 6 mA DC) per point and load management.', 'The client wants maximum use of the supply via load management.'] },
+    expansion: { da: ['Anl\u00e6gget skal kunne udvides med 8 ekstra ladepunkter.', 'Der \u00f8nskes en fremtidig 150 kW DC-lader.'], en: ['The facility must allow 8 extra charging points.', 'A future 150 kW DC charger is wanted.'] },
+    loads: [
+      { da: 'AC-ladepunkt', en: 'AC charging point', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 },
+      { da: 'AC-ladepunkt (gruppe)', en: 'AC charging group', P: [22, 44], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 },
+      { da: 'Belysning + skiltning', en: 'Lighting + signage', P: [1.5, 4], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 1.0 },
+      { da: 'DC-lader (hurtig)', en: 'DC charger (fast)', P: [50, 60], cos: 0.98, eta: 0.95, ph: 3, type: 'ev', sf: 1.0 }
+    ]
+  },
+  {
+    id: 'solbatteri', cat: 'erhverv', icon: '\u2600\uFE0F', da: 'Solceller + batteri', en: 'Solar + battery', earthing: 'TN-S', hasForsyning: false,
+    bg: { da: ['En ejendom etablerer et solcelleanl\u00e6g med batterilager og net-tilslutning.', 'En virksomhed installerer PV + BESS for egetforbrug og spidslastreduktion.'], en: ['A property establishes a PV system with battery storage and grid connection.', 'A company installs PV + BESS for self-consumption and peak shaving.'] },
+    customer: { da: ['Kunden \u00f8nsker maksimal egetforbrug og sikker \u00f8-drift ved netfejl.', 'Bygherren kr\u00e6ver korrekt beskyttelse og afbrydning af PV/batteri.'], en: ['The customer wants maximum self-consumption and safe island operation at grid faults.', 'The client requires correct protection and disconnection of PV/battery.'] },
+    expansion: { da: ['Batterikapaciteten skal kunne fordobles.', 'PV-anl\u00e6gget skal kunne udvides med en ekstra streng.'], en: ['Battery capacity must be doublable.', 'The PV system must allow an extra string.'] },
+    loads: [
+      { da: 'PV-inverter (streng)', en: 'PV inverter (string)', P: [8, 20], cos: 1.0, eta: 1, ph: 3, type: 'solar', sf: 1.0 },
+      { da: 'Batteri-inverter (BESS)', en: 'Battery inverter (BESS)', P: [10, 30], cos: 1.0, eta: 1, ph: 3, type: 'solar', sf: 1.0 },
+      { da: 'Bygningslast (samlet)', en: 'Building load (aggregate)', P: [15, 40], cos: 0.9, eta: 1, ph: 3, type: 'socket', sf: 0.6 }
+    ]
+  },
+  {
+    id: 'renovering', cat: 'renovering', icon: '\uD83D\uDD27', da: 'Renovering (eksisterende)', en: 'Renovation (existing)', earthing: 'TN-C-S', hasForsyning: false,
+    bg: { da: ['En eksisterende installation skal renoveres og udvides under hensyn til det bestaaende anl\u00e6g.', 'En \u00e6ldre ejendom moderniseres: HPFI eftermonteres og kredse udvides.'], en: ['An existing installation must be renovated and extended in view of the legacy system.', 'An older property is modernised: RCDs are retrofitted and circuits extended.'] },
+    customer: { da: ['Kunden \u00f8nsker at genbruge brugbare dele af den eksisterende installation, hvor det er forsvarligt.', 'Bygherren kr\u00e6ver dokumentation af det eksisterende anl\u00e6gs tilstand f\u00f8r udvidelse.'], en: ['The customer wants to reuse usable parts of the existing installation where safe.', 'The client requires documentation of the existing system condition before extension.'] },
+    expansion: { da: ['Den nye tavle skal have plads til fremtidig elbillader.', 'Der skal forberedes til varmepumpe.'], en: ['The new board must have room for a future EV charger.', 'Preparation for a heat pump is required.'] },
+    loads: [
+      { da: 'Eksisterende lysgrupper', en: 'Existing lighting circuits', P: [1.5, 3], cos: 0.95, eta: 1, ph: 1, type: 'light', sf: 1.0 },
+      { da: 'Eksisterende stikgrupper', en: 'Existing socket circuits', P: [3, 3.7], cos: 0.95, eta: 1, ph: 1, type: 'socket', sf: 0.6 },
+      { da: 'Ny varmepumpe', en: 'New heat pump', P: [4, 8], cos: 0.9, eta: 1, ph: 3, type: 'hp', sf: 1.0 },
+      { da: 'Ny elbillader', en: 'New EV charger', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 }
+    ]
+  }
+];
+function axBuilding(id) { for (var i = 0; i < AX_BUILDINGS.length; i++) if (AX_BUILDINGS[i].id === id) return AX_BUILDINGS[i]; return AX_BUILDINGS[0]; }
+
+// --- autoexam: generator helpers ----------------------------------------------
+var AX_STD_MOTOR_KW = [4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75];
+function axSnap(v, arr) { var best = arr[0], bd = Infinity; for (var i = 0; i < arr.length; i++) { var d = Math.abs(arr[i] - v); if (d < bd) { bd = d; best = arr[i]; } } return best; }
+function axRound(v, step) { return Math.round(v / step) * step; }
+// Build a click-only option set: correct value plus plausible distractors, sorted.
+function axNumOpts(correct, distractors) {
+  var set = [correct]; for (var i = 0; i < distractors.length; i++) { if (distractors[i] > 0 && set.indexOf(distractors[i]) < 0) set.push(distractors[i]); }
+  set.sort(function (a, b) { return a - b; });
+  return { opts: set, ci: set.indexOf(correct) };
+}
+
+// Generate the supply conditions + a coherent installation (transformer, service
+// line, group circuits). Pure & deterministic for a given rng sequence.
+function axGenInstallation(rng, b, tier) {
+  var snPool = (b.cat === 'industri' || b.id === 'hospital') ? [630, 1000, 1250, 1600] : (b.cat === 'erhverv' ? [400, 630, 1000] : [250, 400, 630]);
+  var SN = axRngPick(rng, snPool);
+  var ek = axRngPick(rng, [4, 4.5, 5, 6]);
+  var trafo = axIkTrafoSecondary(SN, 400, ek);
+  var ambient = axRngPick(rng, tier.lvl <= 1 ? [30] : (tier.lvl <= 3 ? [30, 35] : [30, 35, 40]));
+  var grouping = (tier.lvl <= 1) ? 1 : axRngInt(rng, 1, Math.min(6, 1 + tier.lvl));
+  var stikMat = (b.cat === 'bolig' || b.id === 'renovering') ? 'Cu' : axRngPick(rng, ['Al', 'Cu']);
+  var stikIns = axRngPick(rng, ['PVC', 'XLPE']);
+  var stikLen = axRound(axRngInt(rng, b.cat === 'bolig' ? 8 : 20, b.cat === 'bolig' ? 35 : 90), 5);
+  var pool = b.loads.slice();
+  function gateOk(t) { if (t === 'motor') return !!tier.feat.motor; if (t === 'ev') return !!tier.feat.ev; if (t === 'solar') return !!tier.feat.solar; return true; }
+  var basics = pool.filter(function (l) { return l.type === 'light' || l.type === 'socket' || l.type === 'cooker' || l.type === 'hp'; });
+  var extras = pool.filter(function (l) { return (l.type === 'motor' || l.type === 'ev' || l.type === 'solar') && gateOk(l.type); });
+  var want = axRngInt(rng, tier.nLoads[0], tier.nLoads[1]);
+  var ordered = basics.concat(extras);
+  var chosen = [];
+  for (var i = 0; i < ordered.length && chosen.length < want; i++) { chosen.push(ordered[i]); }
+  if (chosen.length === 0) chosen.push(pool[0]);
+  var loads = chosen.map(function (l, idx) {
+    var P = axRound(l.P[0] + rng() * (l.P[1] - l.P[0]), 0.5);
+    if (l.type === 'motor') P = axSnap(P, AX_STD_MOTOR_KW);
+    if (l.type === 'ev') P = axSnap(P, [11, 22, 44, 50]);
+    var IB = axIB(P, l.ph === 3 ? 400 : 230, l.cos, l.eta, l.ph);
+    return { id: 'L' + (idx + 1), da: l.da, en: l.en, P: P, cos: l.cos, eta: l.eta, ph: l.ph, type: l.type, sf: l.sf, IB: Math.round(IB * 10) / 10, IBdiv: Math.round(IB * l.sf * 10) / 10 };
+  });
+  var IBtotal = 0; loads.forEach(function (l) { IBtotal += l.IBdiv; });
+  IBtotal = Math.round(IBtotal * 10) / 10;
+  return {
+    earthing: b.earthing, trafo: { SN: SN, ek: ek, Un1: 10, Un2: 400, In: trafo.In, Ik: trafo.Ik, IkkA: trafo.IkkA, vector: 'Dyn1', PCu: Math.round(SN * 10) },
+    ambient: ambient, grouping: grouping,
+    stik: { material: stikMat, insulation: stikIns, length: stikLen, cos: 0.9 },
+    loads: loads, IBtotal: IBtotal
+  };
+}
+
+function axTasksInstallation(d, tier, maxTasks) {
+  var tasks = [];
+  var kTemp = TEMP_FACTORS[d.ambient] || 1;
+  var kGroup = GROUP_FACTORS[d.grouping] || 1;
+  var ibT = d.IBtotal;
+  var ibNoSf = 0; d.loads.forEach(function (l) { ibNoSf += l.IB; }); ibNoSf = Math.round(ibNoSf * 10) / 10;
+  var nIb = axNumOpts(ibT, [ibNoSf, Math.round(ibT * 0.7 * 10) / 10, Math.round(ibT * 1.25 * 10) / 10]);
+  tasks.push({ id: 't_ib', kind: 'ib_total', prompt: { da: 'Beregn den dimensionsgivende belastningsstr\u00f8m IB for stikledningen (anvend de angivne samtidighedsfaktorer).', en: 'Calculate the dimensioning load current IB for the service line (apply the stated diversity factors).' }, given: { loads: d.loads }, answer: ibT, opts: nIb.opts, ci: nIb.ci, unit: 'A', clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' });
+  var In = axDeviceRating(ibT);
+  var n2 = axNumOpts(In, [axDeviceRating(ibT * 0.8), AX_STD_RATINGS[Math.max(0, AX_STD_RATINGS.indexOf(In) - 1)], AX_STD_RATINGS[Math.min(AX_STD_RATINGS.length - 1, AX_STD_RATINGS.indexOf(In) + 1)]]);
+  tasks.push({ id: 't_dev', kind: 'device', prompt: { da: 'Bestem stikledningens overstr\u00f8msbeskyttelse In (mindste standardv\u00e6rdi der opfylder IB \u2264 In).', en: 'Determine the service-line overcurrent protection In (smallest standard value meeting IB \u2264 In).' }, given: { IB: ibT }, answer: In, opts: n2.opts, ci: n2.ci, unit: 'A', clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' });
+  var sel = axSelectCable(In, d.stik.material, d.stik.insulation, kTemp, kGroup, 1);
+  var csa = sel ? sel.csa : 240;
+  var csaList = Object.keys(axIzTable(d.stik.material, d.stik.insulation)).map(Number).sort(function (a, b) { return a - b; });
+  tasks.push({ id: 't_cab', kind: 'cable', prompt: { da: 'Dimensionér stikledningen (mindste tv\u00e6rsnit) i ' + (d.stik.material === 'Al' ? 'aluminium' : 'kobber') + '/' + d.stik.insulation + ' ved ' + d.ambient + ' \u00b0C og ' + d.grouping + ' samlede kabler, s\u00e5 korrigeret Iz \u2265 In.', en: 'Size the service line (smallest cross-section) in ' + (d.stik.material === 'Al' ? 'aluminium' : 'copper') + '/' + d.stik.insulation + ' at ' + d.ambient + ' \u00b0C and ' + d.grouping + ' bunched cables so corrected Iz \u2265 In.' }, given: { In: In, material: d.stik.material, insulation: d.stik.insulation, kTemp: kTemp, kGroup: kGroup, kInstall: 1 }, answer: csa, opts: csaList, ci: csaList.indexOf(csa), unit: 'mm\u00b2', clause: 'DS/HD 60364-5-52 \u00a7523', cat: 'cable' });
+  var r = axCableR(csa, d.stik.material), x = axCableX(csa);
+  var vd = axVdrop(ibT, d.stik.length, r, x, d.stik.cos, 3, 400);
+  var vdPct = Math.round(vd.pct * 100) / 100;
+  var n4 = axNumOpts(vdPct, [Math.round(vdPct * 1.4 * 100) / 100, Math.round(vdPct * 0.6 * 100) / 100, Math.round(vdPct * 2 * 100) / 100]);
+  tasks.push({ id: 't_vd', kind: 'vdrop', prompt: { da: 'Beregn det procentuelle sp\u00e6ndingsfald \u0394U% p\u00e5 stikledningen (L = ' + axFmt(d.stik.length) + ' m).', en: 'Calculate the percentage voltage drop \u0394U% on the service line (L = ' + axFmt(d.stik.length) + ' m).' }, given: { IB: ibT, L: d.stik.length, csa: csa, material: d.stik.material, cos: d.stik.cos, ph: 3 }, answer: vdPct, opts: n4.opts, ci: n4.ci, unit: '%', clause: 'DS/HD 60364-5-52 \u00a7525', cat: 'vdrop' });
+  var ikkA = d.trafo.IkkA;
+  var n5 = axNumOpts(ikkA, [Math.round(ikkA * 1.3 * 10) / 10, Math.round(ikkA * 0.7 * 10) / 10, Math.round(ikkA * 1.6 * 10) / 10]);
+  tasks.push({ id: 't_ik', kind: 'iktrafo', prompt: { da: 'Beregn den prospektive kortslutningsstr\u00f8m Ik,max p\u00e5 lavsp\u00e6ndingssiden ved tavlen (' + d.trafo.SN + ' kVA, ek = ' + axFmt(d.trafo.ek) + ' %, kun trafoimpedans).', en: 'Calculate the prospective short-circuit current Ik,max at the LV side of the board (' + d.trafo.SN + ' kVA, ek = ' + axFmt(d.trafo.ek) + ' %, transformer impedance only).' }, given: { SN: d.trafo.SN, Un: 400, ek: d.trafo.ek }, answer: ikkA, opts: n5.opts, ci: n5.ci, unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5', cat: 'shortcircuit' });
+  var kKey = d.stik.material + '/' + d.stik.insulation; var kVal = AX_K[kKey] || 115;
+  var tClear = 0.1; var ad = axAdiabatic(kVal, csa, d.trafo.Ik, tClear);
+  tasks.push({ id: 't_adia', kind: 'adiabatic', prompt: { da: 'Kontrollér om stikledningen er kortslutningsbeskyttet (adiabatisk, t = 0,1 s): er k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t opfyldt?', en: 'Check whether the service line is short-circuit protected (adiabatic, t = 0.1 s): is k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t satisfied?' }, given: { k: kVal, csa: csa, Ik: d.trafo.Ik, t: tClear }, answer: ad.ok ? 1 : 0, opts: [{ da: 'Nej \u2013 ikke opfyldt', en: 'No \u2013 not satisfied' }, { da: 'Ja \u2013 opfyldt', en: 'Yes \u2013 satisfied' }], ci: ad.ok ? 1 : 0, unit: '', clause: 'DS/HD 60364-4-43 \u00a7434.5.2', cat: 'shortcircuit' });
+  var endIn = axDeviceRating(d.loads[d.loads.length - 1].IB || 16); if (endIn > 63) endIn = 32;
+  var Ia = 10 * endIn; var U0 = 230; var zsMax = axZsMax(U0, Ia);
+  var n7 = axNumOpts(Math.round(zsMax * 100) / 100, [Math.round(zsMax * 1.5 * 100) / 100, Math.round(zsMax * 0.6 * 100) / 100, Math.round(zsMax * 2 * 100) / 100]);
+  tasks.push({ id: 't_zs', kind: 'zs', prompt: { da: 'Bestem den maksimalt tilladte sl\u00f8jfeimpedans Zs for en endegruppe beskyttet af en C' + endIn + ' automatsikring (Ia = 10\u00b7In, U0 = 230 V).', en: 'Determine the maximum permissible loop impedance Zs for a final circuit protected by a C' + endIn + ' MCB (Ia = 10\u00b7In, U0 = 230 V).' }, given: { U0: U0, Ia: Ia, endIn: endIn }, answer: Math.round(zsMax * 100) / 100, opts: n7.opts, ci: n7.ci, unit: '\u03a9', clause: 'DS/HD 60364-4-41 \u00a7411.4.4', cat: 'fault' });
+  return tasks.slice(0, Math.max(2, Math.min(maxTasks, tasks.length)));
+}
+
+function axGenForsyning(rng, b, tier) {
+  var SN = axRngPick(rng, [630, 1000, 1250, 1600]);
+  var ek = axRngPick(rng, [4, 5, 6]);
+  var tr = axIkTrafoSecondary(SN, 400, ek);
+  var ambient = axRngPick(rng, [30, 35]);
+  var data = { SN: SN, ek: ek, Un1: 10, Un2: 400, In: tr.In, Ik: tr.Ik, IkkA: tr.IkkA, ambient: ambient, vector: 'Dyn1', ki: axRngPick(rng, [300, 400, 600]) };
+  var tasks = [];
+  var n1 = axNumOpts(tr.IkkA, [Math.round(tr.IkkA * 1.3 * 10) / 10, Math.round(tr.IkkA * 0.7 * 10) / 10]);
+  tasks.push({ id: 'f_ik', kind: 'iktrafo', prompt: { da: 'Beregn Ik,max p\u00e5 lavsp\u00e6ndingssiden af transformeren (' + SN + ' kVA, ek = ' + axFmt(ek) + ' %).', en: 'Calculate Ik,max on the LV side of the transformer (' + SN + ' kVA, ek = ' + axFmt(ek) + ' %).' }, given: { SN: SN, Un: 400, ek: ek }, answer: tr.IkkA, opts: n1.opts, ci: n1.ci, unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5', cat: 'shortcircuit' });
+  var mainIn = axDeviceRating(tr.In);
+  var n2 = axNumOpts(mainIn, [AX_STD_RATINGS[Math.max(0, AX_STD_RATINGS.indexOf(mainIn) - 1)], AX_STD_RATINGS[Math.min(AX_STD_RATINGS.length - 1, AX_STD_RATINGS.indexOf(mainIn) + 1)]]);
+  tasks.push({ id: 'f_dev', kind: 'device', prompt: { da: 'Bestem hovedbeskyttelsens m\u00e6rkestr\u00f8m In p\u00e5 lavsp\u00e6ndingstavlen (IB = transformerens fuldlaststr\u00f8m = ' + axFmt(tr.In, 0) + ' A).', en: 'Determine the main protection rating In on the LV board (IB = transformer full-load current = ' + axFmt(tr.In, 0) + ' A).' }, given: { IB: tr.In }, answer: mainIn, opts: n2.opts, ci: n2.ci, unit: 'A', clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' });
+  var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var needIcu = stdIcu.filter(function (v) { return v >= tr.IkkA - 1e-9; })[0] || 100;
+  var icuOpts = stdIcu.filter(function (v) { return v >= tr.IkkA - 5 && v <= tr.IkkA + 30; }); if (icuOpts.indexOf(needIcu) < 0) icuOpts.push(needIcu); icuOpts.sort(function (a, b) { return a - b; });
+  tasks.push({ id: 'f_icu', kind: 'breaking', prompt: { da: 'V\u00e6lg mindste standard brydeevne Icu for hovedafbryderen (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).', en: 'Choose the smallest standard breaking capacity Icu for the main breaker (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).' }, given: { IkkA: tr.IkkA }, answer: needIcu, opts: icuOpts, ci: icuOpts.indexOf(needIcu), unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5.1', cat: 'shortcircuit' });
+  if (tier.feat.selectivity) {
+    tasks.push({ id: 'f_sel', kind: 'selectivity', prompt: { da: 'En 250 A afgang ligger nedstr\u00f8ms hovedbeskyttelsen. Hvad sikrer selektivitet?', en: 'A 250 A feeder sits downstream of the main protection. What ensures selectivity?' }, given: {}, answer: 0, opts: [{ da: 'Tid/str\u00f8m-graduering: hovedets korttidsforsinkelse l\u00e6gges over afgangens udl\u00f8sekurve i hele fejlomr\u00e5det', en: 'Time/current grading: the main short-time delay sits above the feeder curve across the whole fault range' }, { da: 'Samme m\u00e6rkestr\u00f8m i begge ender', en: 'Same rating at both ends' }, { da: 'Fjern den nedstr\u00f8ms beskyttelse', en: 'Remove the downstream protection' }], ci: 0, clause: 'DS/HD 60364-5-53 \u00a7536', cat: 'fault' });
+  }
+  return { data: data, tasks: tasks };
+}
+
+var AX_REG_BANK = [
+  { q: { da: 'Hvilken systemjording deler PEN op i N og PE ved installationens indgang?', en: 'Which earthing system splits PEN into N and PE at the installation entry?' }, opts: ['TN-C-S', 'TT', 'IT', 'TN-C'], ci: 0, clause: 'DS/HD 60364-1', cat: 'fault' },
+  { q: { da: 'Maksimal frakoblingstid i TN for en endegruppe \u2264 32 A ved 230 V?', en: 'Max disconnection time in TN for a final circuit \u2264 32 A at 230 V?' }, opts: ['0,4 s', '5 s', '0,2 s', '1 s'], ci: 0, clause: 'DS/HD 60364-4-41 \u00a7411.3.2.2', cat: 'fault' },
+  { q: { da: 'Hvilken HPFI-type kr\u00e6ves til en EV-lader uden indbygget 6 mA DC-detektion?', en: 'Which RCD type is required for an EV charger without built-in 6 mA DC detection?' }, opts: ['Type B', 'Type AC', 'Type A alene', 'Ingen'], ci: 0, clause: 'DS/HD 60364-7-722 \u00a7722.531.3.101', cat: 'fault' },
+  { q: { da: 'Maks. tilladt sp\u00e6ndingsfald for \u00f8vrige belastninger (ikke belysning)?', en: 'Max permitted voltage drop for other loads (not lighting)?' }, opts: ['5%', '3%', '8%', '10%'], ci: 0, clause: 'DS/HD 60364-5-52 \u00a7525', cat: 'vdrop' },
+  { q: { da: 'Betingelsen for en afbryders brydeevne ved kortslutning?', en: 'The condition for a device breaking capacity under short-circuit?' }, opts: ['Icu \u2265 Ik,max', 'Icu \u2264 Ik,max', 'Icu = In', 'Icu \u2265 IB'], ci: 0, clause: 'DS/HD 60364-4-43 \u00a7434.5.1', cat: 'shortcircuit' },
+  { q: { da: 'Grundreglen for overbelastningsbeskyttelse?', en: 'The fundamental rule for overload protection?' }, opts: ['IB \u2264 In \u2264 Iz', 'Iz \u2264 In \u2264 IB', 'In \u2264 IB \u2264 Iz', 'IB \u2265 In \u2265 Iz'], ci: 0, clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' },
+  { q: { da: 'Ved 3. harmoniske > 33% behandles neutrallederen som?', en: 'With 3rd harmonic > 33%, the neutral conductor is treated as?' }, opts: [{ da: 'En fuldt belastet str\u00f8mf\u00f8rende leder', en: 'A fully loaded current-carrying conductor' }, { da: 'Kan reduceres', en: 'Can be reduced' }, { da: 'Udelades', en: 'Omitted' }, { da: 'Halveres', en: 'Halved' }], ci: 0, clause: 'DS/HD 60364-5-52 \u00a7523.6.3', cat: 'cable' },
+  { q: { da: 'Den forenklede danske 75%-regel for kabeldimensionering er...', en: 'The simplified Danish 75% cable-dimensioning rule is...' }, opts: [{ da: 'Afskaffet 1. jan 2020', en: 'Abolished 1 Jan 2020' }, { da: 'Stadig g\u00e6ldende', en: 'Still in force' }, { da: 'Kun for aluminium', en: 'Aluminium only' }, { da: 'Obligatorisk', en: 'Mandatory' }], ci: 0, clause: 'DS/HD 60364-5-52 (dansk till\u00e6g); Sikkerhedsstyrelsen', cat: 'cable' }
+];
+function axGenSpoergsmaal(rng, tier, n) {
+  var idx = []; for (var i = 0; i < AX_REG_BANK.length; i++) idx.push(i);
+  for (var j = idx.length - 1; j > 0; j--) { var r = Math.floor(rng() * (j + 1)); var t = idx[j]; idx[j] = idx[r]; idx[r] = t; }
+  var pick = idx.slice(0, Math.max(2, Math.min(n || 4, AX_REG_BANK.length)));
+  return pick.map(function (k, m) { var qq = AX_REG_BANK[k]; return { id: 's_' + m, kind: 'reg', prompt: qq.q, given: {}, answer: qq.ci, opts: qq.opts, ci: qq.ci, clause: qq.clause, cat: qq.cat }; });
+}
+
+// axGenerate(seed, buildingId, tierId, modeId) -> full authentic exam project.
+function axGenerate(seed, buildingId, tierId, modeId) {
+  var rng = axRngMake(seed >>> 0);
+  var b = axBuilding(buildingId), tier = axTier(tierId), mode = axMode(modeId);
+  var parts = mode.parts.filter(function (p) { return p !== 'forsyning' || b.hasForsyning; });
+  if (parts.length === 0) parts = ['installation'];
+  var weights;
+  if (parts.length === 3) weights = { forsyning: 20, installation: 60, spoergsmaal: 20 };
+  else if (parts.length === 2) weights = (parts.indexOf('forsyning') >= 0) ? { forsyning: 30, installation: 70 } : { installation: 70, spoergsmaal: 30 };
+  else { weights = {}; weights[parts[0]] = 100; }
+  var tasksPerPart = Math.max(2, Math.floor(mode.maxTasks / parts.length));
+  var opgaver = []; var num = 0;
+  parts.forEach(function (part) {
+    num++;
+    if (part === 'forsyning') {
+      var f = axGenForsyning(rng, b, tier);
+      opgaver.push({ num: num, type: 'forsyning', weightPct: weights.forsyning, title: { da: 'Forsyningsanl\u00e6g', en: 'Supply installation' }, data: f.data, tasks: f.tasks.slice(0, tasksPerPart) });
+    } else if (part === 'installation') {
+      var d = axGenInstallation(rng, b, tier);
+      var it = axTasksInstallation(d, tier, tasksPerPart);
+      opgaver.push({ num: num, type: 'installation', weightPct: weights.installation, title: { da: 'Bygningsinstallation', en: 'Building installation' }, data: d, tasks: it });
+    } else {
+      var st = axGenSpoergsmaal(rng, tier, tasksPerPart);
+      opgaver.push({ num: num, type: 'spoergsmaal', weightPct: weights.spoergsmaal, title: { da: 'Sp\u00f8rgsm\u00e5l til bekendtg\u00f8relser/standarder', en: 'Questions on regulations/standards' }, data: {}, tasks: st });
+    }
+  });
+  var months = ['januar', 'februar', 'marts', 'april', 'maj', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'december'];
+  var monthsEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var mo = axRngInt(rng, 0, 11); var yr = 2024 + axRngInt(rng, 0, 2); var day = axRngInt(rng, 1, 27);
+  var totalTasks = 0; opgaver.forEach(function (o) { totalTasks += o.tasks.length; });
+  return {
+    seed: seed >>> 0, buildingId: b.id, tierId: tier.id, modeId: mode.id,
+    meta: {
+      title: { da: 'El-autorisationspr\u00f8ve', en: 'Electrical authorization exam' },
+      building: { da: b.da, en: b.en }, icon: b.icon,
+      date: { da: day + '. ' + months[mo] + ' ' + yr, en: monthsEn[mo] + ' ' + day + ', ' + yr },
+      time: '8.30 \u2013 ' + (mode.id === 'fuld' ? '14.30' : (mode.id === 'mini' ? '9.00' : '12.30')),
+      durationMin: mode.min, durationSec: mode.sec, approved: 'Godkendt af Sikkerhedsstyrelsen',
+      pages: 2 + parts.length, bilag: parts.length, weights: weights, totalTasks: totalTasks,
+      tier: { da: tier.da, en: tier.en }, mode: { da: mode.da, en: mode.en }
+    },
+    background: { da: axRngPick(rng, b.bg.da), en: b.bg.en[0] }, _bg: b.bg,
+    customer: b.customer, expansion: b.expansion,
+    opgaver: opgaver
+  };
+}
+
+// --- autoexam: WORKED REFERENCE SOLUTION ENGINE -------------------------------
+// axSolveTask(task) -> a full worked solution in the authentic authorization-exam
+// style: Antagelser (assumptions) -> Standardvalg/Formelvalg -> Inds\u00e6tning +
+// Mellemregninger -> Resultat -> Verifikation -> Compliance -> Konklusion. PURE:
+// recomputes the answer from task.given via the verified helpers (no DOM), so the
+// solution can never drift from the generated reference answer.
+function axSolveTask(task, opgave) {
+  var g = task.given || {};
+  function S(da, en) { return { da: da, en: en }; }
+  var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
+  if (task.kind === 'ib_total') {
+    sol.assumptions = [S('3-faset 400 V hvor ikke andet er angivet; cos\u03c6 og \u03b7 pr. last som opgivet.', '3-phase 400 V unless stated; cos\u03c6 and \u03b7 per load as given.'), S('Samtidighedsfaktorer (Sf) anvendes pr. last; ladning/kontinuerlig last regnes ved Sf = 1.', 'Diversity factors (Sf) applied per load; charging/continuous loads at Sf = 1.')];
+    sol.formula = 'I\u1d2e,i = P\u1d62 / (\u221a3 \u00b7 U \u00b7 cos\u03c6\u1d62 \u00b7 \u03b7\u1d62) ;  I\u1d2e = \u03a3 (Sf\u1d62 \u00b7 I\u1d2e,i)';
+    var sum = 0;
+    (g.loads || []).forEach(function (l) {
+      var ib = axIB(l.P, l.ph === 3 ? 400 : 230, l.cos, l.eta, l.ph); var d = ib * l.sf; sum += d;
+      sol.steps.push({ da: l.da + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', en: l.en + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', expr: 'I\u1d2e = ' + axFmt(ib, 1) + ' A \u00d7 ' + axFmt(l.sf), result: axFmt(Math.round(d * 10) / 10, 1) + ' A' });
+    });
+    sum = Math.round(sum * 10) / 10;
+    sol.result = { value: sum, unit: 'A', da: 'Dimensionsgivende belastningsstr\u00f8m', en: 'Dimensioning load current' };
+    sol.verification = S('I\u1d2e = ' + axFmt(sum, 1) + ' A er udgangspunktet for IB \u2264 In \u2264 Iz. Uden samtidighed ville str\u00f8mmen v\u00e6re overvurderet og beskyttelsen un\u00f8digt stor; med korrekt Sf rammes den reelle dimensioneringsstr\u00f8m.', 'IB = ' + axFmt(sum, 1) + ' A is the basis for IB \u2264 In \u2264 Iz. Without diversity the current would be overestimated; with correct Sf it matches the real dimensioning current.');
+    sol.compliance = [S('DS/HD 60364-4-43 \u00a7433.1: overbelastningsbeskyttelse skal koordineres efter IB.', 'DS/HD 60364-4-43 \u00a7433.1: overload protection coordinated to IB.')];
+    sol.conclusion = S('Den dimensionsgivende belastningsstr\u00f8m er I\u1d2e = ' + axFmt(sum, 1) + ' A.', 'The dimensioning load current is IB = ' + axFmt(sum, 1) + ' A.');
+  } else if (task.kind === 'device') {
+    var In = axDeviceRating(g.IB);
+    sol.assumptions = [S('Standard m\u00e6rkestr\u00f8mme iht. IEC (6\u20131600 A). Konservativt v\u00e6lges mindste In \u2265 IB.', 'Standard ratings per IEC (6\u20131600 A). Conservatively pick the smallest In \u2265 IB.')];
+    sol.formula = 'I\u1d2e \u2264 In  \u21d2  In = mindste standardv\u00e6rdi \u2265 I\u1d2e';
+    sol.substitution = 'I\u1d2e = ' + axFmt(g.IB, 1) + ' A  \u21d2  In = ' + In + ' A';
+    sol.steps = [{ da: 'N\u00e6rmeste standard \u2265 IB', en: 'Nearest standard \u2265 IB', expr: 'In \u2265 ' + axFmt(g.IB, 1) + ' A', result: In + ' A' }];
+    sol.result = { value: In, unit: 'A', da: 'Overstr\u00f8msbeskyttelsens m\u00e6rkestr\u00f8m', en: 'Overcurrent protection rating' };
+    sol.verification = S('In = ' + In + ' A \u2265 IB = ' + axFmt(g.IB, 1) + ' A \u2014 opfylder f\u00f8rste led i IB \u2264 In \u2264 Iz. En lavere In (' + (AX_STD_RATINGS[Math.max(0, AX_STD_RATINGS.indexOf(In) - 1)]) + ' A) ville udl\u00f8se p\u00e5 normal drift; det er ikke tilladt.', 'In = ' + In + ' A \u2265 IB = ' + axFmt(g.IB, 1) + ' A \u2014 satisfies the first part of IB \u2264 In \u2264 Iz. A lower In would trip in normal operation; not permitted.');
+    sol.compliance = [S('DS/HD 60364-4-43 \u00a7433.1.', 'DS/HD 60364-4-43 \u00a7433.1.')];
+    sol.conclusion = S('V\u00e6lg In = ' + In + ' A.', 'Choose In = ' + In + ' A.');
+  } else if (task.kind === 'cable') {
+    var kT = g.kTemp, kG = g.kGroup, kI = g.kInstall || 1; var k = kT * kG * kI;
+    var sel = axSelectCable(g.In, g.material, g.insulation, kT, kG, kI);
+    var tab = axIzTable(g.material, g.insulation); var baseIz = sel ? sel.baseIz : null;
+    sol.assumptions = [S('Reference-Iz fra DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Korrektion for temperatur og gruppering ganges p\u00e5.', 'Reference Iz from DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Temperature & grouping corrections multiply.'), S('Konservativt: Iz rundes ned, og mindste tv\u00e6rsnit der opfylder Iz_korr \u2265 In v\u00e6lges.', 'Conservative: round Iz down, choose the smallest cross-section meeting Iz_corr \u2265 In.')];
+    sol.formula = 'Iz_korr = Iz_tab \u00b7 K_temp \u00b7 K_group ;  krav: Iz_korr \u2265 In';
+    sol.substitution = 'K = ' + axFmt(kT, 2) + ' \u00d7 ' + axFmt(kG, 2) + ' = ' + axFmt(Math.round(k * 1000) / 1000, 3) + ' ;  Iz_korr(' + (sel ? sel.csa : '?') + ' mm\u00b2) = ' + (baseIz || '?') + ' \u00d7 ' + axFmt(Math.round(k * 1000) / 1000, 3) + ' = ' + (sel ? axFmt(sel.izCorr, 1) : '?') + ' A';
+    sol.steps = [
+      { da: 'Korrektionsfaktor', en: 'Correction factor', expr: 'K_temp \u00d7 K_group = ' + axFmt(kT, 2) + ' \u00d7 ' + axFmt(kG, 2), result: axFmt(Math.round(k * 1000) / 1000, 3) },
+      { da: 'Mindste tv\u00e6rsnit med Iz_korr \u2265 ' + g.In + ' A', en: 'Smallest cross-section with Iz_corr \u2265 ' + g.In + ' A', expr: (sel ? (baseIz + ' \u00d7 ' + axFmt(Math.round(k * 1000) / 1000, 3)) : '\u2014'), result: (sel ? axFmt(sel.izCorr, 1) + ' A \u2192 ' + sel.csa + ' mm\u00b2' : '\u2014') }
+    ];
+    sol.result = { value: sel ? sel.csa : null, unit: 'mm\u00b2', da: 'Valgt tv\u00e6rsnit', en: 'Selected cross-section' };
+    sol.verification = sel ? S('Iz_korr = ' + axFmt(sel.izCorr, 1) + ' A \u2265 In = ' + g.In + ' A \u2265 IB. Hele kæden IB \u2264 In \u2264 Iz er opfyldt \u2014 kablet kan ikke overbelastes uden at beskyttelsen udl\u00f8ser.', 'Iz_corr = ' + axFmt(sel.izCorr, 1) + ' A \u2265 In = ' + g.In + ' A \u2265 IB. The full chain IB \u2264 In \u2264 Iz is satisfied \u2014 the cable cannot overload without the protection tripping.') : S('Intet tv\u00e6rsnit i tabellen er stort nok \u2014 v\u00e6lg parallelle kabler eller bedre f\u00f8ringsmetode.', 'No tabulated cross-section is large enough \u2014 use parallel cables or a better installation method.');
+    sol.compliance = [S('DS/HD 60364-5-52 \u00a7523 (str\u00f8mb\u00e6reevne) + \u00a7433.1 (koordinering).', 'DS/HD 60364-5-52 \u00a7523 (ampacity) + \u00a7433.1 (coordination).')];
+    sol.conclusion = sel ? S('V\u00e6lg ' + sel.csa + ' mm\u00b2 ' + g.material + '/' + g.insulation + '.', 'Choose ' + sel.csa + ' mm\u00b2 ' + g.material + '/' + g.insulation + '.') : S('Tv\u00e6rsnit utilstr\u00e6kkeligt \u2014 omprojektér.', 'Cross-section insufficient \u2014 redesign.');
+  } else if (task.kind === 'vdrop') {
+    var r = axCableR(g.csa, g.material), x = axCableX(g.csa);
+    var vd = axVdrop(g.IB, g.L, r, x, g.cos, g.ph, g.ph === 3 ? 400 : 230);
+    var sinp = Math.sqrt(Math.max(0, 1 - g.cos * g.cos));
+    sol.assumptions = [S('Leder-resistans r ved driftstemperatur og reaktans x fra kabeltabel; cos\u03c6 = ' + axFmt(g.cos) + '.', 'Conductor resistance r at operating temp and reactance x from cable table; cos\u03c6 = ' + axFmt(g.cos) + '.')];
+    sol.formula = (g.ph === 3 ? '\u0394U = \u221a3 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)' : '\u0394U = 2 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)') + ' ;  \u0394U% = \u0394U / Un \u00b7 100';
+    sol.substitution = '\u0394U = ' + (g.ph === 3 ? '\u221a3' : '2') + ' \u00d7 ' + axFmt(g.IB, 1) + ' \u00d7 ' + axFmt(g.L / 1000, 3) + ' \u00d7 (' + r + '\u00d7' + axFmt(g.cos, 2) + ' + ' + x + '\u00d7' + axFmt(sinp, 3) + ')';
+    sol.steps = [
+      { da: 'sin\u03c6', en: 'sin\u03c6', expr: '\u221a(1 \u2212 ' + axFmt(g.cos, 2) + '\u00b2)', result: axFmt(sinp, 3) },
+      { da: 'r\u00b7cos\u03c6 + x\u00b7sin\u03c6', en: 'r\u00b7cos\u03c6 + x\u00b7sin\u03c6', expr: r + '\u00d7' + axFmt(g.cos, 2) + ' + ' + x + '\u00d7' + axFmt(sinp, 3), result: axFmt(Math.round((r * g.cos + x * sinp) * 1e4) / 1e4, 4) + ' \u03a9/km' },
+      { da: '\u0394U', en: '\u0394U', expr: 'se inds\u00e6tning', result: axFmt(vd.dU, 2) + ' V' },
+      { da: '\u0394U%', en: '\u0394U%', expr: '(' + axFmt(vd.dU, 2) + ' / ' + vd.Un + ') \u00d7 100', result: axFmt(vd.pct, 2) + ' %' }
+    ];
+    sol.result = { value: Math.round(vd.pct * 100) / 100, unit: '%', da: 'Sp\u00e6ndingsfald', en: 'Voltage drop' };
+    var vdOk = vd.pct <= 5;
+    sol.verification = S('\u0394U% = ' + axFmt(vd.pct, 2) + ' % ' + (vd.pct <= 4 ? '\u2264 4 % (god margin)' : (vd.pct <= 5 ? '\u2264 5 % (\u00f8vrige laster), men > 4 %' : '> 5 % \u2014 FOR STORT')) + '. Belysning: maks. 3 %; \u00f8vrige: maks. 5 %.', '\u0394U% = ' + axFmt(vd.pct, 2) + ' % ' + (vd.pct <= 4 ? '\u2264 4 % (good margin)' : (vd.pct <= 5 ? '\u2264 5 % (other loads), but > 4 %' : '> 5 % \u2014 TOO HIGH')) + '. Lighting: max 3 %; other: max 5 %.');
+    sol.compliance = [S('DS/HD 60364-5-52 \u00a7525.', 'DS/HD 60364-5-52 \u00a7525.')];
+    sol.conclusion = S('\u0394U = ' + axFmt(vd.dU, 2) + ' V (' + axFmt(vd.pct, 2) + ' %) \u2014 ' + (vdOk ? 'inden for gr\u00e6nsen.' : 'overskrider gr\u00e6nsen, v\u00e6lg st\u00f8rre tv\u00e6rsnit.'), '\u0394U = ' + axFmt(vd.dU, 2) + ' V (' + axFmt(vd.pct, 2) + ' %) \u2014 ' + (vdOk ? 'within limit.' : 'exceeds limit, upsize the cable.'));
+  } else if (task.kind === 'iktrafo') {
+    var tr = axIkTrafoSecondary(g.SN, g.Un, g.ek);
+    sol.assumptions = [S('Stift net (kun trafoimpedans medregnes) \u2192 h\u00f8jeste, konservative Ik for valg af brydeevne.', 'Stiff grid (transformer impedance only) \u2192 highest, conservative Ik for breaking-capacity selection.')];
+    sol.formula = 'In = SN / (\u221a3 \u00b7 U) ;  Ik = In / (ek/100)';
+    sol.substitution = 'In = ' + (g.SN * 1000) + ' / (\u221a3 \u00d7 ' + g.Un + ') = ' + axFmt(tr.In, 1) + ' A ;  Ik = ' + axFmt(tr.In, 1) + ' / ' + axFmt(g.ek / 100, 3);
+    sol.steps = [
+      { da: 'Fuldlaststr\u00f8m', en: 'Full-load current', expr: g.SN + ' kVA / (\u221a3 \u00d7 ' + g.Un + ' V)', result: axFmt(tr.In, 1) + ' A' },
+      { da: 'Kortslutningsstr\u00f8m', en: 'Short-circuit current', expr: axFmt(tr.In, 1) + ' / ' + axFmt(g.ek / 100, 3), result: axFmt(tr.IkkA, 1) + ' kA' }
+    ];
+    sol.result = { value: tr.IkkA, unit: 'kA', da: 'Prospektiv Ik,max', en: 'Prospective Ik,max' };
+    sol.verification = S('Ik,max = ' + axFmt(tr.IkkA, 1) + ' kA er den dimensionerende v\u00e6rdi for brydeevne Icu. At se bort fra netimpedansen giver den h\u00f8jeste v\u00e6rdi \u2014 sikkerhedsm\u00e6ssigt korrekt.', 'Ik,max = ' + axFmt(tr.IkkA, 1) + ' kA is the design value for breaking capacity Icu. Ignoring grid impedance gives the highest value \u2014 the safe choice.');
+    sol.compliance = [S('DS/HD 60364-4-43 \u00a7434.5.', 'DS/HD 60364-4-43 \u00a7434.5.')];
+    sol.conclusion = S('Ik,max \u2248 ' + axFmt(tr.IkkA, 1) + ' kA.', 'Ik,max \u2248 ' + axFmt(tr.IkkA, 1) + ' kA.');
+  } else if (task.kind === 'breaking') {
+    var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var need = stdIcu.filter(function (v) { return v >= g.IkkA - 1e-9; })[0] || 100;
+    sol.assumptions = [S('Brydeevne Icu skal mindst d\u00e6kke den prospektive Ik,max; mindste standardv\u00e6rdi over Ik,max v\u00e6lges.', 'Breaking capacity Icu must at least cover prospective Ik,max; pick the smallest standard value above it.')];
+    sol.formula = 'Icu \u2265 Ik,max';
+    sol.substitution = 'Ik,max = ' + axFmt(g.IkkA, 1) + ' kA \u21d2 Icu = ' + need + ' kA';
+    sol.steps = [{ da: 'N\u00e6rmeste standard Icu \u2265 Ik,max', en: 'Nearest standard Icu \u2265 Ik,max', expr: 'Icu \u2265 ' + axFmt(g.IkkA, 1) + ' kA', result: need + ' kA' }];
+    sol.result = { value: need, unit: 'kA', da: 'Brydeevne Icu', en: 'Breaking capacity Icu' };
+    sol.verification = S('Icu = ' + need + ' kA \u2265 Ik,max = ' + axFmt(g.IkkA, 1) + ' kA. En lavere Icu er FARLIGT \u2014 afbryderen kan eksplodere/svejse ved en fuld kortslutning.', 'Icu = ' + need + ' kA \u2265 Ik,max = ' + axFmt(g.IkkA, 1) + ' kA. A lower Icu is DANGEROUS \u2014 the breaker can rupture/weld during a full short-circuit.');
+    sol.compliance = [S('DS/HD 60364-4-43 \u00a7434.5.1.', 'DS/HD 60364-4-43 \u00a7434.5.1.')];
+    sol.conclusion = S('V\u00e6lg Icu = ' + need + ' kA.', 'Choose Icu = ' + need + ' kA.');
+  } else if (task.kind === 'adiabatic') {
+    var ad = axAdiabatic(g.k, g.csa, g.Ik, g.t);
+    sol.assumptions = [S('Adiabatisk model (ingen varmeafledning under fejlen); k iht. IEC 60364-4-43 Tabel 43A.', 'Adiabatic model (no heat dissipation during the fault); k per IEC 60364-4-43 Table 43A.')];
+    sol.formula = 'k\u00b2 \u00b7 S\u00b2 \u2265 I\u00b2 \u00b7 t   \u21d4   S \u2265 Smin = Ik \u00b7 \u221at / k';
+    sol.substitution = 'Smin = ' + axFmt(g.Ik, 0) + ' \u00d7 \u221a' + axFmt(g.t, 2) + ' / ' + g.k + ' = ' + axFmt(ad.Smin, 2) + ' mm\u00b2';
+    sol.steps = [
+      { da: 'Mindste tv\u00e6rsnit', en: 'Minimum cross-section', expr: axFmt(g.Ik, 0) + ' \u00d7 ' + axFmt(Math.sqrt(g.t), 3) + ' / ' + g.k, result: axFmt(ad.Smin, 2) + ' mm\u00b2' },
+      { da: 'Sammenlign med valgt S', en: 'Compare with chosen S', expr: g.csa + ' mm\u00b2 ' + (ad.ok ? '\u2265' : '<') + ' ' + axFmt(ad.Smin, 2) + ' mm\u00b2', result: ad.ok ? 'OK' : (lang === 'da' ? 'IKKE OK' : 'NOT OK') }
+    ];
+    sol.result = { value: ad.ok ? 1 : 0, unit: '', da: ad.ok ? 'Opfyldt' : 'Ikke opfyldt', en: ad.ok ? 'Satisfied' : 'Not satisfied' };
+    sol.verification = S('Smin = ' + axFmt(ad.Smin, 2) + ' mm\u00b2; valgt S = ' + g.csa + ' mm\u00b2 \u2192 ' + (ad.ok ? 'lederen t\u00e5ler kortslutningsenergien.' : 'lederen overophedes f\u00f8r fejlen ryddes \u2014 v\u00e6lg st\u00f8rre tv\u00e6rsnit eller hurtigere beskyttelse.'), 'Smin = ' + axFmt(ad.Smin, 2) + ' mm\u00b2; chosen S = ' + g.csa + ' mm\u00b2 \u2192 ' + (ad.ok ? 'the conductor withstands the short-circuit energy.' : 'the conductor overheats before the fault clears \u2014 choose a larger cross-section or faster protection.'));
+    sol.compliance = [S('DS/HD 60364-4-43 \u00a7434.5.2.', 'DS/HD 60364-4-43 \u00a7434.5.2.')];
+    sol.conclusion = ad.ok ? S('Kortslutningsbeskyttelsen er opfyldt (S \u2265 Smin).', 'Short-circuit protection satisfied (S \u2265 Smin).') : S('IKKE opfyldt \u2014 forst\u00f8r tv\u00e6rsnittet til mindst ' + Math.ceil(ad.Smin) + ' mm\u00b2.', 'NOT satisfied \u2014 enlarge to at least ' + Math.ceil(ad.Smin) + ' mm\u00b2.');
+  } else if (task.kind === 'zs') {
+    var zsMax = axZsMax(g.U0, g.Ia);
+    sol.assumptions = [S('Automatisk frakobling i TN: Zs\u00b7Ia \u2264 U0. Ia for kurve C \u2248 10\u00b7In (\u00f8jeblikkelig udl\u00f8sning).', 'Automatic disconnection in TN: Zs\u00b7Ia \u2264 U0. Ia for curve C \u2248 10\u00b7In (instantaneous trip).')];
+    sol.formula = 'Zs \u2264 U0 / Ia';
+    sol.substitution = 'Zs_max = ' + g.U0 + ' / ' + g.Ia + ' = ' + axFmt(zsMax, 2) + ' \u03a9';
+    sol.steps = [{ da: 'Maks. tilladt sl\u00f8jfeimpedans', en: 'Max permissible loop impedance', expr: g.U0 + ' V / ' + g.Ia + ' A', result: axFmt(zsMax, 2) + ' \u03a9' }];
+    sol.result = { value: Math.round(zsMax * 100) / 100, unit: '\u03a9', da: 'Zs,max', en: 'Zs,max' };
+    sol.verification = S('Den m\u00e5lte Zs skal v\u00e6re \u2264 ' + axFmt(zsMax, 2) + ' \u03a9 (konservativt typisk \u2264 0,8\u00b7Zs,max ved varm leder). Ellers rydder beskyttelsen ikke fejlen inden for kr\u00e6vet tid \u2192 ber\u00f8ringsfare.', 'The measured Zs must be \u2264 ' + axFmt(zsMax, 2) + ' \u03a9 (conservatively \u2264 0.8\u00b7Zs,max for a hot conductor). Otherwise the device does not clear the fault in time \u2192 shock hazard.');
+    sol.compliance = [S('DS/HD 60364-4-41 \u00a7411.4.4.', 'DS/HD 60364-4-41 \u00a7411.4.4.')];
+    sol.conclusion = S('Zs skal v\u00e6re \u2264 ' + axFmt(zsMax, 2) + ' \u03a9.', 'Zs must be \u2264 ' + axFmt(zsMax, 2) + ' \u03a9.');
+  } else if (task.kind === 'selectivity') {
+    sol.assumptions = [S('Selektivitet = nedstr\u00f8ms beskyttelse rydder fejlen f\u00f8r opstr\u00f8ms beskyttelse udl\u00f8ser.', 'Selectivity = downstream device clears the fault before upstream trips.')];
+    sol.formula = 'Tid/str\u00f8m-graduering + I\u00b2t-koordinering';
+    sol.result = { value: 0, unit: '', da: task.opts[task.ci].da, en: task.opts[task.ci].en };
+    sol.verification = S('Kr\u00e6ver at hovedets udl\u00f8sekurve (incl. korttidsforsinkelse) ligger over afgangens i HELE fejlomr\u00e5det op til Ik,max. Bekr\u00e6ftes mod fabrikantens selektivitetstabel.', 'Requires the main trip curve (incl. short-time delay) to sit above the feeder curve across the WHOLE fault range up to Ik,max. Confirm against the manufacturer selectivity table.');
+    sol.compliance = [S('DS/HD 60364-5-53 \u00a7536.', 'DS/HD 60364-5-53 \u00a7536.')];
+    sol.conclusion = S(task.opts[task.ci].da, task.opts[task.ci].en);
+  } else { // reg / fallback
+    var optTxt = (function (o) { return (typeof o === 'string') ? { da: o, en: o } : o; })(task.opts[task.ci]);
+    sol.assumptions = [S('Regelsp\u00f8rgsm\u00e5l \u2014 svar iht. g\u00e6ldende DS/HD 60364 og dansk lovgivning.', 'Regulatory question \u2014 answer per current DS/HD 60364 and Danish law.')];
+    sol.result = { value: task.ci, unit: '', da: optTxt.da, en: optTxt.en };
+    sol.verification = S('Korrekt svar: ' + optTxt.da + '. Reference: ' + task.clause + '.', 'Correct answer: ' + optTxt.en + '. Reference: ' + task.clause + '.');
+    sol.compliance = [S(task.clause, task.clause)];
+    sol.conclusion = S(optTxt.da, optTxt.en);
+  }
+  return sol;
+}
+// Solve the whole project: returns parallel opgave/task structure with solutions.
+function axSolve(project) {
+  return (project.opgaver || []).map(function (op) {
+    return { num: op.num, type: op.type, title: op.title, weightPct: op.weightPct, tasks: (op.tasks || []).map(function (t) { return axSolveTask(t, op); }) };
+  });
+}
+
+// --- autoexam: AI EXAMINER (censor) -------------------------------------------
+// Censor-style weighting by competency category (mirrors how a Danish examiner
+// weights an authorization answer): overbelastning 30, kabel 25, fejlbeskyttelse
+// 20, kortslutning 15, sp\u00e6ndingsfald 10.
+var AX_CAT_WEIGHT = { overload: 30, cable: 25, fault: 20, shortcircuit: 15, vdrop: 10 };
+var AX_CAT_NAME = {
+  overload: { da: 'Overbelastningsbeskyttelse (IB \u2264 In \u2264 Iz)', en: 'Overload protection (IB \u2264 In \u2264 Iz)' },
+  cable: { da: 'Kabeldimensionering (Iz/derating)', en: 'Cable sizing (Iz/derating)' },
+  fault: { da: 'Fejlbeskyttelse & frakobling (Zs)', en: 'Fault protection & disconnection (Zs)' },
+  shortcircuit: { da: 'Kortslutning & brydeevne', en: 'Short-circuit & breaking capacity' },
+  vdrop: { da: 'Sp\u00e6ndingsfald (\u0394U%)', en: 'Voltage drop (\u0394U%)' }
+};
+function axCatWeight(cat) { return AX_CAT_WEIGHT[cat] != null ? AX_CAT_WEIGHT[cat] : 15; }
+
+// axExamine(project, answers) -> censor verdict. answers: { taskId: chosenOptionIndex }.
+// Every generated task carries opts + ci, so correctness is index === ci.
+function axExamine(project, answers) {
+  answers = answers || {};
+  var tier = axTier(project.tierId); var passMark = tier.pass || 80;
+  var cats = {}; // cat -> {got, max}
+  var perOpgave = []; var correctCount = 0, totalCount = 0, answeredCount = 0;
+  var missing = [];
+  (project.opgaver || []).forEach(function (op) {
+    var oGot = 0, oMax = 0;
+    op.tasks.forEach(function (t) {
+      var w = axCatWeight(t.cat); totalCount++; oMax += w;
+      if (!cats[t.cat]) cats[t.cat] = { got: 0, max: 0 }; cats[t.cat].max += w;
+      var ua = answers[t.id];
+      if (ua === undefined || ua === null) { missing.push({ id: t.id, prompt: t.prompt, opgave: op.num }); return; }
+      answeredCount++;
+      if (ua === t.ci) { oGot += w; cats[t.cat].got += w; correctCount++; }
+    });
+    var pct = oMax > 0 ? Math.round((oGot / oMax) * 100) : 0;
+    perOpgave.push({ num: op.num, type: op.type, title: op.title, weightPct: op.weightPct, pct: pct });
+  });
+  // Overall score weighted by opgave weight.
+  var wsum = 0, acc = 0;
+  perOpgave.forEach(function (o) { acc += o.pct * o.weightPct; wsum += o.weightPct; });
+  var score = wsum > 0 ? Math.round(acc / wsum) : 0;
+  // Per-category percentages.
+  var catPct = {};
+  Object.keys(cats).forEach(function (c) { catPct[c] = cats[c].max > 0 ? Math.round((cats[c].got / cats[c].max) * 100) : 0; });
+  // Verdict: overall >= passMark AND no opgave below floor (50%).
+  var floor = 50; var anyBelow = perOpgave.some(function (o) { return o.pct < floor; });
+  var verdict = (score >= passMark && !anyBelow && answeredCount === totalCount) ? 'pass' : ((score >= passMark && !anyBelow) ? 'pass' : 'fail');
+  if (answeredCount < totalCount && score < passMark) verdict = 'fail';
+  // Qualitative feedback.
+  var strengths = [], weaknesses = [], suggestions = [];
+  Object.keys(catPct).forEach(function (c) {
+    var nm = AX_CAT_NAME[c] || { da: c, en: c };
+    if (catPct[c] >= 80) strengths.push({ da: 'St\u00e6rk p\u00e5: ' + nm.da + ' (' + catPct[c] + '%).', en: 'Strong on: ' + nm.en + ' (' + catPct[c] + '%).' });
+    else if (catPct[c] < 60) {
+      weaknesses.push({ da: 'Svag p\u00e5: ' + nm.da + ' (' + catPct[c] + '%).', en: 'Weak on: ' + nm.en + ' (' + catPct[c] + '%).' });
+      suggestions.push(axCatSuggest(c));
+    }
+  });
+  if (missing.length) suggestions.unshift({ da: 'Besvar alle delopgaver \u2014 ' + missing.length + ' st\u00e5r ubesvaret. En censor giver 0 for manglende dokumentation.', en: 'Answer every sub-task \u2014 ' + missing.length + ' left blank. A censor gives 0 for missing documentation.' });
+  if (!strengths.length) strengths.push({ da: 'Forts\u00e6t \u2014 byg rutine i kerneberegningerne f\u00f8rst (IB, In, Iz).', en: 'Keep going \u2014 build fluency in the core calculations first (IB, In, Iz).' });
+  return {
+    score: score, passMark: passMark, verdict: verdict, perOpgave: perOpgave, catPct: catPct,
+    correctCount: correctCount, totalCount: totalCount, answeredCount: answeredCount,
+    strengths: strengths, weaknesses: weaknesses, missing: missing, suggestions: suggestions
+  };
+}
+function axCatSuggest(cat) {
+  var m = {
+    overload: { da: 'Tr\u00e6n IB \u2264 In \u2264 Iz: beregn IB med samtidighed, v\u00e6lg In som mindste standard \u2265 IB (DS/HD 60364-4-43 \u00a7433.1).', en: 'Drill IB \u2264 In \u2264 Iz: compute IB with diversity, pick In as the smallest standard \u2265 IB (DS/HD 60364-4-43 \u00a7433.1).' },
+    cable: { da: 'Husk korrektionsfaktorer (temperatur \u00d7 gruppering) og rund Iz ned (DS/HD 60364-5-52 \u00a7523).', en: 'Remember correction factors (temperature \u00d7 grouping) and round Iz down (DS/HD 60364-5-52 \u00a7523).' },
+    fault: { da: 'Repetér Zs \u2264 U0/Ia og frakoblingstider i TN (DS/HD 60364-4-41 \u00a7411).', en: 'Revisit Zs \u2264 U0/Ia and TN disconnection times (DS/HD 60364-4-41 \u00a7411).' },
+    shortcircuit: { da: 'Tr\u00e6n Ik = In/(ek/100), Icu \u2265 Ik,max og den adiabatiske kontrol k\u00b2S\u00b2 \u2265 I\u00b2t (DS/HD 60364-4-43 \u00a7434.5).', en: 'Drill Ik = In/(ek/100), Icu \u2265 Ik,max and the adiabatic check k\u00b2S\u00b2 \u2265 I\u00b2t (DS/HD 60364-4-43 \u00a7434.5).' },
+    vdrop: { da: 'Repetér \u0394U-formlen og gr\u00e6nserne 3% (lys) / 5% (\u00f8vrige) (DS/HD 60364-5-52 \u00a7525).', en: 'Revisit the \u0394U formula and the 3% (lighting) / 5% (other) limits (DS/HD 60364-5-52 \u00a7525).' }
+  };
+  return m[cat] || { da: 'Repetér det relevante DS/HD 60364-afsnit.', en: 'Revisit the relevant DS/HD 60364 clause.' };
+}
+
 let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
@@ -11590,6 +12248,248 @@ function examRenderAnswerKey(){
   });
   html += `<div class="select-grid" style="margin-top:14px"><button class="sel-btn selected" onclick="examTab('quiz')">\u25C0 ${tx('Tilbage', 'Back')}</button></div></div>`;
   return html;
+}
+
+// ============================================================================
+// ===== AUTORISATIONSPR\u00d8VE-GENERATOR \u2014 UI (renderAutoExam) ====================
+// ============================================================================
+var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, timerOn: false, timerLeft: 0, timerSec: 0 };
+var autoexamTimer = null;
+function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == null ? '' : String(o)); }
+function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
+function axStoreSet(s) { try { localStorage.setItem('autoexamStore', JSON.stringify(s)); } catch (e) {} }
+function axFmtTime(s) { s = Math.max(0, s | 0); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60; return (h > 0 ? (h + ':') : '') + (m < 10 && h > 0 ? '0' : '') + m + ':' + (ss < 10 ? '0' : '') + ss; }
+function axUIgenerate(keepSeed) {
+  if (!keepSeed || !autoexamState.seed) autoexamState.seed = (Math.floor(Math.random() * 1e9)) || 1;
+  autoexamState.project = axGenerate(autoexamState.seed, autoexamState.building, autoexamState.tier, autoexamState.mode);
+  autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false;
+  var md = axMode(autoexamState.mode); autoexamState.timerSec = md.sec; autoexamState.timerLeft = md.sec; autoexamState.timerOn = false;
+  if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; }
+}
+function axEnsure() { if (!autoexamState.project) axUIgenerate(true); return autoexamState.project; }
+function axNewTask() { axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam'); }
+function axSetBuilding(id) { autoexamState.building = id; axUIgenerate(true); renderModule('autoexam'); }
+function axSetTier(id) { autoexamState.tier = id; axUIgenerate(true); renderModule('autoexam'); }
+function axSetMode(id) { autoexamState.mode = id; axUIgenerate(true); renderModule('autoexam'); }
+function axUITab(t) { autoexamState.tab = t; renderModule('autoexam'); }
+function axPick(taskId, i) { autoexamState.answers[taskId] = i; renderModule('autoexam'); }
+function axGrade() { var p = axEnsure(); autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.revealFacit = true; var st = axStoreGet(); var key = p.buildingId + ':' + p.tierId + ':' + p.modeId; st[key] = Math.max(st[key] || 0, autoexamState.result.score); axStoreSet(st); if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; } autoexamState.tab = 'censor'; renderModule('autoexam'); }
+function axResetAnswers() { autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; renderModule('autoexam'); }
+function axTimerStart() { autoexamState.timerOn = true; var end = Date.now() + autoexamState.timerLeft * 1000; if (autoexamTimer) clearInterval(autoexamTimer); autoexamTimer = setInterval(function () { autoexamState.timerLeft = Math.max(0, Math.round((end - Date.now()) / 1000)); var el = document.getElementById('axTimer'); if (el) el.textContent = axFmtTime(autoexamState.timerLeft); if (autoexamState.timerLeft <= 0) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; renderModule('autoexam'); } }, 1000); renderModule('autoexam'); }
+function axTimerPause() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } renderModule('autoexam'); }
+function axTimerReset() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } autoexamState.timerLeft = autoexamState.timerSec; renderModule('autoexam'); }
+
+// Authentic deliverables / documentation / evaluation sections by opgave type.
+function axDeliverables(type) {
+  if (type === 'forsyning') return [{ da: 'Dimensionering af h\u00f8j- og lavsp\u00e6ndingskabler i stationen', en: 'Sizing of HV and LV cables in the station' }, { da: 'Kortslutningsberegninger (Ik,max og Ik,min)', en: 'Short-circuit calculations (Ik,max and Ik,min)' }, { da: 'Rel\u00e6indstillinger og vurdering af selektivitet', en: 'Relay settings and selectivity assessment' }, { da: 'Beskyttende (BJ) og driftsm\u00e6ssigt (DJ) jordingsanl\u00e6g', en: 'Protective (BJ) and operational (DJ) earthing' }, { da: 'Enstregsdiagram for transformerstationen', en: 'Single-line diagram of the substation' }];
+  if (type === 'spoergsmaal') return [{ da: 'Skriftlig redeg\u00f8relse med pr\u00e6cise henvisninger til g\u00e6ldende bekendtg\u00f8relser og standarder', en: 'Written account with precise references to current regulations and standards' }];
+  return [{ da: 'Dimensioneringsberegninger for stikledning og gruppeledninger', en: 'Sizing calculations for the service line and group circuits' }, { da: 'Belastningsskema (bilag) med samtidighedsfaktorer', en: 'Load schedule (appendix) with diversity factors' }, { da: 'Valg af beskyttelsesudstyr med begrundelse', en: 'Selection of protective devices with justification' }, { da: 'Dokumentation for sp\u00e6ndingsfald og kortslutning', en: 'Documentation of voltage drop and short-circuit' }, { da: 'Enstregsdiagram og verifikation iht. DS/HD 60364-6', en: 'Single-line diagram and verification per DS/HD 60364-6' }];
+}
+function axDocReq() {
+  return [{ da: 'Antagelser angives eksplicit', en: 'State assumptions explicitly' }, { da: 'Formelvalg begrundes', en: 'Justify the choice of formula' }, { da: 'Standardhenvisning (DS/HD 60364-afsnit) for hvert valg', en: 'Standard reference (DS/HD 60364 clause) for each choice' }, { da: 'Mellemregninger vises \u2014 ingen black-box', en: 'Show intermediate calculations \u2014 no black box' }, { da: 'Komponentvalg begrundes mod verificerede data', en: 'Justify component selection against verified data' }, { da: 'Compliance-kontrol: IB \u2264 In \u2264 Iz, Zs-frakobling og adiabatisk betingelse', en: 'Compliance check: IB \u2264 In \u2264 Iz, Zs disconnection and the adiabatic condition' }];
+}
+function axEvalCriteria(pass) {
+  return [{ da: 'Korrekt metode og formelvalg (v\u00e6gtes h\u00f8jt)', en: 'Correct method and formula choice (weighted heavily)' }, { da: 'Korrekte beregninger og resultater', en: 'Correct calculations and results' }, { da: 'Korrekt standardhenvisning', en: 'Correct standard references' }, { da: 'Begrundede, sikkerhedsorienterede komponentvalg', en: 'Justified, safety-oriented component selection' }, { da: 'Best\u00e5et kr\u00e6ver \u2265 ' + pass + '% samlet samt best\u00e5et hver opgave', en: 'Passing requires \u2265 ' + pass + '% overall plus passing each part' }];
+}
+
+// Option label for a click-only answer button.
+function axOptLabel(task, i) {
+  var o = task.opts[i];
+  if (typeof o === 'number') return axFmt(o) + (task.unit ? (' ' + task.unit) : '');
+  return axL(o);
+}
+
+// ---- sub-renderers ----
+function axBullets(arr) { return '<ul style="margin:4px 0 8px 20px;padding:0;line-height:1.55">' + arr.map(function (x) { return '<li>' + axL(x) + '</li>'; }).join('') + '</ul>'; }
+
+function axRenderHeader(p) {
+  var m = p.meta;
+  var h = '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + m.icon + ' ' + axL(m.title) + ' \u2014 ' + axL(m.building) + '</div>';
+  h += '<div style="padding:4px 2px;line-height:1.7">';
+  h += '<div><strong>' + tx('Dato', 'Date') + ':</strong> ' + axL(m.date) + ', kl. ' + m.time + '</div>';
+  h += '<div><strong>' + tx('Niveau', 'Level') + ':</strong> ' + axL(m.tier) + ' \u00b7 <strong>' + tx('Form', 'Format') + ':</strong> ' + axL(m.mode) + '</div>';
+  h += '<div style="color:var(--success);font-weight:600">' + m.approved + '</div>';
+  h += '<div style="color:var(--text-muted);font-size:0.85rem">' + tx('Pr\u00f8ven indeholder', 'The exam contains') + ' ' + m.pages + ' ' + tx('sider, heraf', 'pages, of which') + ' ' + m.bilag + ' ' + tx('bilag', 'appendices') + ' \u00b7 ' + m.totalTasks + ' ' + tx('delopgaver', 'sub-tasks') + '</div>';
+  // V\u00e6gtning
+  var wk = Object.keys(m.weights);
+  h += '<div style="margin-top:6px"><strong>' + tx('V\u00e6gtning', 'Weighting') + ':</strong> ' + p.opgaver.map(function (op) { return 'Opgave ' + op.num + ' = ' + op.weightPct + '%'; }).join(' \u00b7 ') + '</div>';
+  h += '</div></div>';
+  // Generelle oplysninger
+  h += '<div class="card" style="margin-bottom:12px"><div class="card-title" style="font-size:0.95rem">' + tx('Generelle oplysninger', 'General information') + '</div>';
+  h += axBullets([
+    { da: 'Besvarelsen udf\u00f8res i overensstemmelse med g\u00e6ldende DS/HD 60364-serie samt Bekendtg\u00f8relse om elektriske installationer (BEK 1082) og g\u00e6ldende F\u00e6llesregulativ.', en: 'The answer follows the current DS/HD 60364 series plus the Danish installation order (BEK 1082) and the current common regulation (F\u00e6llesregulativ).' },
+    { da: 'Hvor der er flere dimensioneringsgrundlag til fastl\u00e6ggelse af str\u00f8mv\u00e6rdier, v\u00e6lges og angives grundlaget efter eget valg.', en: 'Where several dimensioning bases exist for current values, choose and state the basis used.' },
+    { da: 'Opgaverne kan l\u00f8ses uafh\u00e6ngigt af hinanden.', en: 'The parts may be solved independently.' }
+  ]);
+  h += '</div>';
+  return h;
+}
+
+function axDataBlockInstallation(d) {
+  var h = '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Tekniske oplysninger', 'Technical information') + '</div><div style="padding:4px 2px;line-height:1.7">';
+  h += '<div><strong>' + tx('Systemjording', 'System earthing') + ':</strong> ' + d.earthing + '</div>';
+  h += '<div><strong>' + tx('Transformer', 'Transformer') + ':</strong> SN = ' + axFmt(d.trafo.SN) + ' kVA, UN = 3\u00d710/0,4 kV, ' + d.trafo.vector + ', ek = ' + axFmt(d.trafo.ek) + ' %</div>';
+  h += '<div><strong>' + tx('Omgivelsestemperatur', 'Ambient temperature') + ':</strong> ' + d.ambient + ' \u00b0C</div>';
+  h += '<div><strong>' + tx('F\u00f8ringsvej / gruppering', 'Routing / grouping') + ':</strong> ' + d.grouping + ' ' + tx('samlede kabler', 'bunched cables') + '</div>';
+  h += '<div><strong>' + tx('Stikledning', 'Service line') + ':</strong> ' + (d.stik.material === 'Al' ? tx('aluminium', 'aluminium') : tx('kobber', 'copper')) + '/' + d.stik.insulation + ', L = ' + axFmt(d.stik.length) + ' m, cos\u03c6 = ' + axFmt(d.stik.cos) + '</div>';
+  h += '</div></div>';
+  // Belastningsskema (bilag)
+  h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin:6px 0">';
+  h += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:4px 6px">' + tx('Brugsgenstand', 'Load') + '</td><td style="padding:4px 6px">P [kW]</td><td style="padding:4px 6px">cos\u03c6</td><td style="padding:4px 6px">\u03b7</td><td style="padding:4px 6px">' + tx('Faser', 'Phases') + '</td><td style="padding:4px 6px">Sf</td><td style="padding:4px 6px">IB [A]</td></tr>';
+  d.loads.forEach(function (l) { h += '<tr style="border-bottom:1px solid var(--border-light)"><td style="padding:4px 6px">' + axL({ da: l.da, en: l.en }) + '</td><td style="padding:4px 6px">' + axFmt(l.P) + '</td><td style="padding:4px 6px">' + axFmt(l.cos) + '</td><td style="padding:4px 6px">' + axFmt(l.eta) + '</td><td style="padding:4px 6px">' + (l.ph === 3 ? '3~' : '1~') + '</td><td style="padding:4px 6px">' + axFmt(l.sf) + '</td><td style="padding:4px 6px">' + axFmt(l.IB, 1) + '</td></tr>'; });
+  h += '<tr style="font-weight:700;background:var(--primary-glow)"><td style="padding:4px 6px" colspan="6">' + tx('Dimensionsgivende IB (med samtidighed)', 'Dimensioning IB (with diversity)') + '</td><td style="padding:4px 6px">' + axFmt(d.IBtotal, 1) + '</td></tr>';
+  h += '</table></div>';
+  return h;
+}
+
+function axDataBlockForsyning(d) {
+  var h = '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Forsyningsforhold', 'Supply conditions') + '</div><div style="padding:4px 2px;line-height:1.7">';
+  h += '<div><strong>' + tx('Transformer', 'Transformer') + ':</strong> SN = ' + axFmt(d.SN) + ' kVA, UN = 3\u00d710/0,4 kV, ' + d.vector + ', ek = ' + axFmt(d.ek) + ' %</div>';
+  h += '<div><strong>' + tx('Fuldlaststr\u00f8m (LV)', 'Full-load current (LV)') + ':</strong> In \u2248 ' + axFmt(d.In, 0) + ' A</div>';
+  h += '<div><strong>' + tx('Str\u00f8mtransformere', 'Current transformers') + ':</strong> ki = ' + d.ki + '/5 A</div>';
+  h += '<div><strong>' + tx('Omgivelsestemperatur', 'Ambient temperature') + ':</strong> ' + d.ambient + ' \u00b0C</div>';
+  h += '<div><strong>' + tx('Rel\u00e6beskyttelse', 'Relay protection') + ':</strong> ' + tx('konstanttidsrel\u00e6', 'constant-time relay') + ' I> / t></div>';
+  h += '</div></div>';
+  return h;
+}
+
+function axOpgaveOverview(op, p) {
+  var h = '<div class="card" style="margin-bottom:12px">';
+  h += '<div class="card-title">Opgave ' + op.num + ' \u2014 ' + axL(op.title) + ' <span style="color:var(--text-muted);font-weight:400">(' + op.weightPct + '%)</span></div>';
+  // Projektbaggrund / Kundekrav (installation only carries narrative)
+  if (op.type === 'installation') {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Projektbaggrund', 'Project background') + ':</strong> ' + axL(p.background) + '</div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Kundekrav', 'Customer requirements') + ':</strong> ' + tx(p.customer.da[0], p.customer.en[0]) + '</div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Fremtidig udvidelse', 'Future expansion') + ':</strong> ' + tx(p.expansion.da[0], p.expansion.en[0]) + '</div>';
+    h += axDataBlockInstallation(op.data);
+  } else if (op.type === 'forsyning') {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Projektbaggrund', 'Project background') + ':</strong> ' + tx('En transformerstation indg\u00e5r i forsyningen og skal dimensioneres og beskyttes korrekt.', 'A substation forms part of the supply and must be correctly sized and protected.') + '</div>';
+    h += axDataBlockForsyning(op.data);
+  } else {
+    h += '<div style="margin-bottom:6px">' + tx('Besvar f\u00f8lgende sp\u00f8rgsm\u00e5l til g\u00e6ldende bekendtg\u00f8relser og standarder.', 'Answer the following questions on current regulations and standards.') + '</div>';
+  }
+  // Opgaven omfatter f\u00f8lgende (task list)
+  h += '<div style="margin-top:8px"><strong>' + tx('Opgaven omfatter f\u00f8lgende', 'The task comprises the following') + ':</strong><ol style="margin:4px 0 8px 20px;padding:0;line-height:1.6">';
+  op.tasks.forEach(function (t) { h += '<li>' + axL(t.prompt) + ' <span style="color:var(--text-muted);font-size:0.8rem">[' + t.clause + ']</span></li>'; });
+  h += '</ol></div>';
+  // Leverancer / Dokumentationskrav / Bed\u00f8mmelseskriterier
+  h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600">' + tx('Leverancer, dokumentationskrav & bed\u00f8mmelseskriterier', 'Deliverables, documentation & evaluation criteria') + '</summary>';
+  h += '<div style="padding:6px 2px"><strong>' + tx('Leverancer', 'Deliverables') + ':</strong>' + axBullets(axDeliverables(op.type));
+  h += '<strong>' + tx('Dokumentationskrav', 'Documentation requirements') + ':</strong>' + axBullets(axDocReq());
+  h += '<strong>' + tx('Bed\u00f8mmelseskriterier', 'Evaluation criteria') + ':</strong>' + axBullets(axEvalCriteria(axTier(p.tierId).pass)) + '</div></details>';
+  h += '</div>';
+  return h;
+}
+
+function axRenderAnswerTab(p) {
+  var h = '<div class="info-row">' + tx('V\u00e6lg dit svar p\u00e5 hver delopgave \u2014 alt er klik, intet skal skrives. Tryk derefter p\u00e5 \u201eBed\u00f8m\u201c for at f\u00e5 censorens vurdering.', 'Pick your answer to each sub-task \u2014 everything is click, no typing. Then press \u201cGrade\u201d for the censor verdict.') + '</div>';
+  var answered = 0, total = 0;
+  p.opgaver.forEach(function (op) {
+    h += '<div class="card" style="margin-bottom:10px"><div class="card-title" style="font-size:0.95rem">Opgave ' + op.num + ' \u2014 ' + axL(op.title) + '</div>';
+    op.tasks.forEach(function (t) {
+      total++; var ua = autoexamState.answers[t.id]; if (ua !== undefined) answered++;
+      h += '<div class="select-group"><div class="select-label">' + axL(t.prompt) + '</div><div class="select-grid">';
+      for (var i = 0; i < t.opts.length; i++) {
+        h += '<button class="sel-btn' + (ua === i ? ' selected' : '') + '" onclick="axPick(\'' + t.id + '\',' + i + ')">' + axOptLabel(t, i) + '</button>';
+      }
+      h += '</div></div>';
+    });
+    h += '</div>';
+  });
+  var head = '<div class="result-box" style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span><strong>' + answered + '/' + total + '</strong> ' + tx('besvaret', 'answered') + '</span>';
+  head += '<button class="sel-btn selected" onclick="axGrade()">\uD83C\uDF93 ' + tx('Bed\u00f8m min besvarelse (censor)', 'Grade my answer (censor)') + '</button>';
+  head += '<button class="sel-btn" onclick="axResetAnswers()">\u21BA ' + tx('Nulstil svar', 'Reset answers') + '</button></div></div>';
+  return head + h;
+}
+
+function axRenderSolutionCard(sol) {
+  var h = '<div class="result-box" style="margin:8px 0;border-left:3px solid var(--primary)"><div class="result-title">' + axL(sol.title) + '</div><div style="padding:4px 2px;font-size:0.86rem;line-height:1.6">';
+  h += '<div style="margin-bottom:4px"><strong>' + tx('Antagelser', 'Assumptions') + ':</strong><ul style="margin:2px 0 4px 18px">' + sol.assumptions.map(function (a) { return '<li>' + axL(a) + '</li>'; }).join('') + '</ul></div>';
+  if (sol.formula) h += '<div><strong>' + tx('Formelvalg', 'Formula') + ':</strong> <code style="background:var(--border-light);padding:1px 5px;border-radius:4px">' + sol.formula + '</code></div>';
+  h += '<div><strong>' + tx('Standard', 'Standard') + ':</strong> ' + sol.standard + '</div>';
+  if (sol.substitution) h += '<div style="margin-top:3px"><strong>' + tx('Inds\u00e6tning', 'Substitution') + ':</strong> <code style="font-size:0.85em">' + sol.substitution + '</code></div>';
+  if (sol.steps && sol.steps.length) { h += '<div style="margin-top:3px"><strong>' + tx('Mellemregninger', 'Intermediate steps') + ':</strong><ol style="margin:2px 0 4px 18px">'; sol.steps.forEach(function (s) { h += '<li>' + axL(s) + ': <code>' + (s.expr || '') + '</code> = <strong>' + (s.result || '') + '</strong></li>'; }); h += '</ol></div>'; }
+  if (sol.result) h += '<div style="margin-top:4px;padding:5px 8px;background:var(--success-bg);border-radius:6px"><strong>' + tx('Resultat', 'Result') + ':</strong> <span style="font-family:monospace;font-size:1.05em">' + axFmt(sol.result.value) + (sol.result.unit ? (' ' + sol.result.unit) : '') + '</span> \u2014 ' + axL({ da: sol.result.da, en: sol.result.en }) + '</div>';
+  if (sol.verification) h += '<div style="margin-top:4px"><strong>' + tx('Verifikation', 'Verification') + ':</strong> ' + axL(sol.verification) + '</div>';
+  if (sol.compliance && sol.compliance.length) h += '<div style="margin-top:3px"><strong>Compliance:</strong> ' + sol.compliance.map(function (c) { return axL(c); }).join('; ') + '</div>';
+  if (sol.conclusion) h += '<div style="margin-top:3px"><strong>' + tx('Konklusion', 'Conclusion') + ':</strong> ' + axL(sol.conclusion) + '</div>';
+  h += '</div></div>';
+  return h;
+}
+
+function axBar(pct, color) { return '<div style="background:var(--border-light);border-radius:6px;height:12px;overflow:hidden"><div style="width:' + Math.max(0, Math.min(100, pct)) + '%;height:100%;background:' + color + '"></div></div>'; }
+
+function axRenderCensorTab(p) {
+  var r = autoexamState.result;
+  if (!r) {
+    return '<div class="result-box"><div class="result-title">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</div><div style="padding:6px 2px">' + tx('Besvar opgaverne under \u201eMin besvarelse\u201c og tryk \u201eBed\u00f8m\u201c. Censoren vurderer din besvarelse som til en rigtig autorisationspr\u00f8ve og viser den fulde facit med mellemregninger.', 'Answer the tasks under \u201cMy answer\u201d and press \u201cGrade\u201d. The censor evaluates your answer like a real authorization exam and reveals the full worked solution.') + '</div><div style="margin-top:8px"><button class="sel-btn selected" onclick="axUITab(\'besvar\')">\u270D\uFE0F ' + tx('G\u00e5 til besvarelse', 'Go to answering') + '</button></div></div>';
+  }
+  var passed = r.verdict === 'pass';
+  var color = passed ? 'var(--success)' : 'var(--danger)';
+  var h = '<div class="result-box" style="border:2px solid ' + color + '"><div class="result-title">' + (passed ? '\u2705 ' + tx('BEST\u00c5ET', 'PASSED') : '\u26D4 ' + tx('IKKE BEST\u00c5ET', 'NOT PASSED')) + '</div>';
+  h += '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:4px 2px"><span style="font-size:2.2rem;font-weight:800;color:' + color + '">' + r.score + '%</span><span style="color:var(--text-muted)">' + tx('best\u00e5elsesgr\u00e6nse', 'pass mark') + ' ' + r.passMark + '% \u00b7 ' + r.correctCount + '/' + r.totalCount + ' ' + tx('korrekte', 'correct') + '</span></div>';
+  // per-opgave
+  h += '<div style="padding:6px 2px">';
+  r.perOpgave.forEach(function (o) { h += '<div style="margin:4px 0"><div style="display:flex;justify-content:space-between;font-size:0.85rem"><span>Opgave ' + o.num + ' \u2014 ' + axL(o.title) + ' (' + o.weightPct + '%)</span><span>' + o.pct + '%</span></div>' + axBar(o.pct, o.pct >= 50 ? 'var(--success)' : 'var(--danger)') + '</div>'; });
+  h += '</div>';
+  // per-category
+  h += '<div style="padding:6px 2px"><strong>' + tx('Kompetencer', 'Competencies') + ':</strong>';
+  Object.keys(r.catPct).forEach(function (c) { var nm = AX_CAT_NAME[c] || { da: c, en: c }; h += '<div style="margin:4px 0"><div style="display:flex;justify-content:space-between;font-size:0.82rem"><span>' + axL(nm) + '</span><span>' + r.catPct[c] + '%</span></div>' + axBar(r.catPct[c], r.catPct[c] >= 80 ? 'var(--success)' : (r.catPct[c] >= 60 ? '#b8860b' : 'var(--danger)')) + '</div>'; });
+  h += '</div></div>';
+  // feedback
+  function fb(title, arr, icon) { if (!arr || !arr.length) return ''; return '<div class="result-box" style="margin-top:8px"><div class="result-title">' + icon + ' ' + title + '</div><ul style="margin:4px 0 4px 20px;line-height:1.55">' + arr.map(function (x) { return '<li>' + axL(x) + '</li>'; }).join('') + '</ul></div>'; }
+  h += fb(tx('Styrker', 'Strengths'), r.strengths, '\uD83D\uDCAA');
+  h += fb(tx('Svagheder', 'Weaknesses'), r.weaknesses, '\u26A0\uFE0F');
+  if (r.missing && r.missing.length) h += fb(tx('Manglende elementer', 'Missing elements'), r.missing.map(function (m) { return { da: 'Opgave ' + m.opgave + ': ' + axL(m.prompt), en: 'Task ' + m.opgave + ': ' + axL(m.prompt) }; }), '\u2753');
+  h += fb(tx('Forslag til forbedring', 'Suggested improvements'), r.suggestions, '\uD83D\uDCA1');
+  // full worked solution
+  h += '<div class="card" style="margin-top:10px"><div class="card-title">\uD83D\uDCD8 ' + tx('Fuld facit med mellemregninger', 'Full worked solution') + '</div>';
+  var sol = axSolve(p);
+  sol.forEach(function (op) { h += '<div style="font-weight:700;margin:6px 0">Opgave ' + op.num + ' \u2014 ' + axL(op.title) + '</div>'; op.tasks.forEach(function (s) { h += axRenderSolutionCard(s); }); });
+  h += '</div>';
+  h += '<div style="margin-top:8px"><button class="sel-btn" onclick="axNewTask()">\uD83D\uDD04 ' + tx('Ny opgave', 'New exam') + '</button> <button class="sel-btn" onclick="axResetAnswers();axUITab(\'besvar\')">\u21BA ' + tx('Pr\u00f8v igen', 'Try again') + '</button></div>';
+  return h;
+}
+
+function renderAutoExam() {
+  var p = axEnsure();
+  var st = axStoreGet(); var bestKey = p.buildingId + ':' + p.tierId + ':' + p.modeId; var best = st[bestKey];
+  var h = '<div class="card fade-in"><div class="card-title">\uD83C\uDFD7\uFE0F ' + tx('Autorisationspr\u00f8ve-generator', 'Authorization exam generator') + '</div>';
+  h += '<div class="info-row">' + tx('Genererer komplette danske el-autorisationspr\u00f8ver \u2014 struktur, sprog, metode og bed\u00f8mmelse som de rigtige pr\u00f8ver. V\u00e6lg bygningstype, niveau og varighed, l\u00f8s opgaverne (klik-only), og lad censoren bed\u00f8mme.', 'Generates complete Danish electrical authorization exams \u2014 structure, language, method and grading like the real exams. Choose building type, level and duration, solve the tasks (click-only) and let the censor grade.') + '</div>';
+  h += '<div class="result-box warning" style="margin-bottom:10px"><div class="result-title">\u26A0\uFE0F ' + tx('Sikkerhedsforbehold', 'Safety disclaimer') + '</div><div style="padding:6px 2px;line-height:1.5">' + tx('L\u00e6ringsv\u00e6rkt\u00f8j \u2014 ikke en projekteringsfacitliste. Verificér altid mod g\u00e6ldende DS/HD 60364 og Sikkerhedsstyrelsen.dk. V\u00e6lg ved tvivl den sikrere l\u00f8sning.', 'Learning tool \u2014 not a design authority. Always verify against current DS/HD 60364 and Sikkerhedsstyrelsen.dk. When in doubt, choose the safer option.') + '</div></div>';
+  // pickers
+  h += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building type') + '</div><div class="select-grid">';
+  AX_BUILDINGS.forEach(function (b) { h += '<button class="sel-btn' + (autoexamState.building === b.id ? ' selected' : '') + '" onclick="axSetBuilding(\'' + b.id + '\')">' + b.icon + ' ' + tx(b.da, b.en) + '</button>'; });
+  h += '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Niveau', 'Level') + '</div><div class="select-grid">';
+  AX_TIERS.forEach(function (tr) { h += '<button class="sel-btn' + (autoexamState.tier === tr.id ? ' selected' : '') + '" onclick="axSetTier(\'' + tr.id + '\')">' + tx(tr.da, tr.en) + '</button>'; });
+  h += '</div></div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Varighed / form', 'Duration / format') + '</div><div class="select-grid">';
+  AX_MODES.forEach(function (md) { h += '<button class="sel-btn' + (autoexamState.mode === md.id ? ' selected' : '') + '" onclick="axSetMode(\'' + md.id + '\')">' + tx(md.da, md.en) + '</button>'; });
+  h += '</div></div>';
+  // generate + timer
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">';
+  h += '<button class="sel-btn selected" onclick="axNewTask()">\uD83C\uDFB2 ' + tx('Generér ny opgave', 'Generate new exam') + '</button>';
+  h += '<span style="color:var(--text-muted);font-size:0.85rem">' + tx('Opgave-id', 'Exam id') + ': #' + p.seed + '</span>';
+  if (best != null) h += '<span style="color:var(--success);font-size:0.85rem">' + tx('Bedste', 'Best') + ': ' + best + '%</span>';
+  h += '</div>';
+  // timer row
+  var tcolor = autoexamState.timerLeft <= 300 ? 'var(--danger)' : (autoexamState.timerLeft <= 900 ? '#b8860b' : 'var(--success)');
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px"><span style="font-size:0.85rem;color:var(--text-muted)">' + tx('Pr\u00f8vetid', 'Exam time') + ':</span><span id="axTimer" style="font-size:1.3rem;font-weight:800;font-variant-numeric:tabular-nums;color:' + tcolor + '">' + axFmtTime(autoexamState.timerLeft) + '</span>';
+  h += autoexamState.timerOn ? ('<button class="sel-btn" onclick="axTimerPause()">\u23F8 ' + tx('Pause', 'Pause') + '</button>') : ('<button class="sel-btn" onclick="axTimerStart()">\u25B6 ' + tx('Start', 'Start') + '</button>');
+  h += '<button class="sel-btn" onclick="axTimerReset()">\u21BA ' + tx('Nulstil', 'Reset') + '</button></div>';
+  h += '</div>';
+  // tabs
+  h += '<div class="select-grid" style="margin-bottom:10px">';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'opgave' ? ' selected' : '') + '" onclick="axUITab(\'opgave\')">\uD83D\uDCCB ' + tx('Opgave', 'Exam') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'besvar' ? ' selected' : '') + '" onclick="axUITab(\'besvar\')">\u270D\uFE0F ' + tx('Min besvarelse', 'My answer') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'censor' ? ' selected' : '') + '" onclick="axUITab(\'censor\')">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</button>';
+  h += '</div>';
+  var body = '';
+  if (autoexamState.tab === 'opgave') { body = axRenderHeader(p); p.opgaver.forEach(function (op) { body += axOpgaveOverview(op, p); }); }
+  else if (autoexamState.tab === 'besvar') body = axRenderAnswerTab(p);
+  else body = axRenderCensorTab(p);
+  return h + body;
 }
 
 function renderExam(){

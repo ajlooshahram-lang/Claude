@@ -13401,6 +13401,235 @@ test('Ingestion: PDF quality gate rejects non-readable (high-byte) dominated out
 });
 
 
+// =====================================================================
+// ===== AUTORISATIONSPR\u00d8VE-GENERATOR (autoexam) TESTS ==================
+// =====================================================================
+console.log('\n=== Authorization Exam Generator (autoexam) Tests ===\n');
+
+test('autoexam: axIB 3-phase motor (37kW,400V,0.86,0.93) approx 67 A', function () {
+  var ib = axIB(37, 400, 0.86, 0.93, 3);
+  assert.ok(Math.abs(ib - 66.8) < 0.5, 'IB ~66.8, got ' + ib);
+});
+test('autoexam: axIB 1-phase (3.7kW,230V,0.95) approx 16.9 A', function () {
+  var ib = axIB(3.7, 230, 0.95, 1, 1);
+  assert.ok(Math.abs(ib - 16.93) < 0.2, 'got ' + ib);
+});
+test('autoexam: axDeviceRating picks smallest standard >= IB', function () {
+  assert.strictEqual(axDeviceRating(67), 80);
+  assert.strictEqual(axDeviceRating(909), 1000);
+  assert.strictEqual(axDeviceRating(16), 16);
+  assert.strictEqual(axDeviceRating(16.1), 20);
+});
+test('autoexam: axIkTrafoSecondary 630kVA/400V/4% => 909A, 22.7kA', function () {
+  var t = axIkTrafoSecondary(630, 400, 4);
+  assert.ok(Math.abs(t.In - 909) < 1, 'In got ' + t.In);
+  assert.ok(Math.abs(t.IkkA - 22.7) < 0.2, 'IkkA got ' + t.IkkA);
+});
+test('autoexam: axIkTrafoSecondary 1000kVA/400V/5% => 1443A, 28.9kA', function () {
+  var t = axIkTrafoSecondary(1000, 400, 5);
+  assert.ok(Math.abs(t.In - 1443) < 1 && Math.abs(t.IkkA - 28.9) < 0.2, 'got ' + JSON.stringify(t));
+});
+test('autoexam: axSelectCable enforces Iz_corr >= In (Cu/PVC In80,k1 => 25mm2)', function () {
+  var sel = axSelectCable(80, 'Cu', 'PVC', 1, 1, 1);
+  assert.strictEqual(sel.csa, 25);
+  assert.ok(sel.izCorr >= 80, 'Iz>=In');
+});
+test('autoexam: axSelectCable with derating upsizes the cable', function () {
+  var base = axSelectCable(100, 'Cu', 'PVC', 1, 1, 1).csa;
+  var derated = axSelectCable(100, 'Cu', 'PVC', 0.87, 0.7, 1).csa;
+  assert.ok(derated > base, 'derating must require a larger cross-section (' + base + ' -> ' + derated + ')');
+});
+test('autoexam: axVdrop percent is correct (3ph)', function () {
+  var vd = axVdrop(67, 80, 0.727, 0.075, 0.86, 3, 400);
+  assert.ok(Math.abs(vd.pct - 1.54) < 0.05, 'pct got ' + vd.pct);
+  assert.ok(Math.abs(vd.dU - 6.16) < 0.1, 'dU got ' + vd.dU);
+});
+test('autoexam: axAdiabatic Smin = Ik*sqrt(t)/k and ok flag', function () {
+  var ad = axAdiabatic(115, 25, 10000, 0.1);
+  assert.ok(Math.abs(ad.Smin - 27.5) < 0.2, 'Smin got ' + ad.Smin);
+  assert.strictEqual(ad.ok, false, '25mm2 < 27.5mm2 must fail');
+  assert.strictEqual(axAdiabatic(115, 35, 10000, 0.1).ok, true, '35mm2 passes');
+});
+test('autoexam: axZsMax = U0/Ia', function () {
+  assert.ok(Math.abs(axZsMax(230, 160) - 1.438) < 0.01, 'got ' + axZsMax(230, 160));
+});
+test('autoexam: axFmt uses Danish decimal comma in da, dot in en', function () {
+  var prev = lang; lang = 'da'; var da = axFmt(1234.5, 1); lang = 'en'; var en = axFmt(1234.5, 1); lang = prev;
+  assert.strictEqual(da, '1.234,5');
+  assert.strictEqual(en, '1,234.5');
+});
+test('autoexam: axGenerate is deterministic for a given seed', function () {
+  var a = axGenerate(12345, 'fabrik', 'ekspert', 'fuld');
+  var b = axGenerate(12345, 'fabrik', 'ekspert', 'fuld');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+});
+test('autoexam: different seeds produce different exams', function () {
+  assert.notStrictEqual(JSON.stringify(axGenerate(1, 'fabrik', 'ekspert', 'fuld')), JSON.stringify(axGenerate(2, 'fabrik', 'ekspert', 'fuld')));
+});
+test('autoexam: full mode for an HV building yields 3 opgaver weighted 20/60/20', function () {
+  var p = axGenerate(7, 'fabrik', 'ekspert', 'fuld');
+  assert.strictEqual(p.opgaver.length, 3);
+  var w = 0; p.opgaver.forEach(function (o) { w += o.weightPct; });
+  assert.strictEqual(w, 100);
+  assert.strictEqual(p.opgaver[1].weightPct, 60, 'installation is 60%');
+});
+test('autoexam: non-HV building (parcelhus) drops the forsyning part', function () {
+  var p = axGenerate(3, 'parcelhus', 'ekspert', 'fuld');
+  assert.ok(p.opgaver.every(function (o) { return o.type !== 'forsyning'; }), 'no forsyning for a house');
+});
+test('autoexam: mini mode yields one installation opgave with <=2 tasks', function () {
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  assert.strictEqual(p.opgaver.length, 1);
+  assert.ok(p.opgaver[0].tasks.length <= 2);
+});
+test('autoexam: every generated task carries opts + ci + clause (click-only answerable)', function () {
+  var p = axGenerate(42, 'kontor', 'kandidat', 'fuld');
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      assert.ok(Array.isArray(t.opts) && t.opts.length >= 2, 'opts present for ' + t.id);
+      assert.ok(typeof t.ci === 'number' && t.ci >= 0 && t.ci < t.opts.length, 'valid ci for ' + t.id);
+      assert.ok(t.clause && /60364|Sikkerhedsstyrelsen/.test(t.clause), 'DS/HD clause for ' + t.id);
+    });
+  });
+});
+test('autoexam: combo sweep (all buildings x tiers x modes) generates without error', function () {
+  var n = 0, err = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    try {
+      var p = axGenerate(n * 7 + 1, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+      assert.ok(p.opgaver.length >= 1);
+      p.opgaver.forEach(function (o) { assert.ok(o.tasks.length >= 1); });
+    } catch (e) { err++; }
+  }
+  assert.strictEqual(err, 0, n + ' combos, ' + err + ' errors');
+});
+test('autoexam: axSolveTask recomputes the stored reference answer (no drift)', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var bad = 0, checked = 0;
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      var s = axSolveTask(t, op); checked++;
+      if (typeof t.answer === 'number' && s.result && typeof s.result.value === 'number') {
+        if (Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++;
+      }
+    });
+  });
+  assert.ok(checked > 0 && bad === 0, checked + ' checked, ' + bad + ' drift');
+});
+test('autoexam: every worked solution has the full 7-part structure', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  axSolve(p).forEach(function (op) {
+    op.tasks.forEach(function (s) {
+      assert.ok(s.assumptions.length >= 1, 'assumptions');
+      assert.ok(s.standard, 'standard');
+      assert.ok(s.verification, 'verification');
+      assert.ok(s.compliance.length >= 1, 'compliance');
+      assert.ok(s.conclusion, 'conclusion');
+      assert.ok(s.result, 'result');
+    });
+  });
+});
+test('autoexam: solution sweep (all combos) is complete & numerically consistent', function () {
+  var tasks = 0, err = 0, n = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    var p = axGenerate(n * 13 + 5, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+    var sol = axSolve(p);
+    p.opgaver.forEach(function (op, oi) {
+      op.tasks.forEach(function (t, k) {
+        tasks++; var s = sol[oi].tasks[k];
+        if (!s || !s.assumptions.length || !s.verification || !s.conclusion || !s.compliance.length) err++;
+        if (typeof t.answer === 'number' && s.result && typeof s.result.value === 'number' && Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) err++;
+      });
+    });
+  }
+  assert.ok(tasks > 1000 && err === 0, tasks + ' tasks, ' + err + ' errors');
+});
+test('autoexam: axExamine scores a perfect answer 100% and PASS', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  var r = axExamine(p, ans);
+  assert.strictEqual(r.score, 100);
+  assert.strictEqual(r.verdict, 'pass');
+  assert.strictEqual(r.weaknesses.length, 0);
+  assert.ok(r.strengths.length >= 1);
+});
+test('autoexam: axExamine fails an empty answer and lists every task as missing', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var r = axExamine(p, {});
+  assert.strictEqual(r.score, 0);
+  assert.strictEqual(r.verdict, 'fail');
+  assert.strictEqual(r.missing.length, r.totalCount);
+});
+test('autoexam: axExamine all-wrong scores 0 and fails', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = (t.ci + 1) % t.opts.length; }); });
+  var r = axExamine(p, ans);
+  assert.strictEqual(r.score, 0);
+  assert.strictEqual(r.verdict, 'fail');
+});
+test('autoexam: partial answer produces a per-category breakdown', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.cat === 'overload') ans[t.id] = t.ci; }); });
+  var r = axExamine(p, ans);
+  assert.ok(r.catPct.overload === 100, 'overload mastered');
+  assert.ok(r.score > 0 && r.score < 100, 'partial score, got ' + r.score);
+});
+test('autoexam: laerling pass mark is 70, expert is 80', function () {
+  assert.strictEqual(axTier('laerling').pass, 70);
+  assert.strictEqual(axTier('ekspert').pass, 80);
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(p, ans).passMark, 70);
+});
+test('autoexam: examiner sweep \u2014 perfect always passes, empty always fails', function () {
+  var n = 0, bad = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    var p = axGenerate(n * 3 + 2, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+    var perf = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { perf[t.id] = t.ci; }); });
+    var rp = axExamine(p, perf);
+    if (rp.verdict !== 'pass' || rp.score !== 100) bad++;
+    if (axExamine(p, {}).verdict !== 'fail') bad++;
+  }
+  assert.strictEqual(bad, 0, n + ' combos, ' + bad + ' anomalies');
+});
+test('autoexam: renderAutoExam returns HTML for all tabs in da and en without leaking undefined', function () {
+  var prevLang = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    autoexamState.seed = 2024; autoexamState.building = 'fabrik'; autoexamState.tier = 'ekspert'; autoexamState.mode = 'fuld';
+    axUIgenerate(true);
+    ['opgave', 'besvar', 'censor'].forEach(function (tab) {
+      autoexamState.tab = tab;
+      var out = renderAutoExam();
+      assert.ok(typeof out === 'string' && out.length > 100, tab + ' renders');
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined leak in ' + lg + '/' + tab);
+    });
+  });
+  lang = prevLang;
+});
+test('autoexam: graded censor view reveals score and full worked solution', function () {
+  var prevLang = lang; lang = 'da';
+  autoexamState.seed = 2024; autoexamState.building = 'fabrik'; autoexamState.tier = 'kandidat'; autoexamState.mode = 'fuld';
+  axUIgenerate(true);
+  var p = autoexamState.project;
+  p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { autoexamState.answers[t.id] = t.ci; }); });
+  autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.tab = 'censor';
+  var out = renderAutoExam();
+  assert.ok(out.indexOf('BEST') >= 0, 'shows pass/fail verdict');
+  assert.ok(out.indexOf('Verifikation') >= 0, 'shows worked-solution verification');
+  assert.ok(out.indexOf('undefined') < 0, 'no undefined leak');
+  lang = prevLang;
+});
+test('autoexam: registered in module label registries (da/en) and nav', function () {
+  assert.ok(T.da.modules.autoexam && T.en.modules.autoexam, 'label registered');
+  var found = false; for (var i = 0; i < NAV_GROUPS.length; i++) if (NAV_GROUPS[i].keys.indexOf('autoexam') >= 0) found = true;
+  assert.ok(found, 'autoexam present in a NAV group');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
