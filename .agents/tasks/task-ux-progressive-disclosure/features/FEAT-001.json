@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the Design System Foundation: new CSS classes, helper functions, and smart input component library that all modules will use. This includes: (1) a new engWizard() helper for multi-step guided flows, (2) an engSmartGroup() helper that wraps select-groups with progressive disclosure based on user mode, (3) expanded CSS for compact/dense selection grids with auto-recommendations, (4) a context-aware smart defaults system, and (5) enhanced eng-cards with descriptions/advantages for card-based selectors.",
+  "status": "in_progress",
+  "steps": [
+    "Add new CSS classes to the design system section (around line 1250-1320): .eng-smart-group (wraps a select-group with depth awareness and optional auto-recommendation badge), .eng-compact-grid (tighter spacing for expert-mode dense grids), .eng-recommendation (highlight chip showing AI/auto-suggested value), .eng-context-hint (small contextual help text that appears only in apprentice/electrician mode), .eng-toggle-pair (two-option toggle styled as pill), .eng-summary-bar (horizontal bar showing key results at top of a module before user scrolls to details)",
+    "Add a new helper function engSmartGroup(opts) that generates a select-group with: label, options array, current value, onclick handler, AND optional recommendation badge + depth class. Parameters: { label, options:[{value,text,icon?,desc?}], current, onclick:'stateObj.field=VALUE;renderModule(MOD)', depth?:2|3, recommend?:value, module }. This consolidates the repetitive sel-btn generation pattern used 800+ times into a single call.",
+    "Add engToggle(opts) helper: renders a 2-3 option toggle (like phase selector 1ph/3ph, or indoor/outdoor) as a compact pill-style toggle. Parameters: { options:[{value,text}], current, onclick, label }. Uses .eng-toggle-pair CSS.",
+    "Add engWizardPanel(opts) helper: renders a wizard step indicator + content for the current step. Parameters: { steps:[{id,label_da,label_en}], currentStep, content }. Uses existing .eng-wizard-steps CSS but adds content below.",
+    "Add engSummaryBar(opts) helper: renders a horizontal bar at the top of a module showing 2-4 key derived values (like IB, cable size verdict, compliance status) with verdict badges. Parameters: { items:[{label, value, unit?, status?:'ok'|'fail'|'warn'}] }. Uses .eng-summary-bar CSS.",
+    "Add engContextHint(da, en) helper: renders a small hint/explanation text that is only visible in apprentice and electrician modes (hidden in engineer/expert via depth class). Helps beginners understand what a parameter means.",
+    "Ensure all new helpers use tx() for bilingual strings and respect the click-only constraint (no text inputs). All new CSS should support both light and dark themes (check existing body.dark rules around line 880-910)."
+  ],
+  "acceptance_criteria": [
+    "All new CSS classes are defined in the design system section of el-dimensionering.html",
+    "engSmartGroup() function exists and generates valid HTML with sel-btn buttons, select-grid, and optional recommendation badge",
+    "engToggle() function exists and generates a compact pill toggle",
+    "engWizardPanel() function exists and renders wizard step indicators with content area",
+    "engSummaryBar() function exists and renders a horizontal summary with verdict badges",
+    "engContextHint() function exists and wraps text in a depth-aware container",
+    "Running `node test-sld.js` passes all 2021+ tests",
+    "No new text inputs are introduced (click-only constraint maintained)",
+    "All new functions use tx() for any user-visible strings"
+  ],
+  "verification": [
+    "Run `node test-sld.js` and confirm all 2021+ tests pass",
+    "Grep for the new function names to confirm they exist: engSmartGroup, engToggle, engWizardPanel, engSummaryBar, engContextHint",
+    "Grep for new CSS classes: eng-smart-group, eng-compact-grid, eng-recommendation, eng-context-hint, eng-toggle-pair, eng-summary-bar"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

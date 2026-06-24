@@ -1319,6 +1319,90 @@ body.mode-engineer .advanced-only { display: none !important; }
 .eng-input-row .eng-input-value { font-weight: 700; font-size: 0.9rem; color: var(--primary); min-width: 60px; text-align: right; }
 .eng-input-row .eng-input-unit { font-size: 0.78rem; color: var(--text-muted); min-width: 30px; }
 
+/* --- Smart Group (wraps select-group with depth + recommendation) --- */
+.eng-smart-group {
+  margin-bottom: 18px; position: relative;
+}
+.eng-smart-group .eng-recommendation {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 12px;
+  font-size: 0.68rem; font-weight: 700;
+  background: rgba(0,230,118,0.12); color: #047857;
+  border: 1px solid rgba(0,230,118,0.3);
+  margin-left: 8px; vertical-align: middle;
+}
+.eng-smart-group .eng-recommendation::before { content: '\u2728'; font-size: 0.72rem; }
+body.dark .eng-smart-group .eng-recommendation {
+  background: rgba(0,230,118,0.08); color: #6ee7b7;
+  border-color: rgba(0,230,118,0.25);
+}
+
+/* --- Compact Grid (dense expert-mode layout) --- */
+.eng-compact-grid {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.eng-compact-grid .sel-btn {
+  padding: 6px 10px; font-size: 0.76rem; min-width: 40px;
+}
+
+/* --- Context Hint (visible in apprentice/electrician only) --- */
+.eng-context-hint {
+  font-size: 0.72rem; color: var(--text-muted);
+  padding: 4px 0 6px; line-height: 1.4;
+  font-style: italic;
+}
+body.mode-engineer .eng-context-hint,
+body.mode-expert .eng-context-hint { display: none !important; }
+body.dark .eng-context-hint { color: var(--text-muted); }
+
+/* --- Toggle Pair (pill-style 2-3 option toggle) --- */
+.eng-toggle-pair {
+  display: inline-flex; border-radius: 20px;
+  border: 1.5px solid var(--border); overflow: hidden;
+  background: var(--bg);
+}
+.eng-toggle-pair .eng-toggle-opt {
+  padding: 7px 16px; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; border: none; background: transparent;
+  color: var(--text-muted); transition: var(--transition);
+  white-space: nowrap;
+}
+.eng-toggle-pair .eng-toggle-opt:hover { color: var(--text); background: var(--border-light); }
+.eng-toggle-pair .eng-toggle-opt.selected {
+  background: var(--primary); color: #fff;
+  box-shadow: 0 2px 6px rgba(0,180,255,0.25);
+}
+body.dark .eng-toggle-pair { border-color: #2a3f55; background: #1a2535; }
+body.dark .eng-toggle-pair .eng-toggle-opt { color: #8ab4d0; }
+body.dark .eng-toggle-pair .eng-toggle-opt:hover { background: #1f3048; color: #e0f4ff; }
+body.dark .eng-toggle-pair .eng-toggle-opt.selected {
+  background: linear-gradient(135deg, var(--neon-a), var(--neon-b)); color: #fff;
+  box-shadow: 0 0 10px rgba(var(--neon-rgb), calc(0.6 * var(--glow)));
+}
+
+/* --- Summary Bar (top-of-module key values) --- */
+.eng-summary-bar {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  padding: 10px 14px; margin-bottom: 14px;
+  background: var(--border-light); border-radius: 8px;
+  align-items: center;
+}
+.eng-summary-bar .eng-sb-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem;
+}
+.eng-summary-bar .eng-sb-label { color: var(--text-muted); font-weight: 500; }
+.eng-summary-bar .eng-sb-value { font-weight: 700; color: var(--text); }
+.eng-summary-bar .eng-sb-unit { color: var(--text-muted); font-size: 0.72rem; }
+.eng-summary-bar .eng-sb-badge {
+  display: inline-flex; align-items: center; padding: 2px 7px;
+  border-radius: 10px; font-size: 0.68rem; font-weight: 700;
+}
+.eng-summary-bar .eng-sb-badge.ok { background: var(--success-bg); color: var(--success); }
+.eng-summary-bar .eng-sb-badge.fail { background: var(--danger-bg); color: var(--danger); }
+.eng-summary-bar .eng-sb-badge.warn { background: var(--warning-bg); color: var(--warning); }
+body.dark .eng-summary-bar { background: #152540; }
+
 /* --- Responsive --- */
 @media (max-width: 600px) {
   .eng-summary { padding: 10px 12px; gap: 8px; }
@@ -1326,6 +1410,9 @@ body.mode-engineer .advanced-only { display: none !important; }
   .eng-card { padding: 10px 8px; }
   .eng-step { font-size: 0.9rem; }
   .eng-wizard-steps { gap: 3px; }
+  .eng-toggle-pair .eng-toggle-opt { padding: 6px 12px; font-size: 0.76rem; }
+  .eng-summary-bar { padding: 8px 10px; gap: 8px; }
+  .eng-compact-grid .sel-btn { padding: 5px 8px; font-size: 0.72rem; }
 }
 </style>
 </head>
@@ -2215,6 +2302,110 @@ function mcPrimeResult(sym, value, unit) {
 // Stacked fraction
 function mcPrimeFrac(num, den) {
   return '<span class="mc-frac"><span class="mc-num">' + num + '</span><span class="mc-den">' + den + '</span></span>';
+}
+
+// ===== PROGRESSIVE DISCLOSURE HELPERS =====
+
+// engSmartGroup: generates a select-group with buttons, optional recommendation badge and depth class
+// opts: { label, options:[{value,text,icon?,desc?}], current, onclick:'stateObj.field=VALUE;renderModule(MOD)', depth?:2|3, recommend?:value, module }
+function engSmartGroup(opts) {
+  var o = opts || {};
+  var depthCls = o.depth ? ' depth-' + o.depth : '';
+  var html = '<div class="eng-smart-group select-group' + depthCls + '">';
+  html += '<div class="select-label">' + (o.label || '');
+  if (o.recommend != null) {
+    html += '<span class="eng-recommendation">' + tx('Anbefalet','Recommended') + ': ' + o.recommend + '</span>';
+  }
+  html += '</div>';
+  var gridCls = (o.depth && o.depth >= 3) ? 'eng-compact-grid' : 'select-grid';
+  html += '<div class="' + gridCls + '">';
+  var options = o.options || [];
+  for (var i = 0; i < options.length; i++) {
+    var opt = options[i];
+    var sel = (String(opt.value) === String(o.current)) ? ' selected' : '';
+    var onclickStr = o.onclick ? o.onclick.replace(/VALUE/g, typeof opt.value === 'string' ? "'" + opt.value + "'" : opt.value) : '';
+    html += '<button class="sel-btn' + sel + '" onclick="' + onclickStr + '">';
+    if (opt.icon) html += '<span style="margin-right:4px">' + opt.icon + '</span>';
+    html += opt.text;
+    if (opt.desc) html += '<br><span style="font-size:0.68rem;color:var(--text-muted);font-weight:400">' + opt.desc + '</span>';
+    html += '</button>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+// engToggle: compact pill-style toggle for 2-3 options
+// opts: { options:[{value,text}], current, onclick, label }
+function engToggle(opts) {
+  var o = opts || {};
+  var html = '';
+  if (o.label) {
+    html += '<div class="select-label">' + o.label + '</div>';
+  }
+  html += '<div class="eng-toggle-pair">';
+  var options = o.options || [];
+  for (var i = 0; i < options.length; i++) {
+    var opt = options[i];
+    var sel = (String(opt.value) === String(o.current)) ? ' selected' : '';
+    var onclickStr = o.onclick ? o.onclick.replace(/VALUE/g, typeof opt.value === 'string' ? "'" + opt.value + "'" : opt.value) : '';
+    html += '<button class="eng-toggle-opt' + sel + '" onclick="' + onclickStr + '">' + opt.text + '</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// engWizardPanel: renders wizard step indicator with content for current step
+// opts: { steps:[{id,label_da,label_en}], currentStep, content }
+function engWizardPanel(opts) {
+  var o = opts || {};
+  var steps = o.steps || [];
+  var currentStep = o.currentStep || (steps.length > 0 ? steps[0].id : '');
+  var html = '<div class="eng-wizard-steps">';
+  var currentIdx = 0;
+  for (var i = 0; i < steps.length; i++) {
+    if (steps[i].id === currentStep) { currentIdx = i; break; }
+  }
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    var state = i < currentIdx ? 'done' : (i === currentIdx ? 'active' : 'pending');
+    html += '<div class="eng-wizard-step ' + state + '">';
+    html += '<span class="eng-wiz-num">' + (i + 1) + '</span>';
+    html += '<span>' + tx(s.label_da, s.label_en) + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  if (o.content) {
+    html += '<div class="eng-wizard-content">' + o.content + '</div>';
+  }
+  return html;
+}
+
+// engSummaryBar: horizontal bar showing key derived values with verdict badges
+// opts: { items:[{label, value, unit?, status?:'ok'|'fail'|'warn'}] }
+function engSummaryBar(opts) {
+  var o = opts || {};
+  var items = o.items || [];
+  var html = '<div class="eng-summary-bar">';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    html += '<div class="eng-sb-item">';
+    html += '<span class="eng-sb-label">' + item.label + '</span>';
+    html += '<span class="eng-sb-value">' + (item.value != null ? item.value : '-') + '</span>';
+    if (item.unit) html += '<span class="eng-sb-unit">' + item.unit + '</span>';
+    if (item.status) {
+      var badge = item.status === 'ok' ? '\u2713' : (item.status === 'fail' ? '\u2717' : '\u26A0');
+      html += '<span class="eng-sb-badge ' + item.status + '">' + badge + '</span>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// engContextHint: small hint text visible only in apprentice/electrician modes
+// da: Danish text, en: English text
+function engContextHint(da, en) {
+  return '<div class="eng-context-hint">' + tx(da, en) + '</div>';
 }
 
 // ===== DATA FROM UPLOADED FILES =====
