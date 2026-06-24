@@ -10085,6 +10085,69 @@ test('Analyzer: analyzerSegment handles no-Opgave text', function() {
   assert(segs.length >= 1, 'returns at least 1 segment');
 });
 
+test('Analyzer: analyzerSegment de-duplicates repeated Opgave headers', function() {
+  var text = 'Opgave 1 Forsyning\nData A\nOpgave 2 Kabler\nData B\nOpgave 3 Regler\nData C\nOpgave 1 Forsyning igen\nMere data\nOpgave 2 Kabler igen\nEndnu mere';
+  var segs = analyzerSegment(text);
+  // Should only produce 3 unique Opgave segments, not 5 (duplicates merged)
+  assert(segs.length <= 3, 'de-duplicated to max 3 segments (got ' + segs.length + ')');
+  var ids = segs.map(function(s) { return s.id; });
+  // Each Opgave ID should appear only once
+  var uniqueIds = ids.filter(function(id, idx) { return ids.indexOf(id) === idx; });
+  assert.strictEqual(ids.length, uniqueIds.length, 'no duplicate IDs in segments');
+  // Merged text should contain content from both occurrences
+  var seg1 = segs.filter(function(s) { return s.id === 1; })[0];
+  assert(seg1.text.indexOf('Data A') >= 0, 'first occurrence text preserved');
+  assert(seg1.text.indexOf('Mere data') >= 0, 'second occurrence text merged');
+});
+
+test('Analyzer: examBuildSolution does not produce repeated opgaver', function() {
+  // Simulate state with duplicate segments
+  var mockState = {
+    segments: [
+      { id: 0, title: 'Generelt', text: 'info', subQuestions: ['info'] },
+      { id: 1, title: 'Opgave 1', text: 'forsyning', subQuestions: ['forsyning'] },
+      { id: 2, title: 'Opgave 2', text: 'kabler', subQuestions: ['kabler'] },
+      { id: 3, title: 'Opgave 3', text: 'regler', subQuestions: ['regler'] },
+      { id: 1, title: 'Opgave 1', text: 'forsyning kopi', subQuestions: ['forsyning kopi'] },
+      { id: 2, title: 'Opgave 2', text: 'kabler kopi', subQuestions: ['kabler kopi'] }
+    ],
+    extracted: null,
+    results: []
+  };
+  var sol = examBuildSolution(mockState);
+  // After de-duplication, only 4 unique opgaver (Generelt + 1 + 2 + 3)
+  assert(sol.opgaver.length <= 4, 'max 4 opgaver after dedup (got ' + sol.opgaver.length + ')');
+  var opgIds = sol.opgaver.map(function(o) { return o.id; });
+  var uniqueOpgIds = opgIds.filter(function(id, idx) { return opgIds.indexOf(id) === idx; });
+  assert.strictEqual(opgIds.length, uniqueOpgIds.length, 'no duplicate opgave IDs');
+});
+
+test('Analyzer: examRenderSolution skips empty opgaver (no repeated empty sections)', function() {
+  var sol = {
+    generatedAt: '2025-01-01',
+    lang: 'da',
+    title: 'Test',
+    opgaver: [
+      { id: 0, title: 'Generelt', questions: [] },
+      { id: 1, title: 'Opgave 1', questions: [] },
+      { id: 2, title: 'Opgave 2', questions: [] },
+      { id: 3, title: 'Opgave 3', questions: [] }
+    ],
+    verdict: { code: 'incomplete', color: '#888', icon: '', label: 'Incomplete', counts: { ok: 0, warning: 0, fail: 0, info: 0 } },
+    sldHtml: '',
+    coverage: { detected: 0, solved: 0, needInput: 0, modulesUsed: [], flagged: [] }
+  };
+  var html = examRenderSolution(sol);
+  // Should NOT contain the old per-section empty message repeated for each opgave
+  var oldMsg = html.match(/Ingen detekterede sp.*rgsm.*l i denne opgave/g);
+  assert(!oldMsg || oldMsg.length === 0, 'no per-section "Ingen detekterede" messages (old repeated pattern removed)');
+  // Should NOT render individual Opgave section headers when all are empty
+  var opgaveHeaders = html.match(/Opgave \d+/g);
+  assert(!opgaveHeaders || opgaveHeaders.length === 0, 'no Opgave headers rendered when all sections are empty (got ' + (opgaveHeaders ? opgaveHeaders.length : 0) + ')');
+  // Should show a single clean empty state
+  assert(html.indexOf('autorisationsopgave') >= 0 || html.indexOf('authorization exam') >= 0, 'clean empty state message shown');
+});
+
 test('Analyzer: analyzerExtract finds power', function() {
   var data = analyzerExtract('Belastning: 37 kW, 400 V, 3-faset');
   assert.strictEqual(data.power_kW, 37, 'power extracted');

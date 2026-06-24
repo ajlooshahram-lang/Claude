@@ -34542,6 +34542,7 @@ function analyzerNormalize(text) {
 // Segment text by Opgave/sub-task structure
 function analyzerSegment(text) {
   var segments = [];
+  var seenIds = {};
   // Split by Opgave headers: "Opgave 1", "Opgave 2", etc.
   var parts = text.split(/(?=Opgave\s+\d+)/i);
   for (var i = 0; i < parts.length; i++) {
@@ -34550,19 +34551,35 @@ function analyzerSegment(text) {
     var headerMatch = part.match(/^Opgave\s+(\d+)[^\n]*/i);
     var segId = headerMatch ? parseInt(headerMatch[1]) : 0;
     var title = headerMatch ? headerMatch[0] : 'Generelt';
-    // Split sub-questions within each Opgave
-    var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
-    var subQuestions = [];
-    for (var j = 0; j < subParts.length; j++) {
-      var sub = subParts[j].trim();
-      if (sub && sub !== title) subQuestions.push(sub);
+    // De-duplicate: if we already have a segment with this ID, merge text into it
+    // (prevents repeated Opgave 1/2/3 sections when headers appear multiple times)
+    var dedupKey = segId + ':' + (headerMatch ? 'opgave' : 'general');
+    if (seenIds[dedupKey]) {
+      var existing = seenIds[dedupKey];
+      existing.text = (existing.text || '') + '\n' + part;
+      // Split and merge sub-questions
+      var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+      for (var j = 0; j < subParts.length; j++) {
+        var sub = subParts[j].trim();
+        if (sub && sub !== title) existing.subQuestions.push(sub);
+      }
+      continue;
     }
-    segments.push({
+    // Split sub-questions within each Opgave
+    var subParts2 = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+    var subQuestions = [];
+    for (var j2 = 0; j2 < subParts2.length; j2++) {
+      var sub2 = subParts2[j2].trim();
+      if (sub2 && sub2 !== title) subQuestions.push(sub2);
+    }
+    var seg = {
       id: segId,
       title: title,
       text: part,
       subQuestions: subQuestions.length > 0 ? subQuestions : [part]
-    });
+    };
+    seenIds[dedupKey] = seg;
+    segments.push(seg);
   }
   if (segments.length === 0) {
     segments.push({ id: 0, title: 'Analyse', text: text, subQuestions: [text] });
@@ -37733,9 +37750,27 @@ function examBuildSolution(state) {
   var results = (state && state.results) ? state.results : [];
 
   // Organise by Opgave using the analyzer's existing segmentation.
-  var segments = (state && state.segments && state.segments.length)
+  var rawSegments = (state && state.segments && state.segments.length)
     ? state.segments
     : (extracted ? [{ id: 0, title: tx('Analyse', 'Analysis'), text: (state && state.rawText) || '', subQuestions: [(state && state.rawText) || ''] }] : []);
+
+  // De-duplicate segments by ID: merge text from duplicates into the first occurrence.
+  // This prevents "Opgave 1/2/3" from appearing multiple times when the source text
+  // mentions these headers more than once (e.g. in a table of contents AND in the body).
+  var segMap = {};
+  var segments = [];
+  for (var si = 0; si < rawSegments.length; si++) {
+    var rs = rawSegments[si];
+    var segKey = String(rs.id) + ':' + (rs.title || '');
+    if (segMap[segKey]) {
+      // Merge text into existing segment (richer text = better question detection)
+      segMap[segKey].text = (segMap[segKey].text || '') + '\n' + (rs.text || '');
+      segMap[segKey].subQuestions = (segMap[segKey].subQuestions || []).concat(rs.subQuestions || []);
+    } else {
+      segMap[segKey] = rs;
+      segments.push(rs);
+    }
+  }
 
   // Result lookup by type (first occurrence wins).
   var byType = {};
@@ -37905,36 +37940,39 @@ function examRenderSolution(sol) {
   h += '</div>';
 
   // ---- (1) Solution organised by Opgave, each question -> calc -> FULL working ----
-  if (!sol.opgaver || !sol.opgaver.length) {
-    h += '<div style="color:var(--text-muted);font-size:0.85rem">' + tx('Ingen eksamensdata endnu \u2014 inds\u00E6t eller upload en opgave f\u00F8rst.', 'No exam data yet \u2014 paste or upload an exam first.') + '</div>';
-  }
-  sol.opgaver.forEach(function (op) {
-    h += '<div class="exam-opgave" style="margin-top:14px;padding-top:8px;border-top:2px solid var(--primary-light)">';
-    var opTitle = op.id ? ('Opgave ' + op.id) : (op.title || tx('Generelt', 'General'));
-    h += '<div style="font-weight:700;font-size:0.95rem;color:var(--primary)">' + opTitle + '</div>';
-    if (!op.questions.length) {
-      h += '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">' + tx('Ingen detekterede sp\u00F8rgsm\u00E5l i denne opgave.', 'No detected questions in this task.') + '</div>';
-    }
-    op.questions.forEach(function (q) {
-      h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
-      // Question text
-      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ':</strong> ' + (q.questionText || q.label) + '</div>';
-      // Mapped calculation
-      h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
-      if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
-      if (q.status === 'ok') h += ' \u2705'; else if (q.status === 'fail') h += ' \u26D4';
-      h += '</div>';
-      // FULL worked solution (calcDetail HTML) OR a click-only gap chip
-      if (q.solved && q.calcHtml) {
-        h += q.calcHtml;
-      } else {
-        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen udregning tilg\u00E6ngelig \u2014 bekr\u00E6ft de manglende input via det tilknyttede modul (kun klik).', 'No working available \u2014 confirm the missing inputs via the linked module (click-only).') + '</div>';
-        if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
-      }
+  // Consolidated single-page view: skip empty opgaver and show one clean empty state
+  // if no questions were detected at all (prevents repeated empty sections).
+  var hasAnyQuestions = (sol.opgaver || []).some(function (op) { return op.questions && op.questions.length > 0; });
+  if (!sol.opgaver || !sol.opgaver.length || !hasAnyQuestions) {
+    h += '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px 0">' + tx('Ingen detekterede sp\u00F8rgsm\u00E5l endnu \u2014 inds\u00E6t eller upload en autorisationsopgave for at se den fulde l\u00F8sning.', 'No detected questions yet \u2014 paste or upload an authorization exam to see the full solution.') + '</div>';
+  } else {
+    // Only render opgaver that have detected questions (consolidated single-page view)
+    sol.opgaver.forEach(function (op) {
+      if (!op.questions || !op.questions.length) return;
+      h += '<div class="exam-opgave" style="margin-top:14px;padding-top:8px;border-top:2px solid var(--primary-light)">';
+      var opTitle = op.id ? ('Opgave ' + op.id) : (op.title || tx('Generelt', 'General'));
+      h += '<div style="font-weight:700;font-size:0.95rem;color:var(--primary)">' + opTitle + '</div>';
+      op.questions.forEach(function (q) {
+        h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
+        // Question text
+        h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ':</strong> ' + (q.questionText || q.label) + '</div>';
+        // Mapped calculation
+        h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
+        if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
+        if (q.status === 'ok') h += ' \u2705'; else if (q.status === 'fail') h += ' \u26D4';
+        h += '</div>';
+        // FULL worked solution (calcDetail HTML) OR a click-only gap chip
+        if (q.solved && q.calcHtml) {
+          h += q.calcHtml;
+        } else {
+          h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen udregning tilg\u00E6ngelig \u2014 bekr\u00E6ft de manglende input via det tilknyttede modul (kun klik).', 'No working available \u2014 confirm the missing inputs via the linked module (click-only).') + '</div>';
+          if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
+        }
+        h += '</div>';
+      });
       h += '</div>';
     });
-    h += '</div>';
-  });
+  }
 
   h += '</div>';
   return h;
@@ -37997,8 +38035,9 @@ function examSolutionPrintHTML(sol) {
   if (cov.modulesUsed && cov.modulesUsed.length) h += '<div>' + tx('Moduler', 'Modules') + ': ' + cov.modulesUsed.join(', ') + '</div>';
   // SLD
   h += '<h2>' + tx('Enstregsdiagram', 'Single-line diagram') + '</h2>' + (sol.sldHtml || '');
-  // Opgaver with full working
+  // Opgaver with full working (skip empty opgaver in print too)
   (sol.opgaver || []).forEach(function (op) {
+    if (!op.questions || !op.questions.length) return;
     var opTitle = op.id ? ('Opgave ' + op.id) : (op.title || tx('Generelt', 'General'));
     h += '<div class="exam-opgave"><h2>' + opTitle + '</h2>';
     op.questions.forEach(function (q) {
