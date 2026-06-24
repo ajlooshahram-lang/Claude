@@ -8265,8 +8265,8 @@ function calcDetailIB(power_kW, cosPhi, voltage, ib, sf, ef) {
 
 // ===== LOAD MODULE (Mathcad Prime Style) =====
 function renderLoad() {
-  const ib = calcIB();
-  const S = calcS();
+  const ib = calcIB() || 0;
+  const S = calcS() || 0;
   const is3 = loadState.voltage === '3x400';
   const Un = is3 ? 400 : 230;
   const P_W = loadState.power * 1000;
@@ -8390,7 +8390,7 @@ function renderLoad() {
   html += '<div style="background:linear-gradient(135deg,rgba(0,180,255,0.06),rgba(0,230,118,0.04));border:2px solid var(--primary);border-radius:10px;padding:12px 16px;margin:12px 0">';
   html += '<div class="eng-step" style="border:none;padding:0">';
   html += '<span class="eng-sym" style="font-size:1.2em;font-weight:800">I<sub>B</sub></span>';
-  html += '<span class="eng-result" style="font-size:1.4em;color:var(--primary);font-weight:800">= ' + ib.toFixed(2) + ' <span style="color:#1565c0">A</span></span>';
+  html += '<span class="eng-result" style="font-size:1.4em;color:var(--primary);font-weight:800">= ' + (isFinite(ib) ? ib.toFixed(2) : '\u2014') + ' <span style="color:#1565c0">A</span></span>';
   html += '</div></div>';
 
   // Additional calculations (depth-2)
@@ -15912,6 +15912,7 @@ function brainDoBOM() {
 
 // Helper: render a safety verdict card (green/red)
 function renderVerdict(safe, text) {
+  if (!text) text = '';
   var color = safe ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)';
   var icon = safe ? '\u2705' : '\u274C';
   return '<div class="result-box" style="border-left:4px solid ' + color + ';margin-top:12px">' +
@@ -16104,7 +16105,7 @@ function renderEV() {
   html += '<div style="font-size:0.95rem;line-height:2.2">';
   html += '<div>\u0394U% \u2264 3% : ' + vdrop.toFixed(2) + '% ' + (vdropOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
   html += '<div>' + tx('Type B RCD','Type B RCD') + ' (722.531.3.101) : ' + (rcdTypeB ? mcPrimeOk() : mcPrimeFail(tx('P\u00C5KR\u00C6VET','REQUIRED'))) + '</div>';
-  html += '<div>' + tx('Netkapacitet','Grid capacity') + ': ' + grid.usagePercent + '% ' + (grid.overloaded ? mcPrimeFail(tx('OVERBELASTET','OVERLOADED')) : mcPrimeOk()) + ' (' + tx('rest','remaining') + ' ' + grid.remainingA + ' A)</div>';
+  html += '<div>' + tx('Netkapacitet','Grid capacity') + ': ' + (isFinite(grid.usagePercent) ? grid.usagePercent : 0) + '% ' + (grid.overloaded ? mcPrimeFail(tx('OVERBELASTET','OVERLOADED')) : mcPrimeOk()) + ' (' + tx('rest','remaining') + ' ' + (isFinite(grid.remainingA) ? grid.remainingA : 0) + ' A)</div>';
   if (grid.needsLoadBalancing) html += '<div style="color:var(--warning)">\u26A0\uFE0F ' + tx('Lastbalancering anbefales (>80%)','Load balancing recommended (>80%)') + '</div>';
   html += '</div>';
 
@@ -17649,16 +17650,16 @@ function renderLighting() {
   ]);
 
   html += mcPrimeHeader(tx('BEREGNING', 'CALCULATION'));
-  html += mcPrimeLine('k', ':= ' + mcPrimeFrac('L \u00B7 W', 'H \u00B7 (L + W)') + ' =', mcPrimeFrac(lightingState.length + ' \u00B7 ' + lightingState.width, lightingState.height + ' \u00B7 (' + lightingState.length + ' + ' + lightingState.width + ')'), calc.roomIndex, '', tx('Rumindeks','Room index'));
-  html += mcPrimeLine('UF', ':= f(k, ' + tx('reflektanser','reflectances') + ') =', '', calc.uf, '', mcPrimeRef('DS/EN 12464-1'));
-  html += mcPrimeLine('n', ':= ' + mcPrimeFrac('E<sub>m</sub> \u00B7 A', '\u03A6<sub>arm</sub> \u00B7 UF \u00B7 MF') + ' =', mcPrimeFrac(calc.targetLux + ' \u00B7 ' + calc.area, calc.lumens + ' \u00B7 ' + calc.uf + ' \u00B7 ' + lightingState.maintenanceFactor), calc.count, tx('stk','pcs'), tx('Antal armaturer','Luminaire count'));
+  html += mcPrimeLine('k', ':= ' + mcPrimeFrac('L \u00B7 W', 'H \u00B7 (L + W)') + ' =', mcPrimeFrac(lightingState.length + ' \u00B7 ' + lightingState.width, lightingState.height + ' \u00B7 (' + lightingState.length + ' + ' + lightingState.width + ')'), calc.roomIndex || '\u2014', '', tx('Rumindeks','Room index'));
+  html += mcPrimeLine('UF', ':= f(k, ' + tx('reflektanser','reflectances') + ') =', '', calc.uf || '\u2014', '', mcPrimeRef('DS/EN 12464-1'));
+  html += mcPrimeLine('n', ':= ' + mcPrimeFrac('E<sub>m</sub> \u00B7 A', '\u03A6<sub>arm</sub> \u00B7 UF \u00B7 MF') + ' =', mcPrimeFrac(calc.targetLux + ' \u00B7 ' + calc.area, calc.lumens + ' \u00B7 ' + calc.uf + ' \u00B7 ' + lightingState.maintenanceFactor), (isFinite(calc.count) ? calc.count : '\u2014'), tx('stk','pcs'), tx('Antal armaturer','Luminaire count'));
 
-  html += mcPrimeResult('n', calc.count + ' ' + tx('armaturer','luminaires') + ' (' + calc.rows + ' \u00D7 ' + calc.cols + ')', '');
+  html += mcPrimeResult('n', (isFinite(calc.count) ? calc.count : '\u2014') + ' ' + tx('armaturer','luminaires') + ' (' + (calc.rows||0) + ' \u00D7 ' + (calc.cols||0) + ')', '');
 
   html += mcPrimeHeader(tx('VERIFIKATION', 'VERIFICATION'));
   html += '<div style="font-size:0.95rem;line-height:2.2">';
-  html += '<div>S/H \u2264 1,5 : ' + calc.spacingRatio + (calc.uniformityOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
-  html += '<div>LENI \u2264 ' + calc.leniMax + ' W/m\u00B2 : ' + calc.powerDensity + ' W/m\u00B2' + (calc.leniOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>S/H \u2264 1,5 : ' + (isFinite(calc.spacingRatio) ? calc.spacingRatio : '\u2014') + (calc.uniformityOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div>LENI \u2264 ' + (calc.leniMax||12) + ' W/m\u00B2 : ' + (isFinite(calc.powerDensity) ? calc.powerDensity : '\u2014') + ' W/m\u00B2' + (calc.leniOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
   html += '<div>' + tx('Kredse','Circuits') + ': ' + calc.circuitsNeeded + ' \u00D7 B10 MCB (' + calc.totalWattage + ' W ' + tx('total','total') + ')</div>';
   html += '</div>';
 
@@ -18155,12 +18156,12 @@ function renderBusbar() {
     { sym: 'L', val: busbarState.sections * 3, unit: 'm' },
     { sym: tx('Aftag','Tap-offs'), val: busbarState.tapOffCount, unit: tx('stk','pcs') }
   ]);
-  html += mcPrimeLine('I<sub>z,korr</sub>', ':= I<sub>n</sub> \u00B7 k<sub>T</sub> \u00B7 k<sub>IP</sub> \u00B7 k<sub>inst</sub> =', '', calc.thermal.deratedCurrent, 'A', calc.thermal.ok ? mcPrimeRef('IEC 61439-6') : '');
-  html += mcPrimeLine('\u0394U%', '=', '', calc.vdrop.vdropPercent, '%', calc.vdrop.ok ? '' : '<strong style="color:var(--danger)">> 1%</strong>');
+  html += mcPrimeLine('I<sub>z,korr</sub>', ':= I<sub>n</sub> \u00B7 k<sub>T</sub> \u00B7 k<sub>IP</sub> \u00B7 k<sub>inst</sub> =', '', (calc.thermal && isFinite(calc.thermal.deratedCurrent) ? calc.thermal.deratedCurrent : '\u2014'), 'A', (calc.thermal && calc.thermal.ok) ? mcPrimeRef('IEC 61439-6') : '');
+  html += mcPrimeLine('\u0394U%', '=', '', (calc.vdrop && isFinite(calc.vdrop.vdropPercent) ? calc.vdrop.vdropPercent : '\u2014'), '%', (calc.vdrop && !calc.vdrop.ok) ? '<strong style="color:var(--danger)">> 1%</strong>' : '');
   html += '<div style="margin:8px 0;font-size:0.95rem">';
-  html += tx('Termisk','Thermal') + ': ' + (calc.thermal.ok ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
-  html += '\u0394U: ' + (calc.vdrop.ok ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
-  html += 'I<sub>cw</sub>: ' + (calc.sc.ok ? mcPrimeOk() : mcPrimeFail());
+  html += tx('Termisk','Thermal') + ': ' + ((calc.thermal && calc.thermal.ok) ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
+  html += '\u0394U: ' + ((calc.vdrop && calc.vdrop.ok) ? mcPrimeOk() : mcPrimeFail()) + ' \u00B7 ';
+  html += 'I<sub>cw</sub>: ' + ((calc.sc && calc.sc.ok) ? mcPrimeOk() : mcPrimeFail());
   html += '</div>';
   html += mcPrimeResult('I<sub>z,korr</sub>', calc.thermal.deratedCurrent, 'A');
   html += '<div style="font-family:sans-serif">' + mcPrimeRef('IEC 61439-6') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
