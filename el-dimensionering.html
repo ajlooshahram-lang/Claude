@@ -670,6 +670,10 @@ body.motion-off .fade-in { will-change: auto; }
 @keyframes simCharge { 0%, 100% { transform: scale(0.95); opacity: 0.85; } 50% { transform: scale(1.05); opacity: 1; } }
 /* Magnetic field line movement */
 @keyframes simField { to { stroke-dashoffset: -40; } }
+@keyframes faultHeatCable { 0%{stroke:#22cc44} 40%{stroke:#ffcc00} 80%{stroke:#ff4422} 100%{stroke:#ff2200} }
+@keyframes faultParticle { 0%{stroke-dashoffset:50} 100%{stroke-dashoffset:0} }
+@keyframes faultDeviceTrip { 0%{fill:#1a2a3a;stroke:#ff8800} 50%{fill:#441100;stroke:#ff3300} 100%{fill:#001a0d;stroke:#00ff88} }
+@keyframes faultPulseAnim { 0%,100%{transform:scale(0.8);opacity:0.8} 50%{transform:scale(1.2);opacity:1} }
 /* Thermal element oscillation */
 @keyframes simHeat { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 /* Active element glow */
@@ -1592,7 +1596,10 @@ const T = {
       film: 'Installations-Film',
       vedligehold: 'Vedligehold',
       eksamen: 'Eksamen Simulator',
-      presets: 'Installations Presets'
+      presets: 'Installations Presets',
+      rapport: 'Projektrapport',
+      recommend: 'Komponent-anbefaling',
+      diffview: 'Hvad ændrede sig?'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1794,7 +1801,10 @@ const T = {
       film: 'Installation Movie',
       vedligehold: 'Maintenance Predictor',
       eksamen: 'Exam Simulator',
-      presets: 'Installation Presets'
+      presets: 'Installation Presets',
+      rapport: 'Project Report',
+      recommend: 'Component Recommendation',
+      diffview: 'What Changed?'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -5040,7 +5050,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis']
+    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis']
   }
 ];
 
@@ -7610,6 +7620,7 @@ function syncSharedQuantities(mod) {
 }
 
 function renderModule(mod) {
+  if (typeof takeSnapshot === 'function') takeSnapshot(); // Diff view: snapshot before render
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
   // Clear timelapse interval when navigating away from live module
   if (mod !== 'live' && liveState.timelapseInterval) {
@@ -7743,6 +7754,9 @@ function renderModule(mod) {
     case 'oneclick': content = renderOneClick(); break;
     case 'eksamen': content = renderEksamen(); break;
     case 'presets': content = renderPresets(); break;
+    case 'rapport': content = renderRapport(); break;
+    case 'recommend': content = renderRecommend(); break;
+    case 'diffview': content = renderDiffView(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -7782,6 +7796,7 @@ function renderModule(mod) {
   }
   _lastRenderedModule = mod;
   renderStatusBar();
+  if (typeof showDiffs === 'function' && typeof document !== 'undefined' && document.body && document.body.appendChild) showDiffs(); // Diff view: show changes after render
 }
 
 function renderQiCard(qi) {
@@ -15068,6 +15083,7 @@ function sldRenderFaultAnimation(tree, result) {
   }
 
   svg += '</svg>';
+  svg += '<div style="text-align:center;margin-top:8px"><button class="sel-btn" onclick="replayFaultAnimation()">\u21BB ' + tx('Afspil igen','Replay') + '</button></div>';
   return svg;
 }
 
@@ -45832,6 +45848,7 @@ function renderOneClick() {
     // Actions
     html += '<div class="card fade-in"><div class="select-grid">';
     html += '<button class="sel-btn selected" onclick="oneClickGoToSLD()">' + tx('Se SLD-diagram', 'View SLD Diagram') + '</button>';
+    html += '<button class="sel-btn" onclick="generateFullProject(\'' + st.selectedBuilding + '\')" style="background:var(--success);color:#fff;border-color:var(--success)">\u26A1 ' + tx('Gener\u00E9r Fuldt Design', 'Generate Full Design') + '</button>';
     html += '</div></div>';
   }
 
@@ -46276,6 +46293,291 @@ function renderKbdOverlay() {
     if (modMap[key]) { switchModule(modMap[key]); e.preventDefault(); }
   });
 })();
+
+
+// ============================================================================
+// ===== GENIUS FEATURE 6: PDF REPORT GENERATOR (rapport) =====================
+// ============================================================================
+function generateProjectReport() {
+  var now = new Date();
+  var dateStr = now.toLocaleDateString(lang === 'da' ? 'da-DK' : 'en-GB');
+  var title = tx('Projektrapport \u2014 El-Dimensionering', 'Project Report \u2014 Electrical Dimensioning');
+  var electrician = tx('Installationselektriker', 'Installation Electrician');
+  var html = '';
+  html += '<div style="page-break-after:always;text-align:center;padding:60px 20px">';
+  html += '<h1 style="font-size:2rem;margin-bottom:12px">' + title + '</h1>';
+  html += '<p style="font-size:1.2rem;color:var(--text-light)">' + dateStr + '</p>';
+  html += '<p style="font-size:1rem;margin-top:20px">' + electrician + ': ___________________</p>';
+  html += '<p style="font-size:0.85rem;color:var(--text-muted);margin-top:40px">DS/HD 60364 | IEC 60364</p>';
+  html += '</div>';
+  if (typeof sldTree !== 'undefined' && sldTree && sldTree.rootId) {
+    html += '<div style="page-break-after:always"><h2>' + tx('Enstregediagram (SLD)', 'Single-Line Diagram (SLD)') + '</h2>';
+    html += sldRenderCanvas(sldTree) + '</div>';
+  }
+  html += '<div style="page-break-after:always"><h2>' + tx('Beregningsoversigt', 'Calculation Summary') + '</h2>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+  html += '<tr style="background:var(--primary);color:#fff"><th style="padding:8px;text-align:left">' + tx('Kreds','Circuit') + '</th><th>IB [A]</th><th>In [A]</th><th>Iz [A]</th><th>\u0394U [%]</th><th>Zs [\u03A9]</th><th>Ik [kA]</th></tr>';
+  if (typeof sldTree !== 'undefined' && sldTree) {
+    var nids = Object.keys(sldTree.nodes);
+    for (var ri = 0; ri < nids.length; ri++) {
+      var rn = sldTree.nodes[nids[ri]];
+      if (rn.type === 'transformer') continue;
+      var rName = lang === 'da' ? (rn.name_da || rn.type) : (rn.name_en || rn.type);
+      html += '<tr style="border-bottom:1px solid #ddd"><td style="padding:6px">' + rName + '</td>';
+      html += '<td style="text-align:center">' + (rn._ib ? rn._ib.toFixed(1) : '-') + '</td>';
+      html += '<td style="text-align:center">' + (rn.protectionIn || '-') + '</td>';
+      html += '<td style="text-align:center">' + (rn.cable ? rn.cable.iz : '-') + '</td>';
+      html += '<td style="text-align:center">' + (rn._vdrop ? rn._vdrop.toFixed(2) : '-') + '</td>';
+      html += '<td style="text-align:center">' + (rn._zs ? rn._zs.toFixed(4) : '-') + '</td>';
+      html += '<td style="text-align:center">' + (rn._ikmax ? (rn._ikmax/1000).toFixed(2) : '-') + '</td></tr>';
+    }
+  }
+  html += '</table></div>';
+  html += '<div style="page-break-after:always"><h2>' + tx('Beskyttelseskoordinering','Protection Coordination') + '</h2>';
+  if (typeof sldTree !== 'undefined' && sldTree) {
+    var cids = Object.keys(sldTree.nodes); var allOk = true;
+    for (var ci = 0; ci < cids.length; ci++) {
+      var cn = sldTree.nodes[cids[ci]]; if (cn.type === 'transformer') continue;
+      var vr = sldVerifyNode(sldTree, cids[ci]);
+      var fails = vr.filter(function(v){return v.status==='fail';});
+      if (fails.length > 0) { allOk = false; html += '<p style="color:var(--danger)">\u274C ' + (lang==='da'?(cn.name_da||cn.type):(cn.name_en||cn.type)) + ': ' + fails[0].rule + '</p>'; }
+    }
+    if (allOk) html += '<p style="color:var(--success)">\u2705 ' + tx('Alle kredse overholder krav','All circuits comply') + '</p>';
+  }
+  html += '</div>';
+  html += '<div style="page-break-after:always"><h2>' + tx('Stykliste (BOM)','Bill of Materials (BOM)') + '</h2>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="background:var(--primary);color:#fff"><th style="padding:8px;text-align:left">' + tx('Komponent','Component') + '</th><th>' + tx('Antal/m','Qty/m') + '</th></tr>';
+  if (typeof sldTree !== 'undefined' && sldTree) {
+    var bomMap = {}; var bIds = Object.keys(sldTree.nodes);
+    for (var bi = 0; bi < bIds.length; bi++) { var bn = sldTree.nodes[bIds[bi]]; if (bn.cable) { var ck = bn.cable.brand + ' ' + bn.cable.model + ' ' + bn.cable.mm2 + 'mm\u00B2'; bomMap[ck] = (bomMap[ck]||0) + (bn.length_m||1); } if (bn.protection) { var pk = bn.protection.brand + ' ' + bn.protection.model + ' ' + (bn.protectionIn||'') + 'A'; bomMap[pk] = (bomMap[pk]||0) + 1; } }
+    var bKeys = Object.keys(bomMap); for (var bk = 0; bk < bKeys.length; bk++) { html += '<tr style="border-bottom:1px solid #ddd"><td style="padding:6px">' + bKeys[bk] + '</td><td style="text-align:center">' + bomMap[bKeys[bk]] + '</td></tr>'; }
+  }
+  html += '</table></div>';
+  html += '<div><h2>' + tx('Overensstemmelseserklæring','Declaration of Conformity') + '</h2>';
+  html += '<p>' + tx('Denne installation er dimensioneret iht. DS/HD 60364-serien.','This installation is dimensioned per DS/HD 60364 series.') + '</p>';
+  html += '<p style="margin-top:20px">' + tx('Dato','Date') + ': ' + dateStr + ' &nbsp; ' + tx('Underskrift','Signature') + ': ___________________</p></div>';
+  return html;
+}
+function printProjectReport() {
+  var rh = generateProjectReport();
+  var pd = document.createElement('div'); pd.id = 'printReportArea'; pd.innerHTML = rh; document.body.appendChild(pd);
+  var st = document.createElement('style'); st.id = 'printReportStyle';
+  st.textContent = '@media print{body>*:not(#printReportArea){display:none!important}#printReportArea{display:block!important}.header,.nav,.nav-cats,.nav-panel{display:none!important}}';
+  document.body.appendChild(st); window.print();
+  setTimeout(function(){var e=document.getElementById('printReportArea');if(e&&e.remove)e.remove();var s=document.getElementById('printReportStyle');if(s&&s.remove)s.remove();},1000);
+}
+function renderRapport() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCC4 ' + tx('Projektrapport','Project Report') + '</div>';
+  html += '<p style="color:var(--text-light);margin:0 0 16px">' + tx('Komplet rapport med forside, SLD, beregninger, stykliste og erkl\u00E6ring.','Complete report with cover, SLD, calculations, BOM and declaration.') + '</p>';
+  html += '<div class="result-box" style="max-height:400px;overflow-y:auto;font-size:0.82rem">' + generateProjectReport() + '</div>';
+  html += '<div style="margin-top:16px;text-align:center"><button class="sel-btn selected" onclick="printProjectReport()" style="font-size:1rem;padding:12px 32px">\uD83D\uDDA8\uFE0F ' + tx('Print / Gem som PDF','Print / Save as PDF') + '</button></div></div>';
+  return html;
+}
+
+// ============================================================================
+// ===== GENIUS FEATURE 7: SMART COMPONENT RECOMMENDATION ENGINE ==============
+// ============================================================================
+function recommendComponents(ib, voltage, phases) {
+  var result = { mcb: null, cable: null, rcd: null };
+  if (!ib || ib <= 0) return result;
+  var isMotor = (typeof loadState !== 'undefined' && loadState.loadType === 'motor');
+  var targetCurve = isMotor ? 'C' : 'B';
+  var mcbCands = PRODUCTS.mcbs.filter(function(m){return m.rating >= ib && m.curve === targetCurve;});
+  mcbCands.sort(function(a,b){return a.rating - b.rating;});
+  if (mcbCands.length > 0) result.mcb = mcbCands[0];
+  if (!result.mcb) { mcbCands = PRODUCTS.mcbs.filter(function(m){return m.rating >= ib;}); mcbCands.sort(function(a,b){return a.rating-b.rating;}); if (mcbCands.length>0) result.mcb = mcbCands[0]; }
+  var protIn = result.mcb ? result.mcb.rating : Math.ceil(ib);
+  var cableCands = PRODUCTS.cables.filter(function(c){return c.material === 'Cu' && c.iz >= protIn;});
+  cableCands.sort(function(a,b){return a.mm2 - b.mm2;});
+  if (cableCands.length > 0) result.cable = cableCands[0];
+  var sensitivity = 30;
+  var rcdCands = PRODUCTS.rcds.filter(function(r){return r.sensitivity === sensitivity && r.rating >= protIn;});
+  rcdCands.sort(function(a,b){return a.rating - b.rating;});
+  if (rcdCands.length > 0) result.rcd = rcdCands[0];
+  if (!result.rcd) { rcdCands = PRODUCTS.rcds.filter(function(r){return r.sensitivity === 30;}); rcdCands.sort(function(a,b){return a.rating-b.rating;}); if (rcdCands.length>0) result.rcd = rcdCands[0]; }
+  return result;
+}
+function applyRecommendation(type) {
+  var ib = calcIB(); var rec = recommendComponents(ib, loadState.voltage, loadState.phases || '1');
+  if (type === 'mcb' && rec.mcb) { mcbState.rating = rec.mcb.rating; mcbState.curve = rec.mcb.curve; mcbState.type = rec.mcb.model; }
+  else if (type === 'cable' && rec.cable) { cableState.crossSection = rec.cable.mm2; cableState.material = 'copper'; }
+  else if (type === 'rcd' && rec.rcd) { fuseState.rcdSensitivity = rec.rcd.sensitivity; fuseState.rcdType = rec.rcd.rcdType; }
+  renderModule(activeModule);
+}
+function renderRecommendCard() {
+  var ib = (typeof calcIB === 'function') ? calcIB() : 0;
+  if (ib <= 0) return '';
+  var rec = recommendComponents(ib, loadState.voltage, loadState.phases || '1');
+  if (!rec.mcb && !rec.cable) return '';
+  var html = '<div class="card fade-in" style="border-left:4px solid var(--accent)"><div class="card-title">\uD83D\uDCA1 ' + tx('Anbefalinger','Recommendations') + '</div>';
+  if (rec.mcb) { html += '<div class="result-box" style="margin-bottom:8px"><div class="result-row"><span class="label">' + tx('MCB','MCB') + ': ' + rec.mcb.brand + ' ' + rec.mcb.model + ' ' + rec.mcb.curve + rec.mcb.rating + ' (' + rec.mcb.standard + ')</span><span class="value"><button class="sel-btn" onclick="applyRecommendation(\'mcb\')" style="padding:4px 10px;font-size:.75rem">' + tx('Anvend','Apply') + '</button></span></div></div>'; }
+  if (rec.cable) { html += '<div class="result-box" style="margin-bottom:8px"><div class="result-row"><span class="label">' + tx('Kabel','Cable') + ': ' + rec.cable.brand + ' ' + rec.cable.model + ' ' + rec.cable.mm2 + 'mm\u00B2 (Iz=' + rec.cable.iz + 'A)</span><span class="value"><button class="sel-btn" onclick="applyRecommendation(\'cable\')" style="padding:4px 10px;font-size:.75rem">' + tx('Anvend','Apply') + '</button></span></div></div>'; }
+  if (rec.rcd) { var rRef = rec.rcd.sensitivity === 30 ? 'DS/HD 60364-4-41' : 'DS/HD 60364-4-41'; html += '<div class="result-box"><div class="result-row"><span class="label">' + tx('RCD','RCD') + ': ' + rec.rcd.brand + ' ' + rec.rcd.model + ' ' + rec.rcd.sensitivity + 'mA Type ' + rec.rcd.rcdType + ' (' + rRef + ')</span><span class="value"><button class="sel-btn" onclick="applyRecommendation(\'rcd\')" style="padding:4px 10px;font-size:.75rem">' + tx('Anvend','Apply') + '</button></span></div></div>'; }
+  html += '</div>';
+  return html;
+}
+function renderRecommend() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCA1 ' + tx('Smart Komponent-anbefaling','Smart Component Recommendation') + '</div>';
+  html += '<p style="color:var(--text-light);margin:0 0 12px">' + tx('Baseret p\u00E5 IB anbefales optimale komponenter.','Based on IB, optimal components are recommended.') + '</p>';
+  var ib = (typeof calcIB === 'function') ? calcIB() : 0;
+  if (ib > 0) { html += renderRecommendCard(); }
+  else { html += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Indstil belastning f\u00F8rst','Set load first') + '</span><span class="value">\u2014</span></div></div>'; }
+  html += '</div>';
+  return html;
+}
+
+// ============================================================================
+// ===== GENIUS FEATURE 8: "WHAT CHANGED?" DIFF VIEW ==========================
+// ============================================================================
+var prevSnapshot = {};
+var diffToastTimeout = null;
+function takeSnapshot() {
+  var snap = {};
+  if (typeof sldTree !== 'undefined' && sldTree && sldTree.nodes) {
+    var nids = Object.keys(sldTree.nodes);
+    for (var i = 0; i < nids.length; i++) { var n = sldTree.nodes[nids[i]]; if (n.type === 'transformer') continue; snap[nids[i]] = { ib: n._ib||0, vdrop: n._vdrop||0, zs: n._zs||0, ikmax: n._ikmax||0 }; }
+  }
+  if (typeof calcIB === 'function') snap._ib_single = calcIB();
+  if (typeof mcbState !== 'undefined') snap._in_single = mcbState.rating || 0;
+  prevSnapshot = snap;
+}
+function showDiffs() {
+  var diffs = [];
+  if (typeof sldTree !== 'undefined' && sldTree && sldTree.nodes) {
+    var nids = Object.keys(sldTree.nodes);
+    for (var i = 0; i < nids.length; i++) {
+      var n = sldTree.nodes[nids[i]]; if (n.type === 'transformer') continue;
+      var prev = prevSnapshot[nids[i]]; if (!prev) continue;
+      var name = (lang==='da'?(n.name_da||n.type):(n.name_en||n.type));
+      if (prev.vdrop && n._vdrop && Math.abs(n._vdrop-prev.vdrop) > 0.01) { var s = n._vdrop > prev.vdrop ? '+' : ''; var w = n._vdrop > 3 ? ' \u26A0\uFE0F' : ''; diffs.push('\u0394U '+name+': '+prev.vdrop.toFixed(1)+'% \u2192 '+n._vdrop.toFixed(1)+'%'+w+' ('+s+(n._vdrop-prev.vdrop).toFixed(1)+'%)'); }
+      if (prev.ib && n._ib && Math.abs(n._ib-prev.ib) > 0.1) { diffs.push('IB '+name+': '+prev.ib.toFixed(1)+'A \u2192 '+n._ib.toFixed(1)+'A'); }
+      if (prev.ikmax && n._ikmax && Math.abs(n._ikmax-prev.ikmax) > 10) { diffs.push('Ik '+name+': '+(prev.ikmax/1000).toFixed(1)+'kA \u2192 '+(n._ikmax/1000).toFixed(1)+'kA'); }
+    }
+  }
+  if (typeof calcIB === 'function') { var cur = calcIB(); if (prevSnapshot._ib_single && Math.abs(cur-prevSnapshot._ib_single) > 0.1) { diffs.push('IB: '+prevSnapshot._ib_single.toFixed(1)+'A \u2192 '+cur.toFixed(1)+'A'); } }
+  if (diffs.length > 0) showDiffToast(diffs);
+}
+function showDiffToast(diffs) {
+  if (typeof document === 'undefined' || !document.body || !document.body.appendChild) return;
+  var ex = document.getElementById('diffToast'); if (ex && ex.remove) ex.remove();
+  if (diffToastTimeout) clearTimeout(diffToastTimeout);
+  var t = document.createElement('div'); t.id = 'diffToast';
+  t.style.cssText = 'position:fixed;top:60px;right:20px;z-index:9999;background:#1a2a3a;color:#00e5ff;padding:12px 18px;border-radius:10px;font-size:.82rem;box-shadow:0 4px 20px rgba(0,0,0,.3);border:1px solid rgba(0,200,255,.3);max-width:350px';
+  t.innerHTML = '<div style="font-weight:700;margin-bottom:4px">\uD83D\uDD04 ' + tx('Hvad \u00E6ndrede sig?','What changed?') + '</div>' + diffs.slice(0,4).join('<br>');
+  document.body.appendChild(t);
+  diffToastTimeout = setTimeout(function(){var el=document.getElementById('diffToast');if(el){el.style.opacity='0';setTimeout(function(){var e2=document.getElementById('diffToast');if(e2&&e2.remove)e2.remove();},300);}},4000);
+}
+function renderDiffView() {
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD04 ' + tx('Hvad \u00E6ndrede sig?','What Changed?') + '</div>';
+  html += '<p style="color:var(--text-light);margin:0 0 12px">' + tx('Automatiske notifikationer n\u00E5r v\u00E6rdier \u00E6ndres.','Automatic notifications when values change.') + '</p>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Status','Status') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('\u00C6ndringsoverv\u00E5gning','Change Monitoring') + '</span><span class="value" style="color:var(--success)">\u2705 ' + tx('Aktiv','Active') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Auto-afvis','Auto-dismiss') + '</span><span class="value">4s</span></div></div>';
+  var snapKeys = Object.keys(prevSnapshot).filter(function(k){return k.charAt(0)!=='_';});
+  if (snapKeys.length > 0) {
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Snapshot','Snapshot') + ' (' + snapKeys.length + ' ' + tx('noder','nodes') + ')</div>';
+    for (var si = 0; si < Math.min(snapKeys.length,5); si++) { var sv = prevSnapshot[snapKeys[si]]; html += '<div class="result-row"><span class="label">' + snapKeys[si] + '</span><span class="value">IB='+(sv.ib?sv.ib.toFixed(1):'0')+'A, \u0394U='+(sv.vdrop?sv.vdrop.toFixed(2):'0')+'%</span></div>'; }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ============================================================================
+// ===== GENIUS FEATURE 9: ANIMATED FAULT PROPAGATION (ENHANCED) ==============
+// ============================================================================
+var faultAnimState = { lastSvg: '', faultNodeId: null, faultType: 'short_circuit' };
+function sldRenderFaultAnimationEnhanced(tree, nodeId, faultType) {
+  if (!tree || !nodeId || !tree.nodes[nodeId]) return '<p>' + tx('Ingen data','No data') + '</p>';
+  faultAnimState.faultNodeId = nodeId; faultAnimState.faultType = faultType || 'short_circuit';
+  var result = sldSimulateFault(tree, nodeId, faultAnimState.faultType);
+  if (!result || !result.path || result.path.length === 0) return '<p>' + tx('Ingen fejlsti','No fault path') + '</p>';
+  var path = result.path; var nodeW = 100, nodeH = 55, gapY = 90;
+  var positions = {}; var maxY = 0;
+  for (var i = 0; i < path.length; i++) { positions[path[i]] = {x:200,y:30+i*(nodeH+gapY)}; if (30+i*(nodeH+gapY)+nodeH > maxY) maxY = 30+i*(nodeH+gapY)+nodeH; }
+  var svgW = 520, svgH = maxY + 80;
+  var totalDuration = Math.min(result.tripTime || 1.5, 5);
+  if (totalDuration === Infinity || totalDuration <= 0) totalDuration = 2;
+  var svg = '<svg width="100%" viewBox="0 0 '+svgW+' '+svgH+'" style="min-height:220px;max-height:650px;border-radius:12px" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect width="100%" height="100%" fill="#040a14"/>';
+  svg += '<defs><filter id="fglow2"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<style>@keyframes pflow{0%{stroke-dashoffset:50}100%{stroke-dashoffset:0}}@keyframes heatCable{0%{stroke:#22cc44}40%{stroke:#ffcc00}80%{stroke:#ff4422}100%{stroke:#ff2200}}@keyframes devTrip{0%{fill:#1a2a3a;stroke:#ff8800}50%{fill:#441100;stroke:#ff3300}100%{fill:#001a0d;stroke:#00ff88}}@keyframes fpulse{0%,100%{r:6;opacity:.8}50%{r:12;opacity:1}}</style>';
+  svg += '<linearGradient id="ftimeG" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ff4422"/><stop offset="100%" stop-color="#00ff88"/></linearGradient></defs>';
+  for (var ci = path.length-1; ci > 0; ci--) {
+    var fp = positions[path[ci]], tp = positions[path[ci-1]]; if (!fp||!tp) continue;
+    var x1=fp.x+nodeW/2,y1=fp.y,x2=tp.x+nodeW/2,y2=tp.y+nodeH; var sd=((path.length-1-ci)*0.2).toFixed(2);
+    svg += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#222" stroke-width="6" stroke-linecap="round"/>';
+    svg += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#22cc44" stroke-width="4" stroke-linecap="round" style="animation:heatCable '+totalDuration.toFixed(1)+'s ease '+sd+'s forwards"/>';
+    svg += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#ff4444" stroke-width="2" stroke-dasharray="8,6" filter="url(#fglow2)" style="animation:pflow .4s linear '+sd+'s infinite"/>';
+  }
+  for (var ni = 0; ni < path.length; ni++) {
+    var nid=path[ni],node=tree.nodes[nid],pos=positions[nid]; if(!node||!pos) continue;
+    var isF=(nid===nodeId),isT=(nid===result.trippingDeviceNodeId);
+    var td=(totalDuration*0.6).toFixed(2); var bc=isT?'#ff8800':(isF?'#ff3344':'#3388aa'); var tc=isT?'#ffaa00':(isF?'#ff6666':'#88ccee');
+    if (isT) { svg += '<rect x="'+pos.x+'" y="'+pos.y+'" width="'+nodeW+'" height="'+nodeH+'" rx="8" fill="#1a2a3a" stroke="'+bc+'" stroke-width="2.5" style="animation:devTrip '+(totalDuration*0.4).toFixed(1)+'s ease '+td+'s forwards"/>'; svg += '<text x="'+(pos.x+nodeW/2)+'" y="'+(pos.y+nodeH+18)+'" fill="#00ff88" font-size="10" text-anchor="middle" font-weight="700" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="'+td+'s" fill="freeze"/>'+tx('UDLOEST','TRIPPED')+'</text>'; }
+    else if (isF) { svg += '<rect x="'+pos.x+'" y="'+pos.y+'" width="'+nodeW+'" height="'+nodeH+'" rx="8" fill="#1a0a0a" stroke="'+bc+'" stroke-width="2.5" filter="url(#fglow2)"/>'; svg += '<circle cx="'+(pos.x+nodeW+22)+'" cy="'+(pos.y+nodeH/2)+'" r="8" fill="#ff3344" style="animation:fpulse .6s ease infinite"/>'; svg += '<text x="'+(pos.x+nodeW+38)+'" y="'+(pos.y+nodeH/2+4)+'" fill="#ff6666" font-size="9">'+tx('FEJL','FAULT')+' '+(result.ikFault?(result.ikFault/1000).toFixed(1)+'kA':'')+'</text>'; }
+    else { svg += '<rect x="'+pos.x+'" y="'+pos.y+'" width="'+nodeW+'" height="'+nodeH+'" rx="8" fill="#1a2a3a" stroke="'+bc+'" stroke-width="2"/>'; }
+    var lb = node.type==='transformer'?'Trafo':(lang==='da'?(node.name_da||node.type):(node.name_en||node.type)); if(lb.length>13) lb=lb.substring(0,12)+'\u2026';
+    svg += '<text x="'+(pos.x+nodeW/2)+'" y="'+(pos.y+22)+'" fill="'+tc+'" font-size="10" text-anchor="middle" font-weight="600">'+lb+'</text>';
+    if (node.protectionIn) svg += '<text x="'+(pos.x+nodeW/2)+'" y="'+(pos.y+38)+'" fill="'+tc+'" font-size="8" text-anchor="middle" opacity="0.7">'+node.protectionIn+'A '+(node.protection?node.protection.curve||'':'')+'</text>';
+  }
+  var barY = svgH-30;
+  svg += '<rect x="30" y="'+barY+'" width="'+(svgW-60)+'" height="5" rx="2.5" fill="#112"/>';
+  svg += '<rect x="30" y="'+barY+'" width="0" height="5" rx="2.5" fill="url(#ftimeG)"><animate attributeName="width" from="0" to="'+(svgW-60)+'" dur="'+totalDuration.toFixed(1)+'s" fill="freeze"/></rect>';
+  svg += '<text x="30" y="'+(barY-6)+'" fill="#88aacc" font-size="9">0s</text>';
+  svg += '<text x="'+(svgW-30)+'" y="'+(barY-6)+'" fill="#88aacc" font-size="9" text-anchor="end">'+totalDuration.toFixed(2)+'s</text>';
+  svg += '</svg>';
+  svg += '<div style="text-align:center;margin-top:8px"><button class="sel-btn" onclick="replayFaultAnimation()">\u21BB '+tx('Afspil igen','Replay')+'</button></div>';
+  faultAnimState.lastSvg = svg;
+  return svg;
+}
+function replayFaultAnimation() { renderModule(activeModule); }
+
+// ============================================================================
+// ===== GENIUS FEATURE 10: ONE-CLICK FULL PROJECT GENERATOR ==================
+// ============================================================================
+function generateFullProject(presetId) {
+  var preset = null;
+  for (var i = 0; i < REVERSE_BUILDING_PRESETS.length; i++) { if (REVERSE_BUILDING_PRESETS[i].id === presetId) { preset = REVERSE_BUILDING_PRESETS[i]; break; } }
+  if (!preset) return;
+  sldNextId = 1;
+  sldTree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  sldTree.nodes[trafo.id] = trafo; sldTree.rootId = trafo.id;
+  var mainBoard = sldCreateNode('main_board', trafo.id);
+  sldTree.nodes[mainBoard.id] = mainBoard; trafo.childIds.push(mainBoard.id);
+  for (var j = 0; j < preset.circuits.length; j++) {
+    var tmplId = preset.circuits[j]; var tmpl = null;
+    for (var k = 0; k < REVERSE_CIRCUIT_TEMPLATES.length; k++) { if (REVERSE_CIRCUIT_TEMPLATES[k].id === tmplId) { tmpl = REVERSE_CIRCUIT_TEMPLATES[k]; break; } }
+    if (!tmpl) continue;
+    var ib = tmpl.power_kW * 1000 / ((tmpl.voltage||230) * (tmpl.cosPhi||0.95));
+    if (tmpl.phases === '3x400') ib = tmpl.power_kW * 1000 / (Math.sqrt(3) * 400 * (tmpl.cosPhi||0.95));
+    var isMotorLoad = (tmpl.id && tmpl.id.indexOf('motor')>=0) || (tmpl.name_en && tmpl.name_en.toLowerCase().indexOf('motor')>=0);
+    var curve = isMotorLoad ? 'C' : 'B';
+    var mcbList = PRODUCTS.mcbs.filter(function(m){return m.rating>=ib && m.curve===curve;});
+    mcbList.sort(function(a,b){return a.rating-b.rating;});
+    var prot = mcbList.length > 0 ? mcbList[0] : PRODUCTS.mcbs.find(function(m){return m.rating===16 && m.curve==='B';});
+    var protIn = prot ? prot.rating : 16;
+    var cableList = PRODUCTS.cables.filter(function(c){return c.material==='Cu' && c.iz>=protIn;});
+    cableList.sort(function(a,b){return a.mm2-b.mm2;});
+    var cable = cableList.length > 0 ? cableList[0] : PRODUCTS.cables.find(function(c){return c.mm2===2.5 && c.material==='Cu';});
+    var fc = sldCreateNode('final_circuit', mainBoard.id, {
+      name_da: tmpl.name_da, name_en: tmpl.name_en,
+      power_kW: tmpl.power_kW, cosPhi: tmpl.cosPhi||0.95,
+      phases: tmpl.phases||'1x230', voltage: tmpl.voltage||230,
+      installMethod: tmpl.installMethod||'C', length_m: tmpl.cableLength_m||25,
+      cable: cable, protection: prot, protectionIn: protIn
+    });
+    sldTree.nodes[fc.id] = fc; mainBoard.childIds.push(fc.id);
+  }
+  sldPropagateAll(sldTree);
+  var allResults = []; var vids = Object.keys(sldTree.nodes);
+  for (var vi = 0; vi < vids.length; vi++) { if (sldTree.nodes[vids[vi]].type==='transformer') continue; allResults = allResults.concat(sldVerifyNode(sldTree, vids[vi])); }
+  oneClickState.selectedBuilding = presetId;
+  oneClickState.generated = true;
+  oneClickState.verifyResults = allResults;
+  renderModule('oneclick');
+}
 
 // ===== INIT =====
 guideLoadProgress();
