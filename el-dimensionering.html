@@ -16459,6 +16459,15 @@ function renderNoed() {
   });
   html += '</div></div>';
 
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('N\u00F8dbelysning','Emergency Lighting') + '</div>';
+  html += mcPrimeLine(tx('Bygning','Building'), ':=', '', bt ? tx(bt.da, bt.en) : '-', '', '');
+  html += mcPrimeLine(tx('System','System'), ':=', '', noedState.systemType || 'central', '', '');
+  html += mcPrimeLine(tx('Varighed','Duration'), ':=', '', noedState.duration, tx('timer','hours'), mcPrimeRef('DS/EN 1838'));
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 1838') + ' ' + mcPrimeRef('DS/EN 50172') + '</div>';
+  html += '</div>';
+
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
