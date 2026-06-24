@@ -11697,6 +11697,7 @@ function axGenerate(seed, buildingId, tierId, modeId) {
 // recomputes the answer from task.given via the verified helpers (no DOM), so the
 // solution can never drift from the generated reference answer.
 function axSolveTask(task, opgave) {
+  if (task.cxsol) return axSolveComplexTask(task);
   var g = task.given || {};
   function S(da, en) { return { da: da, en: en }; }
   var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
@@ -11899,6 +11900,184 @@ function axCatSuggest(cat) {
     vdrop: { da: 'Repetér \u0394U-formlen og gr\u00e6nserne 3% (lys) / 5% (\u00f8vrige) (DS/HD 60364-5-52 \u00a7525).', en: 'Revisit the \u0394U formula and the 3% (lighting) / 5% (other) limits (DS/HD 60364-5-52 \u00a7525).' }
   };
   return m[cat] || { da: 'Repetér det relevante DS/HD 60364-afsnit.', en: 'Revisit the relevant DS/HD 60364 clause.' };
+}
+
+// AX_BATCH2_ANCHOR
+// ============================================================================
+// ===== BATCH 2: COMPLEX (VIGGO) DRILLS + AI MENTOR + ANALYTICS ===============
+// ============================================================================
+
+// --- Complex-number helpers (rectangular + polar, Viggo method) ---------------
+function axCxMag(re, im) { return Math.sqrt(re * re + im * im); }
+function axCxAngDeg(re, im) { return Math.atan2(im, re) * 180 / Math.PI; }
+function axCxRectStr(re, im, dec) { dec = dec == null ? 3 : dec; return axFmt(Math.round(re * Math.pow(10, dec)) / Math.pow(10, dec)) + (im >= 0 ? ' + j' : ' \u2212 j') + axFmt(Math.abs(Math.round(im * Math.pow(10, dec)) / Math.pow(10, dec))); }
+function axCxPolarStr(mag, angDeg, dec) { dec = dec == null ? 3 : dec; return axFmt(Math.round(mag * Math.pow(10, dec)) / Math.pow(10, dec)) + ' \u2220 ' + axFmt(Math.round(angDeg * 10) / 10) + '\u00b0'; }
+
+// Full Viggo short-circuit chain: HV network Z (from Sk & cos\u03c6k) referred to LV,
+// transformer Z (from ek & PCu), vector-summed, then Ik3. All SI; returns \u03a9 / A.
+function axCxScenario(s) {
+  var Uhv = s.U_HV * 1000, Sk = s.Sk * 1e6, Ulv = s.U_LV, SN = s.SN * 1000, PCu = s.PCu * 1000;
+  var ZnetHV = Uhv * Uhv / Sk; var phiN = Math.acos(s.cosk);
+  var RnetHV = ZnetHV * s.cosk, XnetHV = ZnetHV * Math.sin(phiN);
+  var k = (Ulv / Uhv); k = k * k;
+  var RnetLV = RnetHV * k, XnetLV = XnetHV * k, ZnetLV = ZnetHV * k;
+  var ZT = (s.ek / 100) * Ulv * Ulv / SN; var RT = PCu * Ulv * Ulv / (SN * SN); var XT = Math.sqrt(Math.max(0, ZT * ZT - RT * RT));
+  var cosT = ZT > 0 ? RT / ZT : 0; var phiT = Math.acos(Math.max(-1, Math.min(1, cosT)));
+  var Rtot = RnetLV + RT, Xtot = XnetLV + XT; var Ztot = Math.sqrt(Rtot * Rtot + Xtot * Xtot); var phiTot = Math.atan2(Xtot, Rtot);
+  var Ik = s.c * Ulv / (Math.sqrt(3) * Ztot);
+  return { ZnetHV: ZnetHV, phiN: phiN * 180 / Math.PI, RnetHV: RnetHV, XnetHV: XnetHV, RnetLV: RnetLV, XnetLV: XnetLV, ZnetLV: ZnetLV, ZT: ZT, RT: RT, XT: XT, cosT: cosT, phiT: phiT * 180 / Math.PI, Rtot: Rtot, Xtot: Xtot, Ztot: Ztot, phiTot: phiTot * 180 / Math.PI, Ik: Ik };
+}
+
+// Generate a complex-calculation drill set (project-shaped, so axSolve/axExamine work).
+function axGenComplex(seed, tierId) {
+  var rng = axRngMake(seed >>> 0); var tier = axTier(tierId);
+  var s = {
+    U_HV: axRngPick(rng, [10, 10, 20]), Sk: axRngPick(rng, [100, 120, 156, 200, 250]), cosk: axRngPick(rng, [0.1, 0.15, 0.2]),
+    SN: axRngPick(rng, [630, 1000, 1250, 1600]), ek: axRngPick(rng, [4, 5, 6]), PCu: 0, U_LV: 400, c: 1.1
+  };
+  s.PCu = axRound(s.SN * axRngPick(rng, [0.009, 0.01, 0.011]), 0.5); // typical Cu loss ~1% of SN (kW)
+  var sc = axCxScenario(s);
+  var tasks = [];
+  var znetO = Math.round(sc.ZnetHV * 1000) / 1000;
+  var n1 = axNumOpts(znetO, [Math.round(znetO * 1.4 * 1000) / 1000, Math.round(znetO * 0.6 * 1000) / 1000]);
+  tasks.push({ id: 'cx_znet', kind: 'znet_mag', cxsol: true, scenario: s, prompt: { da: 'Beregn netimpedansens st\u00f8rrelse |Z_net| p\u00e5 ' + s.U_HV + ' kV-siden (S\u2096 = ' + s.Sk + ' MVA, cos\u03c6\u2096 = ' + axFmt(s.cosk) + ').', en: 'Compute the network impedance magnitude |Z_net| on the ' + s.U_HV + ' kV side (Sk = ' + s.Sk + ' MVA, cos\u03c6k = ' + axFmt(s.cosk) + ').' }, given: s, answer: znetO, opts: n1.opts, ci: n1.ci, unit: '\u03a9', clause: 'Viggo-metoden \u00b7 DS/HD 60364-4-43', cat: 'shortcircuit' });
+  var ztmO = Math.round(sc.ZT * 1e5) / 100; // m\u03a9
+  var n2 = axNumOpts(ztmO, [Math.round(ztmO * 1.3 * 100) / 100, Math.round(ztmO * 0.7 * 100) / 100]);
+  tasks.push({ id: 'cx_ztrafo', kind: 'ztrafo_mag', cxsol: true, scenario: s, prompt: { da: 'Beregn transformerens kortslutningsimpedans |Z_T| henf\u00f8rt til 400 V (SN = ' + s.SN + ' kVA, ek = ' + axFmt(s.ek) + ' %).', en: 'Compute the transformer short-circuit impedance |Z_T| referred to 400 V (SN = ' + s.SN + ' kVA, ek = ' + axFmt(s.ek) + ' %).' }, given: s, answer: ztmO, opts: n2.opts, ci: n2.ci, unit: 'm\u03a9', clause: 'Viggo-metoden \u00b7 IEC 60076', cat: 'shortcircuit' });
+  var ztotO = Math.round(sc.Ztot * 1e5) / 100;
+  var n3 = axNumOpts(ztotO, [Math.round((sc.ZnetLV + sc.ZT) * 1e5) / 100, Math.round(ztotO * 0.6 * 100) / 100]);
+  tasks.push({ id: 'cx_ztot', kind: 'ztot_mag', cxsol: true, scenario: s, prompt: { da: 'L\u00e6g netimpedansen (henf\u00f8rt til 400 V) og transformerimpedansen sammen som vektorer og find |Z_total| ved tavlen.', en: 'Vector-add the network impedance (referred to 400 V) and the transformer impedance; find |Z_total| at the board.' }, given: s, answer: ztotO, opts: n3.opts, ci: n3.ci, unit: 'm\u03a9', clause: 'Viggo-metoden', cat: 'shortcircuit' });
+  var ikkA = Math.round(sc.Ik / 100) / 10;
+  var n4 = axNumOpts(ikkA, [Math.round(ikkA * 1.3 * 10) / 10, Math.round(ikkA * 0.7 * 10) / 10]);
+  tasks.push({ id: 'cx_ik', kind: 'ik3', cxsol: true, scenario: s, prompt: { da: 'Beregn den 3-polede kortslutningsstr\u00f8m Ik3 ved tavlen (c = 1,1).', en: 'Compute the 3-phase short-circuit current Ik3 at the board (c = 1.1).' }, given: s, answer: ikkA, opts: n4.opts, ci: n4.ci, unit: 'kA', clause: 'IEC 60909 \u00b7 Viggo-metoden', cat: 'shortcircuit' });
+  return {
+    seed: seed >>> 0, buildingId: 'kompleks', tierId: tierId, modeId: 'kompleks',
+    meta: { title: { da: 'Kompleks regning (Viggo)', en: 'Complex calculation (Viggo)' }, building: { da: 'Forsyningsk\u00e6de', en: 'Supply chain' }, icon: '\uD83E\uDDEE', tier: { da: tier.da, en: tier.en } },
+    scenario: s, opgaver: [{ num: 1, type: 'kompleks', weightPct: 100, title: { da: 'Kompleks kortslutningsberegning', en: 'Complex short-circuit calculation' }, data: s, tasks: tasks }]
+  };
+}
+
+// Worked solution for a complex drill (rectangular + polar, Viggo notation).
+function axSolveComplexTask(task) {
+  function S(da, en) { return { da: da, en: en }; }
+  var s = task.scenario; var sc = axCxScenario(s);
+  var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
+  if (task.kind === 'znet_mag') {
+    sol.assumptions = [S('Netimpedans bestemmes af kortslutningseffekten: |Z| = U\u00b2/S\u2096. Vinklen fra cos\u03c6\u2096 (arccos).', 'Network impedance from short-circuit power: |Z| = U\u00b2/Sk. Angle from cos\u03c6k (arccos).')];
+    sol.formula = '|Z_net| = U\u00b2 / S\u2096 ;  \u03c6 = arccos(cos\u03c6\u2096) ;  Z = R + jX';
+    sol.substitution = '|Z_net| = (' + (s.U_HV * 1000) + ')\u00b2 / ' + (s.Sk * 1e6) + ' = ' + axFmt(Math.round(sc.ZnetHV * 1000) / 1000) + ' \u03a9';
+    sol.steps = [
+      { da: 'Vinkel', en: 'Angle', expr: 'arccos(' + axFmt(s.cosk) + ')', result: axFmt(Math.round(sc.phiN * 10) / 10) + '\u00b0' },
+      { da: 'Rektangul\u00e6r', en: 'Rectangular', expr: 'R + jX', result: axCxRectStr(sc.RnetHV, sc.XnetHV, 3) + ' \u03a9' },
+      { da: 'Pol\u00e6r', en: 'Polar', expr: '|Z| \u2220 \u03c6', result: axCxPolarStr(sc.ZnetHV, sc.phiN, 3) + ' \u03a9' }
+    ];
+    sol.result = { value: Math.round(sc.ZnetHV * 1000) / 1000, unit: '\u03a9', da: 'Netimpedans (HV)', en: 'Network impedance (HV)' };
+    sol.verification = S('Lille cos\u03c6\u2096 \u21d2 n\u00e6sten ren reaktans (\u03c6 \u2248 ' + axFmt(Math.round(sc.phiN * 10) / 10) + '\u00b0), som forventet for et stift net.', 'Small cos\u03c6k \u21d2 nearly pure reactance (\u03c6 \u2248 ' + axFmt(Math.round(sc.phiN * 10) / 10) + '\u00b0), as expected for a stiff grid.');
+  } else if (task.kind === 'ztrafo_mag') {
+    sol.assumptions = [S('Z_T henf\u00f8rt til LV: |Z_T| = (ek/100)\u00b7U\u00b2/SN. R_T fra kobbertabet PCu; vinkel fra arccos(R_T/Z_T).', 'Z_T referred to LV: |Z_T| = (ek/100)\u00b7U\u00b2/SN. R_T from copper loss PCu; angle from arccos(R_T/Z_T).')];
+    sol.formula = '|Z_T| = (ek/100)\u00b7U\u00b2/SN ;  R_T = PCu\u00b7U\u00b2/SN\u00b2 ;  X_T = \u221a(Z_T\u00b2 \u2212 R_T\u00b2)';
+    sol.substitution = '|Z_T| = ' + axFmt(s.ek / 100, 3) + '\u00d7400\u00b2/' + (s.SN * 1000) + ' = ' + axFmt(Math.round(sc.ZT * 1e5) / 100) + ' m\u03a9';
+    sol.steps = [
+      { da: 'R_T', en: 'R_T', expr: 'PCu\u00b7U\u00b2/SN\u00b2', result: axFmt(Math.round(sc.RT * 1e5) / 100) + ' m\u03a9' },
+      { da: 'X_T', en: 'X_T', expr: '\u221a(Z_T\u00b2\u2212R_T\u00b2)', result: axFmt(Math.round(sc.XT * 1e5) / 100) + ' m\u03a9' },
+      { da: 'Pol\u00e6r', en: 'Polar', expr: '|Z_T| \u2220 \u03c6_T', result: axCxPolarStr(sc.ZT * 1000, sc.phiT, 2) + ' m\u03a9' }
+    ];
+    sol.result = { value: Math.round(sc.ZT * 1e5) / 100, unit: 'm\u03a9', da: 'Transformerimpedans (LV)', en: 'Transformer impedance (LV)' };
+    sol.verification = S('cos\u03c6_T = R_T/Z_T = ' + axFmt(Math.round(sc.cosT * 100) / 100) + ' \u21d2 \u03c6_T \u2248 ' + axFmt(Math.round(sc.phiT * 10) / 10) + '\u00b0. Realistisk for en distributionstransformer.', 'cos\u03c6_T = R_T/Z_T = ' + axFmt(Math.round(sc.cosT * 100) / 100) + ' \u21d2 \u03c6_T \u2248 ' + axFmt(Math.round(sc.phiT * 10) / 10) + '\u00b0. Realistic for a distribution transformer.');
+  } else if (task.kind === 'ztot_mag') {
+    sol.assumptions = [S('Netimpedansen henf\u00f8res til LV med (U_LV/U_HV)\u00b2 og l\u00e6gges til Z_T som komplekse tal (ikke skalart!).', 'The network impedance is referred to LV by (U_LV/U_HV)\u00b2 and added to Z_T as complex numbers (not scalar!).')];
+    sol.formula = 'Z_net,LV = Z_net,HV\u00b7(U_LV/U_HV)\u00b2 ;  Z_total = (R_net+R_T) + j(X_net+X_T)';
+    sol.substitution = 'Z_total = ' + axCxRectStr(sc.Rtot * 1000, sc.Xtot * 1000, 2) + ' m\u03a9';
+    sol.steps = [
+      { da: 'Z_net henf\u00f8rt til LV', en: 'Z_net referred to LV', expr: axCxRectStr(sc.RnetLV * 1000, sc.XnetLV * 1000, 2), result: axFmt(Math.round(sc.ZnetLV * 1e5) / 100) + ' m\u03a9' },
+      { da: 'Vektorsum', en: 'Vector sum', expr: axCxRectStr(sc.Rtot * 1000, sc.Xtot * 1000, 2), result: '|Z| = ' + axFmt(Math.round(sc.Ztot * 1e5) / 100) + ' m\u03a9' },
+      { da: 'Pol\u00e6r', en: 'Polar', expr: '|Z_total| \u2220 \u03c6', result: axCxPolarStr(sc.Ztot * 1000, sc.phiTot, 2) + ' m\u03a9' }
+    ];
+    sol.result = { value: Math.round(sc.Ztot * 1e5) / 100, unit: 'm\u03a9', da: 'Samlet impedans (LV)', en: 'Total impedance (LV)' };
+    sol.verification = S('Skalar addition ville give ' + axFmt(Math.round((sc.ZnetLV + sc.ZT) * 1e5) / 100) + ' m\u03a9 \u2014 forkert. Vektorsum giver ' + axFmt(Math.round(sc.Ztot * 1e5) / 100) + ' m\u03a9. Forskellen er hvorfor komplekse tal er n\u00f8dvendige.', 'Scalar addition would give ' + axFmt(Math.round((sc.ZnetLV + sc.ZT) * 1e5) / 100) + ' m\u03a9 \u2014 wrong. Vector sum gives ' + axFmt(Math.round(sc.Ztot * 1e5) / 100) + ' m\u03a9. That gap is why complex numbers are needed.');
+  } else { // ik3
+    sol.assumptions = [S('Ik3 = c\u00b7U_LV/(\u221a3\u00b7|Z_total|), c = 1,1 (maks). |Z_total| fra vektorsummen.', 'Ik3 = c\u00b7U_LV/(\u221a3\u00b7|Z_total|), c = 1.1 (max). |Z_total| from the vector sum.')];
+    sol.formula = 'Ik3 = c\u00b7U_LV / (\u221a3\u00b7|Z_total|)';
+    sol.substitution = 'Ik3 = 1,1\u00d7400 / (\u221a3\u00d7' + axFmt(Math.round(sc.Ztot * 1e5) / 100) + ' m\u03a9) = ' + axFmt(Math.round(sc.Ik / 100) / 10) + ' kA';
+    sol.steps = [{ da: 'Ik3', en: 'Ik3', expr: '1,1\u00d7400/(\u221a3\u00d7' + axFmt(Math.round(sc.Ztot * 1e6) / 1e6, 5) + ' \u03a9)', result: axFmt(Math.round(sc.Ik / 100) / 10) + ' kA' }];
+    sol.result = { value: Math.round(sc.Ik / 100) / 10, unit: 'kA', da: 'Kortslutningsstr\u00f8m Ik3', en: 'Short-circuit current Ik3' };
+    sol.verification = S('Ik3 = ' + axFmt(Math.round(sc.Ik / 100) / 10) + ' kA er dimensionerende for brydeevnen Icu \u2265 Ik3.', 'Ik3 = ' + axFmt(Math.round(sc.Ik / 100) / 10) + ' kA sets the required breaking capacity Icu \u2265 Ik3.');
+  }
+  sol.compliance = [S(task.clause, task.clause)];
+  sol.conclusion = sol.result ? S(axL({ da: sol.result.da, en: sol.result.da }) + ' = ' + axFmt(sol.result.value) + ' ' + sol.result.unit + '.', (sol.result.en) + ' = ' + axFmt(sol.result.value) + ' ' + sol.result.unit + '.') : S('', '');
+  return sol;
+}
+
+// --- AI MENTOR: progressive hints that guide WITHOUT giving the answer ---------
+function axMentorHints(task) {
+  var H = {
+    ib_total: [{ da: 'Hver last: I\u1d2e = P / (\u221a3\u00b7U\u00b7cos\u03c6\u00b7\u03b7) for 3-faset.', en: 'Each load: IB = P / (\u221a3\u00b7U\u00b7cos\u03c6\u00b7\u03b7) for 3-phase.' }, { da: 'Gang hver last med dens samtidighedsfaktor Sf, f\u00f8r du summerer.', en: 'Multiply each load by its diversity factor Sf before summing.' }, { da: 'Den dimensionsgivende str\u00f8m er summen af de samtidige str\u00f8mme \u2014 ikke den fulde sum.', en: 'The dimensioning current is the sum of the diversified currents \u2014 not the full sum.' }],
+    device: [{ da: 'Krav: IB \u2264 In. In skal v\u00e6re mindst lig IB.', en: 'Rule: IB \u2264 In. In must be at least IB.' }, { da: 'V\u00e6lg den MINDSTE standardv\u00e6rdi (\u2026,16,20,25,32,40,50,63,80,100\u2026) der ikke er under IB.', en: 'Pick the SMALLEST standard value (\u2026,16,20,25,32,40,50,63,80,100\u2026) not below IB.' }],
+    cable: [{ da: 'Iz_korr = Iz_tabel \u00b7 K_temp \u00b7 K_group. Sl\u00e5 korrektionsfaktorerne op.', en: 'Iz_corr = Iz_table \u00b7 K_temp \u00b7 K_group. Look up the correction factors.' }, { da: 'Krav: Iz_korr \u2265 In. Rund Iz nedad (konservativt).', en: 'Rule: Iz_corr \u2265 In. Round Iz down (conservative).' }, { da: 'Pr\u00f8v tv\u00e6rsnit opad indtil det mindste der opfylder kravet.', en: 'Step cross-sections up to the smallest that meets the rule.' }],
+    vdrop: [{ da: '\u0394U = \u221a3\u00b7IB\u00b7L\u00b7(r\u00b7cos\u03c6 + x\u00b7sin\u03c6) for 3-faset (L i km).', en: '\u0394U = \u221a3\u00b7IB\u00b7L\u00b7(r\u00b7cos\u03c6 + x\u00b7sin\u03c6) for 3-phase (L in km).' }, { da: '\u0394U% = \u0394U/Un \u00b7 100. Gr\u00e6nser: 3 % (lys), 5 % (\u00f8vrige).', en: '\u0394U% = \u0394U/Un \u00b7 100. Limits: 3 % (lighting), 5 % (other).' }],
+    iktrafo: [{ da: 'F\u00f8rst fuldlaststr\u00f8mmen: In = SN/(\u221a3\u00b7U).', en: 'First the full-load current: In = SN/(\u221a3\u00b7U).' }, { da: 'Ik = In / (ek/100). Lille ek \u21d2 stor Ik.', en: 'Ik = In / (ek/100). Small ek \u21d2 large Ik.' }],
+    adiabatic: [{ da: 'Betingelsen er k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t.', en: 'The condition is k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t.' }, { da: 'Beregn Smin = Ik\u00b7\u221at/k og sammenlign med det valgte tv\u00e6rsnit.', en: 'Compute Smin = Ik\u00b7\u221at/k and compare with the chosen cross-section.' }],
+    zs: [{ da: 'Automatisk frakobling: Zs\u00b7Ia \u2264 U0.', en: 'Automatic disconnection: Zs\u00b7Ia \u2264 U0.' }, { da: 'Zs,max = U0/Ia. For kurve C er Ia = 10\u00b7In.', en: 'Zs,max = U0/Ia. For curve C, Ia = 10\u00b7In.' }],
+    breaking: [{ da: 'Brydeevne: Icu \u2265 Ik,max.', en: 'Breaking capacity: Icu \u2265 Ik,max.' }, { da: 'V\u00e6lg n\u00e6rmeste standard Icu over Ik,max.', en: 'Pick the nearest standard Icu above Ik,max.' }],
+    selectivity: [{ da: 'Selektivitet = nedstr\u00f8ms rydder f\u00f8r opstr\u00f8ms.', en: 'Selectivity = downstream clears before upstream.' }, { da: 'T\u00e6nk p\u00e5 tid/str\u00f8m-graduering over hele fejlomr\u00e5det.', en: 'Think time/current grading across the whole fault range.' }],
+    znet_mag: [{ da: '|Z| = U\u00b2/S\u2096. Brug HV-sp\u00e6ndingen i volt.', en: '|Z| = U\u00b2/Sk. Use the HV voltage in volts.' }, { da: 'Vinklen f\u00e5s af arccos(cos\u03c6\u2096).', en: 'The angle is arccos(cos\u03c6k).' }],
+    ztrafo_mag: [{ da: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, henf\u00f8rt til 400 V.', en: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, referred to 400 V.' }, { da: 'R_T fra kobbertabet; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).', en: 'R_T from copper loss; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).' }],
+    ztot_mag: [{ da: 'Henf\u00f8r netimpedansen til LV med (400/U_HV)\u00b2.', en: 'Refer the network impedance to LV by (400/U_HV)\u00b2.' }, { da: 'L\u00e6g sammen som VEKTORER: (R\u2211)+j(X\u2211), ikke skalart.', en: 'Add as VECTORS: (\u03a3R)+j(\u03a3X), not scalar.' }],
+    ik3: [{ da: 'Ik3 = c\u00b7U/(\u221a3\u00b7|Z_total|), c = 1,1.', en: 'Ik3 = c\u00b7U/(\u221a3\u00b7|Z_total|), c = 1.1.' }],
+    reg: [{ da: 'T\u00e6nk p\u00e5 hvilket DS/HD 60364-afsnit emnet h\u00f8rer under.', en: 'Think about which DS/HD 60364 clause governs the topic.' }, { da: 'Sl\u00e5 op i Sikkerhedsstyrelsens g\u00e6ldende regler ved tvivl.', en: 'Check Sikkerhedsstyrelsen current rules if unsure.' }]
+  };
+  var arr = H[task.kind] || [{ da: 'Find den relevante formel og det styrende DS/HD 60364-afsnit.', en: 'Find the relevant formula and the governing DS/HD 60364 clause.' }];
+  // Always add the clause pointer as a final, non-spoiling hint.
+  return arr.concat([{ da: 'Reference: ' + task.clause + '. (Hintet afsl\u00f8rer aldrig selve svaret.)', en: 'Reference: ' + task.clause + '. (The hint never reveals the answer itself.)' }]);
+}
+
+// --- PERFORMANCE ANALYTICS over the attempt log -------------------------------
+function axLogList() { try { return JSON.parse(localStorage.getItem('autoexamLog') || '[]'); } catch (e) { return []; } }
+function axLogPush(rec) { try { var l = axLogList(); l.push(rec); if (l.length > 300) l = l.slice(l.length - 300); localStorage.setItem('autoexamLog', JSON.stringify(l)); } catch (e) {} }
+function axAnalytics(log) {
+  log = log || [];
+  var n = log.length, passN = 0, sum = 0, best = 0;
+  var byCat = {}, byBuild = {}, byTier = {}, trend = [], streak = 0;
+  log.forEach(function (r) {
+    sum += r.score; if (r.score > best) best = r.score; if (r.verdict === 'pass') passN++;
+    trend.push({ ts: r.ts, score: r.score, verdict: r.verdict });
+    if (r.catPct) Object.keys(r.catPct).forEach(function (c) { if (!byCat[c]) byCat[c] = { sum: 0, n: 0 }; byCat[c].sum += r.catPct[c]; byCat[c].n++; });
+    if (r.building) { if (!byBuild[r.building]) byBuild[r.building] = { sum: 0, n: 0, best: 0 }; byBuild[r.building].sum += r.score; byBuild[r.building].n++; if (r.score > byBuild[r.building].best) byBuild[r.building].best = r.score; }
+    if (r.tier) { if (!byTier[r.tier]) byTier[r.tier] = { sum: 0, n: 0 }; byTier[r.tier].sum += r.score; byTier[r.tier].n++; }
+  });
+  for (var i = log.length - 1; i >= 0; i--) { if (log[i].verdict === 'pass') streak++; else break; }
+  var catAvg = {}; Object.keys(byCat).forEach(function (c) { catAvg[c] = Math.round(byCat[c].sum / byCat[c].n); });
+  var buildAvg = {}; Object.keys(byBuild).forEach(function (b) { buildAvg[b] = { avg: Math.round(byBuild[b].sum / byBuild[b].n), n: byBuild[b].n, best: byBuild[b].best }; });
+  var tierAvg = {}; Object.keys(byTier).forEach(function (t) { tierAvg[t] = { avg: Math.round(byTier[t].sum / byTier[t].n), n: byTier[t].n }; });
+  var weakest = null, strongest = null;
+  Object.keys(catAvg).forEach(function (c) { if (weakest === null || catAvg[c] < catAvg[weakest]) weakest = c; if (strongest === null || catAvg[c] > catAvg[strongest]) strongest = c; });
+  return { attempts: n, passCount: passN, passRate: n ? Math.round(100 * passN / n) : 0, avgScore: n ? Math.round(sum / n) : 0, bestScore: best, catAvg: catAvg, buildAvg: buildAvg, tierAvg: tierAvg, trend: trend, streak: streak, weakest: weakest, strongest: strongest };
+}
+
+// --- Inline SVG charts (no dependencies) --------------------------------------
+function axSvgLine(series, w, h) {
+  w = w || 340; h = h || 120; var pad = 22;
+  if (!series || !series.length) return '<svg width="' + w + '" height="' + h + '"></svg>';
+  var n = series.length; var maxV = 100, minV = 0;
+  function x(i) { return pad + (n === 1 ? (w - 2 * pad) / 2 : (i * (w - 2 * pad) / (n - 1))); }
+  function y(v) { return h - pad - (v - minV) / (maxV - minV) * (h - 2 * pad); }
+  var path = ''; series.forEach(function (p, i) { path += (i === 0 ? 'M' : 'L') + axFmt(Math.round(x(i))) + ' ' + axFmt(Math.round(y(p.score))); });
+  var dots = series.map(function (p, i) { return '<circle cx="' + Math.round(x(i)) + '" cy="' + Math.round(y(p.score)) + '" r="3" fill="' + (p.verdict === 'pass' ? '#22a06b' : '#d64545') + '"/>'; }).join('');
+  var grid = '';[0, 50, 80, 100].forEach(function (gv) { grid += '<line x1="' + pad + '" y1="' + Math.round(y(gv)) + '" x2="' + (w - pad) + '" y2="' + Math.round(y(gv)) + '" stroke="#8884" stroke-dasharray="3 3"/><text x="2" y="' + (Math.round(y(gv)) + 3) + '" font-size="9" fill="#888">' + gv + '</text>'; });
+  return '<svg width="' + w + '" height="' + h + '" style="max-width:100%">' + grid + '<path d="' + path + '" fill="none" stroke="#3b82f6" stroke-width="2"/>' + dots + '</svg>';
+}
+function axSvgBars(items, w, barH) {
+  w = w || 340; barH = 18; var gap = 8; var labelW = 150; var h = items.length * (barH + gap) + 6;
+  if (!items.length) return '';
+  var rows = items.map(function (it, i) {
+    var yy = 4 + i * (barH + gap); var bw = Math.max(2, Math.round((w - labelW - 40) * Math.min(100, it.value) / 100));
+    var col = it.value >= 80 ? '#22a06b' : (it.value >= 60 ? '#b8860b' : '#d64545');
+    return '<text x="0" y="' + (yy + barH - 4) + '" font-size="10" fill="currentColor">' + (it.label.length > 24 ? it.label.slice(0, 23) + '\u2026' : it.label) + '</text>' +
+      '<rect x="' + labelW + '" y="' + yy + '" width="' + (w - labelW - 40) + '" height="' + barH + '" fill="#8882" rx="3"/>' +
+      '<rect x="' + labelW + '" y="' + yy + '" width="' + bw + '" height="' + barH + '" fill="' + col + '" rx="3"/>' +
+      '<text x="' + (w - 34) + '" y="' + (yy + barH - 4) + '" font-size="10" fill="currentColor">' + it.value + '%</text>';
+  }).join('');
+  return '<svg width="' + w + '" height="' + h + '" style="max-width:100%">' + rows + '</svg>';
 }
 
 let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
@@ -12253,7 +12432,7 @@ function examRenderAnswerKey(){
 // ============================================================================
 // ===== AUTORISATIONSPR\u00d8VE-GENERATOR \u2014 UI (renderAutoExam) ====================
 // ============================================================================
-var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, timerOn: false, timerLeft: 0, timerSec: 0 };
+var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, timerOn: false, timerLeft: 0, timerSec: 0 };
 var autoexamTimer = null;
 function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == null ? '' : String(o)); }
 function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
@@ -12262,7 +12441,7 @@ function axFmtTime(s) { s = Math.max(0, s | 0); var h = Math.floor(s / 3600), m 
 function axUIgenerate(keepSeed) {
   if (!keepSeed || !autoexamState.seed) autoexamState.seed = (Math.floor(Math.random() * 1e9)) || 1;
   autoexamState.project = axGenerate(autoexamState.seed, autoexamState.building, autoexamState.tier, autoexamState.mode);
-  autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false;
+  autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; autoexamState.hints = {};
   var md = axMode(autoexamState.mode); autoexamState.timerSec = md.sec; autoexamState.timerLeft = md.sec; autoexamState.timerOn = false;
   if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; }
 }
@@ -12273,8 +12452,14 @@ function axSetTier(id) { autoexamState.tier = id; axUIgenerate(true); renderModu
 function axSetMode(id) { autoexamState.mode = id; axUIgenerate(true); renderModule('autoexam'); }
 function axUITab(t) { autoexamState.tab = t; renderModule('autoexam'); }
 function axPick(taskId, i) { autoexamState.answers[taskId] = i; renderModule('autoexam'); }
-function axGrade() { var p = axEnsure(); autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.revealFacit = true; var st = axStoreGet(); var key = p.buildingId + ':' + p.tierId + ':' + p.modeId; st[key] = Math.max(st[key] || 0, autoexamState.result.score); axStoreSet(st); if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; } autoexamState.tab = 'censor'; renderModule('autoexam'); }
-function axResetAnswers() { autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; renderModule('autoexam'); }
+function axGrade() { var p = axEnsure(); autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.revealFacit = true; var st = axStoreGet(); var key = p.buildingId + ':' + p.tierId + ':' + p.modeId; st[key] = Math.max(st[key] || 0, autoexamState.result.score); axStoreSet(st); axLogPush({ ts: Date.now(), building: p.buildingId, tier: p.tierId, mode: p.modeId, score: autoexamState.result.score, verdict: autoexamState.result.verdict, catPct: autoexamState.result.catPct, correctCount: autoexamState.result.correctCount, totalCount: autoexamState.result.totalCount }); if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; } autoexamState.tab = 'censor'; renderModule('autoexam'); }
+function axResetAnswers() { autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; autoexamState.hints = {}; renderModule('autoexam'); }
+function axHint(taskId) { autoexamState.hints[taskId] = (autoexamState.hints[taskId] || 0) + 1; renderModule('autoexam'); }
+// Complex (Viggo) drill flow.
+function axCxGen() { autoexamState.cxProject = axGenComplex((Math.floor(Math.random() * 1e9)) || 1, autoexamState.tier); autoexamState.cxAnswers = {}; autoexamState.cxResult = null; autoexamState.cxReveal = false; renderModule('autoexam'); }
+function axCxEnsure() { if (!autoexamState.cxProject) axCxGen(); return autoexamState.cxProject; }
+function axCxPick(taskId, i) { autoexamState.cxAnswers[taskId] = i; renderModule('autoexam'); }
+function axCxGrade() { var p = axCxEnsure(); autoexamState.cxResult = axExamine(p, autoexamState.cxAnswers); autoexamState.cxReveal = true; axLogPush({ ts: Date.now(), building: 'kompleks', tier: p.tierId, mode: 'kompleks', score: autoexamState.cxResult.score, verdict: autoexamState.cxResult.verdict, catPct: autoexamState.cxResult.catPct, correctCount: autoexamState.cxResult.correctCount, totalCount: autoexamState.cxResult.totalCount }); renderModule('autoexam'); }
 function axTimerStart() { autoexamState.timerOn = true; var end = Date.now() + autoexamState.timerLeft * 1000; if (autoexamTimer) clearInterval(autoexamTimer); autoexamTimer = setInterval(function () { autoexamState.timerLeft = Math.max(0, Math.round((end - Date.now()) / 1000)); var el = document.getElementById('axTimer'); if (el) el.textContent = axFmtTime(autoexamState.timerLeft); if (autoexamState.timerLeft <= 0) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; renderModule('autoexam'); } }, 1000); renderModule('autoexam'); }
 function axTimerPause() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } renderModule('autoexam'); }
 function axTimerReset() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } autoexamState.timerLeft = autoexamState.timerSec; renderModule('autoexam'); }
@@ -12392,6 +12577,12 @@ function axRenderAnswerTab(p) {
       for (var i = 0; i < t.opts.length; i++) {
         h += '<button class="sel-btn' + (ua === i ? ' selected' : '') + '" onclick="axPick(\'' + t.id + '\',' + i + ')">' + axOptLabel(t, i) + '</button>';
       }
+      h += '</div>';
+      // AI Mentor: progressive hints (never reveal the answer)
+      var hints = axMentorHints(t); var shown = autoexamState.hints[t.id] || 0;
+      h += '<div style="margin-top:4px">';
+      if (shown < hints.length) h += '<button class="sel-btn" style="font-size:0.8rem" onclick="axHint(\'' + t.id + '\')">\uD83D\uDCA1 ' + tx('Hint fra AI-mentor', 'AI mentor hint') + ' (' + (shown + 1) + '/' + hints.length + ')</button>';
+      for (var k = 0; k < shown; k++) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-top:3px;padding-left:6px;border-left:2px solid var(--primary)">\uD83D\uDCA1 ' + axL(hints[k]) + '</div>';
       h += '</div></div>';
     });
     h += '</div>';
@@ -12451,6 +12642,65 @@ function axRenderCensorTab(p) {
   return h;
 }
 
+function axRenderKompleks() {
+  var p = axCxEnsure();
+  var h = '<div class="info-row">' + tx('Kompleks kortslutningsberegning efter Viggo-metoden: netimpedans (arccos af cos\u03c6\u2096), transformerimpedans, vektorsum og Ik3 \u2014 i rektangul\u00e6r og pol\u00e6r form. Alt klik-only.', 'Complex short-circuit calculation, Viggo method: network impedance (arccos of cos\u03c6k), transformer impedance, vector sum and Ik3 \u2014 in rectangular and polar form. All click-only.') + '</div>';
+  h += '<div style="margin:6px 0"><button class="sel-btn selected" onclick="axCxGen()">\uD83C\uDFB2 ' + tx('Ny kompleks opgave', 'New complex drill') + '</button> <span style="color:var(--text-muted);font-size:0.85rem">#' + p.seed + ' \u00b7 ' + axL(p.meta.tier) + '</span></div>';
+  // scenario data block
+  var s = p.scenario;
+  h += '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Givet', 'Given') + '</div><div style="padding:4px 2px;line-height:1.7">';
+  h += '<div>' + tx('Net', 'Grid') + ': U_HV = ' + s.U_HV + ' kV, S\u2096 = ' + s.Sk + ' MVA, cos\u03c6\u2096 = ' + axFmt(s.cosk) + '</div>';
+  h += '<div>' + tx('Transformer', 'Transformer') + ': SN = ' + s.SN + ' kVA, ek = ' + axFmt(s.ek) + ' %, PCu = ' + axFmt(s.PCu) + ' kW, U_LV = 400 V, c = 1,1</div>';
+  h += '</div></div>';
+  var done = false; if (autoexamState.cxResult) done = true;
+  p.opgaver[0].tasks.forEach(function (t) {
+    var ua = autoexamState.cxAnswers[t.id];
+    h += '<div class="select-group"><div class="select-label">' + axL(t.prompt) + '</div><div class="select-grid">';
+    for (var i = 0; i < t.opts.length; i++) { var mark = ''; if (done) { if (i === t.ci) mark = ' selected'; } else if (ua === i) mark = ' selected'; h += '<button class="sel-btn' + mark + (done && ua === i && i !== t.ci ? '" style="outline:2px solid var(--danger)' : '') + '" onclick="axCxPick(\'' + t.id + '\',' + i + ')">' + axOptLabel(t, i) + '</button>'; }
+    h += '</div>';
+    var hints = axMentorHints(t); var shown = autoexamState.hints[t.id] || 0;
+    if (shown < hints.length) h += '<div style="margin-top:4px"><button class="sel-btn" style="font-size:0.8rem" onclick="axHint(\'' + t.id + '\')">\uD83D\uDCA1 ' + tx('Hint', 'Hint') + ' (' + (shown + 1) + '/' + hints.length + ')</button></div>';
+    for (var k = 0; k < shown; k++) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-top:3px;padding-left:6px;border-left:2px solid var(--primary)">\uD83D\uDCA1 ' + axL(hints[k]) + '</div>';
+    h += '</div>';
+  });
+  h += '<div style="margin-top:6px"><button class="sel-btn selected" onclick="axCxGrade()">\uD83C\uDF93 ' + tx('Ret', 'Check') + '</button></div>';
+  if (autoexamState.cxResult) {
+    var r = autoexamState.cxResult;
+    h += '<div class="result-box" style="margin-top:8px;border:2px solid ' + (r.verdict === 'pass' ? 'var(--success)' : 'var(--danger)') + '"><div class="result-title">' + r.correctCount + '/' + r.totalCount + ' ' + tx('korrekte', 'correct') + ' \u00b7 ' + r.score + '%</div></div>';
+    h += '<div class="card" style="margin-top:8px"><div class="card-title">\uD83D\uDCD8 ' + tx('Facit (rektangul\u00e6r + pol\u00e6r)', 'Solution (rectangular + polar)') + '</div>';
+    axSolve(p)[0].tasks.forEach(function (sol) { h += axRenderSolutionCard(sol); });
+    h += '</div>';
+  }
+  return h;
+}
+
+function axRenderDashboard() {
+  var log = axLogList(); var a = axAnalytics(log);
+  if (!a.attempts) return '<div class="result-box"><div class="result-title">\uD83D\uDCCA ' + tx('Tr\u00e6ningsanalyse', 'Training analytics') + '</div><div style="padding:6px 2px">' + tx('Ingen data endnu. L\u00f8s og bed\u00f8m mindst \u00e9n pr\u00f8ve, s\u00e5 vises din udvikling, st\u00e6rke og svage kompetencer og best\u00e5elsesrate her.', 'No data yet. Solve and grade at least one exam to see your progress, strong and weak competencies and pass rate here.') + '</div></div>';
+  var h = '<div class="result-box"><div class="result-title">\uD83D\uDCCA ' + tx('Tr\u00e6ningsanalyse', 'Training analytics') + '</div>';
+  h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 2px">';
+  function stat(v, lbl, col) { return '<div style="min-width:80px"><div style="font-size:1.5rem;font-weight:800;color:' + (col || 'var(--text)') + '">' + v + '</div><div style="font-size:0.78rem;color:var(--text-muted)">' + lbl + '</div></div>'; }
+  h += stat(a.attempts, tx('Fors\u00f8g', 'Attempts'));
+  h += stat(a.passRate + '%', tx('Best\u00e5elsesrate', 'Pass rate'), a.passRate >= 50 ? 'var(--success)' : 'var(--danger)');
+  h += stat(a.avgScore + '%', tx('Gennemsnit', 'Average'));
+  h += stat(a.bestScore + '%', tx('Bedste', 'Best'), 'var(--success)');
+  h += stat('\uD83D\uDD25 ' + a.streak, tx('Stime (best\u00e5et)', 'Streak (passed)'));
+  h += '</div>';
+  h += '<div style="padding:6px 2px"><div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:2px">' + tx('Score over tid', 'Score over time') + '</div>' + axSvgLine(a.trend) + '</div>';
+  h += '</div>';
+  // competency bars
+  var catItems = Object.keys(a.catAvg).map(function (c) { var nm = AX_CAT_NAME[c] || { da: c, en: c }; return { label: axL(nm), value: a.catAvg[c] }; });
+  if (catItems.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Kompetencer (gennemsnit)', 'Competencies (average)') + '</div><div style="padding:4px 2px">' + axSvgBars(catItems) + '</div></div>';
+  // per building
+  var buildItems = Object.keys(a.buildAvg).map(function (b) { var bb = axBuilding(b); return { label: (bb ? axL({ da: bb.da, en: bb.en }) : b) + ' (' + a.buildAvg[b].n + ')', value: a.buildAvg[b].avg }; });
+  if (buildItems.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Pr. bygningstype', 'By building type') + '</div><div style="padding:4px 2px">' + axSvgBars(buildItems) + '</div></div>';
+  // coaching line
+  if (a.weakest) { var nm = AX_CAT_NAME[a.weakest] || { da: a.weakest, en: a.weakest }; h += '<div class="result-box warning" style="margin-top:8px"><div style="padding:6px 2px">\uD83C\uDFAF ' + tx('Fokus n\u00e6ste gang', 'Focus next time') + ': <strong>' + axL(nm) + '</strong> (' + a.catAvg[a.weakest] + '%). ' + axL(axCatSuggest(a.weakest)) + '</div></div>'; }
+  h += '<div style="margin-top:8px"><button class="sel-btn" onclick="axClearLog()">\uD83D\uDDD1\uFE0F ' + tx('Ryd historik', 'Clear history') + '</button></div>';
+  return h;
+}
+function axClearLog() { try { localStorage.removeItem('autoexamLog'); } catch (e) {} renderModule('autoexam'); }
+
 function renderAutoExam() {
   var p = axEnsure();
   var st = axStoreGet(); var bestKey = p.buildingId + ':' + p.tierId + ':' + p.modeId; var best = st[bestKey];
@@ -12484,10 +12734,14 @@ function renderAutoExam() {
   h += '<button class="sel-btn' + (autoexamState.tab === 'opgave' ? ' selected' : '') + '" onclick="axUITab(\'opgave\')">\uD83D\uDCCB ' + tx('Opgave', 'Exam') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'besvar' ? ' selected' : '') + '" onclick="axUITab(\'besvar\')">\u270D\uFE0F ' + tx('Min besvarelse', 'My answer') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'censor' ? ' selected' : '') + '" onclick="axUITab(\'censor\')">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'kompleks' ? ' selected' : '') + '" onclick="axUITab(\'kompleks\')">\uD83E\uDDEE ' + tx('Kompleks (Viggo)', 'Complex (Viggo)') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'analyse' ? ' selected' : '') + '" onclick="axUITab(\'analyse\')">\uD83D\uDCCA ' + tx('Analyse', 'Analytics') + '</button>';
   h += '</div>';
   var body = '';
   if (autoexamState.tab === 'opgave') { body = axRenderHeader(p); p.opgaver.forEach(function (op) { body += axOpgaveOverview(op, p); }); }
   else if (autoexamState.tab === 'besvar') body = axRenderAnswerTab(p);
+  else if (autoexamState.tab === 'kompleks') body = axRenderKompleks();
+  else if (autoexamState.tab === 'analyse') body = axRenderDashboard();
   else body = axRenderCensorTab(p);
   return h + body;
 }
