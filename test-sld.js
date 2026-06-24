@@ -19468,6 +19468,239 @@ test('renderFlaskehals/renderMarginkort show a graceful empty state when there a
   } finally { lang = prevLang; anlaegtraeState = JSON.parse(prevTree); if (prevP !== 'null') projectState = JSON.parse(prevP); }
 });
 
+// =====================================================================
+// Impedansbudget & Designvariant Tests
+// =====================================================================
+
+console.log('\n=== Impedansbudget & Designvariant Tests ===\n');
+
+// IB-1: With a populated 3-node tree (forsyning→hovedtavle→kreds), the stacked
+// bar shows cumulative Z increasing monotonically and Zs/Zs,max % is correct.
+test('impedansbudget: 3-node path shows monotonically increasing Z and correct Zs/Zs,max', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'hovedtavle', parentId: 'an_1', childIds: ['an_3'], name_da: 'Hovedtavle', name_en: 'Main board', mm2: 50, length_m: 10, nPar: 1, phases: '3x400', In: 160, curve: 'C', load_kW: 10, cosPhi: 0.9, kind: 'tavle' },
+        'an_3': { id: 'an_3', type: 'kreds', parentId: 'an_2', childIds: [], name_da: 'Stik', name_en: 'Sockets', mm2: 2.5, length_m: 25, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3.45, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 4, selectedId: 'an_2'
+    };
+    impedansbudgetState = { leafIdx: 0 };
+    var html = renderImpedansbudget();
+    // Should contain svg with bars
+    assert(html.indexOf('<svg') >= 0, 'should contain SVG stacked bar');
+    assert(html.indexOf('Z\u209B,max') >= 0, 'should show Zs,max limit');
+    // Verify monotonically increasing: the cumulative values in the segments
+    anlaegPropagate();
+    var leaves = impedansbudgetLeaves();
+    var leaf = leaves[0];
+    var path = impedansbudgetPath(leaf.id);
+    var prevCumZs = 0;
+    for (var i = 0; i < path.length; i++) {
+      var cumZs = cxMag(path[i]._zs);
+      assert(cumZs >= prevCumZs, 'cumulative Zs must be monotonically increasing at node ' + i);
+      prevCumZs = cumZs;
+    }
+    // Verify Zs/Zs,max calculation
+    var zsMax = impedansbudgetZsMax(leaf);
+    var expectedZsMax = 230 * 1000 / (5 * 16); // B curve, In=16, Ia=80A -> 2875 mOhm
+    assert(Math.abs(zsMax - expectedZsMax) < 0.1, 'Zs,max should be 2875 mOhm for MCB B16, got ' + zsMax.toFixed(1));
+    var totalZs = cxMag(leaf._zs);
+    var ratioPct = totalZs / zsMax * 100;
+    assert(ratioPct > 0 && ratioPct < 100, 'Zs/Zs,max ratio should be between 0 and 100% for well-dimensioned circuit');
+    // Check the ratio is shown in the HTML
+    assert(html.indexOf(asDa(ratioPct.toFixed(1))) >= 0, 'ratio percentage should be displayed in output');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// IB-2: A circuit close to Zs,max limit shows red/amber coloring.
+test('impedansbudget: circuit near Zs,max shows red/amber segment colors', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    // Long cable will push Zs close to limit: B16 -> Zs,max=2875 mOhm
+    // 100m of 1.5mm² Cu: r=12.1 Ohm/km, so cable Z ~ 100*12.1/1000 = 1.21 Ohm = 1210 mOhm
+    // Zs = 2*1210 = 2420 mOhm from cable alone, plus source ~ 10 mOhm -> total ~2430
+    // That's about 85% of 2875 -> should trigger amber/red
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'kreds', parentId: 'an_1', childIds: [], name_da: 'Langt kabel', name_en: 'Long cable', mm2: 1.5, length_m: 100, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 2, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 3, selectedId: null
+    };
+    impedansbudgetState = { leafIdx: 0 };
+    var html = renderImpedansbudget();
+    // Should contain red or amber colors (for segments exceeding 60% or 85%)
+    var hasAmberOrRed = html.indexOf('#ffa726') >= 0 || html.indexOf('#ef5350') >= 0;
+    assert(hasAmberOrRed, 'should show amber or red segments for near-limit circuit');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// IB-3: Empty tree returns graceful empty-state markup.
+test('impedansbudget: empty tree shows friendly empty state', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: { 'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' } },
+      rootId: 'an_1', nextId: 2, selectedId: null
+    };
+    impedansbudgetState = { leafIdx: 0 };
+    var html = renderImpedansbudget();
+    assert(html.indexOf('Anlægstræ') >= 0, 'empty state should mention Anlægstræ module');
+    assert(html.indexOf('<svg') < 0, 'empty state should NOT contain SVG bars');
+    assert(html.indexOf('NaN') < 0, 'no NaN in empty state');
+    assert(html.indexOf('undefined') < 0, 'no undefined in empty state');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// DV-4: Increasing mm² (2.5→6) reduces |Zs| and increases Ik (safer) — green delta.
+test('designvariant: increasing mm2 reduces Zs and increases Ik (safer)', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'kreds', parentId: 'an_1', childIds: [], name_da: 'Test', name_en: 'Test', mm2: 2.5, length_m: 25, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 3, selectedId: null
+    };
+    designvariantState = { leafIdx: 0, tweakType: 'mm2', tweakVal: 6 };
+    anlaegPropagate();
+    var leaf = anlaegtraeState.nodes['an_2'];
+    var parent = anlaegtraeState.nodes['an_1'];
+    var resultA = designvariantCompute(leaf, parent._z1, parent._zs);
+    // Clone with mm2=6
+    var cloned = {}; Object.keys(leaf).forEach(function(k){ cloned[k] = leaf[k]; }); cloned.mm2 = 6;
+    anlaegtraeState.nodes['an_2'] = cloned;
+    cloned._ib = anlaegNodeIB(cloned);
+    var resultB = designvariantCompute(cloned, parent._z1, parent._zs);
+    anlaegtraeState.nodes['an_2'] = leaf; // restore
+    assert(resultB.zs < resultA.zs, 'Larger mm2 should reduce Zs: B=' + resultB.zs.toFixed(2) + ' < A=' + resultA.zs.toFixed(2));
+    assert(resultB.ik1min > resultA.ik1min, 'Larger mm2 should increase Ik1min: B=' + resultB.ik1min.toFixed(1) + ' > A=' + resultA.ik1min.toFixed(1));
+    // Render and check for green color (safer)
+    var html = renderDesignvariant();
+    assert(html.indexOf('var(--success)') >= 0, 'safer values should show green');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// DV-5: Increasing length (20→50m) increases |Zs| and reduces Ik (more dangerous) — red delta.
+test('designvariant: increasing length increases Zs and reduces Ik (more dangerous)', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'kreds', parentId: 'an_1', childIds: [], name_da: 'Test', name_en: 'Test', mm2: 2.5, length_m: 20, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 3, selectedId: null
+    };
+    designvariantState = { leafIdx: 0, tweakType: 'length', tweakVal: 50 };
+    anlaegPropagate();
+    var leaf = anlaegtraeState.nodes['an_2'];
+    var parent = anlaegtraeState.nodes['an_1'];
+    var resultA = designvariantCompute(leaf, parent._z1, parent._zs);
+    // Clone with length=50
+    var cloned = {}; Object.keys(leaf).forEach(function(k){ cloned[k] = leaf[k]; }); cloned.length_m = 50;
+    anlaegtraeState.nodes['an_2'] = cloned;
+    cloned._ib = anlaegNodeIB(cloned);
+    var resultB = designvariantCompute(cloned, parent._z1, parent._zs);
+    anlaegtraeState.nodes['an_2'] = leaf; // restore
+    assert(resultB.zs > resultA.zs, 'Longer cable should increase Zs: B=' + resultB.zs.toFixed(2) + ' > A=' + resultA.zs.toFixed(2));
+    assert(resultB.ik1min < resultA.ik1min, 'Longer cable should decrease Ik1min: B=' + resultB.ik1min.toFixed(1) + ' < A=' + resultA.ik1min.toFixed(1));
+    // Render and check for red color (more dangerous)
+    var html = renderDesignvariant();
+    assert(html.indexOf('var(--danger)') >= 0, 'more dangerous values should show red');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// DV-6: The comparison does NOT mutate the real anlaegtraeState.
+test('designvariant: comparison does NOT mutate real anlaegtraeState', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'kreds', parentId: 'an_1', childIds: [], name_da: 'Test', name_en: 'Test', mm2: 2.5, length_m: 25, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 3, selectedId: null
+    };
+    var before = JSON.stringify(anlaegtraeState);
+    designvariantState = { leafIdx: 0, tweakType: 'mm2', tweakVal: 10 };
+    renderDesignvariant();
+    var after = JSON.stringify(anlaegtraeState);
+    // The only acceptable change is propagation fields (_z1, _zs, etc.) — the user data fields must be identical
+    var origNode = anlaegtraeState.nodes['an_2'];
+    assert.strictEqual(origNode.mm2, 2.5, 'mm2 must remain 2.5 after comparison');
+    assert.strictEqual(origNode.length_m, 25, 'length_m must remain 25 after comparison');
+    assert.strictEqual(origNode.nPar, 1, 'nPar must remain 1 after comparison');
+    assert.strictEqual(origNode.In, 16, 'In must remain 16 after comparison');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// IB-7: renderImpedansbudget() returns UI markup in both da and en with no untranslated-key leaks.
+test('renderImpedansbudget returns bilingual markup with no leaks', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'hovedtavle', parentId: 'an_1', childIds: ['an_3'], name_da: 'Hovedtavle', name_en: 'Main board', mm2: 50, length_m: 10, nPar: 1, phases: '3x400', In: 160, curve: 'C', load_kW: 10, cosPhi: 0.9, kind: 'tavle' },
+        'an_3': { id: 'an_3', type: 'kreds', parentId: 'an_2', childIds: [], name_da: 'Stik', name_en: 'Sockets', mm2: 2.5, length_m: 25, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3.45, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 4, selectedId: 'an_2'
+    };
+    impedansbudgetState = { leafIdx: 0 };
+    lang = 'da';
+    var hDa = renderImpedansbudget();
+    assert(hDa.indexOf('Impedansbudget') >= 0, 'da title present');
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en';
+    var hEn = renderImpedansbudget();
+    assert(hEn.indexOf('Impedance Budget') >= 0 || hEn.indexOf('Impedance budget') >= 0, 'en title present');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
+// DV-8: renderDesignvariant() returns UI markup in both da and en with no untranslated-key leaks.
+test('renderDesignvariant returns bilingual markup with no leaks', function() {
+  var prevTree = JSON.stringify(anlaegtraeState);
+  var prevLang = lang;
+  try {
+    anlaegtraeState = {
+      src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: {
+        'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: ['an_2'], name_da: 'Forsyning', name_en: 'Supply' },
+        'an_2': { id: 'an_2', type: 'kreds', parentId: 'an_1', childIds: [], name_da: 'Test', name_en: 'Test', mm2: 2.5, length_m: 25, nPar: 1, phases: '1x230', In: 16, curve: 'B', load_kW: 3, cosPhi: 0.95, kind: 'stik' }
+      }, rootId: 'an_1', nextId: 3, selectedId: null
+    };
+    designvariantState = { leafIdx: 0, tweakType: 'mm2', tweakVal: 6 };
+    lang = 'da';
+    var hDa = renderDesignvariant();
+    assert(hDa.indexOf('Designvariant') >= 0 || hDa.indexOf('A/B') >= 0, 'da content present');
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en';
+    var hEn = renderDesignvariant();
+    assert(hEn.indexOf('Design Variant') >= 0 || hEn.indexOf('A/B') >= 0, 'en content present');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { anlaegtraeState = JSON.parse(prevTree); lang = prevLang; }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

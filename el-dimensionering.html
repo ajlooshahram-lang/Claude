@@ -1548,6 +1548,8 @@ const T = {
       repetition: '\uD83D\uDD01 Repetitionstr\u00E6ner',
       kompetence: '\uD83E\uDDE0 Kompetencekort',
       anlaegstrae: '\uD83C\uDF33 Anl\u00E6gstr\u00E6 (impedans)',
+      impedansbudget: '\uD83D\uDCCA Impedansbudget',
+      designvariant: '\uD83D\uDD00 Designvariant (A/B)',
       idrift: '\u2705 Idrifts\u00E6ttelsesattest',
       flaskehals: '\uD83C\uDF9B\uFE0F Flaskehals-analyse',
       marginkort: '\uD83D\uDDFA\uFE0F Marginkort',
@@ -1768,6 +1770,8 @@ const T = {
       repetition: '\uD83D\uDD01 Spaced Repetition',
       kompetence: '\uD83E\uDDE0 Competency Map',
       anlaegstrae: '\uD83C\uDF33 Installation Tree (impedance)',
+      impedansbudget: '\uD83D\uDCCA Impedance Budget',
+      designvariant: '\uD83D\uDD00 Design Variant (A/B)',
       idrift: '\u2705 Commissioning Certificate',
       flaskehals: '\uD83C\uDF9B\uFE0F Bottleneck analysis',
       marginkort: '\uD83D\uDDFA\uFE0F Margin map',
@@ -5066,7 +5070,7 @@ const NAV_GROUPS = [
     da: 'Tavle, skinne & tegning', en: 'Panel, busbar & drawing',
     descDa: 'Saml installationen fysisk: tavle og skinnesystem, kabelbakke, og det enstregede diagram (tegning) der dokumenterer hvordan alt h\u00E6nger sammen.',
     descEn: 'Put the installation together physically: panel and busbar, cable tray, and the single-line diagram (drawing) that documents how everything connects.',
-    keys: ['panel', 'busbar', 'anlaegstrae', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel', 'live', 'install3d', 'film']
+    keys: ['panel', 'busbar', 'anlaegstrae', 'impedansbudget', 'designvariant', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel', 'live', 'install3d', 'film']
   },
   {
     id: 'theory', icon: '\uD83D\uDCD6',
@@ -8431,6 +8435,389 @@ function renderMarginkort() {
   return html;
 }
 
+// =====================================================================
+// IMPEDANSBUDGET — Stacked bar visualization of cumulative Z along a path
+// DS/HD 60364-4-41 Table 41.1 disconnection limit compliance
+// 100% click-only, bilingual via tx(), inline SVG only.
+// =====================================================================
+
+var impedansbudgetState = { leafIdx: 0 };
+(function () { try { var s = JSON.parse(localStorage.getItem('impedansbudgetState') || 'null'); if (s && typeof s.leafIdx === 'number') impedansbudgetState = s; } catch (e) { } })();
+function impedansbudgetSave() { try { localStorage.setItem('impedansbudgetState', JSON.stringify(impedansbudgetState)); } catch (e) { } }
+function impedansbudgetSelect(idx) { impedansbudgetState.leafIdx = idx; impedansbudgetSave(); renderModule('impedansbudget'); }
+
+function impedansbudgetLeaves() {
+  anlaegInit();
+  var t = anlaegtraeState; var leaves = [];
+  Object.keys(t.nodes).forEach(function (k) {
+    var n = t.nodes[k];
+    if (n.type === 'kreds') leaves.push(n);
+  });
+  return leaves;
+}
+
+function impedansbudgetPath(leafId) {
+  var t = anlaegtraeState; var path = []; var cur = leafId;
+  while (cur) { var n = t.nodes[cur]; if (!n) break; path.unshift(n); cur = n.parentId; }
+  return path;
+}
+
+function impedansbudgetZsMax(leaf) {
+  // DS/HD 60364-4-41 Table 41.1: Zs,max = U0 / Ia
+  // For MCB: B -> Ia=5*In, C -> Ia=10*In, D -> Ia=20*In
+  // For fuses: conservative Ia = 5*In as safe default
+  var info = anlaegIa(leaf);
+  var U0 = anlaegtraeState.src.U0 || 230;
+  return (info.Ia > 0) ? (U0 * 1000 / info.Ia) : 999999; // mOhm
+}
+
+function renderImpedansbudget() {
+  anlaegInit();
+  anlaegPropagate();
+  var leaves = impedansbudgetLeaves();
+  var html = '';
+
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83D\uDCCA ' + tx('Impedansbudget', 'Impedance Budget') + '</div>';
+  html += '<div class="info-row">' + tx(
+    'Visualiserer hvordan impedansen akkumuleres langs en valgt sti fra forsyning til slutkreds. Viser Z\u2081 (3-faset fejlsløjfe) og Z\u209B (jordfejlsløjfe, faktor 2\u00D7kabel per DS/HD 60364-4-41). Den røde grænselinje angiver Z\u209B,max = U\u2080/I\u2090 for frakobling inden 0,4 s / 5 s.',
+    'Visualises how impedance accumulates along a selected path from supply to final circuit. Shows Z\u2081 (3-phase fault loop) and Z\u209B (earth fault loop, factor 2\u00D7cable per DS/HD 60364-4-41). The red limit line marks Z\u209B,max = U\u2080/I\u2090 for disconnection within 0.4 s / 5 s.') + '</div>';
+
+  if (!leaves.length) {
+    html += '<div class="info-row">' + tx(
+      'Ingen kredse fundet. Byg et anlægstræ i Anlægstræ-modulet med mindst én slutkreds.',
+      'No circuits found. Build an installation tree in the Installation Tree module with at least one final circuit.') + '</div>';
+    html += '<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="switchModule(\'anlaegstrae\')">\uD83C\uDF33 ' + tx('Åbn Anlægstræ', 'Open Installation Tree') + '</button></div></div>';
+    return html;
+  }
+
+  var idx = impedansbudgetState.leafIdx;
+  if (!(idx >= 0 && idx < leaves.length)) idx = 0;
+
+  // Click-only dropdown for leaf selection
+  html += '<div style="font-size:0.8rem;color:var(--text-muted);margin:6px 0 2px">' + tx('Vælg slutkreds', 'Select final circuit') + ':</div>';
+  html += '<div class="select-grid">';
+  leaves.forEach(function (lf, i) {
+    html += '<button class="sel-btn' + (i === idx ? ' selected' : '') + '" onclick="impedansbudgetSelect(' + i + ')">' + anlaegEsc(tx(lf.name_da || lf.id, lf.name_en || lf.id)) + '</button>';
+  });
+  html += '</div></div>';
+
+  var leaf = leaves[idx];
+  var path = impedansbudgetPath(leaf.id);
+  var zsMax = impedansbudgetZsMax(leaf);
+  var iaInfo = anlaegIa(leaf);
+
+  // Build segment data
+  var segments = [];
+  for (var i = 0; i < path.length; i++) {
+    var n = path[i];
+    var dz1, dzs;
+    if (n.type === 'forsyning') {
+      dz1 = cxMag(n._z1); // source impedance (Znet + Ztrafo)
+      dzs = cxMag(n._zs); // same for earth loop at source
+    } else {
+      dz1 = cxMag(n._cz); // incremental cable Z (1x)
+      dzs = cxMag(n._cz) * 2; // earth loop factor 2x per DS/HD 60364-4-41
+    }
+    var cumZ1 = cxMag(n._z1);
+    var cumZs = cxMag(n._zs);
+    segments.push({ node: n, dz1: dz1, dzs: dzs, cumZ1: cumZ1, cumZs: cumZs });
+  }
+
+  var lastSeg = segments[segments.length - 1];
+  var totalZ1 = lastSeg.cumZ1;
+  var totalZs = lastSeg.cumZs;
+  var zsRatio = (zsMax > 0) ? (totalZs / zsMax * 100) : 0;
+
+  // Find tightest node (highest Zs/Zs,max ratio contribution)
+  var tightIdx = 0; var tightRatio = 0;
+  for (var ti = 0; ti < segments.length; ti++) {
+    var r = segments[ti].cumZs / zsMax * 100;
+    if (r > tightRatio) { tightRatio = r; tightIdx = ti; }
+  }
+
+  // Header with verdict
+  var verdictColor = zsRatio > 85 ? 'var(--danger)' : (zsRatio > 60 ? '#f57f17' : 'var(--success)');
+  html += '<div class="card fade-in">';
+  html += mcPrimeHeader(tx('Impedansbudget for ', 'Impedance budget for ') + anlaegEsc(tx(leaf.name_da || leaf.id, leaf.name_en || leaf.id)), zsRatio <= 85 ? 'green' : null);
+
+  // Key metrics
+  html += '<div class="result-box" style="border-left:6px solid ' + verdictColor + '">';
+  html += '<div class="result-title" style="color:' + verdictColor + '">' + tx('Samlet Zs/Zs,max', 'Total Zs/Zs,max') + ': ' + asDa(zsRatio.toFixed(1)) + '%</div>';
+  html += '<div class="result-row"><span class="label">Z\u209B,max</span><span class="value">' + asDa(zsMax.toFixed(1)) + ' m\u03A9 &nbsp; (U\u2080/I\u2090 = 230V / ' + asDa(iaInfo.Ia.toFixed(0)) + 'A)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Frakoblingstid', 'Disconnection time') + '</span><span class="value">' + iaInfo.t + ' s &nbsp; ' + mcPrimeRef('DS/HD 60364-4-41 Tabel 41.1') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Resterende margin', 'Remaining margin') + '</span><span class="value" style="color:' + verdictColor + '">' + asDa((100 - zsRatio).toFixed(1)) + '% &nbsp; (' + asDa((zsMax - totalZs).toFixed(1)) + ' m\u03A9)</span></div>';
+  html += '</div>';
+
+  // SVG stacked bars
+  var barW = 500; var barH = 28; var svgH = 120;
+  var scaleZ1 = (totalZ1 > 0) ? barW / Math.max(totalZ1, zsMax * 0.6) : barW;
+  var scaleZs = (zsMax > 0) ? barW / (zsMax * 1.15) : barW;
+
+  html += '<div style="overflow-x:auto;margin:12px 0"><svg width="' + (barW + 80) + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:var(--font-mono-eng);font-size:10px">';
+
+  // Z1 bar (top)
+  html += '<text x="0" y="14" fill="var(--text)" font-weight="700">Z\u2081</text>';
+  var x1 = 30;
+  for (var s1 = 0; s1 < segments.length; s1++) {
+    var w1 = segments[s1].dz1 * scaleZ1;
+    if (w1 < 0.5) w1 = 0.5;
+    html += '<rect x="' + x1 + '" y="4" width="' + w1 + '" height="' + barH + '" fill="' + (s1 === 0 ? '#546e7a' : '#42a5f5') + '" stroke="#fff" stroke-width="1" rx="2"/>';
+    if (w1 > 18) html += '<text x="' + (x1 + w1 / 2) + '" y="22" text-anchor="middle" fill="#fff" font-size="9">' + asDa(segments[s1].dz1.toFixed(1)) + '</text>';
+    x1 += w1;
+  }
+  html += '<text x="' + (x1 + 4) + '" y="22" fill="var(--text)">' + asDa(totalZ1.toFixed(1)) + ' m\u03A9</text>';
+
+  // Zs bar (bottom)
+  var yZs = barH + 24;
+  html += '<text x="0" y="' + (yZs + 14) + '" fill="var(--text)" font-weight="700">Z\u209B</text>';
+  var x2 = 30; var cumZsDrawn = 0;
+  for (var s2 = 0; s2 < segments.length; s2++) {
+    cumZsDrawn += segments[s2].dzs;
+    var pct = cumZsDrawn / zsMax * 100;
+    var segColor = (pct > 85) ? '#ef5350' : (pct > 60) ? '#ffa726' : '#66bb6a';
+    var w2 = segments[s2].dzs * scaleZs;
+    if (w2 < 0.5) w2 = 0.5;
+    html += '<rect x="' + x2 + '" y="' + yZs + '" width="' + w2 + '" height="' + barH + '" fill="' + segColor + '" stroke="#fff" stroke-width="1" rx="2"/>';
+    if (w2 > 18) html += '<text x="' + (x2 + w2 / 2) + '" y="' + (yZs + 18) + '" text-anchor="middle" fill="#fff" font-size="9">' + asDa(segments[s2].dzs.toFixed(1)) + '</text>';
+    x2 += w2;
+  }
+  html += '<text x="' + (x2 + 4) + '" y="' + (yZs + 18) + '" fill="var(--text)">' + asDa(totalZs.toFixed(1)) + ' m\u03A9</text>';
+
+  // Limit line for Zs,max
+  var limX = 30 + zsMax * scaleZs;
+  if (limX <= barW + 30) {
+    html += '<line x1="' + limX + '" y1="' + (yZs - 4) + '" x2="' + limX + '" y2="' + (yZs + barH + 8) + '" stroke="#d32f2f" stroke-width="2" stroke-dasharray="4,2"/>';
+    html += '<text x="' + limX + '" y="' + (yZs + barH + 18) + '" text-anchor="middle" fill="#d32f2f" font-size="9">Z\u209B,max=' + asDa(zsMax.toFixed(0)) + '</text>';
+  }
+
+  html += '</svg></div>';
+
+  // Summary table (Mathcad Prime style)
+  html += mcPrimeHeader(tx('Impedansfordeling per node', 'Impedance distribution per node'), 'green');
+  html += '<div class="eng-block" style="padding:6px 10px">';
+  for (var st = 0; st < segments.length; st++) {
+    var seg = segments[st];
+    var nodeName = anlaegEsc(tx(seg.node.name_da || seg.node.type, seg.node.name_en || seg.node.type));
+    var nodeZsPct = (zsMax > 0) ? (seg.cumZs / zsMax * 100) : 0;
+    var isTight = (st === tightIdx && segments.length > 1);
+    var rowStyle = isTight ? ' style="background:rgba(255,82,82,0.08);border-radius:4px;padding:2px 4px"' : '';
+    html += '<div class="eng-step"' + rowStyle + '>';
+    html += '<span class="eng-sym">' + (isTight ? '\uD83D\uDEA8 ' : '') + nodeName + '</span>';
+    html += '<span class="eng-result">\u0394Z=' + asDa(seg.dzs.toFixed(2)) + ' m\u03A9 &nbsp; \u03A3Z\u209B=' + asDa(seg.cumZs.toFixed(2)) + ' m\u03A9 &nbsp; ' + asDa(nodeZsPct.toFixed(1)) + '% of Z\u209B,max</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Mathcad Prime calculation display
+  html += mcPrimeLine('Z\u209B,max', '=', 'U\u2080 / I\u2090 = 230 V / ' + asDa(iaInfo.Ia.toFixed(0)) + ' A', asDa(zsMax.toFixed(1)), 'm\u03A9', mcPrimeRef('DS/HD 60364-4-41 411.3.2.2'));
+  html += mcPrimeLine('Z\u209B', '=', tx('\u03A3 kabel-impedanser (faktor 2\u00D7)', '\u03A3 cable impedances (factor 2\u00D7)'), asDa(totalZs.toFixed(1)), 'm\u03A9', '');
+  html += mcPrimeResult('Z\u209B / Z\u209B,max', asDa(zsRatio.toFixed(1)) + '%', '');
+
+  html += '</div>';
+  return html;
+}
+// =====================================================================
+// DESIGNVARIANT — A/B comparison tool (click-only)
+// Compare one circuit with a single-variable tweak. Never mutates real state.
+// DS/HD 60364-4-41 / 433.1 / 434.5.1 clause references.
+// =====================================================================
+
+var designvariantState = { leafIdx: 0, tweakType: 'mm2', tweakVal: null };
+(function () { try { var s = JSON.parse(localStorage.getItem('designvariantState') || 'null'); if (s && typeof s.leafIdx === 'number') designvariantState = s; } catch (e) { } })();
+function designvariantSave() { try { localStorage.setItem('designvariantState', JSON.stringify(designvariantState)); } catch (e) { } }
+function designvariantSelectLeaf(idx) { designvariantState.leafIdx = idx; designvariantState.tweakVal = null; designvariantSave(); renderModule('designvariant'); }
+function designvariantSetType(type) { designvariantState.tweakType = type; designvariantState.tweakVal = null; designvariantSave(); renderModule('designvariant'); }
+function designvariantSetVal(val) { designvariantState.tweakVal = val; designvariantSave(); renderModule('designvariant'); }
+
+function designvariantCompute(node, parentZ1, parentZs) {
+  // Recompute derived values for a node given parent cumulative impedances
+  var cz = anlaegCableZ(node);
+  var z1 = cxAdd(parentZ1, cz);
+  var zs = cxAdd(parentZs, cxScale(cz, 2));
+  var ib = anlaegNodeIB(node);
+  var ik3max = asIk3(anlaegtraeState.src.Un_LV, z1, 1.05);
+  var ik1min = asIk1(anlaegtraeState.src.U0 || 230, zs, 0.95);
+  var iaInfo = anlaegIa(node);
+  var zsMax = ((anlaegtraeState.src.U0 || 230) * 1000) / (iaInfo.Ia || 1);
+  var zsMargin = (zsMax > 0) ? ((1 - cxMag(zs) / zsMax) * 100) : 0;
+  var cable = anlaegCable(node.mm2);
+  var iz = (cable.iz || 24) * (node.nPar || 1);
+  var In = node.In || 0;
+  // Voltage drop (simplified for this node path)
+  var vdrop = anlaegNodeVdrop(node);
+  return {
+    z1: cxMag(z1),
+    zs: cxMag(zs),
+    ik3max: ik3max,
+    ik1min: ik1min,
+    vdrop: vdrop,
+    zsMargin: zsMargin,
+    zsMax: zsMax,
+    ib: ib,
+    In: In,
+    iz: iz,
+    ibLeIn: ib <= In,
+    inLeIz: In <= iz,
+    disconn: ik1min >= iaInfo.Ia
+  };
+}
+
+function renderDesignvariant() {
+  anlaegInit();
+  anlaegPropagate();
+  var leaves = impedansbudgetLeaves(); // reuse same leaf finder
+  var html = '';
+
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83D\uDD00 ' + tx('Designvariant (A/B)', 'Design Variant (A/B)') + '</div>';
+  html += '<div class="info-row">' + tx(
+    'Sammenlign den aktuelle kreds (A) med en ændret variant (B) hvor DU ændrer præcis ÉN variabel. Viser alle afledte størrelser side om side. Grøn = sikrere, Rød = farligere. Ændrer IKKE det rigtige anlægstræ.',
+    'Compare the current circuit (A) with a modified variant (B) where YOU change exactly ONE variable. Shows all derived quantities side by side. Green = safer, Red = more dangerous. Does NOT modify the real installation tree.') + '</div>';
+
+  if (!leaves.length) {
+    html += '<div class="info-row">' + tx(
+      'Ingen kredse fundet. Byg et anlægstræ i Anlægstræ-modulet med mindst én slutkreds.',
+      'No circuits found. Build an installation tree in the Installation Tree module with at least one final circuit.') + '</div>';
+    html += '<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="switchModule(\'anlaegstrae\')">\uD83C\uDF33 ' + tx('Åbn Anlægstræ', 'Open Installation Tree') + '</button></div></div>';
+    return html;
+  }
+
+  var idx = designvariantState.leafIdx;
+  if (!(idx >= 0 && idx < leaves.length)) idx = 0;
+
+  // Click-only dropdown for leaf selection
+  html += '<div style="font-size:0.8rem;color:var(--text-muted);margin:6px 0 2px">' + tx('Vælg kreds', 'Select circuit') + ':</div>';
+  html += '<div class="select-grid">';
+  leaves.forEach(function (lf, i) {
+    html += '<button class="sel-btn' + (i === idx ? ' selected' : '') + '" onclick="designvariantSelectLeaf(' + i + ')">' + anlaegEsc(tx(lf.name_da || lf.id, lf.name_en || lf.id)) + '</button>';
+  });
+  html += '</div></div>';
+
+  var leaf = leaves[idx];
+  var st = designvariantState;
+
+  // Tweak type selection (radio-style)
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Vælg ændring', 'Select change') + '</div>';
+  var tweakTypes = [
+    { key: 'mm2', da: 'Kabeltværsnit (mm²)', en: 'Cable cross-section (mm²)' },
+    { key: 'length', da: 'Kabellængde (m)', en: 'Cable length (m)' },
+    { key: 'nPar', da: 'Parallelle kabler', en: 'Parallel cables' },
+    { key: 'In', da: 'Enhed In (A)', en: 'Device In (A)' }
+  ];
+  html += '<div class="select-grid">';
+  tweakTypes.forEach(function (tt) {
+    html += '<button class="sel-btn' + (st.tweakType === tt.key ? ' selected' : '') + '" onclick="designvariantSetType(\'' + tt.key + '\')">' + tx(tt.da, tt.en) + '</button>';
+  });
+  html += '</div>';
+
+  // Value buttons for the selected tweak type
+  var tweakOpts = [];
+  if (st.tweakType === 'mm2') tweakOpts = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 95, 150, 240];
+  else if (st.tweakType === 'length') tweakOpts = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+  else if (st.tweakType === 'nPar') tweakOpts = [1, 2, 3, 4];
+  else if (st.tweakType === 'In') tweakOpts = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+
+  html += '<div style="margin-top:8px"><div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px">' + tx('Ny værdi for variant B', 'New value for variant B') + ':</div>';
+  html += '<div class="select-grid">';
+  tweakOpts.forEach(function (v) {
+    var isCurrent = false;
+    if (st.tweakType === 'mm2' && v === leaf.mm2) isCurrent = true;
+    if (st.tweakType === 'length' && v === leaf.length_m) isCurrent = true;
+    if (st.tweakType === 'nPar' && v === (leaf.nPar || 1)) isCurrent = true;
+    if (st.tweakType === 'In' && v === leaf.In) isCurrent = true;
+    var sel = (st.tweakVal === v) ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + (isCurrent ? ' style="border:2px solid var(--accent)"' : '') + '" onclick="designvariantSetVal(' + v + ')">' + v + (isCurrent ? ' (A)' : '') + '</button>';
+  });
+  html += '</div></div></div>';
+
+  // Compute A (original) and B (modified)
+  var parent = leaf.parentId ? anlaegtraeState.nodes[leaf.parentId] : null;
+  var parentZ1 = parent ? parent._z1 : cxRect(0, 0);
+  var parentZs = parent ? parent._zs : cxRect(0, 0);
+
+  var resultA = designvariantCompute(leaf, parentZ1, parentZs);
+
+  // Clone and apply tweak for B
+  var cloned = {};
+  Object.keys(leaf).forEach(function (k) { cloned[k] = leaf[k]; });
+  if (st.tweakVal !== null) {
+    if (st.tweakType === 'mm2') cloned.mm2 = st.tweakVal;
+    else if (st.tweakType === 'length') cloned.length_m = st.tweakVal;
+    else if (st.tweakType === 'nPar') cloned.nPar = st.tweakVal;
+    else if (st.tweakType === 'In') cloned.In = st.tweakVal;
+  }
+
+  // Temporarily put cloned in tree to compute vdrop, then remove
+  var origNode = anlaegtraeState.nodes[leaf.id];
+  anlaegtraeState.nodes[leaf.id] = cloned;
+  cloned._ib = anlaegNodeIB(cloned);
+  var resultB = designvariantCompute(cloned, parentZ1, parentZs);
+  anlaegtraeState.nodes[leaf.id] = origNode; // RESTORE immediately
+
+  if (st.tweakVal === null) {
+    html += '<div class="card fade-in"><div class="info-row">' + tx('Vælg en ny værdi ovenfor for at se sammenligning.', 'Select a new value above to see comparison.') + '</div></div>';
+    return html;
+  }
+
+  // Results comparison table
+  html += '<div class="card fade-in">';
+  html += mcPrimeHeader('A vs B: ' + anlaegEsc(tx(leaf.name_da || leaf.id, leaf.name_en || leaf.id)), 'green');
+
+  function dvRow(label, valA, valB, unit, lowerIsSafer) {
+    var a = parseFloat(valA) || 0; var b = parseFloat(valB) || 0;
+    var delta = b - a;
+    var color = 'var(--text-muted)';
+    if (Math.abs(delta) > 0.001) {
+      if (lowerIsSafer) color = (delta < 0) ? 'var(--success)' : 'var(--danger)';
+      else color = (delta > 0) ? 'var(--success)' : 'var(--danger)';
+    }
+    return '<div class="result-row"><span class="label">' + label + '</span><span class="value">' + asDa(typeof valA === 'number' ? valA.toFixed(2) : valA) + ' ' + unit + '</span><span class="value" style="color:' + color + '">' + asDa(typeof valB === 'number' ? valB.toFixed(2) : valB) + ' ' + unit + '</span></div>';
+  }
+
+  function dvRowBool(label, valA, valB) {
+    var colorA = valA ? 'var(--success)' : 'var(--danger)';
+    var colorB = valB ? 'var(--success)' : 'var(--danger)';
+    var txtA = valA ? 'OK' : 'FEJL';
+    var txtB = valB ? 'OK' : 'FEJL';
+    return '<div class="result-row"><span class="label">' + label + '</span><span class="value" style="color:' + colorA + '">' + txtA + '</span><span class="value" style="color:' + colorB + '">' + txtB + '</span></div>';
+  }
+
+  html += '<div class="result-box">';
+  html += '<div class="result-row" style="font-weight:700"><span class="label">' + tx('Parameter', 'Parameter') + '</span><span class="value">A (' + tx('Original', 'Original') + ')</span><span class="value">B (' + tx('Ændret', 'Modified') + ')</span></div>';
+  html += dvRow('|Z\u2081| (m\u03A9)', resultA.z1, resultB.z1, 'm\u03A9', true);
+  html += dvRow('|Z\u209B| (m\u03A9)', resultA.zs, resultB.zs, 'm\u03A9', true);
+  html += dvRow('I\u2096\u2083,max (A)', resultA.ik3max, resultB.ik3max, 'A', false);
+  html += dvRow('I\u2096\u2081,min (A)', resultA.ik1min, resultB.ik1min, 'A', false);
+  html += dvRow('\u0394U (%)', resultA.vdrop, resultB.vdrop, '%', true);
+  html += dvRow('Z\u209B ' + tx('margin', 'margin') + ' (%)', resultA.zsMargin, resultB.zsMargin, '%', false);
+  html += dvRowBool('I_B \u2264 I_n \u2264 I_z ' + mcPrimeRef('DS/HD 60364 433.1'), resultA.ibLeIn && resultA.inLeIz, resultB.ibLeIn && resultB.inLeIz);
+  html += dvRowBool(tx('Frakobling', 'Disconnection') + ' (I\u2096\u2081,min \u2265 I\u2090) ' + mcPrimeRef('DS/HD 60364-4-41 411.3.2.2'), resultA.disconn, resultB.disconn);
+  html += '</div>';
+
+  // Verdict
+  var saferCount = 0; var dangerCount = 0;
+  if (resultB.zs < resultA.zs - 0.01) saferCount++; else if (resultB.zs > resultA.zs + 0.01) dangerCount++;
+  if (resultB.ik1min > resultA.ik1min + 0.1) saferCount++; else if (resultB.ik1min < resultA.ik1min - 0.1) dangerCount++;
+  if (resultB.vdrop < resultA.vdrop - 0.01) saferCount++; else if (resultB.vdrop > resultA.vdrop + 0.01) dangerCount++;
+  if (resultB.zsMargin > resultA.zsMargin + 0.1) saferCount++; else if (resultB.zsMargin < resultA.zsMargin - 0.1) dangerCount++;
+
+  var verdictTxt, verdictCol;
+  if (saferCount > dangerCount) {
+    verdictTxt = tx('Variant B er sikrere end A', 'Variant B is safer than A');
+    verdictCol = 'var(--success)';
+  } else if (dangerCount > saferCount) {
+    verdictTxt = tx('Variant B er farligere end A', 'Variant B is more dangerous than A');
+    verdictCol = 'var(--danger)';
+  } else {
+    verdictTxt = tx('Variant B er sammenlignelig med A', 'Variant B is comparable to A');
+    verdictCol = 'var(--text-muted)';
+  }
+  html += '<div class="result-box" style="border-left:6px solid ' + verdictCol + '"><div class="result-title" style="color:' + verdictCol + '">' + verdictTxt + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Relevante klausuler', 'Relevant clauses') + '</span><span class="value">' + mcPrimeRef('DS/HD 60364-4-41 411.3.2.2') + ' ' + mcPrimeRef('DS/HD 60364 433.1') + ' ' + mcPrimeRef('DS/HD 60364-5-52 525') + '</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
 function renderModule(mod) {
   if (typeof takeSnapshot === 'function') takeSnapshot(); // Diff view: snapshot before render
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
@@ -8581,6 +8968,8 @@ function renderModule(mod) {
     case 'repetition': content = renderRepetition(); break;
     case 'kompetence': content = renderKompetence(); break;
     case 'anlaegstrae': content = renderAnlaegstrae(); break;
+    case 'impedansbudget': content = renderImpedansbudget(); break;
+    case 'designvariant': content = renderDesignvariant(); break;
     case 'idrift': content = renderIdrift(); break;
     case 'flaskehals': content = renderFlaskehals(); break;
     case 'marginkort': content = renderMarginkort(); break;
