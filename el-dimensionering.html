@@ -1549,6 +1549,8 @@ const T = {
       kompetence: '\uD83E\uDDE0 Kompetencekort',
       anlaegstrae: '\uD83C\uDF33 Anl\u00E6gstr\u00E6 (impedans)',
       idrift: '\u2705 Idrifts\u00E6ttelsesattest',
+      flaskehals: '\uD83C\uDF9B\uFE0F Flaskehals-analyse',
+      marginkort: '\uD83D\uDDFA\uFE0F Marginkort',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
@@ -1767,6 +1769,8 @@ const T = {
       kompetence: '\uD83E\uDDE0 Competency Map',
       anlaegstrae: '\uD83C\uDF33 Installation Tree (impedance)',
       idrift: '\u2705 Commissioning Certificate',
+      flaskehals: '\uD83C\uDF9B\uFE0F Bottleneck analysis',
+      marginkort: '\uD83D\uDDFA\uFE0F Margin map',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
@@ -5076,7 +5080,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'idrift', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis', 'share']
+    keys: ['standards', 'bank', 'pdf', 'rapport', 'recommend', 'diffview', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kalkulation', 'kls', 'commission', 'commissioning', 'idrift', 'flaskehals', 'marginkort', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark', 'kundportal', 'kundetillid', 'hukommelse', 'regassist', 'inspeksim', 'kvalitet', 'kundevis', 'share']
   }
 ];
 
@@ -8150,6 +8154,283 @@ function renderIdrift() {
   return html;
 }
 
+// =====================================================================
+// DESIGNMARGIN & BESLUTNINGSSTOETTE  (Flaskehals-analyse + Marginkort)
+// ---------------------------------------------------------------------
+// Two complementary decision-support views. Both are built ENTIRELY on the
+// existing audited logic in idriftAuditCircuit / idriftCircuits: every margin
+// number and every DS/HD 60364 clause comes verbatim from that function -- no
+// formula or clause is invented or altered here. Criteria we cannot prove safe
+// (null margin = uncertain, or status 'warn') are treated as the MOST binding,
+// exactly like the commissioning certificate: conservative by design.
+// 100% click-only (dropdown buttons), bilingual via tx(), inline SVG only.
+// =====================================================================
+
+// Single shared source of truth for both modules and the tests: the normalized
+// descriptor list (installation tree when it has real circuits, else the flat
+// project list). Returns { src, list } from idriftCircuits() unchanged (DRY).
+function designmarginCircuits() {
+  return idriftCircuits();
+}
+
+// Persisted click-only selection for the bottleneck view.
+var flaskehalsState = { idx: 0 };
+function flaskehalsLoad() {
+  try { var s = localStorage.getItem('flaskehalsState'); if (s) { var o = JSON.parse(s); if (o && typeof o.idx === 'number') flaskehalsState = o; } } catch (e) { }
+}
+function flaskehalsSave() { try { localStorage.setItem('flaskehalsState', JSON.stringify(flaskehalsState)); } catch (e) { } }
+function flaskehalsSelect(idx) { flaskehalsState.idx = idx; flaskehalsSave(); renderModule('flaskehals'); }
+
+// Shared colour thresholds (identical for both modules):
+//   red   -> status 'fail' OR margin < 10
+//   amber -> status 'warn'/uncertain (null margin) OR margin < 25
+//   green -> status 'ok' AND margin >= 25
+function designmarginColor(chk) {
+  if (!chk) return '#9e9e9e';
+  if (chk.status === 'fail') return 'var(--danger)';
+  if (chk.margin == null || !isFinite(chk.margin)) return '#f57f17'; // uncertain -> amber (conservative)
+  if (chk.status === 'warn') return '#f57f17';
+  if (chk.margin < 10) return 'var(--danger)';
+  if (chk.margin < 25) return '#f57f17';
+  return 'var(--success)';
+}
+
+// A check is "binding" if it is a failure OR cannot be proven (null/uncertain).
+function designmarginBindingFlag(chk) {
+  return chk.status === 'fail' || chk.margin == null || !isFinite(chk.margin);
+}
+
+// Sort key: lower sorts FIRST (more binding). Binding checks (fail + uncertain)
+// get a large negative offset so they always rank above provable-OK checks;
+// within each group the lowest margin sorts first. Conservative: an unprovable
+// criterion is never allowed below a merely-tight-but-OK one.
+function designmarginKey(chk) {
+  var m = (chk.margin == null || !isFinite(chk.margin)) ? 0 : chk.margin;
+  return (designmarginBindingFlag(chk) ? -1e6 : 0) + m;
+}
+function designmarginSort(checks) {
+  return checks.slice().sort(function (a, b) { return designmarginKey(a) - designmarginKey(b); });
+}
+// The single binding constraint = the worst (most binding) check, or null.
+function designmarginBinding(checks) {
+  var s = designmarginSort(checks);
+  return s.length ? s[0] : null;
+}
+
+// Inline-SVG horizontal margin gauge. Fill width = clamped margin %, colour from
+// designmarginColor. Uncertain (null margin) renders as a hatched amber bar so it
+// never visually reads as "full / safe".
+function designmarginGauge(chk) {
+  var col = designmarginColor(chk);
+  var w = 168, h = 14;
+  var hasM = !(chk.margin == null || !isFinite(chk.margin));
+  var pct = hasM ? Math.max(0, Math.min(100, chk.margin)) : 100;
+  var fill = (pct / 100) * w;
+  var label = hasM ? asDa(chk.margin.toFixed(0)) + '%' : tx('ukendt', 'unknown');
+  var s = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" style="vertical-align:middle">';
+  if (!hasM) {
+    s += '<defs><pattern id="dmHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f57f17" opacity="0.25"/><line x1="0" y1="0" x2="0" y2="6" stroke="#f57f17" stroke-width="2"/></pattern></defs>';
+  }
+  s += '<rect x="0" y="0" width="' + w + '" height="' + h + '" rx="3" fill="#e0e0e0"/>';
+  s += '<rect x="0" y="0" width="' + fill.toFixed(1) + '" height="' + h + '" rx="3" fill="' + (hasM ? col : 'url(#dmHatch)') + '"/>';
+  // threshold ticks at 10% and 25% (the red/amber/green boundaries)
+  s += '<line x1="' + (0.10 * w) + '" y1="0" x2="' + (0.10 * w) + '" y2="' + h + '" stroke="#fff" stroke-width="1" opacity="0.7"/>';
+  s += '<line x1="' + (0.25 * w) + '" y1="0" x2="' + (0.25 * w) + '" y2="' + h + '" stroke="#fff" stroke-width="1" opacity="0.7"/>';
+  s += '</svg> <span style="font-size:0.78rem;color:var(--text-muted)">' + label + '</span>';
+  return s;
+}
+
+// Shared status badge.
+function designmarginBadge(chk) {
+  return chk.status === 'ok' ? mcPrimeOk()
+    : (chk.status === 'warn' ? '<span class="mc-ref">' + tx('ADVARSEL', 'WARN') + '</span>' : mcPrimeFail(tx('FEJL', 'FAIL')));
+}
+
+// Friendly empty state shared by both modules.
+function designmarginEmpty(modKey) {
+  var html = '';
+  html += '<div class="info-row">' + tx(
+    'Ingen kredse fundet. Byg et anl\u00E6gstr\u00E6 i Anl\u00E6gstr\u00E6-modulet (fuld impedans) eller tilf\u00F8j grupper i Projekt-modulet, s\u00E5 analyserer vi hver kreds.',
+    'No circuits found. Build an installation tree in the Installation Tree module (full impedance) or add circuits in the Project module, and we will analyse each circuit.') + '</div>';
+  html += '<div class="select-grid" style="margin-top:8px">';
+  html += '<button class="sel-btn" onclick="switchModule(\'anlaegstrae\')">\uD83C\uDF33 ' + tx('\u00C5bn Anl\u00E6gstr\u00E6', 'Open Installation Tree') + '</button>';
+  html += '<button class="sel-btn" onclick="switchModule(\'projekt\')">\uD83D\uDCCB ' + tx('\u00C5bn Projekt', 'Open Project') + '</button>';
+  html += '</div>';
+  return html;
+}
+
+// ---- MODULE A: Flaskehals-analyse (binding-constraint scorecard) ----
+function renderFlaskehals() {
+  flaskehalsLoad();
+  var data = designmarginCircuits();
+  var circuits = data.list;
+  var html = '';
+
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83C\uDF9B\uFE0F ' + tx('Flaskehals-analyse', 'Bottleneck analysis') + '</div>';
+  html += '<div class="info-row">' + tx(
+    'For \u00E9n valgt kreds: hvor stor sikkerhedsmargin har den mod HVERT DS/HD 60364-krav \u2014 v\u00E6rst f\u00F8rst. \u00D8verst st\u00E5r den BINDENDE begr\u00E6nsning (mindst margin) og det konservative l\u00F8sningsforslag. Ubeviselige krav (ukendt margin) regnes som mest bindende.',
+    'For ONE selected circuit: how much safety margin it has against EVERY DS/HD 60364 criterion \u2014 worst first. The top line names the BINDING constraint (least margin) and the conservative fix. Criteria we cannot prove (unknown margin) count as most binding.') + '</div>';
+  html += '<div class="info-row" style="font-size:0.8rem;color:var(--text-muted)">' + tx('Datakilde', 'Data source') + ': <strong>' + (data.src === 'tree' ? tx('Anl\u00E6gstr\u00E6 (fuld impedans)', 'Installation tree (full impedance)') : tx('Projekt (flad gruppeliste)', 'Project (flat circuit list)')) + '</strong></div>';
+
+  if (!circuits.length) {
+    html += designmarginEmpty('flaskehals') + '</div>';
+    return html;
+  }
+
+  var idx = flaskehalsState.idx;
+  if (!(idx >= 0 && idx < circuits.length)) idx = 0;
+
+  // Click-only dropdown: one button per circuit, current selection highlighted.
+  html += '<div style="font-size:0.8rem;color:var(--text-muted);margin:6px 0 2px">' + tx('V\u00E6lg kreds', 'Select circuit') + ':</div>';
+  html += '<div class="select-grid">';
+  circuits.forEach(function (c, i) {
+    html += '<button class="sel-btn' + (i === idx ? ' selected' : '') + '" onclick="flaskehalsSelect(' + i + ')">' + anlaegEsc(c.name) + '</button>';
+  });
+  html += '</div></div>';
+
+  var c = circuits[idx];
+  var checks = idriftAuditCircuit(c);
+  var sorted = designmarginSort(checks);
+  var binding = sorted.length ? sorted[0] : null;
+
+  // Headline: the single binding constraint.
+  html += '<div class="card fade-in">';
+  var cf = checks.some(function (k) { return k.status === 'fail'; });
+  var cw = checks.some(function (k) { return k.status === 'warn'; });
+  var verdict = cf ? mcPrimeFail(tx('FEJL', 'FAIL')) : (cw ? '<span class="mc-ref">' + tx('ADVARSEL', 'WARN') + '</span>' : mcPrimeOk());
+  html += mcPrimeHeader(anlaegEsc(c.name) + ' \u2014 ' + (c.phases === '3x400' ? '3\u00D7400 V' : '1\u00D7230 V') + ' &nbsp; ' + verdict, cf ? null : 'green');
+
+  if (binding) {
+    var bcol = designmarginColor(binding);
+    var marginPhrase = (binding.margin == null || !isFinite(binding.margin))
+      ? tx('ukendt margin (kan ikke bevises sikker)', 'unknown margin (cannot be proven safe)')
+      : tx('margin', 'margin') + ' ' + asDa(binding.margin.toFixed(0)) + '%';
+    html += '<div class="result-box" style="border-left:6px solid ' + bcol + '">';
+    html += '<div class="result-title" style="color:' + bcol + '">\uD83C\uDFAF ' + tx('Bindende begr\u00E6nsning', 'Binding constraint') + ': ' + binding.rule + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">' + mcPrimeRef(binding.ref) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Margin', 'Margin') + '</span><span class="value">' + marginPhrase + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Aktuelt', 'Actual') + '</span><span class="value">' + binding.actual + '</span></div>';
+    // Mathcad Prime relation for the binding criterion.
+    html += mcPrimeLine(binding.rule, '\u21D2', '', binding.actual, '', mcPrimeRef(binding.ref));
+    html += mcPrimeResult(tx('Margin', 'Margin'), (binding.margin == null || !isFinite(binding.margin)) ? tx('ukendt', 'unknown') : asDa(binding.margin.toFixed(0)) + '%', '');
+    if (binding.fix) {
+      html += '<div class="result-row"><span class="label">' + tx('Konservativ l\u00F8sning', 'Conservative fix') + '</span><span class="value" style="color:var(--danger)">\u21B3 ' + binding.fix + '</span></div>';
+    } else {
+      html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value" style="color:var(--success)">' + tx('Ingen handling n\u00F8dvendig', 'No action required') + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  // Full ranked scorecard, worst-first, each with an SVG margin gauge.
+  html += '<div class="eng-block" style="padding:6px 10px">';
+  html += '<div style="font-weight:700;margin-bottom:4px">' + tx('Alle krav, v\u00E6rst f\u00F8rst', 'All criteria, worst first') + '</div>';
+  sorted.forEach(function (chk) {
+    html += '<div class="eng-step"><span class="eng-sym">' + chk.rule + '</span><span class="eng-result">' + designmarginGauge(chk) + ' ' + designmarginBadge(chk) + '</span>' + mcPrimeRef(chk.ref) + '</div>';
+    html += '<div class="eng-step"><span class="eng-note" style="padding-left:0;color:var(--text-muted)">' + chk.actual + '</span></div>';
+    if (chk.fix) html += '<div class="eng-step"><span class="eng-note" style="padding-left:0;color:var(--danger)">\u21B3 ' + chk.fix + '</span></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+// Canonical criterion columns for the margin map. Each is matched to a check by
+// its DS/HD 60364 clause (stable; the displayed rule string can vary, e.g. the
+// voltage-drop limit). Stable left-to-right order = the safe-design sequence.
+var DESIGNMARGIN_COLS = [
+  { key: 'IB', da: 'Str\u00F8mf\u00F8ringsevne', en: 'Current capacity', sym: 'I_B \u2264 I_n \u2264 I_z', match: function (r) { return r.indexOf('433.1') >= 0; } },
+  { key: 'Zs', da: 'Udkobling', en: 'Disconnection', sym: 'Z_s\u00B7I_a \u2264 U_0', match: function (r) { return r.indexOf('411.3.2') >= 0; } },
+  { key: 'dU', da: 'Sp\u00E6ndingsfald', en: 'Voltage drop', sym: '\u0394U', match: function (r) { return r.indexOf('60364-5-52 525') >= 0; } },
+  { key: 'Icu', da: 'Brydeevne', en: 'Breaking capacity', sym: 'I_cu \u2265 I_k,max', match: function (r) { return r.indexOf('434.5.1') >= 0; } },
+  { key: 'HPFI', da: 'HPFI 30 mA', en: 'RCD 30 mA', sym: 'HPFI 30 mA', match: function (r) { return r.indexOf('411.3.3') >= 0; } },
+  { key: 'S', da: 'Adiabatisk', en: 'Adiabatic', sym: 'S \u2265 \u221A(I\u00B2t)/k', match: function (r) { return r.indexOf('434.5.2') >= 0; } }
+];
+
+// Find the check covering a given column for a circuit's check list (or null).
+function designmarginCellCheck(checks, col) {
+  for (var i = 0; i < checks.length; i++) { if (col.match(checks[i].ref || '')) return checks[i]; }
+  return null;
+}
+
+// ---- MODULE B: Marginkort (whole-installation margin heatmap) ----
+function renderMarginkort() {
+  var data = designmarginCircuits();
+  var circuits = data.list;
+  var html = '';
+
+  html += '<div class="card fade-in no-print"><div class="card-title">\uD83D\uDDFA\uFE0F ' + tx('Marginkort', 'Margin map') + '</div>';
+  html += '<div class="info-row">' + tx(
+    'Portef\u00F8ljevisning: hver kreds er en r\u00E6kke, hvert DS/HD 60364-krav en kolonne. Hver celle er farvet efter margin. \u00D8verst vises den svageste kreds+krav i hele anl\u00E6gget. Gr\u00E5 \u201E\u2013\u201C = ikke relevant; gul = advarsel/ukendt (konservativ).',
+    'Portfolio view: every circuit is a row, every DS/HD 60364 criterion a column. Each cell is coloured by margin. The top line surfaces the single weakest circuit+criterion across the whole installation. Grey \u201C\u2013\u201D = not applicable; amber = warn/uncertain (conservative).') + '</div>';
+  html += '<div class="info-row" style="font-size:0.8rem;color:var(--text-muted)">' + tx('Datakilde', 'Data source') + ': <strong>' + (data.src === 'tree' ? tx('Anl\u00E6gstr\u00E6 (fuld impedans)', 'Installation tree (full impedance)') : tx('Projekt (flad gruppeliste)', 'Project (flat circuit list)')) + '</strong></div>';
+
+  if (!circuits.length) {
+    html += designmarginEmpty('marginkort') + '</div>';
+    return html;
+  }
+  html += '</div>';
+
+  // Pre-compute every circuit's checks once, and find the single weakest cell.
+  var rows = circuits.map(function (c) { return { c: c, checks: idriftAuditCircuit(c) }; });
+  var worst = null; // { c, chk, col }
+  rows.forEach(function (row) {
+    DESIGNMARGIN_COLS.forEach(function (col) {
+      var chk = designmarginCellCheck(row.checks, col);
+      if (!chk) return;
+      if (worst == null || designmarginKey(chk) < designmarginKey(worst.chk)) worst = { c: row.c, chk: chk, col: col };
+    });
+  });
+
+  // Headline: weakest circuit + criterion across the whole installation.
+  html += '<div class="card fade-in">';
+  if (worst) {
+    var wcol = designmarginColor(worst.chk);
+    var wmargin = (worst.chk.margin == null || !isFinite(worst.chk.margin))
+      ? tx('ukendt margin', 'unknown margin')
+      : tx('margin', 'margin') + ' ' + asDa(worst.chk.margin.toFixed(0)) + '%';
+    html += mcPrimeHeader('\uD83C\uDFAF ' + tx('Svageste punkt i anl\u00E6gget', 'Weakest point in the installation'), worst.chk.status === 'ok' ? 'green' : null);
+    html += '<div class="result-box" style="border-left:6px solid ' + wcol + '">';
+    html += '<div class="result-title" style="color:' + wcol + '">' + anlaegEsc(worst.c.name) + ' \u2014 ' + worst.chk.rule + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">' + mcPrimeRef(worst.chk.ref) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Margin', 'Margin') + '</span><span class="value">' + designmarginGauge(worst.chk) + ' &nbsp;' + wmargin + '</span></div>';
+    if (worst.chk.fix) html += '<div class="result-row"><span class="label">' + tx('Konservativ l\u00F8sning', 'Conservative fix') + '</span><span class="value" style="color:var(--danger)">\u21B3 ' + worst.chk.fix + '</span></div>';
+    html += '</div>';
+  }
+
+  // Heatmap table. Interactions are click-only (clicking a row opens the
+  // bottleneck view for that circuit); no typing anywhere.
+  html += '<div style="overflow-x:auto"><table class="dm-table" style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+  html += '<thead><tr><th style="text-align:left;padding:4px 6px;border-bottom:2px solid var(--border)">' + tx('Kreds', 'Circuit') + '</th>';
+  DESIGNMARGIN_COLS.forEach(function (col) {
+    html += '<th style="padding:4px 6px;border-bottom:2px solid var(--border)" title="' + col.sym + '">' + tx(col.da, col.en) + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+  rows.forEach(function (row, ri) {
+    html += '<tr style="cursor:pointer" onclick="flaskehalsSelect(' + ri + ');switchModule(\'flaskehals\')">';
+    html += '<td style="padding:4px 6px;border-bottom:1px solid var(--border);font-weight:600">' + anlaegEsc(row.c.name) + '</td>';
+    DESIGNMARGIN_COLS.forEach(function (col) {
+      var chk = designmarginCellCheck(row.checks, col);
+      if (!chk) {
+        html += '<td style="padding:4px 6px;text-align:center;border-bottom:1px solid var(--border);background:#eeeeee;color:#9e9e9e">\u2013</td>';
+        return;
+      }
+      var cellCol = designmarginColor(chk);
+      var cellTxt = (chk.margin == null || !isFinite(chk.margin)) ? '?' : asDa(chk.margin.toFixed(0)) + '%';
+      html += '<td style="padding:4px 6px;text-align:center;border-bottom:1px solid var(--border);background:' + cellCol + ';color:#fff;font-weight:600" title="' + col.sym + ' \u00B7 ' + chk.ref + '">' + cellTxt + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // Legend.
+  html += '<div class="info-row" style="font-size:0.78rem;margin-top:8px">'
+    + '<span style="display:inline-block;width:12px;height:12px;background:var(--success);border-radius:2px;vertical-align:middle"></span> ' + tx('margin \u2265 25%', 'margin \u2265 25%') + ' &nbsp; '
+    + '<span style="display:inline-block;width:12px;height:12px;background:#f57f17;border-radius:2px;vertical-align:middle"></span> ' + tx('margin < 25% / advarsel / ukendt', 'margin < 25% / warn / unknown') + ' &nbsp; '
+    + '<span style="display:inline-block;width:12px;height:12px;background:var(--danger);border-radius:2px;vertical-align:middle"></span> ' + tx('margin < 10% / fejl', 'margin < 10% / fail') + ' &nbsp; '
+    + '<span style="display:inline-block;width:12px;height:12px;background:#eeeeee;border-radius:2px;vertical-align:middle"></span> ' + tx('ikke relevant', 'not applicable') + '</div>';
+  html += '</div>';
+  return html;
+}
+
 function renderModule(mod) {
   if (typeof takeSnapshot === 'function') takeSnapshot(); // Diff view: snapshot before render
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
@@ -8301,6 +8582,8 @@ function renderModule(mod) {
     case 'kompetence': content = renderKompetence(); break;
     case 'anlaegstrae': content = renderAnlaegstrae(); break;
     case 'idrift': content = renderIdrift(); break;
+    case 'flaskehals': content = renderFlaskehals(); break;
+    case 'marginkort': content = renderMarginkort(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);

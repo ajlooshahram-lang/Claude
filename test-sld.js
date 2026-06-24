@@ -19324,6 +19324,150 @@ test('renderIdrift returns a conservative certificate citing DS/HD 60364 (da + e
   } finally { lang = prevLang; anlaegtraeState = JSON.parse(prev); }
 });
 
+// ===== DESIGNMARGIN & BESLUTNINGSSTOETTE TESTS =====
+// Flaskehals-analyse (binding-constraint scorecard) + Marginkort (margin heatmap).
+// These exercise the REAL functions (designmarginSort / designmarginBinding /
+// idriftAuditCircuit / renderFlaskehals / renderMarginkort) and assert behaviour,
+// not just truthiness. Every margin and clause originates in idriftAuditCircuit.
+console.log('\n=== Designmargin & Beslutningsstoette Tests ===\n');
+
+// DM-1: binding selection picks the LOWEST-margin check, and treats both
+// failures and null-margin (uncertain) checks as MOST binding (top of the list).
+test('designmarginBinding picks lowest margin; null-margin/fail rank as most binding', function() {
+  var checks = [
+    { rule: 'OK-tight', ref: 'X 1', actual: '', status: 'ok', margin: 5, fix: null },
+    { rule: 'OK-loose', ref: 'X 2', actual: '', status: 'ok', margin: 80, fix: null },
+    { rule: 'Uncertain', ref: 'X 3', actual: '', status: 'warn', margin: null, fix: 'model it' },
+    { rule: 'Failing', ref: 'X 4', actual: '', status: 'fail', margin: -50, fix: 'bigger cable' }
+  ];
+  var sorted = designmarginSort(checks);
+  // Both binding checks (fail, null) must precede BOTH provable-OK checks.
+  var idxFail = sorted.findIndex(function(c){ return c.rule === 'Failing'; });
+  var idxUnc = sorted.findIndex(function(c){ return c.rule === 'Uncertain'; });
+  var idxTight = sorted.findIndex(function(c){ return c.rule === 'OK-tight'; });
+  var idxLoose = sorted.findIndex(function(c){ return c.rule === 'OK-loose'; });
+  assert(idxFail < idxTight && idxFail < idxLoose, 'failing check ranks above OK checks');
+  assert(idxUnc < idxTight && idxUnc < idxLoose, 'null-margin (uncertain) check ranks above OK checks (conservative)');
+  // The single binding constraint = the most binding = the failing one (lowest margin).
+  var binding = designmarginBinding(checks);
+  assert.strictEqual(binding.rule, 'Failing', 'binding constraint is the lowest-margin failing check, got ' + binding.rule);
+  // designmarginBindingFlag classifies fail and null as binding, OK-with-margin as not.
+  assert(designmarginBindingFlag(checks[3]) === true, 'fail is binding');
+  assert(designmarginBindingFlag(checks[2]) === true, 'null margin is binding');
+  assert(designmarginBindingFlag(checks[0]) === false, 'provable OK margin is not binding');
+});
+
+// DM-2: a circuit with a genuinely undersized parameter is flagged with the
+// correct DS/HD clause as the binding constraint (here: voltage drop, 60364-5-52 525).
+test('designmarginBinding flags an undersized voltage-drop circuit with clause 60364-5-52 525', function() {
+  var c = { name: 'Lang foeringsvej', phases: '1x230', U0: 230, ib: 6, In: 10, iz: 32,
+    zs: 300, ia: 50, t_req: 0.4, ikmax: 800, icu: 6000,
+    vdropPct: 12, vdropLimit: 4,            // 12% >> 4% limit -> deep failure, lowest margin
+    needsRCD: false, hasRCD: true, cableS: 6, k: 115, t_sc: 0.1 };
+  var checks = idriftAuditCircuit(c);
+  var binding = designmarginBinding(checks);
+  assert(binding.ref.indexOf('60364-5-52 525') >= 0, 'binding clause is the voltage-drop clause, got ' + binding.ref);
+  assert(binding.status === 'fail', 'binding voltage-drop check is a failure');
+  assert(binding.margin != null && binding.margin < 0, 'binding margin is negative (undersized), got ' + binding.margin);
+  // And it really is the worst: every other check has a higher margin / is OK.
+  checks.forEach(function(chk){ if (chk !== binding) assert(designmarginKey(chk) >= designmarginKey(binding), chk.rule + ' should not be more binding than the voltage-drop failure'); });
+});
+
+// DM-3: a well-dimensioned circuit shows all-green / large margins (binding margin large).
+test('designmargin shows all-green large margins for a well-dimensioned circuit', function() {
+  var good = { name: 'Belysning', phases: '1x230', U0: 230, ib: 6, In: 10, iz: 32,
+    zs: 300, ia: 50, t_req: 0.4, ikmax: 800, icu: 6000, vdropPct: 1, vdropLimit: 4,
+    needsRCD: false, hasRCD: true, cableS: 6, k: 115, t_sc: 0.1 };
+  var checks = idriftAuditCircuit(good);
+  assert(checks.length >= 4, 'multiple checks produced, got ' + checks.length);
+  assert(checks.every(function(c){ return c.status === 'ok'; }), 'every check is OK: ' + checks.map(function(c){return c.rule+':'+c.status;}).join(', '));
+  // Every margin (incl. the binding/worst one) is comfortably green (>= 25%).
+  var binding = designmarginBinding(checks);
+  assert(binding.margin != null && binding.margin >= 25, 'binding margin is large/green, got ' + binding.margin);
+  checks.forEach(function(chk){ assert(designmarginColor(chk) === 'var(--success)', chk.rule + ' should be green, margin=' + chk.margin); });
+});
+
+// DM-4: designmarginCircuits is the shared (DRY) source of truth = idriftCircuits.
+test('designmarginCircuits returns the same normalized list as idriftCircuits (DRY)', function() {
+  var prevTree = JSON.stringify(anlaegtraeState), prevP = JSON.stringify(typeof projectState !== 'undefined' ? projectState : null);
+  try {
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: { 'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' } }, rootId: 'an_1', nextId: 2, selectedId: null };
+    projectState = { name: 'T', circuits: [ { name: 'Stik', voltage: '1x230', power: 3.45, cosPhi: 0.95, ib: 15, cable: 'NOIKLX 5G 2.5mm\u00B2', length: 25, vdrop: 3.1, protection: 'MCB C16' } ] };
+    var a = designmarginCircuits(), b = idriftCircuits();
+    assert.strictEqual(a.src, b.src, 'same source flag');
+    assert.strictEqual(a.list.length, b.list.length, 'same circuit count');
+    assert(a.src === 'project' && a.list.length === 1, 'flat project list used when tree has no real circuits');
+  } finally { anlaegtraeState = JSON.parse(prevTree); if (prevP !== 'null') projectState = JSON.parse(prevP); }
+});
+
+// DM-5: renderFlaskehals returns bilingual UI markup (svg gauge + DS/HD citation) with no leaks.
+test('renderFlaskehals renders bilingual scorecard with SVG gauge and no untranslated-key leaks', function() {
+  var prevLang = lang, prevTree = JSON.stringify(anlaegtraeState), prevP = JSON.stringify(typeof projectState !== 'undefined' ? projectState : null), prevFh = mockStorage['flaskehalsState'];
+  try {
+    delete mockStorage['flaskehalsState'];
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: { 'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' } }, rootId: 'an_1', nextId: 2, selectedId: null };
+    projectState = { name: 'T', circuits: [
+      { name: 'Stikkontakter', voltage: '1x230', power: 3.45, cosPhi: 0.95, ib: 15, cable: 'NOIKLX 5G 2.5mm\u00B2', length: 25, vdrop: 3.1, protection: 'MCB C16' },
+      { name: 'Belysning', voltage: '1x230', power: 1, cosPhi: 0.95, ib: 5, cable: 'NOIKLX 3G 1.5mm\u00B2', length: 15, vdrop: 1.2, protection: 'MCB B10' } ] };
+    lang = 'da'; var hDa = renderFlaskehals();
+    assert(hDa.indexOf('Flaskehals-analyse') >= 0, 'da title present');
+    assert(hDa.indexOf('<svg') >= 0, 'inline SVG margin gauge rendered');
+    assert(hDa.indexOf('DS/HD 60364') >= 0, 'cites the DS/HD 60364 standard family');
+    assert(hDa.indexOf('Bindende begr\u00E6nsning') >= 0, 'da binding-constraint headline present');
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en'; var hEn = renderFlaskehals();
+    assert(hEn.indexOf('Bottleneck analysis') >= 0, 'en title present');
+    assert(hEn.indexOf('Binding constraint') >= 0, 'en binding-constraint headline present');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { lang = prevLang; anlaegtraeState = JSON.parse(prevTree); if (prevP !== 'null') projectState = JSON.parse(prevP); if (prevFh === undefined) delete mockStorage['flaskehalsState']; else mockStorage['flaskehalsState'] = prevFh; }
+});
+
+// DM-6: renderMarginkort returns a table covering ALL circuits in both languages, no leaks.
+test('renderMarginkort renders a heatmap table covering all circuits (da + en, no leaks)', function() {
+  var prevLang = lang, prevTree = JSON.stringify(anlaegtraeState), prevP = JSON.stringify(typeof projectState !== 'undefined' ? projectState : null);
+  try {
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: { 'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' } }, rootId: 'an_1', nextId: 2, selectedId: null };
+    projectState = { name: 'T', circuits: [
+      { name: 'Stikkontakter', voltage: '1x230', power: 3.45, cosPhi: 0.95, ib: 15, cable: 'NOIKLX 5G 2.5mm\u00B2', length: 25, vdrop: 3.1, protection: 'MCB C16' },
+      { name: 'Belysning', voltage: '1x230', power: 1, cosPhi: 0.95, ib: 5, cable: 'NOIKLX 3G 1.5mm\u00B2', length: 15, vdrop: 1.2, protection: 'MCB B10' } ] };
+    lang = 'da'; var hDa = renderMarginkort();
+    assert(hDa.indexOf('Marginkort') >= 0, 'da title present');
+    assert(hDa.indexOf('<table') >= 0, 'renders an HTML table');
+    assert(hDa.indexOf('Stikkontakter') >= 0 && hDa.indexOf('Belysning') >= 0, 'every circuit appears as a row');
+    var bodyRows = (hDa.match(/<tr/g) || []).length;
+    assert(bodyRows >= 3, 'header + 2 circuit rows = at least 3 <tr>, got ' + bodyRows);
+    assert(hDa.indexOf('NaN') < 0 && hDa.indexOf('undefined') < 0 && hDa.indexOf('[object Object]') < 0, 'no leaks in da');
+    lang = 'en'; var hEn = renderMarginkort();
+    assert(hEn.indexOf('Margin map') >= 0, 'en title present');
+    assert(hEn.indexOf('Stikkontakter') >= 0 && hEn.indexOf('Belysning') >= 0, 'circuits present in en');
+    assert(hEn.indexOf('NaN') < 0 && hEn.indexOf('undefined') < 0 && hEn.indexOf('[object Object]') < 0, 'no leaks in en');
+  } finally { lang = prevLang; anlaegtraeState = JSON.parse(prevTree); if (prevP !== 'null') projectState = JSON.parse(prevP); }
+});
+
+// DM-7: empty-state path returns gracefully (no circuits) for both modules, both languages.
+test('renderFlaskehals/renderMarginkort show a graceful empty state when there are no circuits', function() {
+  var prevLang = lang, prevTree = JSON.stringify(anlaegtraeState), prevP = JSON.stringify(typeof projectState !== 'undefined' ? projectState : null);
+  try {
+    anlaegtraeState = { src: { Sk_MVA: 250, RX: 0.1, Un_LV: 400, U0: 230, Sn_kVA: 630, ek_pct: 4, Pcu_W: 6500, earthing: 'TN' },
+      nodes: { 'an_1': { id: 'an_1', type: 'forsyning', parentId: null, childIds: [], name_da: 'Forsyning', name_en: 'Supply' } }, rootId: 'an_1', nextId: 2, selectedId: null };
+    projectState = { name: 'T', circuits: [] };
+    lang = 'da';
+    var fDa = renderFlaskehals(), mDa = renderMarginkort();
+    assert(fDa.indexOf('\u00C5bn Anl\u00E6gstr\u00E6') >= 0, 'flaskehals da empty state offers Anlaegstrae');
+    assert(fDa.indexOf('<table') < 0, 'flaskehals empty state has no heatmap table');
+    assert(mDa.indexOf('\u00C5bn Projekt') >= 0, 'marginkort da empty state offers Projekt');
+    assert(mDa.indexOf('<table') < 0, 'marginkort empty state has no table');
+    lang = 'en';
+    var fEn = renderFlaskehals(), mEn = renderMarginkort();
+    assert(fEn.indexOf('Open Installation Tree') >= 0, 'flaskehals en empty state offers tree');
+    assert(mEn.indexOf('Open Project') >= 0, 'marginkort en empty state offers project');
+    [fDa, mDa, fEn, mEn].forEach(function(h){ assert(h.indexOf('NaN') < 0 && h.indexOf('undefined') < 0 && h.indexOf('[object Object]') < 0, 'no leaks in empty state'); });
+  } finally { lang = prevLang; anlaegtraeState = JSON.parse(prevTree); if (prevP !== 'null') projectState = JSON.parse(prevP); }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
