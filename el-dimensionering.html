@@ -6717,6 +6717,12 @@ function renderCascadeTCC() {
 
     // Cable info display
     if (cable) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('Kaskadeselektivitet','Cascade Selectivity') + '</span> ';
+  html += mcPrimeRef('IEC 60947-2 Annex A');
+  html += '</div>';
+
       html += '<div class="result-box"><div class="result-title">' + tx('Kabel under vurdering','Cable being evaluated') + ' - DS/HD 60364-4-43 cl.434.5.2</div>';
       html += '<div class="result-row"><span class="label">' + tx('Kabel','Cable') + '</span><span class="value">' + cable.material + ' ' + cable.mm2 + ' mm\u00B2 (' + (cable.model || '') + ')</span></div>';
       var kFactor = tccGetCableK(cable);
@@ -7162,6 +7168,12 @@ function renderPanel() {
   if (panelState.boards.length > 0) {
     var board = panelState.boards[panelState.selectedBoardIdx || 0];
     if (board) {
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('Tavledesign','Panel Design') + '</span> ';
+  html += mcPrimeRef('IEC 61439-1') + ' ' + mcPrimeRef('DS/HD 60364');
+  html += '</div>';
+
       html += '<div class="result-box"><div class="result-title">' + board.name + '</div>';
       html += '<div class="result-row"><span class="label">' + tx('Moduler','Modules') + '</span><span class="value">' + board.totalModules + '</span></div>';
       html += '<div class="result-row"><span class="label">' + tx('Effekttab','Power Loss') + '</span><span class="value">' + board.totalPowerLoss.toFixed(1) + ' W</span></div>';
@@ -9732,6 +9744,12 @@ function renderTrafoEMF() {
   html += '<div class="select-group"><div class="select-label">' + tx('Kernetvaersnit A [m\u00B2]', 'Core area A [m\u00B2]') + '</div><div class="select-grid">';
   areaPresets.forEach(function(a) { html += '<button class="sel-btn' + (trafoState.emfArea === a ? ' selected' : '') + '" onclick="trafoState.emfArea=' + a + ';renderModule(\'trafo\')">' + (a*10000).toFixed(0) + ' cm\u00B2</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('EMF-ligning','EMF Equation') + '</span> ';
+  html += mcPrimeRef('IEC 60076-1');
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (EMF)</span><span class="value">' + E.toFixed(2) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Flux', 'Flux') + ' \u03A6_max</span><span class="value">' + (trafoState.emfBmax * trafoState.emfArea * 1000).toFixed(3) + ' mWb</span></div>';
@@ -9755,6 +9773,12 @@ function renderTrafoOCSC() {
   html += '<div class="select-group"><div class="select-label">' + tx('Magnetiseringsstroem I0 [%]', 'Magnetizing current I0 [%]') + '</div><div class="select-grid">';
   [1, 1.5, 2, 2.5, 3, 3.5, 4, 5].forEach(function(v) { html += '<button class="sel-btn' + (trafoState.ocI0pct === v ? ' selected' : '') + '" onclick="trafoState.ocI0pct=' + v + ';renderModule(\'trafo\')">' + v + '%</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('OC/SC-prøve','OC/SC Test') + '</span> ';
+  html += mcPrimeRef('IEC 60076-1');
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Tomgangsproeve (OC)', 'Open-Circuit Test') + '</div>';
   html += '<div class="result-row"><span class="label">P0 (' + tx('jerntab', 'iron loss') + ')</span><span class="value">' + P0 + ' W</span></div>';
   html += '<div class="result-row"><span class="label">I0</span><span class="value">' + I0_A.toFixed(2) + ' A (' + I0pct + '%)</span></div>';
@@ -9788,6 +9812,12 @@ function renderTrafoRegulation() {
   html += '<button class="sel-btn' + (trafoState.regLoad === 'inductive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'inductive\';renderModule(\'trafo\')">' + tx('Induktiv', 'Inductive') + '</button>';
   html += '<button class="sel-btn' + (trafoState.regLoad === 'capacitive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'capacitive\';renderModule(\'trafo\')">' + tx('Kapacitiv', 'Capacitive') + '</button>';
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('Virkningsgrad','Efficiency') + '</span> ';
+  html += mcPrimeRef('IEC 60076-1');
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394U%</span><span class="value">' + reg.dU_pct.toFixed(3) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">\u0394U (400 V)</span><span class="value">' + (reg.dU_pct / 100 * 400).toFixed(2) + ' V</span></div>';
@@ -9813,6 +9843,12 @@ function renderTrafoEfficiency() {
   html += '<div class="select-group"><div class="select-label">cos\u03C6</div><div class="select-grid">';
   cosPhiPresets.forEach(function(c) { html += '<button class="sel-btn' + (trafoState.effCosPhi === c ? ' selected' : '') + '" onclick="trafoState.effCosPhi=' + c + ';renderModule(\'trafo\')">' + c + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('Paralleldrift','Parallel Operation') + '</span> ';
+  html += mcPrimeRef('IEC 60076-1');
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700;font-size:1.1em">' + (eff.eta * 100).toFixed(2) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">P2</span><span class="value">' + (eff.P2/1000).toFixed(2) + ' kW</span></div>';
@@ -9836,6 +9872,12 @@ function renderTrafoParallel() {
   html += '<div class="select-group"><div class="select-label">' + tx('Trafo 2 [kVA]', 'Transformer 2 [kVA]') + '</div><div class="select-grid">';
   S2sizes.forEach(function(s) { var u2 = (s >= 630 ? 6 : 4); html += '<button class="sel-btn' + (trafoState.parTrafo2size === s ? ' selected' : '') + '" onclick="trafoState.parTrafo2size=' + s + ';trafoState.parTrafo2uk=' + u2 + ';renderModule(\'trafo\')">' + s + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 ' + tx('Vektorgruppe','Vector Group') + '</span> ';
+  html += mcPrimeRef('IEC 60076-1');
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Belastningsfordeling', 'Load Sharing') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kapacitet', 'Capacity') + '</span><span class="value">' + par.totalCapacity + ' kVA</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Total belastning', 'Total load') + '</span><span class="value">' + totalLoad.toFixed(0) + ' kVA</span></div>';
@@ -42049,6 +42091,12 @@ function renderRCDSel() {
     var sel = RCD_INSTALL_TYPES.filter(function(t) { return t.id === s.installType; })[0];
     var typeInfo = RCD_TYPES_INFO[sel.rcdType];
     html += '</div><div class="card fade-in"><div class="card-title">' + tx('Anbefaling', 'Recommendation') + '</div>';
+  // MATHCAD PRIME
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:10px 14px;margin:8px 0;border-left:3px solid var(--primary)">';
+  html += '<span style="font-family:sans-serif;font-weight:700;font-size:0.82rem">\uD83D\uDCD0 RCD/HPFI</span> ';
+  html += mcPrimeRef('DS/HD 60364-4-41') + ' ' + mcPrimeRef('IEC 61008');
+  html += '</div>';
+
     html += '<div class="result-box">';
     html += '<div class="result-row"><span class="label">' + tx('Installation', 'Installation') + '</span><span class="value">' + tx(sel.da, sel.en) + '</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Anbefalet RCD-type', 'Recommended RCD type') + '</span><span class="value" style="font-weight:700;color:var(--primary)">Type ' + sel.rcdType + '</span></div>';
