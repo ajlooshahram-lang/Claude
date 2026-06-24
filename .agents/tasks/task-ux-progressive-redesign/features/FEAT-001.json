@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create centralized Engineering Notation System (ENG_NOTATION map + engSym() function) and apply professional mathematical notation throughout all displayed engineering variables in the application. Replace plain-text variables like In, Ib, Iz, Ik, CosPhi, DeltaU etc. with proper HTML-formatted subscript/superscript/Greek notation in all display strings (labels, result-box labels, card titles, mcPrimeLine calls, status chips). Do NOT change JavaScript variable names - only their display representations.",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Create centralized ENG_NOTATION map and engSym(key) function near the other helper functions",
+    "Step 2 - Apply notation to mcPrimeLine/mcPrimeResult/mcPrimeDefLine calls across all modules",
+    "Step 3 - Apply notation to result-box labels, card titles, status chips, and button labels",
+    "Step 4 - Verify all tests pass"
+  ],
+  "acceptance_criteria": [
+    "engSym() function exists and returns proper HTML notation for all key engineering variables",
+    "ENG_NOTATION map contains all required variable mappings",
+    "Display strings use proper notation (subscripts, Greek letters, etc.)",
+    "JavaScript variable names are NOT changed",
+    "Running `node test-sld.js` passes all existing tests",
+    "No new text inputs introduced"
+  ],
+  "verification": [
+    "Run `node test-sld.js` and confirm all tests pass",
+    "Grep for engSym function to confirm it exists",
+    "Grep for ENG_NOTATION to confirm the map exists"
+  ],
+  "blocked_reason": null,
+  "findings": "ENG_NOTATION map with 36 variable mappings added at line 2117. engSym() function at line 2154. Display-only notation applied across 30+ render functions (renderLoad, renderCable, renderVdrop, renderShortCircuit, renderFuse, renderMCB, renderMCCB, renderTrefase, renderMotorteori, renderFaultResults, renderFaultCSA, renderRelay, renderStatusBar, etc.). Key constraint: data fields (rule/detail in sldVerifyNode, upCheckOverload, provBuildSegment) must stay as plain text because upFindingCategory uses indexOf('IB') for category classification and tests assert against plain strings. The renderThermal and renderCable3D modules were also converted from range inputs to click-only sel-btn with Mathcad Prime worksheets. All 2023 tests pass."
+}
