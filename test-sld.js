@@ -308,10 +308,9 @@ test('sldGetPath returns correct path from root to leaf', function() {
 });
 
 // Test 13: Module translations exist
-test('SLD module exists in all three language translation objects', function() {
+test('SLD module exists in both language translation objects', function() {
   assert(T.da.modules.sld, 'Danish translation missing');
   assert(T.en.modules.sld, 'English translation missing');
-  assert(T.fa.modules.sld, 'Persian translation missing');
 });
 
 // Test 14: Existing modules still have their render functions
@@ -1207,11 +1206,10 @@ test('All Brain functions are defined', function() {
   assert(typeof brainToggleOption === 'function', 'brainToggleOption should be a function');
 });
 
-// Test 54: Brain module registered in all three languages
-test('Brain module appears in all three language translation objects', function() {
+// Test 54: Brain module registered in both languages
+test('Brain module appears in both language translation objects', function() {
   assert(T.da.modules.brain === 'El-Hjerne', 'Danish brain module name. Got: ' + T.da.modules.brain);
   assert(T.en.modules.brain === 'Brain', 'English brain module name. Got: ' + T.en.modules.brain);
-  assert(T.fa.modules.brain !== undefined, 'Farsi brain module exists');
 });
 
 // Test 55: brainGenerateInstallation creates valid tree for parcelhus
@@ -1450,10 +1448,9 @@ test('renderBrain UI has no text input fields (click-only)', function() {
 console.log('\n=== PDF Documentation Package Tests ===\n');
 
 // Test 71: PDF module in translations
-test('PDF module appears in all three language translation objects', function() {
+test('PDF module appears in both language translation objects', function() {
   assert(T.da.modules.pdf, 'Danish translation must have pdf module');
   assert(T.en.modules.pdf, 'English translation must have pdf module');
-  assert(T.fa.modules.pdf, 'Farsi translation must have pdf module');
 });
 
 // Test 72: All PDF functions are defined
@@ -1638,11 +1635,10 @@ test('All PDF render functions return valid HTML strings', function() {
 // === Cascade TCC Module Tests ===
 console.log('\n=== Cascade TCC Module Tests ===\n');
 
-// Test 83: TCC module appears in all three language translation objects
-test('TCC module appears in all three language translation objects', function() {
+// Test 83: TCC module appears in both language translation objects
+test('TCC module appears in both language translation objects', function() {
   assert(T.da.modules.tcc, 'T.da must have tcc module');
   assert(T.en.modules.tcc, 'T.en must have tcc module');
-  assert(T.fa.modules.tcc, 'T.fa must have tcc module');
   assert.strictEqual(T.da.modules.tcc, 'Kaskade-TCC');
   assert.strictEqual(T.en.modules.tcc, 'Cascade TCC');
 });
@@ -1838,11 +1834,10 @@ test('Grading margin information is displayed in the TCC view', function() {
 // === IEC 61439 Panel Builder Tests ===
 console.log('\n=== Panel Builder Module Tests ===\n');
 
-// Test 97: Panel module appears in all three language translations
-test('Panel module appears in all three language translation objects', function() {
+// Test 97: Panel module appears in both language translations
+test('Panel module appears in both language translation objects', function() {
   assert(T.da.modules.panel, 'T.da must have panel module');
   assert(T.en.modules.panel, 'T.en must have panel module');
-  assert(T.fa.modules.panel, 'T.fa must have panel module');
 });
 
 // Test 98: All panel functions are defined
@@ -2059,10 +2054,9 @@ test('panelMoveDevice and panelRemoveDevice modify board state correctly', funct
 console.log('\n=== Thermal Simulation Tests ===\n');
 
 // Test 111: Thermal module in translation objects
-test('Thermal module appears in all three language translation objects', function() {
+test('Thermal module appears in both language translation objects', function() {
   assert.strictEqual(T.da.modules.thermal, 'Termisk Sim.');
   assert.strictEqual(T.en.modules.thermal, 'Thermal Sim');
-  assert.strictEqual(T.fa.modules.thermal, '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062D\u0631\u0627\u0631\u062A\u06CC');
 });
 
 // Test 112: Thermal functions exist
@@ -2192,10 +2186,9 @@ test('THERMAL_CABLE_DATA has correct max temps per DS/HD 60364-5-52 Table 52.1',
 console.log('\n=== 3D Cable Routing Tests ===\n');
 
 // Test 126: Cable3D module in translations
-test('Cable3D module appears in all three language translation objects', function() {
+test('Cable3D module appears in both language translation objects', function() {
   assert.strictEqual(T.da.modules.cable3d, '3D Kabelfoering');
   assert.strictEqual(T.en.modules.cable3d, '3D Cable Routing');
-  assert.strictEqual(T.fa.modules.cable3d, '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0633\u0647\u200C\u0628\u0639\u062F\u06CC');
 });
 
 // Test 127: Cable3D functions exist
@@ -2315,10 +2308,9 @@ test('cable3dLayoutCircular returns correct number of positions', function() {
 console.log('\n=== Energy Monitoring Tests ===\n');
 
 // Test 141: Energy module in translations
-test('Energy module appears in all three language translation objects', function() {
+test('Energy module appears in both language translation objects', function() {
   assert.strictEqual(T.da.modules.energy, 'Energi Monitor');
   assert.strictEqual(T.en.modules.energy, 'Energy Monitor');
-  assert.strictEqual(T.fa.modules.energy, '\u0645\u0627\u0646\u06CC\u062A\u0648\u0631 \u0627\u0646\u0631\u0698\u06CC');
 });
 
 // Test 142: Energy functions exist
@@ -3050,16 +3042,13 @@ test('Lux requirements match EN 1838 specifications', function() {
 });
 
 // Test 218: All three new modules appear in translations
-test('All three new modules registered in T.da, T.en, T.fa', function() {
+test('All three new modules registered in T.da, T.en', function() {
   assert.ok(T.da.modules.ev, 'EV must be in Danish translations');
   assert.ok(T.en.modules.ev, 'EV must be in English translations');
-  assert.ok(T.fa.modules.ev, 'EV must be in Farsi translations');
   assert.ok(T.da.modules.solar, 'Solar must be in Danish translations');
   assert.ok(T.en.modules.solar, 'Solar must be in English translations');
-  assert.ok(T.fa.modules.solar, 'Solar must be in Farsi translations');
   assert.ok(T.da.modules.noed, 'Noed must be in Danish translations');
   assert.ok(T.en.modules.noed, 'Noed must be in English translations');
-  assert.ok(T.fa.modules.noed, 'Noed must be in Farsi translations');
 });
 
 // Test 219: Anti-panic has longer spacing than escape
@@ -3412,16 +3401,13 @@ test('renderVFD uses sel-btn buttons', function() {
 });
 
 // Test 267: All three new modules registered in translations
-test('Motor, Harmonic, VFD registered in T.da, T.en, T.fa', function() {
+test('Motor, Harmonic, VFD registered in T.da, T.en', function() {
   assert.ok(T.da.modules.motor, 'motor must be in Danish');
   assert.ok(T.en.modules.motor, 'motor must be in English');
-  assert.ok(T.fa.modules.motor, 'motor must be in Farsi');
   assert.ok(T.da.modules.harmonic, 'harmonic must be in Danish');
   assert.ok(T.en.modules.harmonic, 'harmonic must be in English');
-  assert.ok(T.fa.modules.harmonic, 'harmonic must be in Farsi');
   assert.ok(T.da.modules.vfd, 'vfd must be in Danish');
   assert.ok(T.en.modules.vfd, 'vfd must be in English');
-  assert.ok(T.fa.modules.vfd, 'vfd must be in Farsi');
 });
 
 // ===== LIGHTING DESIGN MODULE TESTS =====
@@ -3798,16 +3784,13 @@ test('busbarCalcFull handles maximum 5000A rating', function() {
 });
 
 // Test 314: All three new modules registered in translations
-test('Lighting, HeatPump, Busbar registered in T.da, T.en, T.fa', function() {
+test('Lighting, HeatPump, Busbar registered in T.da, T.en', function() {
   assert.ok(T.da.modules.lighting, 'lighting must be in Danish');
   assert.ok(T.en.modules.lighting, 'lighting must be in English');
-  assert.ok(T.fa.modules.lighting, 'lighting must be in Farsi');
   assert.ok(T.da.modules.heatpump, 'heatpump must be in Danish');
   assert.ok(T.en.modules.heatpump, 'heatpump must be in English');
-  assert.ok(T.fa.modules.heatpump, 'heatpump must be in Farsi');
   assert.ok(T.da.modules.busbar, 'busbar must be in Danish');
   assert.ok(T.en.modules.busbar, 'busbar must be in English');
-  assert.ok(T.fa.modules.busbar, 'busbar must be in Farsi');
 });
 
 // Test 315: Farsi translations in _FA for lighting
@@ -3819,10 +3802,9 @@ test('Lighting, HeatPump, Busbar registered in T.da, T.en, T.fa', function() {
 // ===== BATHROOM ZONES MODULE TESTS =====
 
 // Test 318: Bathroom module registered in translations
-test('Bathroom module registered in T.da, T.en, T.fa', function() {
+test('Bathroom module registered in T.da, T.en', function() {
   assert.ok(T.da.modules.bathroom, 'bathroom must be in Danish');
   assert.ok(T.en.modules.bathroom, 'bathroom must be in English');
-  assert.ok(T.fa.modules.bathroom, 'bathroom must be in Farsi');
 });
 
 // Test 319: Farsi translations for bathroom module
@@ -3931,10 +3913,9 @@ test('renderBathroom references DS/HD 60364-7-701', function() {
 // ===== FIRE ALARM MODULE TESTS =====
 
 // Test 334: Fire alarm module registered in translations
-test('Fire alarm module registered in T.da, T.en, T.fa', function() {
+test('Fire alarm module registered in T.da, T.en', function() {
   assert.ok(T.da.modules.firealarm, 'firealarm must be in Danish');
   assert.ok(T.en.modules.firealarm, 'firealarm must be in English');
-  assert.ok(T.fa.modules.firealarm, 'firealarm must be in Farsi');
 });
 
 // Test 335: Farsi translations for fire alarm module
@@ -4030,10 +4011,9 @@ test('firealarmCalcDetectors: smoke derated above 6m ceiling', function() {
 // ===== STRUCTURED CABLING MODULE TESTS =====
 
 // Test 349: Data module registered in translations
-test('Data module registered in T.da, T.en, T.fa', function() {
+test('Data module registered in T.da, T.en', function() {
   assert.ok(T.da.modules.data, 'data must be in Danish');
   assert.ok(T.en.modules.data, 'data must be in English');
-  assert.ok(T.fa.modules.data, 'data must be in Farsi');
 });
 
 // Test 350: Farsi translations for data module
@@ -4860,13 +4840,10 @@ test('SPECIAL_ITEMS has bathroom, ev, solar, firealarm', function() {
 test('Module translations exist for trayfill, zs, commission', function() {
   assert(T.da.modules.trayfill, 'Danish trayfill missing');
   assert(T.en.modules.trayfill, 'English trayfill missing');
-  assert(T.fa.modules.trayfill, 'Farsi trayfill missing');
   assert(T.da.modules.zs, 'Danish zs missing');
   assert(T.en.modules.zs, 'English zs missing');
-  assert(T.fa.modules.zs, 'Farsi zs missing');
   assert(T.da.modules.commission, 'Danish commission missing');
   assert(T.en.modules.commission, 'English commission missing');
-  assert(T.fa.modules.commission, 'Farsi commission missing');
 });
 
 
@@ -5313,19 +5290,14 @@ test('earthCalcRodResistance: 2000 Ohm-m granite exceeds 10 Ohm', function() {
 test('Module translations exist for shev, access, generator, discrim, earthsys', function() {
   assert(T.da.modules.shev, 'Danish shev missing');
   assert(T.en.modules.shev, 'English shev missing');
-  assert(T.fa.modules.shev, 'Farsi shev missing');
   assert(T.da.modules.access, 'Danish access missing');
   assert(T.en.modules.access, 'English access missing');
-  assert(T.fa.modules.access, 'Farsi access missing');
   assert(T.da.modules.generator, 'Danish generator missing');
   assert(T.en.modules.generator, 'English generator missing');
-  assert(T.fa.modules.generator, 'Farsi generator missing');
   assert(T.da.modules.discrim, 'Danish discrim missing');
   assert(T.en.modules.discrim, 'English discrim missing');
-  assert(T.fa.modules.discrim, 'Farsi discrim missing');
   assert(T.da.modules.earthsys, 'Danish earthsys missing');
   assert(T.en.modules.earthsys, 'English earthsys missing');
-  assert(T.fa.modules.earthsys, 'Farsi earthsys missing');
 });
 
 // Test 534: All new module render functions callable
@@ -5350,7 +5322,6 @@ console.log('\n--- Swimming Pool & Fountain Module (DS/HD 60364-7-702) ---');
 test('Pool: module translations exist for pool', function() {
   assert(T.da.modules.pool, 'Danish pool missing');
   assert(T.en.modules.pool, 'English pool missing');
-  assert(T.fa.modules.pool, 'Farsi pool missing');
 });
 
 test('Pool: POOL_ZONES has 3 zones (0,1,2)', function() {
@@ -5443,7 +5414,6 @@ console.log('\n--- Construction Site Module (DS/HD 60364-7-704) ---');
 test('Construction: module translations exist', function() {
   assert(T.da.modules.construction, 'Danish construction missing');
   assert(T.en.modules.construction, 'English construction missing');
-  assert(T.fa.modules.construction, 'Farsi construction missing');
 });
 
 test('Construction: calcLoad with empty equipment returns 0', function() {
@@ -5529,7 +5499,6 @@ console.log('\n--- Agricultural Installation Module (DS/HD 60364-7-705) ---');
 test('Agri: module translations exist', function() {
   assert(T.da.modules.agri, 'Danish agri missing');
   assert(T.en.modules.agri, 'English agri missing');
-  assert(T.fa.modules.agri, 'Farsi agri missing');
 });
 
 test('Agri: cattle house has livestock hazard and corrosive atmosphere', function() {
@@ -5608,7 +5577,6 @@ console.log('\n--- Arc Flash Module (IEC 62271-200 / IEEE 1584) ---');
 test('ArcFlash: module translations exist', function() {
   assert(T.da.modules.arcflash, 'Danish arcflash missing');
   assert(T.en.modules.arcflash, 'English arcflash missing');
-  assert(T.fa.modules.arcflash, 'Farsi arcflash missing');
 });
 
 test('ArcFlash: low energy (400V, 1kA, 0.01s) gives Category 0', function() {
@@ -5706,7 +5674,6 @@ console.log('\n--- Cable Lifetime Module (IEC 60502) ---');
 test('CableLife: module translations exist', function() {
   assert(T.da.modules.cablelife, 'Danish cablelife missing');
   assert(T.en.modules.cablelife, 'English cablelife missing');
-  assert(T.fa.modules.cablelife, 'Farsi cablelife missing');
 });
 
 test('CableLife: PVC at rated temp (70C) gives design life 35 years', function() {
@@ -6434,10 +6401,9 @@ test('KLS: exactly 14 sheets in index', function() {
   assert.strictEqual(KLS_SHEETS.length, 14);
 });
 
-test('KLS: module registered in T.da/en/fa.modules', function() {
+test('KLS: module registered in T.da/en.modules', function() {
   assert(T.da.modules.kls, 'kls missing in T.da.modules');
   assert(T.en.modules.kls, 'kls missing in T.en.modules');
-  assert(T.fa.modules.kls, 'kls missing in T.fa.modules');
 });
 
 test('KLS: renderKLS returns non-empty HTML for all 14 views', function() {
@@ -7866,8 +7832,8 @@ test('Critical Mind: pick transformer -> Ik -> audit -> verdict renders in BOTH 
 // ===== AI-GUIDER MODULE TESTS =====
 console.log('\n=== AI-Guider Module Tests ===\n');
 
-test('Guide: nav label exists and is FIRST key in da, en, fa', function() {
-  ['da', 'en', 'fa'].forEach(function(L) {
+test('Guide: nav label exists and is FIRST key in da, en', function() {
+  ['da', 'en'].forEach(function(L) {
     assert(T[L] && T[L].modules && T[L].modules.guide, 'guide nav label missing in ' + L);
     assert.strictEqual(Object.keys(T[L].modules)[0], 'guide', 'guide must be the FIRST nav key in ' + L);
   });
@@ -9004,8 +8970,8 @@ test('renderImpedans: 100% click-only (no text inputs)', function() {
   assert(html.indexOf('prompt(') < 0, 'No prompt calls');
 });
 
-// Verify trilingual support
-test('impedans module: trilingual labels (da authoritative, en secondary, fa via _FA)', function() {
+// Verify bilingual support
+test('impedans module: bilingual labels (da authoritative, en secondary)', function() {
   var prevLang = lang;
   try {
     lang = 'da';
@@ -9014,10 +8980,6 @@ test('impedans module: trilingual labels (da authoritative, en secondary, fa via
     lang = 'en';
     var htmlEn = renderImpedans();
     assert(htmlEn.indexOf('Resistance') >= 0 || htmlEn.indexOf('Series') >= 0, 'English text present');
-    lang = 'fa';
-    var htmlFa = renderImpedans();
-    // Farsi content should be present (via _FA lookup)
-    assert(htmlFa.length > 500, 'Farsi render produces content');
   } finally {
     lang = prevLang;
   }
@@ -9038,8 +9000,8 @@ test('impedans module: navGroupForKey returns theory group', function() {
   assert(gid === 'theory', 'impedans should be in theory group, got ' + gid);
 });
 
-// Verify module translation exists in all languages
-test('impedans module: translation exists in da/en/fa', function() {
+// Verify module translation exists in both languages
+test('impedans module: translation exists in da/en', function() {
   var prevLang = lang;
   try {
     lang = 'da';
@@ -9048,9 +9010,6 @@ test('impedans module: translation exists in da/en/fa', function() {
     lang = 'en';
     mods = t('modules');
     assert(mods.impedans, 'English module name exists: ' + mods.impedans);
-    lang = 'fa';
-    mods = t('modules');
-    assert(mods.impedans, 'Farsi module name exists: ' + mods.impedans);
   } finally {
     lang = prevLang;
   }
@@ -9194,13 +9153,11 @@ test('Opgavesamling 7.3 verify: Star load, IL=2.17A approx', function() {
 });
 
 // --- Module registration tests ---
-test('trefase module: translation exists in da/en/fa', function() {
+test('trefase module: translation exists in da/en', function() {
   var da = T.da.modules.trefase;
   var en = T.en.modules.trefase;
-  var fa = T.fa.modules.trefase;
   assert(da && da.length > 0, 'Danish translation exists');
   assert(en && en.length > 0, 'English translation exists');
-  assert(fa && fa.length > 0, 'Farsi translation exists');
 });
 
 test('trefase module: registered in NAV_GROUPS theory group', function() {
@@ -9362,13 +9319,11 @@ test('Opgavesamling 11.35 verify: slip=4.8%', function() {
 });
 
 // --- Module registration tests ---
-test('motorteori module: translation exists in da/en/fa', function() {
+test('motorteori module: translation exists in da/en', function() {
   var da = T.da.modules.motorteori;
   var en = T.en.modules.motorteori;
-  var fa = T.fa.modules.motorteori;
   assert(da && da.length > 0, 'Danish translation exists');
   assert(en && en.length > 0, 'English translation exists');
-  assert(fa && fa.length > 0, 'Farsi translation exists');
 });
 
 test('motorteori module: registered in NAV_GROUPS theory group', function() {
@@ -9446,10 +9401,9 @@ test('relay module: 100% click-only (no text inputs)', function() {
   assert(html.indexOf('<textarea') < 0, 'no textarea');
 });
 
-test('relay module: translation exists in da/en/fa', function() {
+test('relay module: translation exists in da/en', function() {
   assert(T.da.modules.relay, 'da translation exists');
   assert(T.en.modules.relay, 'en translation exists');
-  assert(T.fa.modules.relay, 'fa translation exists');
 });
 
 // ===== FAULT CALCULATION MODULE TESTS =====
@@ -9550,10 +9504,9 @@ test('fault module: CSA mode produces HTML', function() {
   faultState.calcMode = 'fault';
 });
 
-test('fault module: translation exists in da/en/fa', function() {
+test('fault module: translation exists in da/en', function() {
   assert(T.da.modules.fault, 'da translation exists');
   assert(T.en.modules.fault, 'en translation exists');
-  assert(T.fa.modules.fault, 'fa translation exists');
 });
 
 test('relay + fault modules in NAV_GROUPS protect group', function() {
@@ -9813,10 +9766,9 @@ test('dc module: 100% click-only (no text inputs)', function() {
   dcState.calcType = 'ohm'; // restore default
 });
 
-test('dc module: translation exists in da/en/fa', function() {
+test('dc module: translation exists in da/en', function() {
   assert(T.da.modules.dc, 'da translation exists');
   assert(T.en.modules.dc, 'en translation exists');
-  assert(T.fa.modules.dc, 'fa translation exists');
 });
 
 test('dc module in NAV_GROUPS theory group', function() {
@@ -10724,11 +10676,10 @@ test('Kapacitor: every sub-mode renders a calcDetail block', function() {
   kapacitorState.calcType = 'capacitance';
 });
 
-test('Kapacitor: trilingual labels resolve (da/en/fa)', function() {
+test('Kapacitor: bilingual labels resolve (da/en)', function() {
   var savedLang = lang;
   lang = 'da'; assert(t('modules').kapacitor === 'Kapacitor & RC', 'da label');
   lang = 'en'; assert(t('modules').kapacitor === 'Capacitor & RC', 'en label');
-  lang = 'fa'; assert(typeof t('modules').kapacitor === 'string' && t('modules').kapacitor.length > 0, 'fa label present');
   lang = savedLang;
 });
 
@@ -10815,11 +10766,10 @@ test('Varme: every sub-mode renders a calcDetail block', function() {
   varmeState.calcType = 'uvalue';
 });
 
-test('Varme: trilingual labels resolve (da/en/fa)', function() {
+test('Varme: bilingual labels resolve (da/en)', function() {
   var savedLang = lang;
   lang = 'da'; assert(t('modules').varme.indexOf('Rumvarme') >= 0, 'da label');
   lang = 'en'; assert(t('modules').varme.indexOf('Room heating') >= 0, 'en label');
-  lang = 'fa'; assert(typeof t('modules').varme === 'string' && t('modules').varme.length > 0, 'fa label present');
   lang = savedLang;
 });
 
@@ -10908,11 +10858,10 @@ test('Dcmaskine: all four machine types are selectable', function() {
   dcmaskineState.type = 'shunt';
 });
 
-test('Dcmaskine: trilingual labels resolve (da/en/fa)', function() {
+test('Dcmaskine: bilingual labels resolve (da/en)', function() {
   var savedLang = lang;
   lang = 'da'; assert(t('modules').dcmaskine.indexOf('Jaevnstr') >= 0, 'da label');
   lang = 'en'; assert(t('modules').dcmaskine === 'DC machines', 'en label');
-  lang = 'fa'; assert(typeof t('modules').dcmaskine === 'string' && t('modules').dcmaskine.length > 0, 'fa label present');
   lang = savedLang;
 });
 
@@ -17798,7 +17747,6 @@ test('Kalkulation module replaces the old stray bid-duplicate (now a real, wired
   // real estimating/tender engine. Verify it is wired cleanly and consistently.
   assert(T.da.modules.kalkulation === 'Kalkulation', 'Danish label present');
   assert(T.en.modules.kalkulation === 'Calculation', 'English label present');
-  assert(T.fa.modules.kalkulation && T.fa.modules.kalkulation.length > 0, 'Farsi label present');
   assert(_innovHtml.indexOf("case 'kalkulation': content = renderKalkulation();") >= 0, 'kalkulation has a renderModule case');
   assert(typeof renderKalkulation === 'function', 'renderKalkulation is defined');
   var groups = NAV_GROUPS.filter(function(g) { return g.keys.indexOf('kalkulation') >= 0; });
@@ -18416,21 +18364,15 @@ test('VDROP-LIGHTING: non-lighting bands preserved (4.5% warning, 5.01% fail)', 
 });
 
 // --- L6. Lighting detected via DANISH name 'Belysning' (not just English) -> 3% applied ---
-test('VDROP-LIGHTING: Danish name "Belysning" triggers 3% limit (trilingual name detection)', function() {
-  var f = _advNode({ type: 'final_circuit', name_da: 'Belysning', name_en: '', name_fa: '', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
+test('VDROP-LIGHTING: Danish name "Belysning" triggers 3% limit (bilingual name detection)', function() {
+  var f = _advNode({ type: 'final_circuit', name_da: 'Belysning', name_en: '', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
   f.node._vdrop = 3.5;
   var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
   assert.strictEqual(c.status, 'fail', 'Danish "Belysning" at 3.5% must FAIL under 3% limit. Got: ' + c.detail);
   assert(c.rule.indexOf('3%') >= 0, 'rule must show 3% limit. Got rule: ' + c.rule);
 });
 
-// --- L6b. Lighting detected via FARSI name 'روشنایی' -> 3% applied ---
-test('VDROP-LIGHTING: Farsi name triggers 3% limit (trilingual name detection)', function() {
-  var f = _advNode({ type: 'final_circuit', name_da: '', name_en: '', name_fa: '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC', cable: { iz: 100, r: 1, x: 0.1 }, protectionIn: 16, protection: { rating: 16, curve: 'B' } });
-  f.node._vdrop = 3.5;
-  var c = _vdCheck(sldVerifyNode(f.tree, f.node.id));
-  assert.strictEqual(c.status, 'fail', 'Farsi lighting name at 3.5% must FAIL under 3% limit. Got: ' + c.detail);
-});
+// --- L6b. (Removed - Farsi no longer supported; app is bilingual da/en only) ---
 
 // --- L6c. A LIGHTING-named board/non-final node keeps the general limit (only final_circuit affected) ---
 test('VDROP-LIGHTING: lighting-named NON-final node (sub_board) keeps general 4% limit', function() {
@@ -18456,20 +18398,19 @@ test('VDROP-LIGHTING: lighting Vdrop rule cites clause DS/HD 60364-5-52 cl. 525'
 // reverse-mode solver so that lighting circuits are sized against the 3% limit and the
 // optimizer never suggests a downsize into the 3-4% band.
 
-// --- R-L1. Shared helpers: isLightingName returns true for trilingual lighting names ---
-test('REVERSE-LIGHTING: isLightingName detects Belysning/Lighting/Farsi, rejects non-lighting', function() {
+// --- R-L1. Shared helpers: isLightingName returns true for bilingual lighting names ---
+test('REVERSE-LIGHTING: isLightingName detects Belysning/Lighting, rejects non-lighting', function() {
   // Positive cases
-  assert.strictEqual(isLightingName('Belysning 2.3kW', '', ''), true, 'Danish Belysning must match');
-  assert.strictEqual(isLightingName('', 'Lighting 2.3kW', ''), true, 'English Lighting must match');
-  assert.strictEqual(isLightingName('', '', '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC 2.3kW'), true, 'Farsi must match');
-  assert.strictEqual(isLightingName('BELYSNING', '', ''), true, 'case-insensitive Danish');
-  assert.strictEqual(isLightingName('', 'lighting panel', ''), true, 'case-insensitive English');
+  assert.strictEqual(isLightingName('Belysning 2.3kW', ''), true, 'Danish Belysning must match');
+  assert.strictEqual(isLightingName('', 'Lighting 2.3kW'), true, 'English Lighting must match');
+  assert.strictEqual(isLightingName('BELYSNING', ''), true, 'case-insensitive Danish');
+  assert.strictEqual(isLightingName('', 'lighting panel'), true, 'case-insensitive English');
   // Negative cases
-  assert.strictEqual(isLightingName('Stikkontakt', 'Sockets 3.45kW', ''), false, 'sockets must NOT match');
-  assert.strictEqual(isLightingName('Komfur', 'Cooker 7.36kW', ''), false, 'cooker must NOT match');
-  assert.strictEqual(isLightingName('Motor 5.5kW', 'Motor 5.5kW', ''), false, 'motor must NOT match');
-  assert.strictEqual(isLightingName('', '', ''), false, 'empty names must NOT match');
-  assert.strictEqual(isLightingName(null, null, null), false, 'null names must NOT match');
+  assert.strictEqual(isLightingName('Stikkontakt', 'Sockets 3.45kW'), false, 'sockets must NOT match');
+  assert.strictEqual(isLightingName('Komfur', 'Cooker 7.36kW'), false, 'cooker must NOT match');
+  assert.strictEqual(isLightingName('Motor 5.5kW', 'Motor 5.5kW'), false, 'motor must NOT match');
+  assert.strictEqual(isLightingName('', ''), false, 'empty names must NOT match');
+  assert.strictEqual(isLightingName(null, null), false, 'null names must NOT match');
 });
 
 // --- R-L2. isLightingNode: only final_circuit type qualifies ---
@@ -18554,13 +18495,13 @@ test('REVERSE-LIGHTING: reverseMultiOptimize uses 3% limit for lighting circuits
   // Build a minimal tree + results mimicking a lighting circuit at 2.9% on current cable.
   // A smaller cable would push it to 3.5% — must NOT be suggested.
   var lightingCkt = {
-    name_da: 'Belysning 2.3kW', name_en: 'Lighting 2.3kW', name_fa: '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC 2.3kW',
+    name_da: 'Belysning 2.3kW', name_en: 'Lighting 2.3kW',
     power_kW: 2.3, cosPhi: 0.92, phases: '1x230', voltage: 230,
     cableLength_m: 30, installMethod: 'C', ambientTemp: 30, grouping: 1,
     cableMaterial: 'Cu', protectionType: 'MCB'
   };
   var socketCkt = {
-    name_da: 'Stikkontakt 3.45kW', name_en: 'Sockets 3.45kW', name_fa: '\u067E\u0631\u06CC\u0632 3.45kW',
+    name_da: 'Stikkontakt 3.45kW', name_en: 'Sockets 3.45kW',
     power_kW: 3.45, cosPhi: 0.95, phases: '1x230', voltage: 230,
     cableLength_m: 25, installMethod: 'C', ambientTemp: 30, grouping: 1,
     cableMaterial: 'Cu', protectionType: 'MCB'
@@ -18582,7 +18523,7 @@ test('REVERSE-LIGHTING: reverseMultiOptimize uses 3% limit for lighting circuits
       // Find the circuit index — if it's lighting, its suggested vdrop must be <= 3%
       if (opt.circuitIndex !== undefined) {
         var refCkt = reverseState.selectedCircuits[opt.circuitIndex];
-        if (refCkt && isLightingName(refCkt.name_da, refCkt.name_en, refCkt.name_fa)) {
+        if (refCkt && isLightingName(refCkt.name_da, refCkt.name_en)) {
           assert(opt.vdropSmaller === undefined || opt.vdropSmaller <= DK_STANDARDS.vdropLighting,
             'Optimizer must NOT suggest downsize for lighting if vdrop would exceed 3%. Got vdrop=' + opt.vdropSmaller);
         }
