@@ -13878,6 +13878,48 @@ test('autoexam/mathml: mathml() falls back gracefully on prose (never throws)', 
   assert.ok(out.indexOf('mathml-fallback') >= 0 || out.indexOf('<math') >= 0, 'either typeset or graceful fallback');
 });
 
+// ----- Batch 6: deeper installation tasks (group circuit, RCD, TT earthing) -----
+test('autoexam/tasks: group-circuit, RCD and (TT) earthing tasks are generated', function () {
+  var evKinds = {}; for (var s = 1; s <= 30; s++) { axGenerate(s * 3 + 1, 'ev_anlaeg', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { evKinds[t.kind] = 1; if (t.id === 't_grp') evKinds.group = 1; }); }); }
+  assert.ok(evKinds.rcd, 'RCD task generated');
+  assert.ok(evKinds.group, 'group-circuit task generated');
+  var ttKinds = {}; for (var s2 = 1; s2 <= 30; s2++) { axGenerate(s2 * 7 + 2, 'landbrug', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ttKinds[t.kind] = 1; }); }); }
+  assert.ok(ttKinds.earthing, 'TT building generates an earthing (RA) task');
+});
+test('autoexam/tasks: TT earthing RA = UL/IDn (50 V / 30 mA = 1667 ohm), typeset', function () {
+  var found = null; for (var s = 1; s <= 40 && !found; s++) { axSolve(axGenerate(s * 7 + 2, 'landbrug', 'ekspert', 'case')).forEach(function (op) { op.tasks.forEach(function (x) { if (x.kind === 'earthing') found = x; }); }); }
+  assert.ok(found, 'an earthing solution exists');
+  assert.strictEqual(found.result.value, 1667, 'RA,max = 1667 ohm');
+  assert.ok(axRenderSolutionCard(found).indexOf('<math') >= 0, 'earthing formula typeset');
+});
+test('autoexam/tasks: RCD selection is Type B for EV, Type A otherwise', function () {
+  var evRcd = null; for (var s = 1; s <= 30 && !evRcd; s++) { axGenerate(s * 3 + 1, 'ev_anlaeg', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'rcd' && t.given.hasEV) evRcd = t; }); }); }
+  assert.ok(evRcd && evRcd.opts[evRcd.ci].en.indexOf('Type B') >= 0, 'EV circuit => Type B');
+  var nonRcd = null; for (var s2 = 1; s2 <= 30 && !nonRcd; s2++) { axGenerate(s2 * 5 + 1, 'skole', 'elektriker', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'rcd' && !t.given.hasEV) nonRcd = t; }); }); }
+  assert.ok(nonRcd && nonRcd.opts[nonRcd.ci].en.indexOf('Type A') >= 0, 'non-EV => Type A');
+});
+test('autoexam/tasks: installation exams vary run-to-run but keep the IB->In->cable core first', function () {
+  var a = axGenerate(11, 'ev_anlaeg', 'ekspert', 'case').opgaver[0].tasks.map(function (t) { return t.id; });
+  var b = axGenerate(12, 'ev_anlaeg', 'ekspert', 'case').opgaver[0].tasks.map(function (t) { return t.id; });
+  assert.notStrictEqual(a.join(','), b.join(','), 'different seeds vary the task set/order');
+  assert.deepStrictEqual(a.slice(0, 3), ['t_ib', 't_dev', 't_cab'], 'core chain first');
+  assert.deepStrictEqual(b.slice(0, 3), ['t_ib', 't_dev', 't_cab'], 'core chain first');
+});
+test('autoexam/tasks: mini mode still yields <=2 tasks after the new kinds', function () {
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  assert.ok(p.opgaver[0].tasks.length <= 2);
+});
+test('autoexam/tasks: new kinds solve consistently and grade perfectly across a sweep', function () {
+  var n = 0, err = 0;
+  AX_BUILDINGS.forEach(function (b) { ['laerling', 'ekspert'].forEach(function (tr) { ['case', 'fuld'].forEach(function (md) {
+    n++; var p = axGenerate(n * 13 + 1, b.id, tr, md); var sol = axSolve(p);
+    p.opgaver.forEach(function (op, oi) { op.tasks.forEach(function (t, k) { var sx = sol[oi].tasks[k]; if (typeof t.answer === 'number' && sx.result && typeof sx.result.value === 'number' && Math.abs(sx.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) err++; }); });
+    var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+    if (axExamine(p, ans).score !== 100) err++;
+  }); }); });
+  assert.ok(n >= 40 && err === 0, n + ' combos, ' + err + ' errors');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
