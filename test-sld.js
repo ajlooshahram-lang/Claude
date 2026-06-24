@@ -13629,6 +13629,100 @@ test('autoexam: registered in module label registries (da/en) and nav', function
   assert.ok(found, 'autoexam present in a NAV group');
 });
 
+// ----- Batch 2: complex (Viggo) drills, AI mentor, analytics -----
+test('autoexam/cx: Viggo chain matches hand calc (156MVA/10kV/0.1 + 1000kVA/5% => ~28kA)', function () {
+  var sc = axCxScenario({ U_HV: 10, Sk: 156, cosk: 0.1, SN: 1000, ek: 5, PCu: 10, U_LV: 400, c: 1.1 });
+  assert.ok(Math.abs(sc.ZnetHV - 0.641) < 0.01, 'ZnetHV got ' + sc.ZnetHV);
+  assert.ok(Math.abs(sc.ZT * 1000 - 8.0) < 0.05, 'ZT got ' + (sc.ZT * 1000) + ' mOhm');
+  assert.ok(Math.abs(sc.cosT - 0.20) < 0.01, 'cosT got ' + sc.cosT);
+  assert.ok(Math.abs(sc.Ik / 1000 - 28.2) < 0.5, 'Ik got ' + (sc.Ik / 1000) + ' kA');
+});
+test('autoexam/cx: vector sum differs from scalar sum (proves complex math is used)', function () {
+  var sc = axCxScenario({ U_HV: 10, Sk: 156, cosk: 0.1, SN: 1000, ek: 5, PCu: 10, U_LV: 400, c: 1.1 });
+  var scalar = sc.ZnetLV + sc.ZT;
+  assert.ok(sc.Ztot < scalar, 'vector |Z| (' + sc.Ztot + ') must be < scalar sum (' + scalar + ')');
+});
+test('autoexam/cx: axGenComplex deterministic + 4 tasks all with opts/ci', function () {
+  var a = axGenComplex(77, 'kandidat'), b = axGenComplex(77, 'kandidat');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+  assert.strictEqual(a.opgaver[0].tasks.length, 4);
+  a.opgaver[0].tasks.forEach(function (t) { assert.ok(t.opts.length >= 2 && typeof t.ci === 'number' && t.cxsol === true); });
+});
+test('autoexam/cx: complex worked solutions recompute the reference answer', function () {
+  var p = axGenComplex(123, 'ekspert'); var bad = 0;
+  p.opgaver[0].tasks.forEach(function (t) { var s = axSolveTask(t); if (Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++; assert.ok(s.steps.length >= 1 && s.verification, 'has steps+verification'); });
+  assert.strictEqual(bad, 0);
+});
+test('autoexam/cx: examiner scores a perfect complex drill 100/pass', function () {
+  var p = axGenComplex(123, 'ekspert'); var ans = {}; p.opgaver[0].tasks.forEach(function (t) { ans[t.id] = t.ci; });
+  var r = axExamine(p, ans); assert.strictEqual(r.score, 100); assert.strictEqual(r.verdict, 'pass');
+});
+test('autoexam/cx: complex generator sweep across tiers/seeds is consistent', function () {
+  var n = 0, bad = 0;
+  ['laerling', 'elektriker', 'avanceret', 'kandidat', 'ekspert'].forEach(function (tr) {
+    for (var s = 1; s <= 12; s++) { n++; var p = axGenComplex(s * 31 + 3, tr); p.opgaver[0].tasks.forEach(function (t) { var so = axSolveTask(t); if (Math.abs(so.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++; }); }
+  });
+  assert.ok(n >= 50 && bad === 0, n + ' drills, ' + bad + ' drift');
+});
+test('autoexam/mentor: hints exist for every task kind and never print the numeric answer', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld'); var leak = 0, none = 0;
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      var hs = axMentorHints(t); if (!hs.length) none++;
+      var joined = hs.map(function (h) { return h.da + ' ' + h.en; }).join(' ');
+      if (typeof t.answer === 'number') { var a = String(t.answer); if (a.length >= 2 && (joined.indexOf(' ' + a + ' ') >= 0 || joined.indexOf('=' + a) >= 0)) leak++; }
+    });
+  });
+  assert.strictEqual(none, 0, 'all kinds have hints');
+  assert.strictEqual(leak, 0, 'no hint leaks the numeric answer');
+});
+test('autoexam/mentor: final hint always points to the governing clause', function () {
+  var hs = axMentorHints({ kind: 'cable', clause: 'DS/HD 60364-5-52 \u00a7523' });
+  assert.ok(hs[hs.length - 1].da.indexOf('60364-5-52') >= 0, 'clause pointer present');
+});
+test('autoexam/analytics: aggregates attempts, pass rate, averages, streak, weakest/strongest', function () {
+  var log = [
+    { ts: 1, building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 60, verdict: 'fail', catPct: { overload: 80, cable: 40, vdrop: 50, shortcircuit: 70, fault: 55 } },
+    { ts: 2, building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 85, verdict: 'pass', catPct: { overload: 100, cable: 60, vdrop: 80, shortcircuit: 90, fault: 80 } },
+    { ts: 3, building: 'kontor', tier: 'avanceret', mode: 'case', score: 90, verdict: 'pass', catPct: { overload: 100, cable: 90, vdrop: 100, fault: 70 } }
+  ];
+  var a = axAnalytics(log);
+  assert.strictEqual(a.attempts, 3);
+  assert.strictEqual(a.passRate, 67);
+  assert.strictEqual(a.avgScore, 78);
+  assert.strictEqual(a.bestScore, 90);
+  assert.strictEqual(a.streak, 2, 'last two are passes');
+  assert.strictEqual(a.weakest, 'cable');
+  assert.strictEqual(a.strongest, 'overload');
+  assert.strictEqual(a.buildAvg.fabrik.n, 2);
+});
+test('autoexam/analytics: empty log yields zeroed analytics (no crash)', function () {
+  var a = axAnalytics([]);
+  assert.strictEqual(a.attempts, 0); assert.strictEqual(a.passRate, 0); assert.strictEqual(a.streak, 0);
+});
+test('autoexam/svg: axSvgLine and axSvgBars produce valid SVG with no NaN', function () {
+  var line = axSvgLine([{ ts: 1, score: 60, verdict: 'fail' }, { ts: 2, score: 90, verdict: 'pass' }]);
+  var bars = axSvgBars([{ label: 'Overload', value: 80 }, { label: 'Cable', value: 40 }]);
+  assert.ok(line.indexOf('<svg') === 0 && line.indexOf('</svg>') > 0, 'valid line svg');
+  assert.ok(bars.indexOf('<svg') === 0, 'valid bar svg');
+  assert.ok((line + bars).indexOf('NaN') < 0, 'no NaN in svg');
+});
+test('autoexam/svg: single-point line chart does not divide by zero', function () {
+  var line = axSvgLine([{ ts: 1, score: 75, verdict: 'pass' }]);
+  assert.ok(line.indexOf('NaN') < 0 && line.indexOf('<circle') > 0, 'single point renders');
+});
+test('autoexam: Kompleks and Analyse tabs render in da and en without leaking', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.cxProject = axGenComplex(5, 'kandidat'); autoexamState.cxAnswers = {}; autoexamState.cxResult = null;
+    autoexamState.tab = 'kompleks'; var k = renderAutoExam();
+    assert.ok(k.length > 200 && k.indexOf('undefined') < 0 && k.indexOf('NaN') < 0, 'kompleks ' + lg);
+    autoexamState.tab = 'analyse'; var d = renderAutoExam();
+    assert.ok(d.length > 100 && d.indexOf('undefined') < 0 && d.indexOf('NaN') < 0, 'analyse ' + lg);
+  });
+  lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
