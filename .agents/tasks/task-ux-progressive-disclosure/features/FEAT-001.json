@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Create the Design System Foundation: new CSS classes, helper functions, and smart input component library that all modules will use. This includes: (1) a new engWizard() helper for multi-step guided flows, (2) an engSmartGroup() helper that wraps select-groups with progressive disclosure based on user mode, (3) expanded CSS for compact/dense selection grids with auto-recommendations, (4) a context-aware smart defaults system, and (5) enhanced eng-cards with descriptions/advantages for card-based selectors.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add new CSS classes to the design system section (around line 1250-1320): .eng-smart-group (wraps a select-group with depth awareness and optional auto-recommendation badge), .eng-compact-grid (tighter spacing for expert-mode dense grids), .eng-recommendation (highlight chip showing AI/auto-suggested value), .eng-context-hint (small contextual help text that appears only in apprentice/electrician mode), .eng-toggle-pair (two-option toggle styled as pill), .eng-summary-bar (horizontal bar showing key results at top of a module before user scrolls to details)",
     "Add a new helper function engSmartGroup(opts) that generates a select-group with: label, options array, current value, onclick handler, AND optional recommendation badge + depth class. Parameters: { label, options:[{value,text,icon?,desc?}], current, onclick:'stateObj.field=VALUE;renderModule(MOD)', depth?:2|3, recommend?:value, module }. This consolidates the repetitive sel-btn generation pattern used 800+ times into a single call.",
@@ -29,5 +29,5 @@
     "Grep for new CSS classes: eng-smart-group, eng-compact-grid, eng-recommendation, eng-context-hint, eng-toggle-pair, eng-summary-bar"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 5 helper functions added at lines 2311-2409 (engSmartGroup, engToggle, engWizardPanel, engSummaryBar, engContextHint). All 6 CSS classes added at lines 1323-1416. All 2021 tests pass. Functions use var (not const/let) for eval() compatibility. Dark mode variants included for all new classes."
 }
