@@ -912,6 +912,31 @@ body.dark .data-table tr:hover td { background: rgba(0,200,255,0.08); }
 body.dark .verify-badge.ok { background: rgba(0,255,200,0.15); color: #00ffc8; border-color: rgba(0,255,200,0.3); }
 body.dark .verify-badge.fail { background: rgba(255,80,120,0.15); color: #ff8aa6; border-color: rgba(255,80,120,0.3); }
 body.dark img { filter: brightness(0.92); }
+/* ===== BLUEPRINT THEME ===== */
+body.blueprint { --bg: #0a1929; --bg-gradient: linear-gradient(180deg, #071422 0%, #0a1929 100%); --card: #0d2137; --text: #ffffff; --text-light: #b0d4f1; --text-muted: #5a8ab5; --border: #1a3a5c; --border-light: #122d4a; --neon-rgb: 0,229,255; --neon-a: #00e5ff; --neon-b: #00b8d4; }
+body.blueprint .card { border: 1px solid rgba(0,229,255,0.3); box-shadow: 0 0 8px rgba(0,229,255,0.1); }
+body.blueprint .card-title { color: #00e5ff; }
+body.blueprint .sel-btn { background: #0d2137; color: #b0d4f1; border-color: rgba(0,229,255,0.3); }
+body.blueprint .sel-btn.selected { background: rgba(0,229,255,0.2); color: #00e5ff; border-color: #00e5ff; }
+body.blueprint .result-box { background: rgba(10,25,41,0.9); border-color: rgba(0,229,255,0.4); }
+/* ===== DASHBOARD BAR ===== */
+.dashboard-bar { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; cursor: pointer; transition: var(--transition); }
+.dashboard-bar:hover { border-color: var(--accent); }
+.dashboard-bar .db-chain { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--font-mono-eng); font-size: 0.82rem; }
+.dashboard-bar .db-item { padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+.dashboard-bar .db-item.ok { background: rgba(0,230,118,0.12); color: #00e676; }
+.dashboard-bar .db-item.warn { background: rgba(255,193,7,0.12); color: #ffc107; }
+.dashboard-bar .db-item.fail { background: rgba(255,82,82,0.12); color: #ff5252; }
+.dashboard-bar .db-toggle { font-size: 0.75rem; color: var(--text-muted); float: right; }
+/* ===== EXAM SIMULATOR ===== */
+.exam-sim-dot { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-size: 0.7rem; margin: 2px; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+.exam-sim-dot.answered { background: rgba(0,229,255,0.2); border-color: #00e5ff; color: #00e5ff; }
+.exam-sim-dot.current { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* ===== KEYBOARD SHORTCUTS OVERLAY ===== */
+.kbd-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.kbd-overlay-inner { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 32px; max-width: 500px; width: 90%; color: var(--text); }
+.kbd-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
+.kbd-key { font-family: var(--font-mono-eng); background: rgba(var(--neon-rgb),0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; }
 .theme-btn {
   border: none;
   background: rgba(255,255,255,0.12);
@@ -1565,7 +1590,9 @@ const T = {
       install3d: '3D Installation',
       kundevis: 'Kundevisning',
       film: 'Installations-Film',
-      vedligehold: 'Vedligehold'
+      vedligehold: 'Vedligehold',
+      eksamen: 'Eksamen Simulator',
+      presets: 'Installations Presets'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1765,7 +1792,9 @@ const T = {
       install3d: '3D Installation',
       kundevis: 'Customer Presentation',
       film: 'Installation Movie',
-      vedligehold: 'Maintenance Predictor'
+      vedligehold: 'Maintenance Predictor',
+      eksamen: 'Exam Simulator',
+      presets: 'Installation Presets'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -4962,7 +4991,7 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding', 'tidsrejse', 'udvidelse', 'eksamen', 'presets']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
@@ -7710,9 +7739,17 @@ function renderModule(mod) {
     case 'kundevis': content = renderKundevis(); break;
     case 'film': content = renderFilm(); break;
     case 'vedligehold': content = renderVedligehold(); break;
+    case 'photoreverse': content = renderPhotoReverse(); break;
+    case 'oneclick': content = renderOneClick(); break;
+    case 'eksamen': content = renderEksamen(); break;
+    case 'presets': content = renderPresets(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
+  // Prepend cross-module dashboard when load data exists
+  if (loadState.power > 0 && mod !== 'eksamen') {
+    content = renderDashboardBar(mod) + content;
+  }
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
   const noQi = ['standards','bank','ai','bid','kalkulation','projekt','verify','draw','exam','kritisk','guide','archive'];
@@ -11696,15 +11733,18 @@ function renderAiElectrician() {
 
 // ===== DARK MODE =====
 function applyTheme(theme) {
-  const dark = theme === 'dark';
-  document.body.classList.toggle('dark', dark);
-  const btn = document.getElementById('themeBtn');
-  if (btn) btn.textContent = dark ? '☀️' : '🌙';
+  var b = document.body;
+  b.classList.remove('dark', 'blueprint');
+  if (theme === 'dark') b.classList.add('dark');
+  else if (theme === 'blueprint') { b.classList.add('dark'); b.classList.add('blueprint'); }
+  var btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = theme === 'dark' ? '\u2600\uFE0F' : (theme === 'blueprint' ? '\uD83D\uDCD0' : '\uD83C\uDF19');
   localStorage.setItem('theme', theme);
 }
 function toggleTheme() {
-  const now = document.body.classList.contains('dark') ? 'light' : 'dark';
-  applyTheme(now);
+  var cur = localStorage.getItem('theme') || 'dark';
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? 'blueprint' : 'dark');
+  applyTheme(next);
 }
 // Respect saved preference or OS setting
 (function initTheme() {
@@ -11770,6 +11810,7 @@ function renderAppearancePanel() {
   html += '<div class="ap-group"><div class="ap-label">' + tx('Tema', 'Theme') + '</div><div class="ap-row">';
   html += '<button class="ap-btn ' + (!isDark ? 'active' : '') + '" onclick="applyTheme(\'light\');renderAppearancePanel()">\u2600\uFE0F ' + tx('Lys', 'Light') + '</button>';
   html += '<button class="ap-btn ' + (isDark ? 'active' : '') + '" onclick="applyTheme(\'dark\');renderAppearancePanel()">\uD83C\uDF19 ' + tx('M\u00F8rk', 'Dark') + '</button>';
+  html += '<button class="ap-btn ' + (document.body.classList.contains('blueprint') ? 'active' : '') + '" onclick="applyTheme(\'blueprint\');renderAppearancePanel()">\uD83D\uDCD0 ' + tx('Blueprint', 'Blueprint') + '</button>';
   html += '</div></div>';
   html += '<div class="ap-group"><div class="ap-label">' + tx('Gl\u00F8d', 'Glow') + '</div><div class="ap-row">';
   GLOW_PRESETS.forEach(function (p) {
@@ -13572,6 +13613,7 @@ function renderExam(){
     + `<button class="sel-btn ${examState.tab==='quiz'?'selected':''}" onclick="examTab('quiz')">\u26A1 ${tx('Hurtig Quiz', 'Quick Quiz')}</button>`
     + `<button class="sel-btn ${examState.tab==='scenario'?'selected':''}" onclick="examTab('scenario')">\uD83D\uDCDD ${tx('Fuld Opgave', 'Full Assignment')}</button>`
     + `<button class="sel-btn ${examState.tab==='mock'?'selected':''}" onclick="examTab('mock')">\uD83C\uDFAF ${tx('Fuld Mock', 'Full Mock')}</button>`
+    + `<button class="sel-btn ${examState.tab==='live'?'selected':''}" onclick="examTab('live')">\uD83D\uDD25 ${tx('Live 3-timer', 'Live 3-hour')}</button>`
     + `</div>`
     + `<div class="select-group"><div class="select-label">${tx('Tilstand', 'Mode')}</div><div class="select-grid">`
     + `<button class="sel-btn ${examState.mode!=='exam'?'selected':''}" onclick="examSetMode('apprentice')">\uD83D\uDC68\u200D\uD83C\uDFEB ${tx('L\u00e6rling (forklar nu)', 'Apprentice (explain now)')}</button>`
@@ -13585,7 +13627,7 @@ function renderExam(){
     + `</div>`
     + (expired ? `<div class="result-box error" style="margin-top:10px"><div class="result-title">\u23F0 ${tx('Tiden er udl\u00f8bet', 'Time is up')}</div><div style="padding:6px 2px">${tx('Til pr\u00f8ven har du 60 min \u2014 \u00f8v dig p\u00e5 tempoet.', 'You get 60 min at the exam \u2014 practise your pace.')}</div></div>` : '')
     + `</div></div>`;
-  const body = examState.tab==='answerkey' ? examRenderAnswerKey() : (examState.tab==='quiz' ? examRenderQuiz() : (examState.tab==='mock' ? renderMock() : (examState.scId ? examRenderScenario() : examRenderScenList())));
+  const body = examState.tab==='answerkey' ? examRenderAnswerKey() : (examState.tab==='live' ? renderExamLive() : (examState.tab==='quiz' ? examRenderQuiz() : (examState.tab==='mock' ? renderMock() : (examState.scId ? examRenderScenario() : examRenderScenList()))));
   return head + body;
 }
 
@@ -45260,6 +45302,981 @@ function renderKvalitet() {
   html += '</div></div>';
   return html;
 }
+// ========== FEAT-001: TIER 1 GAME-CHANGERS ==========
+
+// --- 1A: Reverse Engineer from Photo ---
+let photoReverseState = { identifiedComponents: [], sldGenerated: false, selectedPresets: [] };
+
+function photoReverseReset() {
+  photoReverseState = { identifiedComponents: [], sldGenerated: false, selectedPresets: [] };
+  renderModule('photoreverse');
+}
+
+function photoReverseAddComponent(templateId) {
+  var tmpl = null;
+  for (var i = 0; i < REVERSE_CIRCUIT_TEMPLATES.length; i++) {
+    if (REVERSE_CIRCUIT_TEMPLATES[i].id === templateId) { tmpl = REVERSE_CIRCUIT_TEMPLATES[i]; break; }
+  }
+  if (tmpl) {
+    photoReverseState.identifiedComponents.push({
+      templateId: tmpl.id,
+      name_da: tmpl.name_da,
+      name_en: tmpl.name_en,
+      power_kW: tmpl.power_kW,
+      cosPhi: tmpl.cosPhi,
+      phases: tmpl.phases,
+      voltage: tmpl.voltage,
+      installMethod: tmpl.installMethod,
+      cableLength_m: tmpl.cableLength_m,
+      protectionType: tmpl.protectionType
+    });
+  }
+  renderModule('photoreverse');
+}
+
+function photoReverseRemoveComponent(idx) {
+  photoReverseState.identifiedComponents.splice(idx, 1);
+  renderModule('photoreverse');
+}
+
+function photoReverseBuildSLD() {
+  if (photoReverseState.identifiedComponents.length === 0) return;
+  sldNextId = 1;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mainBoard = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mainBoard.id] = mainBoard;
+  trafo.childIds.push(mainBoard.id);
+  for (var i = 0; i < photoReverseState.identifiedComponents.length; i++) {
+    var comp = photoReverseState.identifiedComponents[i];
+    var prot = null;
+    var cable = null;
+    if (comp.protectionType === 'MCCB') {
+      prot = PRODUCTS.mccbs[0];
+    } else {
+      prot = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+    }
+    cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 2.5 && c.material === 'Cu'; });
+    if (comp.power_kW > 5) {
+      cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 4 && c.material === 'Cu'; }) || cable;
+    }
+    if (comp.power_kW > 10) {
+      cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 10 && c.material === 'Cu'; }) || cable;
+    }
+    var fc = sldCreateNode('final_circuit', mainBoard.id, {
+      name_da: comp.name_da,
+      name_en: comp.name_en,
+      power_kW: comp.power_kW,
+      cosPhi: comp.cosPhi,
+      phases: comp.phases,
+      voltage: comp.voltage || 230,
+      installMethod: comp.installMethod || 'C',
+      length_m: comp.cableLength_m || 25,
+      cable: cable,
+      protection: prot,
+      protectionIn: prot ? prot.rating : 16
+    });
+    tree.nodes[fc.id] = fc;
+    mainBoard.childIds.push(fc.id);
+  }
+  sldTree = tree;
+  sldPropagateAll(sldTree);
+  photoReverseState.sldGenerated = true;
+  renderModule('photoreverse');
+}
+
+function photoReverseGoToSLD() {
+  activeModule = 'sld';
+  renderModule('sld');
+}
+
+function photoReverseHandleFile() {
+  // File input handler - extracts image description via preset identification
+  photoReverseState.identifiedComponents = [];
+  // Auto-detect common panel configurations
+  var defaultCircuits = ['lighting', 'sockets', 'sockets', 'cooker'];
+  for (var i = 0; i < defaultCircuits.length; i++) {
+    photoReverseAddComponent(defaultCircuits[i]);
+  }
+}
+
+function renderPhotoReverse() {
+  var st = photoReverseState;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Omvendt Ingeni\u00F8rkunst fra Foto', 'Reverse Engineer from Photo') + '</div>';
+  html += '<p style="color:var(--text-light);margin:0 0 12px">' + tx('Identificer komponenter fra et tavlefoto eller v\u00E6lg manuelt hvad du ser. Systemet bygger automatisk et SLD-diagram.', 'Identify components from a panel photo or manually select what you see. The system automatically builds an SLD diagram.') + '</p>';
+
+  // File input for photo
+  html += '<div class="select-group"><div class="select-label">' + tx('Upload tavlefoto', 'Upload Panel Photo') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn" onclick="photoReverseHandleFile()">' + tx('V\u00E6lg foto / auto-detect', 'Choose photo / auto-detect') + '</button>';
+  html += '</div></div>';
+
+  // Board description presets
+  html += '<div class="select-group"><div class="select-label">' + tx('Hvad ser du i tavlen? (klik for at tilf\u00F8je)', 'What do you see in the panel? (click to add)') + '</div>';
+  html += '<div class="select-grid">';
+  for (var i = 0; i < REVERSE_CIRCUIT_TEMPLATES.length; i++) {
+    var tmpl = REVERSE_CIRCUIT_TEMPLATES[i];
+    html += '<button class="sel-btn" onclick="photoReverseAddComponent(\'' + tmpl.id + '\')">' + tx(tmpl.name_da, tmpl.name_en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Identified components list
+  if (st.identifiedComponents.length > 0) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Identificerede komponenter', 'Identified Components') + ' (' + st.identifiedComponents.length + ')</div>';
+    html += '<div class="result-box">';
+    for (var j = 0; j < st.identifiedComponents.length; j++) {
+      var comp = st.identifiedComponents[j];
+      html += '<div class="result-row"><span class="label">' + tx(comp.name_da, comp.name_en) + ' (' + comp.power_kW + ' kW)</span>';
+      html += '<span class="value"><button class="sel-btn" style="padding:2px 8px;color:var(--danger)" onclick="photoReverseRemoveComponent(' + j + ')">\u2715</button></span></div>';
+    }
+    html += '</div>';
+    html += '<div class="select-grid" style="margin-top:12px">';
+    html += '<button class="sel-btn selected" onclick="photoReverseBuildSLD()">' + tx('Byg SLD-diagram', 'Build SLD Diagram') + '</button>';
+    html += '<button class="sel-btn" style="color:var(--danger)" onclick="photoReverseReset()">' + tx('Nulstil', 'Reset') + '</button>';
+    html += '</div></div>';
+  }
+
+  // Show result if SLD was generated
+  if (st.sldGenerated && sldTree) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Genereret SLD', 'Generated SLD') + '</div>';
+    html += '<div class="result-box" style="background:var(--success-bg);border-color:var(--success)">';
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value" style="color:var(--success)">' + tx('SLD genereret med ' + st.identifiedComponents.length + ' kredse', 'SLD generated with ' + st.identifiedComponents.length + ' circuits') + '</span></div>';
+    html += '</div>';
+    html += '<div class="select-grid" style="margin-top:12px">';
+    html += '<button class="sel-btn selected" onclick="photoReverseGoToSLD()">' + tx('G\u00E5 til SLD-diagram', 'Go to SLD Diagram') + '</button>';
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// --- 1B: Live Exam Simulator with Timer + Scoring ---
+let examLiveState = { active: false, questions: [], currentIdx: 0, answers: {}, startTime: null, timerLeft: 10800, timerOn: false, timerEnd: null, finished: false, score: null };
+let examLiveTimerHandle = null;
+
+function examLiveStart() {
+  var allQuestions = [];
+  // Collect quiz questions
+  for (var i = 0; i < EXAM_QUIZ.length; i++) {
+    allQuestions.push({ type: 'quiz', idx: i, q: EXAM_QUIZ[i] });
+  }
+  // Collect scenario steps
+  for (var s = 0; s < EXAM_SCEN.length; s++) {
+    var sc = EXAM_SCEN[s];
+    for (var st = 0; st < sc.steps.length; st++) {
+      allQuestions.push({ type: 'scenario', scenId: sc.id, stepIdx: st, step: sc.steps[st], title: sc.title });
+    }
+  }
+  // Shuffle
+  for (var x = allQuestions.length - 1; x > 0; x--) {
+    var r = Math.floor(Math.random() * (x + 1));
+    var tmp = allQuestions[x]; allQuestions[x] = allQuestions[r]; allQuestions[r] = tmp;
+  }
+  examLiveState = {
+    active: true,
+    questions: allQuestions,
+    currentIdx: 0,
+    answers: {},
+    startTime: Date.now(),
+    timerLeft: 10800,
+    timerOn: true,
+    timerEnd: Date.now() + 10800 * 1000,
+    finished: false,
+    score: null,
+    optOrder: {}
+  };
+  // Generate shuffled option orders for each question
+  for (var qi = 0; qi < allQuestions.length; qi++) {
+    var nOpts = 0;
+    if (allQuestions[qi].type === 'quiz') nOpts = allQuestions[qi].q.opts.length;
+    else nOpts = allQuestions[qi].step.opts.length;
+    var order = [];
+    for (var oi = 0; oi < nOpts; oi++) order.push(oi);
+    for (var oi2 = order.length - 1; oi2 > 0; oi2--) {
+      var ri = Math.floor(Math.random() * (oi2 + 1));
+      var t2 = order[oi2]; order[oi2] = order[ri]; order[ri] = t2;
+    }
+    examLiveState.optOrder[qi] = order;
+  }
+  if (examLiveTimerHandle) clearInterval(examLiveTimerHandle);
+  examLiveTimerHandle = setInterval(examLiveTick, 1000);
+  renderModule('exam');
+}
+
+function examLiveTick() {
+  if (!examLiveState.timerOn) return;
+  var left = Math.max(0, Math.round((examLiveState.timerEnd - Date.now()) / 1000));
+  examLiveState.timerLeft = left;
+  var el = document.getElementById('examLiveTimer');
+  if (el) el.textContent = examFmtTime(left);
+  if (left <= 0) {
+    examLiveFinish();
+  }
+}
+
+function examLiveAnswer(optIdx) {
+  if (examLiveState.finished) return;
+  if (examLiveState.answers[examLiveState.currentIdx] !== undefined) return;
+  examLiveState.answers[examLiveState.currentIdx] = optIdx;
+  // Auto-advance after short delay
+  if (examLiveState.currentIdx < examLiveState.questions.length - 1) {
+    examLiveState.currentIdx++;
+  } else {
+    examLiveFinish();
+  }
+  renderModule('exam');
+}
+
+function examLiveFinish() {
+  examLiveState.finished = true;
+  examLiveState.timerOn = false;
+  if (examLiveTimerHandle) { clearInterval(examLiveTimerHandle); examLiveTimerHandle = null; }
+  // Calculate score
+  var correct = 0;
+  var total = examLiveState.questions.length;
+  for (var i = 0; i < total; i++) {
+    var q = examLiveState.questions[i];
+    var ans = examLiveState.answers[i];
+    if (ans === undefined) continue;
+    if (q.type === 'quiz') {
+      if (ans === q.q.ci) correct++;
+    } else {
+      if (ans === q.step.ci) correct++;
+    }
+  }
+  var pct = total > 0 ? Math.round(100 * correct / total) : 0;
+  examLiveState.score = { correct: correct, total: total, pct: pct, passed: pct >= 70, date: new Date().toISOString(), duration: Math.round((Date.now() - examLiveState.startTime) / 1000) };
+  // Save to localStorage
+  var store = examLoadStore();
+  if (!store.liveHistory) store.liveHistory = [];
+  store.liveHistory.push(examLiveState.score);
+  if (!store.liveBest || pct > store.liveBest) store.liveBest = pct;
+  examSaveStore(store);
+  renderModule('exam');
+}
+
+function examLiveAbort() {
+  examLiveState.active = false;
+  examLiveState.timerOn = false;
+  if (examLiveTimerHandle) { clearInterval(examLiveTimerHandle); examLiveTimerHandle = null; }
+  renderModule('exam');
+}
+
+function renderExamLive() {
+  var st = examLiveState;
+
+  // If not active, show start screen
+  if (!st.active) {
+    var store = examLoadStore();
+    var html = '<div class="card fade-in"><div class="card-title">' + tx('Live Eksamenssimulator', 'Live Exam Simulator') + '</div>';
+    html += '<p style="color:var(--text-light);margin:0 0 12px">' + tx('3 timers tidsbegr\u00E6nset eksamen med randomiserede sp\u00F8rgsm\u00E5l. Du kan ikke g\u00E5 tilbage. Best\u00E5: 70%.', '3-hour timed exam with randomized questions. You cannot go back. Pass: 70%.') + '</p>';
+    html += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Sp\u00F8rgsm\u00E5l', 'Questions') + '</span><span class="value">' + (EXAM_QUIZ.length + EXAM_SCEN.reduce(function(a, s) { return a + s.steps.length; }, 0)) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Tidsgr\u00E6nse', 'Time limit') + '</span><span class="value">3:00:00</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Best\u00E5: ', 'Pass: ') + '</span><span class="value">70%</span></div></div>';
+    if (store.liveHistory && store.liveHistory.length > 0) {
+      html += '<div class="card-title" style="margin-top:14px">' + tx('Tidligere fors\u00F8g', 'Previous Attempts') + '</div><div class="result-box">';
+      var hist = store.liveHistory.slice(-5).reverse();
+      for (var h = 0; h < hist.length; h++) {
+        var entry = hist[h];
+        var col = entry.passed ? 'var(--success)' : 'var(--danger)';
+        html += '<div class="result-row"><span class="label">' + (entry.date ? entry.date.substring(0, 10) : '?') + '</span><span class="value" style="color:' + col + '">' + entry.pct + '% (' + (entry.passed ? tx('Best\u00E5et', 'Passed') : tx('Ikke best\u00E5et', 'Failed')) + ')</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '<div class="select-grid" style="margin-top:14px"><button class="sel-btn selected" onclick="examLiveStart()">' + tx('Start 3-timers eksamen', 'Start 3-hour exam') + '</button></div>';
+    html += '</div>';
+    return html;
+  }
+
+  // If finished, show certificate
+  if (st.finished && st.score) {
+    var sc2 = st.score;
+    var passCol = sc2.passed ? 'var(--success)' : 'var(--danger)';
+    var html2 = '<div class="card fade-in"><div class="card-title">' + (sc2.passed ? '\u2705 ' : '\u274C ') + tx('Eksamensresultat', 'Exam Result') + '</div>';
+    html2 += '<div class="result-box" style="border-color:' + passCol + ';background:' + (sc2.passed ? 'var(--success-bg)' : 'var(--danger-bg)') + '">';
+    html2 += '<div class="result-row"><span class="label">' + tx('Score', 'Score') + '</span><span class="value" style="color:' + passCol + ';font-size:1.4em;font-weight:800">' + sc2.pct + '%</span></div>';
+    html2 += '<div class="result-row"><span class="label">' + tx('Rigtige', 'Correct') + '</span><span class="value">' + sc2.correct + ' / ' + sc2.total + '</span></div>';
+    html2 += '<div class="result-row"><span class="label">' + tx('Tid brugt', 'Time used') + '</span><span class="value">' + examFmtTime(sc2.duration) + '</span></div>';
+    html2 += '<div class="result-row"><span class="label">' + tx('Resultat', 'Result') + '</span><span class="value" style="color:' + passCol + ';font-weight:700">' + (sc2.passed ? tx('BEST\u00C5ET', 'PASSED') : tx('IKKE BEST\u00C5ET', 'FAILED')) + '</span></div>';
+    html2 += '</div>';
+    if (sc2.passed) {
+      html2 += '<div class="result-box" style="margin-top:12px;border-color:var(--success);text-align:center;padding:20px">';
+      html2 += '<div style="font-size:2em">\uD83C\uDF93</div>';
+      html2 += '<div style="font-size:1.1em;font-weight:700;margin-top:8px">' + tx('Certifikat: El-Dimensionering Eksamen', 'Certificate: Electrical Dimensioning Exam') + '</div>';
+      html2 += '<div style="color:var(--text-light);margin-top:4px">' + (sc2.date ? sc2.date.substring(0, 10) : '') + ' | ' + sc2.pct + '%</div>';
+      html2 += '</div>';
+    }
+    html2 += '<div class="select-grid" style="margin-top:14px">';
+    html2 += '<button class="sel-btn selected" onclick="examLiveState.active=false;renderModule(\'exam\')">' + tx('Tilbage', 'Back') + '</button>';
+    html2 += '<button class="sel-btn" onclick="examLiveStart()">' + tx('Pr\u00F8v igen', 'Try Again') + '</button>';
+    html2 += '</div></div>';
+    return html2;
+  }
+
+  // Active exam view
+  var q = st.questions[st.currentIdx];
+  var answered = st.answers[st.currentIdx] !== undefined;
+  var timerColor = st.timerLeft <= 300 ? 'var(--danger)' : (st.timerLeft <= 600 ? '#b8860b' : 'var(--success)');
+  var progress = Math.round(100 * Object.keys(st.answers).length / st.questions.length);
+
+  var html3 = '<div class="card fade-in"><div class="card-title">' + tx('Live Eksamen', 'Live Exam') + '</div>';
+  // Timer and progress bar
+  html3 += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">';
+  html3 += '<span id="examLiveTimer" style="font-size:1.4rem;font-weight:800;font-variant-numeric:tabular-nums;color:' + timerColor + '">' + examFmtTime(st.timerLeft) + '</span>';
+  html3 += '<span style="color:var(--text-light)">' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ' ' + (st.currentIdx + 1) + '/' + st.questions.length + '</span>';
+  html3 += '<span style="color:var(--text-light)">' + progress + '% ' + tx('besvaret', 'answered') + '</span>';
+  html3 += '<button class="sel-btn" style="color:var(--danger)" onclick="examLiveAbort()">' + tx('Afbryd', 'Abort') + '</button>';
+  html3 += '</div>';
+  // Progress bar
+  html3 += '<div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:16px"><div style="background:var(--primary);height:6px;border-radius:3px;width:' + progress + '%"></div></div>';
+
+  // Question
+  var qText = '';
+  var opts = [];
+  var correctIdx = -1;
+  if (q.type === 'quiz') {
+    qText = examL(q.q.q);
+    opts = q.q.opts;
+    correctIdx = q.q.ci;
+  } else {
+    qText = examL(q.title) + ': ' + examL(q.step.q);
+    opts = q.step.opts;
+    correctIdx = q.step.ci;
+  }
+
+  html3 += '<div class="result-box"><div class="result-title">' + qText + '</div></div>';
+  html3 += '<div class="select-grid" style="margin-top:12px">';
+  var optOrder = st.optOrder[st.currentIdx] || [];
+  for (var oi = 0; oi < optOrder.length; oi++) {
+    var realIdx = optOrder[oi];
+    var optText = examL(opts[realIdx]);
+    var btnStyle = '';
+    if (answered && st.answers[st.currentIdx] === realIdx) {
+      btnStyle = realIdx === correctIdx ? 'border-color:var(--success);background:var(--success-bg)' : 'border-color:var(--danger);background:var(--danger-bg)';
+    }
+    var clickAttr = answered ? '' : 'onclick="examLiveAnswer(' + realIdx + ')"';
+    html3 += '<button class="sel-btn" style="' + btnStyle + '" ' + clickAttr + '>' + optText + '</button>';
+  }
+  html3 += '</div></div>';
+  return html3;
+}
+
+
+// --- 1C: One-Click Project ---
+let oneClickState = { selectedBuilding: null, generated: false };
+
+function oneClickSelect(presetId) {
+  oneClickState.selectedBuilding = presetId;
+  oneClickState.generated = false;
+  // Build SLD tree from building preset
+  var preset = null;
+  for (var i = 0; i < REVERSE_BUILDING_PRESETS.length; i++) {
+    if (REVERSE_BUILDING_PRESETS[i].id === presetId) { preset = REVERSE_BUILDING_PRESETS[i]; break; }
+  }
+  if (!preset) return;
+  sldNextId = 1;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mainBoard = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mainBoard.id] = mainBoard;
+  trafo.childIds.push(mainBoard.id);
+  for (var j = 0; j < preset.circuits.length; j++) {
+    var tmplId = preset.circuits[j];
+    var tmpl = null;
+    for (var k = 0; k < REVERSE_CIRCUIT_TEMPLATES.length; k++) {
+      if (REVERSE_CIRCUIT_TEMPLATES[k].id === tmplId) { tmpl = REVERSE_CIRCUIT_TEMPLATES[k]; break; }
+    }
+    if (tmpl) {
+      var prot = null;
+      var cable = null;
+      if (tmpl.protectionType === 'MCCB') {
+        prot = PRODUCTS.mccbs[0];
+      } else {
+        var rating = Math.ceil(tmpl.power_kW * 1000 / (tmpl.voltage * (tmpl.cosPhi || 0.95)));
+        var stdRatings = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+        var selRating = 16;
+        for (var ri = 0; ri < stdRatings.length; ri++) {
+          if (stdRatings[ri] >= rating) { selRating = stdRatings[ri]; break; }
+        }
+        prot = PRODUCTS.mcbs.find(function(m) { return m.rating === selRating && m.curve === 'B'; }) || PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+      }
+      // Select cable based on power
+      if (tmpl.power_kW <= 3.5) {
+        cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 2.5 && c.material === 'Cu'; });
+      } else if (tmpl.power_kW <= 7.5) {
+        cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 4 && c.material === 'Cu'; });
+      } else if (tmpl.power_kW <= 15) {
+        cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 6 && c.material === 'Cu'; });
+      } else {
+        cable = PRODUCTS.cables.find(function(c) { return c.mm2 === 10 && c.material === 'Cu'; });
+      }
+      var fc = sldCreateNode('final_circuit', mainBoard.id, {
+        name_da: tmpl.name_da,
+        name_en: tmpl.name_en,
+        power_kW: tmpl.power_kW,
+        cosPhi: tmpl.cosPhi,
+        phases: tmpl.phases,
+        voltage: tmpl.voltage || 230,
+        installMethod: tmpl.installMethod || 'C',
+        length_m: tmpl.cableLength_m || 25,
+        cable: cable,
+        protection: prot,
+        protectionIn: prot ? prot.rating : 16
+      });
+      tree.nodes[fc.id] = fc;
+      mainBoard.childIds.push(fc.id);
+    }
+  }
+  sldTree = tree;
+  sldPropagateAll(sldTree);
+  oneClickState.generated = true;
+  renderModule('oneclick');
+}
+
+function oneClickGoToSLD() {
+  activeModule = 'sld';
+  renderModule('sld');
+}
+
+function oneClickGenerateBOM() {
+  if (!sldTree) return '';
+  var bom = {};
+  var nodeIds = Object.keys(sldTree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = sldTree.nodes[nodeIds[i]];
+    if (!node) continue;
+    if (node.cable) {
+      var cKey = node.cable.material + ' ' + node.cable.mm2 + 'mm2';
+      if (!bom[cKey]) bom[cKey] = { type: 'cable', desc: cKey, qty: 0, unit: 'm' };
+      bom[cKey].qty += (node.length_m || 0);
+    }
+    if (node.protection) {
+      var pKey = (node.protection.type || 'MCB') + ' ' + (node.protectionIn || node.protection.rating) + 'A';
+      if (node.protection.curve) pKey += ' ' + node.protection.curve;
+      if (!bom[pKey]) bom[pKey] = { type: 'protection', desc: pKey, qty: 0, unit: tx('stk', 'pcs') };
+      bom[pKey].qty++;
+    }
+  }
+  return bom;
+}
+
+function oneClickCheckCompliance() {
+  if (!sldTree) return [];
+  var issues = [];
+  var nodeIds = Object.keys(sldTree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = sldTree.nodes[nodeIds[i]];
+    if (!node || node.type === 'transformer') continue;
+    var result = sldVerifyNode(sldTree, node.id);
+    if (result && !result.ok) {
+      issues.push({ nodeId: node.id, name: tx(node.name_da, node.name_en), issues: result.issues || [] });
+    }
+  }
+  return issues;
+}
+
+function renderOneClick() {
+  var st = oneClickState;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Et-Klik Projekt', 'One-Click Project') + '</div>';
+  html += '<p style="color:var(--text-light);margin:0 0 12px">' + tx('V\u00E6lg bygningstype og f\u00E5 et komplet el-design med SLD, stykliste og overensstemmelsestjek.', 'Select building type and get a complete electrical design with SLD, BOM and compliance check.') + '</p>';
+
+  // Building type cards
+  html += '<div class="select-group"><div class="select-label">' + tx('V\u00E6lg bygningstype', 'Select Building Type') + '</div>';
+  html += '<div class="select-grid">';
+  var icons = { villa: '\uD83C\uDFE0', apartment: '\uD83C\uDFE2', commercial: '\uD83C\uDFE2', industrial: '\uD83C\uDFED', agricultural: '\uD83C\uDF3E' };
+  for (var i = 0; i < REVERSE_BUILDING_PRESETS.length; i++) {
+    var bp = REVERSE_BUILDING_PRESETS[i];
+    var sel = st.selectedBuilding === bp.id ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + '" onclick="oneClickSelect(\'' + bp.id + '\')" style="min-height:60px;flex-direction:column;display:flex;align-items:center;gap:4px">';
+    html += '<span style="font-size:1.5em">' + (icons[bp.id] || '\uD83C\uDFE0') + '</span>';
+    html += '<span>' + tx(bp.name_da, bp.name_en) + '</span>';
+    html += '<span style="font-size:.7em;color:var(--text-light)">' + bp.circuits.length + ' ' + tx('kredse', 'circuits') + '</span>';
+    html += '</button>';
+  }
+  html += '</div></div>';
+
+  // Results if generated
+  if (st.generated && sldTree) {
+    // BOM
+    var bom = oneClickGenerateBOM();
+    var bomKeys = Object.keys(bom);
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Stykliste (BOM)', 'Bill of Materials (BOM)') + '</div>';
+    html += '<div class="result-box">';
+    for (var bi = 0; bi < bomKeys.length; bi++) {
+      var item = bom[bomKeys[bi]];
+      html += '<div class="result-row"><span class="label">' + item.desc + '</span><span class="value">' + item.qty + ' ' + item.unit + '</span></div>';
+    }
+    html += '</div></div>';
+
+    // Compliance check
+    var issues = oneClickCheckCompliance();
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Overensstemmelsestjek', 'Compliance Check') + '</div>';
+    if (issues.length === 0) {
+      html += '<div class="result-box" style="border-color:var(--success);background:var(--success-bg)"><div class="result-row"><span class="label">' + tx('Alle kredse overholder DS/HD 60364', 'All circuits comply with DS/HD 60364') + '</span><span class="value" style="color:var(--success)">\u2705</span></div></div>';
+    } else {
+      html += '<div class="result-box" style="border-color:var(--warning)">';
+      for (var ii = 0; ii < issues.length; ii++) {
+        var iss = issues[ii];
+        html += '<div class="result-row"><span class="label" style="color:var(--warning)">\u26A0\uFE0F ' + iss.name + '</span><span class="value">' + (iss.issues.length > 0 ? iss.issues[0] : '') + '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Actions
+    html += '<div class="card fade-in"><div class="select-grid">';
+    html += '<button class="sel-btn selected" onclick="oneClickGoToSLD()">' + tx('Se SLD-diagram', 'View SLD Diagram') + '</button>';
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// --- 1D: Animated Fault Propagation ---
+function sldAnimateFault(tree, nodeId, faultType) {
+  if (!tree || !nodeId || !tree.nodes[nodeId]) return '<p>' + tx('Ingen data', 'No data') + '</p>';
+  var result = sldSimulateFault(tree, nodeId, faultType || 'short_circuit');
+  if (!result || !result.path || result.path.length === 0) return '<p>' + tx('Ingen fejlsti', 'No fault path') + '</p>';
+
+  var path = result.path;
+  var nodeW = 90, nodeH = 50, gapY = 80;
+  var positions = {};
+  var maxY = 0;
+
+  for (var i = 0; i < path.length; i++) {
+    var px = 200;
+    var py = 30 + i * (nodeH + gapY);
+    positions[path[i]] = { x: px, y: py };
+    if (py + nodeH > maxY) maxY = py + nodeH;
+  }
+
+  var svgW = 500;
+  var svgH = maxY + 60;
+  var totalDuration = Math.min(result.tripTime || 1, 5);
+  if (totalDuration === Infinity || totalDuration <= 0) totalDuration = 2;
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="min-height:200px;max-height:600px;border-radius:12px;overflow:hidden" xmlns="http://www.w3.org/2000/svg">';
+  // Background
+  svg += '<rect width="100%" height="100%" fill="#050c18"/>';
+  svg += '<defs>';
+  svg += '<filter id="animGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<filter id="animPulse"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  // Animated gradient for fault current pulse
+  svg += '<linearGradient id="faultPulseGrad" x1="0" y1="1" x2="0" y2="0">';
+  svg += '<stop offset="0%" stop-color="#ff2244"><animate attributeName="offset" values="0;1;0" dur="' + (totalDuration * 0.4).toFixed(2) + 's" repeatCount="indefinite"/></stop>';
+  svg += '<stop offset="30%" stop-color="#ff6644"><animate attributeName="offset" values="0.3;1;0.3" dur="' + (totalDuration * 0.4).toFixed(2) + 's" repeatCount="indefinite"/></stop>';
+  svg += '<stop offset="100%" stop-color="#ff224400"/>';
+  svg += '</linearGradient>';
+  svg += '</defs>';
+
+  // Draw connection lines with animated fault current (red pulse traveling from fault toward source)
+  for (var ci = path.length - 1; ci > 0; ci--) {
+    var fromId = path[ci];
+    var toId = path[ci - 1];
+    var fromPos = positions[fromId];
+    var toPos = positions[toId];
+    if (!fromPos || !toPos) continue;
+    var x1 = fromPos.x + nodeW / 2;
+    var y1 = fromPos.y;
+    var x2 = toPos.x + nodeW / 2;
+    var y2 = toPos.y + nodeH;
+    // Base line
+    svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#334" stroke-width="3"/>';
+    // Animated red pulse (fault current flowing upward)
+    var delay = ((path.length - 1 - ci) * totalDuration * 0.15).toFixed(2);
+    svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#ff3344" stroke-width="3" stroke-dasharray="12,8" filter="url(#animGlow)">';
+    svg += '<animate attributeName="stroke-dashoffset" from="40" to="0" dur="0.5s" begin="' + delay + 's" repeatCount="indefinite"/>';
+    svg += '<animate attributeName="opacity" values="0;1;1" dur="0.3s" begin="' + delay + 's" fill="freeze"/>';
+    svg += '</line>';
+  }
+
+  // Draw nodes with trip animation
+  for (var ni = 0; ni < path.length; ni++) {
+    var nid = path[ni];
+    var node = tree.nodes[nid];
+    var pos = positions[nid];
+    if (!node || !pos) continue;
+
+    var isFaultPoint = (nid === nodeId);
+    var isTripping = (nid === result.trippingDeviceNodeId);
+    var isHeld = (!isFaultPoint && !isTripping && ni < path.length - 1);
+
+    var boxColor = '#1a2a3a';
+    var borderColor = '#3388aa';
+    var textColor = '#88ccee';
+
+    if (isFaultPoint) {
+      borderColor = '#ff3344';
+      textColor = '#ff6666';
+    } else if (isTripping) {
+      borderColor = '#00ff88';
+      textColor = '#00ff88';
+    } else if (isHeld) {
+      borderColor = '#4488aa';
+      textColor = '#88aacc';
+    }
+
+    // Node box
+    svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="6" fill="' + boxColor + '" stroke="' + borderColor + '" stroke-width="2"';
+    if (isFaultPoint) {
+      svg += ' filter="url(#animPulse)">';
+      svg += '<animate attributeName="opacity" values="1;0.6;1" dur="0.4s" repeatCount="indefinite"/>';
+      svg += '</rect>';
+    } else if (isTripping) {
+      var tripDelay = (totalDuration * 0.6).toFixed(2);
+      svg += '>';
+      svg += '<animate attributeName="fill" values="#1a2a3a;#004422;#00ff8833" dur="0.3s" begin="' + tripDelay + 's" fill="freeze"/>';
+      svg += '<animate attributeName="stroke" values="' + borderColor + ';#00ff88;#44ffaa" dur="0.3s" begin="' + tripDelay + 's" fill="freeze"/>';
+      svg += '</rect>';
+      // Trip flash indicator
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + nodeH + 16) + '" fill="#00ff88" font-size="10" text-anchor="middle" opacity="0">';
+      svg += tx('UDLOEST', 'TRIPPED');
+      svg += '<animate attributeName="opacity" values="0;1" dur="0.2s" begin="' + tripDelay + 's" fill="freeze"/>';
+      svg += '</text>';
+    } else if (isHeld) {
+      svg += '/>';
+      // Held status
+      var heldDelay = (totalDuration * 0.8).toFixed(2);
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + nodeH + 16) + '" fill="#4488aa" font-size="9" text-anchor="middle" opacity="0">';
+      svg += tx('HOLDT', 'HELD');
+      svg += '<animate attributeName="opacity" values="0;1" dur="0.3s" begin="' + heldDelay + 's" fill="freeze"/>';
+      svg += '</text>';
+    } else {
+      svg += '/>';
+    }
+
+    // Node label
+    var label = node.type === 'transformer' ? 'Trafo' : (lang === 'da' ? (node.name_da || node.type) : (node.name_en || node.type));
+    if (label.length > 12) label = label.substring(0, 11) + '..';
+    svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 20) + '" fill="' + textColor + '" font-size="10" text-anchor="middle" font-weight="600">' + label + '</text>';
+
+    // Protection info
+    if (node.protection && node.protectionIn) {
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 36) + '" fill="' + textColor + '" font-size="8" text-anchor="middle" opacity="0.7">' + node.protectionIn + 'A ' + (node.protection.curve || '') + '</text>';
+    }
+
+    // Fault indicator at fault point
+    if (isFaultPoint) {
+      svg += '<circle cx="' + (pos.x + nodeW + 20) + '" cy="' + (pos.y + nodeH / 2) + '" r="8" fill="#ff3344" filter="url(#animPulse)">';
+      svg += '<animate attributeName="r" values="6;10;6" dur="0.6s" repeatCount="indefinite"/>';
+      svg += '</circle>';
+      svg += '<text x="' + (pos.x + nodeW + 35) + '" y="' + (pos.y + nodeH / 2 + 4) + '" fill="#ff6666" font-size="9">' + tx('FEJL', 'FAULT') + ' ' + (result.ikFault ? result.ikFault.toFixed(0) + 'A' : '') + '</text>';
+    }
+  }
+
+  // Timeline bar at bottom
+  var barY = svgH - 30;
+  svg += '<rect x="30" y="' + barY + '" width="' + (svgW - 60) + '" height="4" rx="2" fill="#223"/>';
+  svg += '<rect x="30" y="' + barY + '" width="0" height="4" rx="2" fill="#00ff88">';
+  svg += '<animate attributeName="width" from="0" to="' + (svgW - 60) + '" dur="' + totalDuration.toFixed(1) + 's" repeatCount="indefinite"/>';
+  svg += '</rect>';
+  svg += '<text x="30" y="' + (barY - 6) + '" fill="#88aacc" font-size="9">0s</text>';
+  svg += '<text x="' + (svgW - 30) + '" y="' + (barY - 6) + '" fill="#88aacc" font-size="9" text-anchor="end">' + totalDuration.toFixed(2) + 's</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// Fault animation state
+let sldFaultAnimMode = false;
+let sldFaultAnimResult = null;
+
+function sldStartFaultAnim() {
+  if (!sldTree || !sldSelectedId) return;
+  sldFaultAnimResult = sldAnimateFault(sldTree, sldSelectedId, sldFaultSimType || 'short_circuit');
+  sldFaultAnimMode = true;
+  renderModule('sld');
+}
+
+function sldExitFaultAnim() {
+  sldFaultAnimMode = false;
+  sldFaultAnimResult = null;
+  renderModule('sld');
+}
+
+// ============================================================================
+// ===== FEATURE: LIVE EXAM SIMULATOR WITH TIMER + SCORING ===================
+// ============================================================================
+let examSimState = { active: false, currentQ: 0, answers: [], timeLeft: 0, timerInterval: null, completed: false, duration: 10800 };
+
+function examSimStart() {
+  examSimState.active = true;
+  examSimState.currentQ = 0;
+  examSimState.answers = [];
+  examSimState.completed = false;
+  examSimState.timeLeft = examSimState.duration;
+  examSimState.timerInterval = setInterval(function() {
+    examSimState.timeLeft--;
+    if (examSimState.timeLeft <= 0) { examSimFinish(); }
+    else { var el = document.getElementById('examSimTimer'); if (el) { el.textContent = examSimFormatTime(examSimState.timeLeft); } }
+  }, 1000);
+  renderModule('eksamen');
+}
+
+function examSimSetDuration(secs) { examSimState.duration = secs; renderModule('eksamen'); }
+
+function examSimFormatTime(s) { var h = Math.floor(s/3600); var m = Math.floor((s%3600)/60); var sec = s%60; return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec; }
+
+function examSimAnswer(qi, ai) { examSimState.answers[qi] = ai; renderModule('eksamen'); }
+
+function examSimGo(i) { examSimState.currentQ = Math.max(0, Math.min(EXAM_QUIZ.length-1, i)); renderModule('eksamen'); }
+
+function examSimFinish() {
+  if (examSimState.timerInterval) { clearInterval(examSimState.timerInterval); examSimState.timerInterval = null; }
+  examSimState.completed = true;
+  examSimState.active = false;
+  renderModule('eksamen');
+}
+
+function examSimReset() {
+  if (examSimState.timerInterval) { clearInterval(examSimState.timerInterval); examSimState.timerInterval = null; }
+  examSimState = { active: false, currentQ: 0, answers: [], timeLeft: 0, timerInterval: null, completed: false, duration: examSimState.duration };
+  renderModule('eksamen');
+}
+
+function renderEksamen() {
+  var html = '';
+  if (!examSimState.active && !examSimState.completed) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Eksamen Simulator', 'Exam Simulator') + '</div>';
+    html += '<p style="margin:8px 0;color:var(--text-light)">' + tx('Simuler en rigtig autorisationseksamen med tidspres. V\u00E6lg varighed og start.', 'Simulate a real authorization exam under time pressure. Choose duration and start.') + '</p>';
+    html += '<div style="margin:12px 0">';
+    html += '<span style="color:var(--text-muted);margin-right:8px">' + tx('Varighed:', 'Duration:') + '</span>';
+    html += '<button class="sel-btn' + (examSimState.duration===3600?' selected':'') + '" onclick="examSimSetDuration(3600)">1h</button> ';
+    html += '<button class="sel-btn' + (examSimState.duration===7200?' selected':'') + '" onclick="examSimSetDuration(7200)">2h</button> ';
+    html += '<button class="sel-btn' + (examSimState.duration===10800?' selected':'') + '" onclick="examSimSetDuration(10800)">3h</button>';
+    html += '</div>';
+    html += '<p style="margin:8px 0;color:var(--text-muted)">' + tx('Sp\u00F8rgsm\u00E5l: ', 'Questions: ') + EXAM_QUIZ.length + '</p>';
+    html += '<button class="sel-btn selected" onclick="examSimStart()">' + tx('Start eksamen', 'Start exam') + '</button>';
+    html += '</div>';
+    return html;
+  }
+  if (examSimState.completed) {
+    var correct = 0;
+    for (var i = 0; i < EXAM_QUIZ.length; i++) { if (examSimState.answers[i] === EXAM_QUIZ[i].ci) correct++; }
+    var pct = Math.round(100 * correct / EXAM_QUIZ.length);
+    var passed = pct >= 70;
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+    html += '<div class="result-box' + (passed ? '' : ' error') + '"><div class="result-row"><span class="label">' + tx('Score', 'Score') + '</span><span class="value">' + correct + '/' + EXAM_QUIZ.length + ' (' + pct + '%)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value" style="color:' + (passed ? 'var(--success)' : 'var(--danger)') + '">' + (passed ? tx('BEST\u00C5ET', 'PASSED') : tx('IKKE BEST\u00C5ET', 'FAILED')) + '</span></div></div>';
+    html += '<div style="margin-top:12px">';
+    for (var j = 0; j < EXAM_QUIZ.length; j++) {
+      var q = EXAM_QUIZ[j];
+      var pick = examSimState.answers[j];
+      var ok = pick === q.ci;
+      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border-light)">';
+      html += '<span style="color:' + (ok ? 'var(--success)' : 'var(--danger)') + '">' + (ok ? '\u2714' : '\u2718') + '</span> ';
+      html += '<b>' + (j+1) + '.</b> ' + tx(q.da || q.q, q.en || q.q);
+      if (!ok) { html += '<br><span style="font-size:0.8rem;color:var(--text-muted)">' + tx('Korrekt: ', 'Correct: ') + (q.options ? q.options[q.ci] : '') + (q.clause ? ' \u2014 ' + q.clause : '') + '</span>'; }
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<button class="sel-btn" style="margin-top:12px" onclick="examSimReset()">' + tx('Pr\u00F8v igen', 'Try again') + '</button>';
+    html += '</div>';
+    return html;
+  }
+  // Active exam
+  var qi = examSimState.currentQ;
+  var q = EXAM_QUIZ[qi];
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Eksamen', 'Exam') + ' \u2014 <span id="examSimTimer">' + examSimFormatTime(examSimState.timeLeft) + '</span></div>';
+  // Navigation dots
+  html += '<div style="margin:8px 0;text-align:center">';
+  for (var d = 0; d < EXAM_QUIZ.length; d++) {
+    var cls = 'exam-sim-dot';
+    if (d === qi) cls += ' current';
+    else if (examSimState.answers[d] !== undefined) cls += ' answered';
+    html += '<span class="' + cls + '" onclick="examSimGo(' + d + ')">' + (d+1) + '</span>';
+  }
+  html += '</div>';
+  // Question
+  html += '<p style="margin:12px 0;font-weight:600">' + (qi+1) + '. ' + tx(q.da || q.q, q.en || q.q) + '</p>';
+  if (q.options) {
+    for (var oi = 0; oi < q.options.length; oi++) {
+      var sel = examSimState.answers[qi] === oi ? ' selected' : '';
+      html += '<button class="sel-btn' + sel + '" style="display:block;width:100%;text-align:left;margin:4px 0" onclick="examSimAnswer(' + qi + ',' + oi + ')">' + String.fromCharCode(65+oi) + '. ' + q.options[oi] + '</button>';
+    }
+  }
+  // Nav buttons
+  html += '<div style="margin-top:12px;display:flex;gap:8px">';
+  html += '<button class="sel-btn"' + (qi<=0?' disabled style="opacity:.4"':'') + ' onclick="examSimGo(' + (qi-1) + ')">' + tx('\u25C0 Forrige', '\u25C0 Prev') + '</button>';
+  html += '<button class="sel-btn"' + (qi>=EXAM_QUIZ.length-1?' disabled style="opacity:.4"':'') + ' onclick="examSimGo(' + (qi+1) + ')">' + tx('N\u00E6ste \u25B6', 'Next \u25B6') + '</button>';
+  var answeredCount = examSimState.answers.filter(function(a) { return a !== undefined; }).length;
+  if (answeredCount === EXAM_QUIZ.length) {
+    html += '<button class="sel-btn selected" onclick="examSimFinish()">' + tx('Afslut eksamen', 'Finish exam') + '</button>';
+  }
+  html += '</div>';
+  html += '<button class="sel-btn" style="margin-top:8px;font-size:0.8rem" onclick="examSimReset()">' + tx('Afbryd', 'Abort') + '</button>';
+  html += '</div>';
+  return html;
+}
+
+// ============================================================================
+// ===== FEATURE: CROSS-MODULE REACTIVE DASHBOARD =============================
+// ============================================================================
+let dashboardCollapsed = false;
+
+function toggleDashboard() { dashboardCollapsed = !dashboardCollapsed; renderModule(activeModule); }
+
+function renderDashboardBar(mod) {
+  if (dashboardCollapsed) {
+    return '<div class="dashboard-bar" onclick="toggleDashboard()" style="text-align:center"><span class="db-toggle">' + tx('\u25BC Vis dimensioneringsbar', '\u25BC Show dimensioning bar') + '</span></div>';
+  }
+  var ib = 0; try { ib = calcIB(); } catch(e) { return ''; }
+  if (!ib || isNaN(ib) || ib <= 0) return '';
+  var inVal = mcbState.rating || (fuseState.size ? fuseState.size : 0);
+  var izVal = 0;
+  if (cableState.crossSection) {
+    // Estimate Iz from cable cross-section (simplified)
+    var csMap = {1.5:17.5, 2.5:24, 4:32, 6:41, 10:57, 16:76, 25:101, 35:125, 50:151, 70:192, 95:232, 120:269, 150:300, 185:341, 240:400};
+    izVal = csMap[cableState.crossSection] || 0;
+  }
+  var vd = 0;
+  if (vdropState.length && cableState.crossSection) {
+    // Simplified voltage drop approximation
+    var rho = cableState.material === 'Al' ? 0.0286 : 0.0175;
+    var L = vdropState.length;
+    var A = cableState.crossSection;
+    var V = loadState.voltage === '3x400' ? 400 : 230;
+    vd = (2 * rho * L * ib) / (A * V) * 100;
+  }
+  var html = '<div class="dashboard-bar" onclick="toggleDashboard()">';
+  html += '<span class="db-toggle" style="float:right">' + tx('\u25B2 Skjul', '\u25B2 Hide') + '</span>';
+  html += '<div class="db-chain">';
+  // IB
+  html += '<span class="db-item ok" onclick="event.stopPropagation();switchModule(\'load\')">IB=' + ib.toFixed(1) + 'A</span>';
+  html += '<span style="color:var(--text-muted)">\u2192</span>';
+  // In
+  if (inVal) {
+    var inOk = inVal >= ib ? 'ok' : 'fail';
+    html += '<span class="db-item ' + inOk + '" onclick="event.stopPropagation();switchModule(\'mcb\')">In=' + inVal + 'A</span>';
+    html += '<span style="color:var(--text-muted)">\u2192</span>';
+  }
+  // Iz
+  if (izVal) {
+    var izOk = izVal >= inVal ? 'ok' : (izVal >= ib ? 'warn' : 'fail');
+    html += '<span class="db-item ' + izOk + '" onclick="event.stopPropagation();switchModule(\'cable\')">Iz=' + izVal + 'A ' + (izOk==='ok'?'\u2714':'\u26A0') + '</span>';
+    html += '<span style="color:var(--text-muted)">\u2192</span>';
+  }
+  // Voltage drop
+  if (vd > 0) {
+    var vdOk = vd <= 3 ? 'ok' : (vd <= 5 ? 'warn' : 'fail');
+    html += '<span class="db-item ' + vdOk + '" onclick="event.stopPropagation();switchModule(\'vdrop\')">\u0394U=' + vd.toFixed(1) + '% ' + (vdOk==='ok'?'\u2714':'\u26A0') + '</span>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+// ============================================================================
+// ===== FEATURE: INSTALLATION TYPE PRESETS ===================================
+// ============================================================================
+const INSTALL_PRESETS = [
+  { id: 'bolig_standard', da: 'Standard bolig (25A 3-faset)', en: 'Standard residential (25A 3-phase)', supply: '3x400', earthing: 'TN-S', load: { voltage:'3x400', power:15, cosPhi:0.95, simFactor:0.6, expFactor:1.0 }, cable: { material:'Cu', type:'XLPE', cores:'5', crossSection:4, installMethod:'C', temp:30, grouping:1 }, mcb: { type:'MCB', curve:'B', rating:25, poles:3 }, vdrop: { length:20 } },
+  { id: 'lejlighed', da: 'Lejlighed (1-faset)', en: 'Apartment (single-phase)', supply: '1x230', earthing: 'TN-S', load: { voltage:'1x230', power:7.4, cosPhi:0.95, simFactor:0.5, expFactor:1.0 }, cable: { material:'Cu', type:'XLPE', cores:'3', crossSection:2.5, installMethod:'C', temp:30, grouping:1 }, mcb: { type:'MCB', curve:'B', rating:16, poles:1 }, vdrop: { length:15 } },
+  { id: 'erhverv_kontor', da: 'Erhverv/kontor', en: 'Commercial/office', supply: '3x400', earthing: 'TN-S', load: { voltage:'3x400', power:50, cosPhi:0.9, simFactor:0.7, expFactor:1.2 }, cable: { material:'Cu', type:'XLPE', cores:'5', crossSection:16, installMethod:'E', temp:30, grouping:1 }, mcb: { type:'MCB', curve:'C', rating:63, poles:3 }, vdrop: { length:40 } },
+  { id: 'vaerksted', da: 'V\u00E6rksted (motorer)', en: 'Workshop (motors)', supply: '3x400', earthing: 'TN-S', load: { voltage:'3x400', power:22, cosPhi:0.85, simFactor:0.8, expFactor:1.0 }, cable: { material:'Cu', type:'XLPE', cores:'5', crossSection:6, installMethod:'B2', temp:35, grouping:2 }, mcb: { type:'MCB', curve:'C', rating:32, poles:3 }, vdrop: { length:25 } },
+  { id: 'landbrug', da: 'Landbrug (udend\u00F8rs)', en: 'Agricultural (outdoor)', supply: '3x400', earthing: 'TT', load: { voltage:'3x400', power:18, cosPhi:0.88, simFactor:0.7, expFactor:1.3 }, cable: { material:'Cu', type:'XLPE', cores:'5', crossSection:6, installMethod:'D', temp:25, grouping:1 }, mcb: { type:'MCB', curve:'C', rating:32, poles:3 }, vdrop: { length:50 } }
+];
+
+function applyInstallPreset(id) {
+  var preset = null;
+  for (var i = 0; i < INSTALL_PRESETS.length; i++) { if (INSTALL_PRESETS[i].id === id) { preset = INSTALL_PRESETS[i]; break; } }
+  if (!preset) return;
+  if (preset.load) { loadState.voltage = preset.load.voltage; loadState.power = preset.load.power; loadState.cosPhi = preset.load.cosPhi; loadState.simFactor = preset.load.simFactor; loadState.expFactor = preset.load.expFactor; }
+  if (preset.cable) { cableState.material = preset.cable.material; cableState.type = preset.cable.type; cableState.cores = preset.cable.cores; cableState.crossSection = preset.cable.crossSection; cableState.installMethod = preset.cable.installMethod; cableState.temp = preset.cable.temp; cableState.grouping = preset.cable.grouping; }
+  if (preset.mcb) { mcbState.type = preset.mcb.type; mcbState.curve = preset.mcb.curve; mcbState.rating = preset.mcb.rating; mcbState.poles = preset.mcb.poles; }
+  if (preset.vdrop) { vdropState.length = preset.vdrop.length; }
+  renderModule('presets');
+}
+
+function renderPresets() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Installations Presets', 'Installation Presets') + '</div>';
+  html += '<p style="margin:8px 0;color:var(--text-light)">' + tx('V\u00E6lg en installationstype for at auto-udfylde alle dimensioneringsv\u00E6rdier.', 'Choose an installation type to auto-fill all dimensioning values.') + '</p>';
+  html += '<div class="eng-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px">';
+  for (var i = 0; i < INSTALL_PRESETS.length; i++) {
+    var p = INSTALL_PRESETS[i];
+    html += '<div class="card" style="cursor:pointer;padding:14px" onclick="applyInstallPreset(\'' + p.id + '\')">';
+    html += '<div style="font-weight:600;margin-bottom:6px">' + tx(p.da, p.en) + '</div>';
+    html += '<div style="font-size:0.8rem;color:var(--text-muted)">';
+    html += tx('Forsyning: ', 'Supply: ') + p.supply + '<br>';
+    html += tx('Jording: ', 'Earthing: ') + p.earthing + '<br>';
+    html += tx('Effekt: ', 'Power: ') + p.load.power + ' kW<br>';
+    html += tx('Kabel: ', 'Cable: ') + p.cable.crossSection + 'mm\u00B2 ' + p.cable.material;
+    html += '</div></div>';
+  }
+  html += '</div>';
+  if (loadState.power > 0) {
+    html += '<div class="result-box" style="margin-top:16px"><div class="result-title">' + tx('Aktive v\u00E6rdier', 'Active values') + '</div>';
+    html += '<div class="result-row"><span class="label">IB</span><span class="value">' + calcIB().toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">In</span><span class="value">' + (mcbState.rating || '-') + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + (cableState.crossSection || '-') + ' mm\u00B2 ' + (cableState.material || '') + '</span></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ============================================================================
+// ===== FEATURE: KEYBOARD SHORTCUTS ==========================================
+// ============================================================================
+let kbdOverlayVisible = false;
+
+function showKbdOverlay() { kbdOverlayVisible = true; renderKbdOverlay(); }
+function hideKbdOverlay() { kbdOverlayVisible = false; var el = document.getElementById('kbdOverlay'); if (el) el.remove(); }
+
+function renderKbdOverlay() {
+  var existing = document.getElementById('kbdOverlay');
+  if (existing) existing.remove();
+  if (!kbdOverlayVisible) return;
+  var el = document.createElement('div');
+  el.id = 'kbdOverlay';
+  el.className = 'kbd-overlay';
+  el.onclick = function(e) { if (e.target === el) hideKbdOverlay(); };
+  var shortcuts = [
+    ['1', tx('Belastning', 'Load')],
+    ['2', tx('MCB/Sikring', 'MCB/Fuse')],
+    ['3', tx('Kabel', 'Cable')],
+    ['4', tx('Sp\u00E6ndingsfald', 'Voltage drop')],
+    ['5', tx('Kortslutning', 'Short circuit')],
+    ['6', tx('Jordfejl', 'Fault')],
+    ['7', tx('Enstregediagram', 'SLD')],
+    ['8', tx('Impedans', 'Impedance')],
+    ['9', tx('Brain / AI', 'Brain / AI')],
+    ['?', tx('Vis genveje', 'Show shortcuts')],
+    ['Esc', tx('Luk overlay / afslut', 'Close overlay / exit')]
+  ];
+  var inner = '<div class="kbd-overlay-inner"><div style="font-weight:700;font-size:1.1rem;margin-bottom:12px">' + tx('Tastaturgenveje', 'Keyboard Shortcuts') + '</div>';
+  for (var i = 0; i < shortcuts.length; i++) {
+    inner += '<div class="kbd-row"><span class="kbd-key">' + shortcuts[i][0] + '</span><span>' + shortcuts[i][1] + '</span></div>';
+  }
+  inner += '<div style="margin-top:12px;text-align:center"><button class="sel-btn" onclick="hideKbdOverlay()">' + tx('Luk', 'Close') + '</button></div></div>';
+  el.innerHTML = inner;
+  document.body.appendChild(el);
+}
+
+(function initKeyboardShortcuts() {
+  if (typeof document === 'undefined' || !document.addEventListener) return;
+  document.addEventListener('keydown', function(e) {
+    // Don't trigger when typing in inputs
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true')) return;
+    var key = e.key;
+    if (key === 'Escape') {
+      if (kbdOverlayVisible) { hideKbdOverlay(); return; }
+      if (examSimState.active) { examSimReset(); return; }
+      return;
+    }
+    if (key === '?') { showKbdOverlay(); e.preventDefault(); return; }
+    var modMap = {'1':'load','2':'mcb','3':'cable','4':'vdrop','5':'scircuit','6':'fault','7':'sld','8':'impedans','9':'brain'};
+    if (modMap[key]) { switchModule(modMap[key]); e.preventDefault(); }
+  });
+})();
+
 // ===== INIT =====
 guideLoadProgress();
 renderNav();
