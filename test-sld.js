@@ -13723,6 +13723,80 @@ test('autoexam: Kompleks and Analyse tabs render in da and en without leaking', 
   lang = prev;
 });
 
+// ----- Batch 3: SLD diagram error-ID + adaptive difficulty -----
+test('autoexam/diagram: axGenDiagram deterministic, 3 tasks, ci matches injected fault', function () {
+  var a = axGenDiagram(101, 'kandidat'), b = axGenDiagram(101, 'kandidat');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+  assert.strictEqual(a.opgaver[0].tasks.length, 3);
+  a.opgaver[0].tasks.forEach(function (t) {
+    var expect = -1; for (var i = 0; i < AX_DIAG_FAULTS.length; i++) if (AX_DIAG_FAULTS[i].id === t.model.faultId) expect = i;
+    assert.strictEqual(t.ci, expect, 'ci indexes the injected fault');
+    assert.strictEqual(t.answer, t.ci);
+  });
+});
+test('autoexam/diagram: each fault type actually creates the inconsistency', function () {
+  ['underrated', 'undersized_cable', 'icu_low', 'missing_rcd', 'selectivity', 'no_main_switch', 'none'].forEach(function (fid) {
+    var rng = axRngMake(7); var m = axBuildDiagramModel(rng, AX_BUILDINGS[5], axTier('ekspert')); axInjectFault(m, fid, rng);
+    if (fid === 'underrated') { var f = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f && f.In < f.IB, 'In<IB'); }
+    else if (fid === 'undersized_cable') { var f2 = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f2 && f2.Iz < f2.In, 'Iz<In'); }
+    else if (fid === 'icu_low') { assert.ok(m.main.Icu < m.trafo.IkkA, 'Icu<Ik'); }
+    else if (fid === 'missing_rcd') { assert.ok(m.feeders.some(function (x) { return x.faulty && x.rcd === false; }), 'rcd removed'); }
+    else if (fid === 'selectivity') { var f3 = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f3 && f3.In >= m.main.In, 'In>=main'); }
+    else if (fid === 'no_main_switch') { assert.strictEqual(m.main.hasSwitch, false); }
+    else { assert.ok(!m.main.faulty && !m.feeders.some(function (x) { return x.faulty; }), 'none has no fault'); }
+  });
+});
+test('autoexam/diagram: worked solution recomputes the answer and explains', function () {
+  var p = axGenDiagram(55, 'avanceret');
+  p.opgaver[0].tasks.forEach(function (t) { var s = axSolveTask(t); assert.strictEqual(s.result.value, t.answer); assert.ok(s.verification && s.conclusion && s.compliance.length); });
+});
+test('autoexam/diagram: axRenderSLD is valid SVG with no NaN; highlight marks the fault', function () {
+  var p = axGenDiagram(9, 'ekspert'); var t = p.opgaver[0].tasks[0];
+  var plain = axRenderSLD(t.model, false), hi = axRenderSLD(t.model, true);
+  assert.ok(plain.indexOf('<svg') === 0 && plain.indexOf('</svg>') > 0 && plain.indexOf('NaN') < 0, 'valid svg');
+  if (t.model.faultId !== 'none') assert.ok(hi.indexOf('#d64545') >= 0 || hi.indexOf('\u26A0') >= 0, 'fault highlighted');
+});
+test('autoexam/diagram: generator+solution+svg sweep (5 tiers x 20 seeds) clean', function () {
+  var n = 0, err = 0;
+  ['laerling', 'elektriker', 'avanceret', 'kandidat', 'ekspert'].forEach(function (tr) {
+    for (var s = 1; s <= 20; s++) { n++; var p = axGenDiagram(s * 17 + 1, tr); p.opgaver[0].tasks.forEach(function (t) { var so = axSolveTask(t); if (so.result.value !== t.answer) err++; if (axRenderSLD(t.model, true).indexOf('NaN') >= 0) err++; }); }
+  });
+  assert.ok(n >= 90 && err === 0, n + ' sets, ' + err + ' errors');
+});
+test('autoexam/diagram: examiner scores a perfect diagram set 100/pass', function () {
+  var p = axGenDiagram(101, 'kandidat'); var ans = {}; p.opgaver[0].tasks.forEach(function (t) { ans[t.id] = t.ci; });
+  var r = axExamine(p, ans); assert.strictEqual(r.score, 100); assert.strictEqual(r.verdict, 'pass');
+});
+test('autoexam/adaptive: empty log stays put; strong run levels up; weak run levels down', function () {
+  assert.strictEqual(axAdaptiveNext([], 'elektriker').tier, 'elektriker');
+  var strong = [{ ts: 1, score: 90, verdict: 'pass', tier: 'kandidat', catPct: { cable: 60, overload: 95 } }, { ts: 2, score: 88, verdict: 'pass', tier: 'kandidat', catPct: { cable: 55, overload: 95 } }, { ts: 3, score: 90, verdict: 'pass', tier: 'kandidat', catPct: { cable: 60, overload: 95 } }];
+  assert.strictEqual(axAdaptiveNext(strong, 'kandidat').tier, 'ekspert');
+  var weak = [{ ts: 1, score: 40, verdict: 'fail', tier: 'kandidat', catPct: { cable: 30 } }, { ts: 2, score: 45, verdict: 'fail', tier: 'kandidat', catPct: { cable: 35 } }];
+  assert.strictEqual(axAdaptiveNext(weak, 'kandidat').tier, 'avanceret');
+});
+test('autoexam/adaptive: never recommends beyond the tier bounds', function () {
+  var maxRun = [{ ts: 1, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }, { ts: 2, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }, { ts: 3, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }];
+  assert.strictEqual(axAdaptiveNext(maxRun, 'ekspert').tier, 'ekspert', 'cannot exceed expert');
+  var minRun = [{ ts: 1, score: 20, verdict: 'fail', tier: 'laerling', catPct: {} }, { ts: 2, score: 25, verdict: 'fail', tier: 'laerling', catPct: {} }];
+  assert.strictEqual(axAdaptiveNext(minRun, 'laerling').tier, 'laerling', 'cannot go below apprentice');
+});
+test('autoexam: Diagram tab renders (plain + graded) in da and en; dashboard shows adaptive panel', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.dgProject = axGenDiagram(101, 'kandidat'); autoexamState.dgAnswers = {}; autoexamState.dgResult = null; autoexamState.tab = 'diagram';
+    var plain = renderAutoExam();
+    assert.ok(plain.indexOf('<svg') >= 0 && plain.indexOf('undefined') < 0 && plain.indexOf('NaN') < 0, 'diagram plain ' + lg);
+    autoexamState.dgProject.opgaver[0].tasks.forEach(function (t) { autoexamState.dgAnswers[t.id] = t.ci; });
+    autoexamState.dgResult = axExamine(autoexamState.dgProject, autoexamState.dgAnswers);
+    var graded = renderAutoExam();
+    assert.ok(graded.indexOf('undefined') < 0 && (graded.indexOf('Verifik') >= 0 || graded.indexOf('Verification') >= 0), 'diagram graded ' + lg);
+  });
+  lang = prev;
+  autoexamState.tab = 'analyse';
+  var d = renderAutoExam();
+  assert.ok(d.indexOf('axApplyAdaptive') >= 0, 'adaptive button present');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

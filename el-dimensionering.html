@@ -11698,6 +11698,7 @@ function axGenerate(seed, buildingId, tierId, modeId) {
 // solution can never drift from the generated reference answer.
 function axSolveTask(task, opgave) {
   if (task.cxsol) return axSolveComplexTask(task);
+  if (task.dgsol) return axSolveDiagramTask(task);
   var g = task.given || {};
   function S(da, en) { return { da: da, en: en }; }
   var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
@@ -12080,6 +12081,178 @@ function axSvgBars(items, w, barH) {
   return '<svg width="' + w + '" height="' + h + '" style="max-width:100%">' + rows + '</svg>';
 }
 
+// ============================================================================
+// ===== BATCH 3: SLD DIAGRAM ERROR-ID ENGINE + ADAPTIVE DIFFICULTY ===========
+// ============================================================================
+// Catalog of single-line-diagram faults a candidate must be able to spot.
+var AX_DIAG_FAULTS = [
+  { id: 'underrated', da: 'Overstr\u00f8msbeskyttelsen er for lille (In < IB) \u2014 overbelastning ikke beskyttet', en: 'Overcurrent device too small (In < IB) \u2014 overload not protected', clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' },
+  { id: 'undersized_cable', da: 'Kablet er underdimensioneret (Iz < In)', en: 'Cable undersized (Iz < In)', clause: 'DS/HD 60364-5-52 \u00a7523', cat: 'cable' },
+  { id: 'icu_low', da: 'Hovedafbryderens brydeevne er for lav (Icu < Ik,max)', en: 'Main breaker breaking capacity too low (Icu < Ik,max)', clause: 'DS/HD 60364-4-43 \u00a7434.5.1', cat: 'shortcircuit' },
+  { id: 'missing_rcd', da: 'Manglende HPFI (RCD) p\u00e5 en kreds der kr\u00e6ver det', en: 'Missing RCD on a circuit that requires it', clause: 'DS/HD 60364-7-722 / -4-41', cat: 'fault' },
+  { id: 'selectivity', da: 'Manglende selektivitet (afgangens In \u2265 hovedets In)', en: 'No selectivity (feeder In \u2265 main In)', clause: 'DS/HD 60364-5-53 \u00a7536', cat: 'fault' },
+  { id: 'no_main_switch', da: 'Manglende hovedafbryder/adskillelse', en: 'Missing main switch/isolation', clause: 'DS/HD 60364-5-53 \u00a7537', cat: 'fault' },
+  { id: 'none', da: 'Ingen fejl \u2014 diagrammet er korrekt', en: 'No fault \u2014 the diagram is correct', clause: '\u2014', cat: 'fault' }
+];
+function axDiagFault(id) { for (var i = 0; i < AX_DIAG_FAULTS.length; i++) if (AX_DIAG_FAULTS[i].id === id) return AX_DIAG_FAULTS[i]; return AX_DIAG_FAULTS[AX_DIAG_FAULTS.length - 1]; }
+
+// Build a correct single-line-diagram model from a building, then optionally
+// inject exactly one fault. Pure & deterministic for the given rng.
+function axBuildDiagramModel(rng, b, tier) {
+  var SN = axRngPick(rng, b.cat === 'bolig' ? [250, 400] : [400, 630, 1000]);
+  var ek = axRngPick(rng, [4, 5, 6]);
+  var tr = axIkTrafoSecondary(SN, 400, ek);
+  var mainIn = axDeviceRating(tr.In);
+  var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var Icu = stdIcu.filter(function (v) { return v >= tr.IkkA - 1e-9; })[0] || 100;
+  // feeders: pick 3-4 loads
+  var pool = b.loads.filter(function (l) { return l.type !== 'solar'; });
+  var nF = Math.min(pool.length, axRngInt(rng, 3, 4));
+  var feeders = [];
+  for (var i = 0; i < nF; i++) {
+    var l = pool[i % pool.length];
+    var P = axRound(l.P[0] + rng() * (l.P[1] - l.P[0]), 0.5);
+    if (l.type === 'motor') P = axSnap(P, AX_STD_MOTOR_KW); if (l.type === 'ev') P = axSnap(P, [11, 22]);
+    var ib = axIB(P, l.ph === 3 ? 400 : 230, l.cos, l.eta, l.ph);
+    var inF = axDeviceRating(ib);
+    var sel = axSelectCable(inF, 'Cu', 'PVC', 1, 1, 1); var csa = sel ? sel.csa : 16;
+    var iz = (IZ_COPPER[csa] || 0);
+    var needRcd = (l.type === 'ev' || l.type === 'socket' || b.earthing === 'TT');
+    feeders.push({ id: 'q' + (i + 1), name: { da: l.da, en: l.en }, IB: Math.round(ib * 10) / 10, In: inF, curve: 'C', csa: csa, material: 'Cu', Iz: iz, rcd: needRcd, rcdMa: 30, faulty: false });
+  }
+  return { earthing: b.earthing, building: { da: b.da, en: b.en }, trafo: { SN: SN, ek: ek, IkkA: tr.IkkA, In: tr.In }, main: { In: mainIn, Icu: Icu, hasSwitch: true, faulty: false }, feeders: feeders, faultId: 'none' };
+}
+function axInjectFault(model, faultId, rng) {
+  model.faultId = faultId;
+  if (faultId === 'none') return model;
+  var fi = (model.feeders.length > 1) ? axRngInt(rng, 0, model.feeders.length - 1) : 0;
+  if (faultId === 'underrated') { var f = model.feeders[fi]; var below = AX_STD_RATINGS.filter(function (v) { return v < f.IB - 1e-9; }); f.In = below.length ? below[below.length - 1] : 6; f.faulty = true; }
+  else if (faultId === 'undersized_cable') { var f2 = model.feeders[fi]; var csas = Object.keys(IZ_COPPER).map(Number).sort(function (a, b) { return a - b; }); var idx = csas.indexOf(f2.csa); f2.csa = csas[Math.max(0, idx - 2)]; f2.Iz = IZ_COPPER[f2.csa] || 0; f2.faulty = true; }
+  else if (faultId === 'icu_low') { var below2 = [6, 10, 15, 20].filter(function (v) { return v < model.trafo.IkkA; }); model.main.Icu = below2.length ? below2[below2.length - 1] : 6; model.main.faulty = true; }
+  else if (faultId === 'missing_rcd') { var cand = model.feeders.filter(function (x) { return x.rcd; }); if (cand.length) { cand[0].rcd = false; cand[0].faulty = true; } else { model.feeders[fi].rcd = false; model.feeders[fi].faulty = true; } }
+  else if (faultId === 'selectivity') { var f3 = model.feeders[fi]; f3.In = model.main.In; f3.faulty = true; }
+  else if (faultId === 'no_main_switch') { model.main.hasSwitch = false; model.main.faulty = true; }
+  return model;
+}
+// Generate a diagram drill set (project-shaped). 3 diagrams, click-only answers.
+function axGenDiagram(seed, tierId) {
+  var rng = axRngMake(seed >>> 0); var tier = axTier(tierId);
+  var opts = AX_DIAG_FAULTS.map(function (f) { return { da: f.da, en: f.en }; });
+  var faultPool = ['underrated', 'undersized_cable', 'icu_low', 'missing_rcd', 'selectivity', 'no_main_switch', 'none'];
+  var tasks = [];
+  for (var i = 0; i < 3; i++) {
+    var b = axRngPick(rng, AX_BUILDINGS);
+    var model = axBuildDiagramModel(rng, b, tier);
+    var fid = axRngPick(rng, faultPool);
+    axInjectFault(model, fid, rng);
+    var ci = 0; for (var k = 0; k < AX_DIAG_FAULTS.length; k++) if (AX_DIAG_FAULTS[k].id === fid) ci = k;
+    tasks.push({ id: 'dg_' + i, kind: 'diagram_error', dgsol: true, model: model, prompt: { da: 'Gennemg\u00e5 enstregsdiagrammet. Hvilken fejl (om nogen) er der i installationen?', en: 'Review the single-line diagram. Which fault (if any) is present in the installation?' }, opts: opts, ci: ci, answer: ci, clause: axDiagFault(fid).clause, cat: axDiagFault(fid).cat });
+  }
+  return { seed: seed >>> 0, buildingId: 'diagram', tierId: tierId, modeId: 'diagram', meta: { title: { da: 'Diagraml\u00e6sning', en: 'Diagram reading' }, building: { da: 'Installation', en: 'Installation' }, icon: '\uD83D\uDCD0', tier: { da: tier.da, en: tier.en } }, opgaver: [{ num: 1, type: 'diagram', weightPct: 100, title: { da: 'Find fejlen i diagrammet', en: 'Find the fault in the diagram' }, data: {}, tasks: tasks }] };
+}
+function axSolveDiagramTask(task) {
+  function S(da, en) { return { da: da, en: en }; }
+  var m = task.model; var f = axDiagFault(m.faultId);
+  var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
+  sol.assumptions = [S('Kontroll\u00e9r systematisk: hovedbeskyttelse (Icu \u2265 Ik), hver afgang (IB \u2264 In \u2264 Iz), HPFI hvor kr\u00e6vet, selektivitet og adskillelse.', 'Check systematically: main protection (Icu \u2265 Ik), each feeder (IB \u2264 In \u2264 Iz), RCD where required, selectivity and isolation.')];
+  var faultyF = null; for (var i = 0; i < m.feeders.length; i++) if (m.feeders[i].faulty) faultyF = m.feeders[i];
+  if (m.faultId === 'none') {
+    sol.steps = [{ da: 'Alle afgange opfylder IB \u2264 In \u2264 Iz', en: 'All feeders satisfy IB \u2264 In \u2264 Iz', expr: '', result: 'OK' }, { da: 'Icu \u2265 Ik,max', en: 'Icu \u2265 Ik,max', expr: m.main.Icu + ' \u2265 ' + axFmt(m.trafo.IkkA), result: 'OK' }, { da: 'HPFI og adskillelse til stede', en: 'RCD and isolation present', expr: '', result: 'OK' }];
+    sol.result = { value: task.answer, unit: '', da: 'Ingen fejl', en: 'No fault' };
+    sol.verification = S('Diagrammet er korrekt: alle beskyttelseskrav er opfyldt.', 'The diagram is correct: all protection requirements are met.');
+  } else if (m.faultId === 'underrated' && faultyF) {
+    sol.formula = 'IB \u2264 In (krav)';
+    sol.substitution = 'IB = ' + axFmt(faultyF.IB, 1) + ' A, In = ' + faultyF.In + ' A \u21d2 In < IB';
+    sol.steps = [{ da: 'Afgang ' + faultyF.id.toUpperCase() + ' (' + axL(faultyF.name) + ')', en: 'Feeder ' + faultyF.id.toUpperCase() + ' (' + axL(faultyF.name) + ')', expr: 'In ' + faultyF.In + ' A < IB ' + axFmt(faultyF.IB, 1) + ' A', result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('Beskyttelsen vil udl\u00f8se under normal drift ELLER, hvis den ikke g\u00f8r, beskytter den ikke mod overbelastning \u2014 lederen kan overophedes. F\u00f8rste led i IB \u2264 In \u2264 Iz er bristet.', 'The device trips in normal operation OR, if not, gives no overload protection \u2014 the conductor can overheat. The first link of IB \u2264 In \u2264 Iz is broken.');
+  } else if (m.faultId === 'undersized_cable' && faultyF) {
+    sol.formula = 'Iz \u2265 In (krav)';
+    sol.substitution = 'Iz(' + faultyF.csa + ' mm\u00b2) = ' + axFmt(faultyF.Iz) + ' A < In = ' + faultyF.In + ' A';
+    sol.steps = [{ da: 'Afgang ' + faultyF.id.toUpperCase(), en: 'Feeder ' + faultyF.id.toUpperCase(), expr: 'Iz ' + axFmt(faultyF.Iz) + ' A < In ' + faultyF.In + ' A', result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('Kablet kan ikke f\u00f8re den str\u00f8m beskyttelsen tillader \u2014 ved langvarig overstr\u00f8m overophedes isoleringen f\u00f8r afbryderen udl\u00f8ser. Sidste led i IB \u2264 In \u2264 Iz er bristet.', 'The cable cannot carry the current the device permits \u2014 under sustained overcurrent the insulation overheats before the device trips. The last link of IB \u2264 In \u2264 Iz is broken.');
+  } else if (m.faultId === 'icu_low') {
+    sol.formula = 'Icu \u2265 Ik,max (krav)';
+    sol.substitution = 'Icu = ' + m.main.Icu + ' kA < Ik,max = ' + axFmt(m.trafo.IkkA) + ' kA';
+    sol.steps = [{ da: 'Hovedafbryder', en: 'Main breaker', expr: 'Icu ' + m.main.Icu + ' kA < Ik ' + axFmt(m.trafo.IkkA) + ' kA', result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('Ved en fuld kortslutning kan afbryderen ikke bryde str\u00f8mmen sikkert \u2014 risiko for lysbue/eksplosion. Brydeevnen SKAL d\u00e6kke den prospektive Ik,max.', 'During a full short-circuit the breaker cannot safely interrupt the current \u2014 arc/explosion risk. The breaking capacity MUST cover the prospective Ik,max.');
+  } else if (m.faultId === 'missing_rcd' && faultyF) {
+    sol.steps = [{ da: 'Afgang ' + faultyF.id.toUpperCase() + ' (' + axL(faultyF.name) + ')', en: 'Feeder ' + faultyF.id.toUpperCase() + ' (' + axL(faultyF.name) + ')', expr: axL({ da: 'mangler HPFI', en: 'missing RCD' }), result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('Stikkredse, elbilladning og hele TT-systemer kr\u00e6ver fejlstr\u00f8msbeskyttelse (HPFI 30 mA). Uden den er der ber\u00f8ringsfare ved isolationsfejl.', 'Socket circuits, EV charging and entire TT systems require residual-current protection (30 mA RCD). Without it there is shock hazard on insulation faults.');
+  } else if (m.faultId === 'selectivity' && faultyF) {
+    sol.substitution = 'In(' + faultyF.id.toUpperCase() + ') = ' + faultyF.In + ' A \u2265 In(hoved) = ' + m.main.In + ' A';
+    sol.steps = [{ da: 'Afgang vs. hoved', en: 'Feeder vs. main', expr: faultyF.In + ' A \u2265 ' + m.main.In + ' A', result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('N\u00e5r afgangen ikke er mindre end hovedet, kan en fejl p\u00e5 \u00e9n afgang udl\u00f8se hovedet og m\u00f8rkl\u00e6gge hele tavlen \u2014 ingen selektivitet.', 'When the feeder is not smaller than the main, a fault on one feeder can trip the main and black out the whole board \u2014 no selectivity.');
+  } else { // no_main_switch
+    sol.steps = [{ da: 'Hovedtavle', en: 'Main board', expr: axL({ da: 'ingen hovedafbryder', en: 'no main switch' }), result: axL({ da: 'FEJL', en: 'FAULT' }) }];
+    sol.result = { value: task.answer, unit: '', da: f.da, en: f.en };
+    sol.verification = S('Hver installation skal kunne afbrydes/adskilles sikkert for service. Manglende hovedafbryder er en alvorlig mangel.', 'Every installation must be safely switchable/isolatable for service. A missing main switch is a serious defect.');
+  }
+  sol.compliance = [S(f.clause, f.clause)];
+  sol.conclusion = S(f.da, f.en);
+  return sol;
+}
+
+// Inline SVG single-line diagram. highlightFault=true marks the faulty element.
+function axRenderSLD(m, highlightFault) {
+  var W = 380; var rowH = 64; var top = 96; var busX = 46; var H = top + m.feeders.length * rowH + 30;
+  function box(x, y, w, hh, txt, bad) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + hh + '" rx="4" fill="' + (bad ? '#d6454522' : '#8881') + '" stroke="' + (bad ? '#d64545' : 'currentColor') + '" stroke-width="' + (bad ? 2 : 1) + '"/>' + (txt ? '<text x="' + (x + w / 2) + '" y="' + (y + hh / 2 + 3) + '" font-size="9" text-anchor="middle" fill="currentColor">' + txt + '</text>' : ''); }
+  function warn(x, y) { return '<text x="' + x + '" y="' + y + '" font-size="14">\u26A0\uFE0F</text>'; }
+  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;color:var(--text)">';
+  // transformer
+  s += '<circle cx="40" cy="22" r="11" fill="none" stroke="currentColor"/><circle cx="40" cy="32" r="11" fill="none" stroke="currentColor"/>';
+  s += '<text x="58" y="22" font-size="10" fill="currentColor">Trafo ' + m.trafo.SN + ' kVA</text><text x="58" y="35" font-size="10" fill="currentColor">ek=' + axFmt(m.trafo.ek) + '% \u00b7 Ik,max=' + axFmt(m.trafo.IkkA) + ' kA</text>';
+  s += '<line x1="40" y1="43" x2="40" y2="58" stroke="currentColor"/>';
+  // main switch + main breaker
+  var mainBad = highlightFault && m.main.faulty;
+  if (m.main.hasSwitch) s += '<line x1="40" y1="58" x2="52" y2="50" stroke="currentColor" stroke-width="1.5"/>';
+  else if (highlightFault) s += warn(50, 58);
+  s += box(8, 60, 130, 24, 'Q0  ' + m.main.In + ' A / Icu ' + m.main.Icu + ' kA', mainBad);
+  if (mainBad) s += warn(140, 78);
+  s += '<line x1="40" y1="84" x2="40" y2="' + (top) + '" stroke="currentColor"/>';
+  // busbar (vertical)
+  s += '<line x1="' + busX + '" y1="' + top + '" x2="' + busX + '" y2="' + (top + m.feeders.length * rowH - 20) + '" stroke="currentColor" stroke-width="3"/>';
+  s += '<text x="2" y="' + (top - 4) + '" font-size="9" fill="currentColor">' + m.earthing + '</text>';
+  // feeders
+  m.feeders.forEach(function (f, i) {
+    var y = top + i * rowH + 8; var bad = highlightFault && f.faulty;
+    s += '<line x1="' + busX + '" y1="' + y + '" x2="' + (busX + 14) + '" y2="' + y + '" stroke="currentColor"/>';
+    s += box(busX + 14, y - 11, 60, 22, f.curve + ' ' + f.In + ' A', bad && (m.faultId === 'underrated' || m.faultId === 'selectivity'));
+    var x2 = busX + 78;
+    // RCD
+    if (f.rcd) { s += box(x2, y - 11, 40, 22, f.rcdMa + ' mA', false); x2 += 44; }
+    else if (highlightFault && m.faultId === 'missing_rcd' && f.faulty) { s += '<text x="' + x2 + '" y="' + (y + 4) + '" font-size="11" fill="#d64545">\u2298 ' + axL({ da: 'ingen HPFI', en: 'no RCD' }) + '</text>'; x2 += 70; }
+    // cable label
+    var cableBad = bad && m.faultId === 'undersized_cable';
+    s += '<text x="' + (x2 + 2) + '" y="' + (y - 1) + '" font-size="8.5" fill="' + (cableBad ? '#d64545' : 'currentColor') + '">' + f.csa + ' mm\u00b2 ' + f.material + ' (Iz ' + axFmt(f.Iz) + ')</text>';
+    s += '<text x="' + (x2 + 2) + '" y="' + (y + 9) + '" font-size="8.5" fill="currentColor">' + axL(f.name) + ' \u00b7 IB ' + axFmt(f.IB, 1) + ' A</text>';
+    if (bad) s += warn(W - 20, y + 4);
+  });
+  s += '</svg>';
+  return s;
+}
+
+// --- ADAPTIVE DIFFICULTY: recommend the next tier + focus from the log --------
+function axAdaptiveNext(log, currentTierId) {
+  var order = ['laerling', 'elektriker', 'avanceret', 'kandidat', 'ekspert'];
+  var a = axAnalytics(log || []);
+  var curIdx = order.indexOf(currentTierId); if (curIdx < 0) curIdx = 1;
+  // recent (last up to 3) scores at/after current tier
+  var recent = (log || []).slice(-3);
+  var recentAvg = recent.length ? Math.round(recent.reduce(function (s, r) { return s + r.score; }, 0) / recent.length) : 0;
+  var recentPass = recent.length ? recent.every(function (r) { return r.verdict === 'pass'; }) : false;
+  var tierIdx = curIdx, reason;
+  if (!log || !log.length) { tierIdx = curIdx; reason = { da: 'Ingen historik endnu \u2014 start p\u00e5 dit nuv\u00e6rende niveau.', en: 'No history yet \u2014 start at your current level.' }; }
+  else if (recentPass && recentAvg >= 85 && curIdx < order.length - 1) { tierIdx = curIdx + 1; reason = { da: 'St\u00e6rke resultater (' + recentAvg + '% i tr\u00e6k) \u2014 hæver niveauet.', en: 'Strong results (' + recentAvg + '% in a row) \u2014 raising the level.' }; }
+  else if (recentAvg < 55 && curIdx > 0) { tierIdx = curIdx - 1; reason = { da: 'Lave resultater (' + recentAvg + '%) \u2014 s\u00e6nker niveauet for at bygge rutine.', en: 'Low results (' + recentAvg + '%) \u2014 lowering the level to build fluency.' }; }
+  else { tierIdx = curIdx; reason = { da: 'Stabilt p\u00e5 niveauet \u2014 bliv her og finpuds de svage kompetencer.', en: 'Stable at this level \u2014 stay and polish the weak competencies.' }; }
+  var focus = a.weakest || null;
+  return { tier: order[tierIdx], focus: focus, focusName: focus ? (AX_CAT_NAME[focus] || { da: focus, en: focus }) : null, reason: reason, recentAvg: recentAvg };
+}
+
 let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
@@ -12432,7 +12605,7 @@ function examRenderAnswerKey(){
 // ============================================================================
 // ===== AUTORISATIONSPR\u00d8VE-GENERATOR \u2014 UI (renderAutoExam) ====================
 // ============================================================================
-var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, timerOn: false, timerLeft: 0, timerSec: 0 };
+var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, dgProject: null, dgAnswers: {}, dgResult: null, dgReveal: false, timerOn: false, timerLeft: 0, timerSec: 0 };
 var autoexamTimer = null;
 function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == null ? '' : String(o)); }
 function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
@@ -12460,6 +12633,13 @@ function axCxGen() { autoexamState.cxProject = axGenComplex((Math.floor(Math.ran
 function axCxEnsure() { if (!autoexamState.cxProject) axCxGen(); return autoexamState.cxProject; }
 function axCxPick(taskId, i) { autoexamState.cxAnswers[taskId] = i; renderModule('autoexam'); }
 function axCxGrade() { var p = axCxEnsure(); autoexamState.cxResult = axExamine(p, autoexamState.cxAnswers); autoexamState.cxReveal = true; axLogPush({ ts: Date.now(), building: 'kompleks', tier: p.tierId, mode: 'kompleks', score: autoexamState.cxResult.score, verdict: autoexamState.cxResult.verdict, catPct: autoexamState.cxResult.catPct, correctCount: autoexamState.cxResult.correctCount, totalCount: autoexamState.cxResult.totalCount }); renderModule('autoexam'); }
+// Diagram (SLD error-ID) flow.
+function axDgGen() { autoexamState.dgProject = axGenDiagram((Math.floor(Math.random() * 1e9)) || 1, autoexamState.tier); autoexamState.dgAnswers = {}; autoexamState.dgResult = null; autoexamState.dgReveal = false; renderModule('autoexam'); }
+function axDgEnsure() { if (!autoexamState.dgProject) axDgGen(); return autoexamState.dgProject; }
+function axDgPick(taskId, i) { autoexamState.dgAnswers[taskId] = i; renderModule('autoexam'); }
+function axDgGrade() { var p = axDgEnsure(); autoexamState.dgResult = axExamine(p, autoexamState.dgAnswers); autoexamState.dgReveal = true; axLogPush({ ts: Date.now(), building: 'diagram', tier: p.tierId, mode: 'diagram', score: autoexamState.dgResult.score, verdict: autoexamState.dgResult.verdict, catPct: autoexamState.dgResult.catPct, correctCount: autoexamState.dgResult.correctCount, totalCount: autoexamState.dgResult.totalCount }); renderModule('autoexam'); }
+// Adaptive: apply the recommended next tier + focus building, then generate.
+function axApplyAdaptive() { var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier; axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam'); }
 function axTimerStart() { autoexamState.timerOn = true; var end = Date.now() + autoexamState.timerLeft * 1000; if (autoexamTimer) clearInterval(autoexamTimer); autoexamTimer = setInterval(function () { autoexamState.timerLeft = Math.max(0, Math.round((end - Date.now()) / 1000)); var el = document.getElementById('axTimer'); if (el) el.textContent = axFmtTime(autoexamState.timerLeft); if (autoexamState.timerLeft <= 0) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; renderModule('autoexam'); } }, 1000); renderModule('autoexam'); }
 function axTimerPause() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } renderModule('autoexam'); }
 function axTimerReset() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } autoexamState.timerLeft = autoexamState.timerSec; renderModule('autoexam'); }
@@ -12676,7 +12856,11 @@ function axRenderKompleks() {
 
 function axRenderDashboard() {
   var log = axLogList(); var a = axAnalytics(log);
-  if (!a.attempts) return '<div class="result-box"><div class="result-title">\uD83D\uDCCA ' + tx('Tr\u00e6ningsanalyse', 'Training analytics') + '</div><div style="padding:6px 2px">' + tx('Ingen data endnu. L\u00f8s og bed\u00f8m mindst \u00e9n pr\u00f8ve, s\u00e5 vises din udvikling, st\u00e6rke og svage kompetencer og best\u00e5elsesrate her.', 'No data yet. Solve and grade at least one exam to see your progress, strong and weak competencies and pass rate here.') + '</div></div>';
+  if (!a.attempts) {
+    var rec0 = axAdaptiveNext(log, autoexamState.tier);
+    return '<div class="result-box"><div class="result-title">\uD83D\uDCCA ' + tx('Tr\u00e6ningsanalyse', 'Training analytics') + '</div><div style="padding:6px 2px">' + tx('Ingen data endnu. L\u00f8s og bed\u00f8m mindst \u00e9n pr\u00f8ve, s\u00e5 vises din udvikling, st\u00e6rke og svage kompetencer og best\u00e5elsesrate her.', 'No data yet. Solve and grade at least one exam to see your progress, strong and weak competencies and pass rate here.') + '</div></div>' +
+      '<div class="result-box" style="margin-top:8px"><div class="result-title">\uD83E\uDDED ' + tx('Adaptiv tr\u00e6ning', 'Adaptive training') + '</div><div style="padding:6px 2px">' + axL(rec0.reason) + ' ' + tx('Anbefalet niveau', 'Recommended level') + ': <strong>' + axL(axTier(rec0.tier)) + '</strong>.<div style="margin-top:6px"><button class="sel-btn selected" onclick="axApplyAdaptive()">\uD83C\uDFAF ' + tx('Generér adaptiv pr\u00f8ve', 'Generate adaptive exam') + '</button></div></div></div>';
+  }
   var h = '<div class="result-box"><div class="result-title">\uD83D\uDCCA ' + tx('Tr\u00e6ningsanalyse', 'Training analytics') + '</div>';
   h += '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 2px">';
   function stat(v, lbl, col) { return '<div style="min-width:80px"><div style="font-size:1.5rem;font-weight:800;color:' + (col || 'var(--text)') + '">' + v + '</div><div style="font-size:0.78rem;color:var(--text-muted)">' + lbl + '</div></div>'; }
@@ -12696,10 +12880,35 @@ function axRenderDashboard() {
   if (buildItems.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Pr. bygningstype', 'By building type') + '</div><div style="padding:4px 2px">' + axSvgBars(buildItems) + '</div></div>';
   // coaching line
   if (a.weakest) { var nm = AX_CAT_NAME[a.weakest] || { da: a.weakest, en: a.weakest }; h += '<div class="result-box warning" style="margin-top:8px"><div style="padding:6px 2px">\uD83C\uDFAF ' + tx('Fokus n\u00e6ste gang', 'Focus next time') + ': <strong>' + axL(nm) + '</strong> (' + a.catAvg[a.weakest] + '%). ' + axL(axCatSuggest(a.weakest)) + '</div></div>'; }
+  // adaptive recommendation
+  var rec = axAdaptiveNext(log, autoexamState.tier);
+  h += '<div class="result-box" style="margin-top:8px"><div class="result-title">\uD83E\uDDED ' + tx('Adaptiv tr\u00e6ning', 'Adaptive training') + '</div><div style="padding:6px 2px">';
+  h += axL(rec.reason) + ' ' + tx('Anbefalet niveau', 'Recommended level') + ': <strong>' + axL(axTier(rec.tier)) + '</strong>' + (rec.focusName ? (' \u00b7 ' + tx('fokus', 'focus') + ': ' + axL(rec.focusName)) : '') + '.';
+  h += '<div style="margin-top:6px"><button class="sel-btn selected" onclick="axApplyAdaptive()">\uD83C\uDFAF ' + tx('Generér adaptiv pr\u00f8ve', 'Generate adaptive exam') + '</button></div></div></div>';
   h += '<div style="margin-top:8px"><button class="sel-btn" onclick="axClearLog()">\uD83D\uDDD1\uFE0F ' + tx('Ryd historik', 'Clear history') + '</button></div>';
   return h;
 }
 function axClearLog() { try { localStorage.removeItem('autoexamLog'); } catch (e) {} renderModule('autoexam'); }
+
+function axRenderDiagram() {
+  var p = axDgEnsure();
+  var h = '<div class="info-row">' + tx('L\u00e6s hvert enstregsdiagram og find fejlen (om nogen). Tjek systematisk: brydeevne (Icu \u2265 Ik), hver afgang (IB \u2264 In \u2264 Iz), HPFI, selektivitet og hovedafbryder. Klik-only.', 'Read each single-line diagram and find the fault (if any). Check systematically: breaking capacity (Icu \u2265 Ik), each feeder (IB \u2264 In \u2264 Iz), RCD, selectivity and main switch. Click-only.') + '</div>';
+  h += '<div style="margin:6px 0"><button class="sel-btn selected" onclick="axDgGen()">\uD83C\uDFB2 ' + tx('Nye diagrammer', 'New diagrams') + '</button> <span style="color:var(--text-muted);font-size:0.85rem">#' + p.seed + ' \u00b7 ' + axL(p.meta.tier) + '</span></div>';
+  var done = !!autoexamState.dgResult;
+  p.opgaver[0].tasks.forEach(function (t, idx) {
+    h += '<div class="card" style="margin-bottom:10px"><div class="card-title" style="font-size:0.92rem">' + tx('Diagram', 'Diagram') + ' ' + (idx + 1) + '</div>';
+    h += '<div style="overflow-x:auto;border:1px solid var(--border-light);border-radius:8px;padding:4px;margin-bottom:6px">' + axRenderSLD(t.model, done) + '</div>';
+    h += '<div class="select-group"><div class="select-label">' + axL(t.prompt) + '</div><div class="select-grid">';
+    var ua = autoexamState.dgAnswers[t.id];
+    for (var i = 0; i < t.opts.length; i++) { var mark = ''; if (done) { if (i === t.ci) mark = ' selected'; } else if (ua === i) mark = ' selected'; var wrongPick = done && ua === i && i !== t.ci; h += '<button class="sel-btn' + mark + '"' + (wrongPick ? ' style="outline:2px solid var(--danger)"' : '') + ' onclick="axDgPick(\'' + t.id + '\',' + i + ')">' + axOptLabel(t, i) + '</button>'; }
+    h += '</div></div>';
+    if (done) { var sol = axSolveDiagramTask(t); h += axRenderSolutionCard(sol); }
+    h += '</div>';
+  });
+  h += '<div style="margin-top:6px"><button class="sel-btn selected" onclick="axDgGrade()">\uD83C\uDF93 ' + tx('Ret', 'Check') + '</button></div>';
+  if (autoexamState.dgResult) { var r = autoexamState.dgResult; h += '<div class="result-box" style="margin-top:8px;border:2px solid ' + (r.verdict === 'pass' ? 'var(--success)' : 'var(--danger)') + '"><div class="result-title">' + r.correctCount + '/' + r.totalCount + ' ' + tx('korrekte', 'correct') + ' \u00b7 ' + r.score + '%</div></div>'; }
+  return h;
+}
 
 function renderAutoExam() {
   var p = axEnsure();
@@ -12735,12 +12944,14 @@ function renderAutoExam() {
   h += '<button class="sel-btn' + (autoexamState.tab === 'besvar' ? ' selected' : '') + '" onclick="axUITab(\'besvar\')">\u270D\uFE0F ' + tx('Min besvarelse', 'My answer') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'censor' ? ' selected' : '') + '" onclick="axUITab(\'censor\')">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'kompleks' ? ' selected' : '') + '" onclick="axUITab(\'kompleks\')">\uD83E\uDDEE ' + tx('Kompleks (Viggo)', 'Complex (Viggo)') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'diagram' ? ' selected' : '') + '" onclick="axUITab(\'diagram\')">\uD83D\uDCD0 ' + tx('Diagram', 'Diagram') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'analyse' ? ' selected' : '') + '" onclick="axUITab(\'analyse\')">\uD83D\uDCCA ' + tx('Analyse', 'Analytics') + '</button>';
   h += '</div>';
   var body = '';
   if (autoexamState.tab === 'opgave') { body = axRenderHeader(p); p.opgaver.forEach(function (op) { body += axOpgaveOverview(op, p); }); }
   else if (autoexamState.tab === 'besvar') body = axRenderAnswerTab(p);
   else if (autoexamState.tab === 'kompleks') body = axRenderKompleks();
+  else if (autoexamState.tab === 'diagram') body = axRenderDiagram();
   else if (autoexamState.tab === 'analyse') body = axRenderDashboard();
   else body = axRenderCensorTab(p);
   return h + body;
