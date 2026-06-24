@@ -13401,6 +13401,572 @@ test('Ingestion: PDF quality gate rejects non-readable (high-byte) dominated out
 });
 
 
+// =====================================================================
+// ===== AUTORISATIONSPR\u00d8VE-GENERATOR (autoexam) TESTS ==================
+// =====================================================================
+console.log('\n=== Authorization Exam Generator (autoexam) Tests ===\n');
+
+test('autoexam: axIB 3-phase motor (37kW,400V,0.86,0.93) approx 67 A', function () {
+  var ib = axIB(37, 400, 0.86, 0.93, 3);
+  assert.ok(Math.abs(ib - 66.8) < 0.5, 'IB ~66.8, got ' + ib);
+});
+test('autoexam: axIB 1-phase (3.7kW,230V,0.95) approx 16.9 A', function () {
+  var ib = axIB(3.7, 230, 0.95, 1, 1);
+  assert.ok(Math.abs(ib - 16.93) < 0.2, 'got ' + ib);
+});
+test('autoexam: axDeviceRating picks smallest standard >= IB', function () {
+  assert.strictEqual(axDeviceRating(67), 80);
+  assert.strictEqual(axDeviceRating(909), 1000);
+  assert.strictEqual(axDeviceRating(16), 16);
+  assert.strictEqual(axDeviceRating(16.1), 20);
+});
+test('autoexam: axIkTrafoSecondary 630kVA/400V/4% => 909A, 22.7kA', function () {
+  var t = axIkTrafoSecondary(630, 400, 4);
+  assert.ok(Math.abs(t.In - 909) < 1, 'In got ' + t.In);
+  assert.ok(Math.abs(t.IkkA - 22.7) < 0.2, 'IkkA got ' + t.IkkA);
+});
+test('autoexam: axIkTrafoSecondary 1000kVA/400V/5% => 1443A, 28.9kA', function () {
+  var t = axIkTrafoSecondary(1000, 400, 5);
+  assert.ok(Math.abs(t.In - 1443) < 1 && Math.abs(t.IkkA - 28.9) < 0.2, 'got ' + JSON.stringify(t));
+});
+test('autoexam: axSelectCable enforces Iz_corr >= In (Cu/PVC In80,k1 => 25mm2)', function () {
+  var sel = axSelectCable(80, 'Cu', 'PVC', 1, 1, 1);
+  assert.strictEqual(sel.csa, 25);
+  assert.ok(sel.izCorr >= 80, 'Iz>=In');
+});
+test('autoexam: axSelectCable with derating upsizes the cable', function () {
+  var base = axSelectCable(100, 'Cu', 'PVC', 1, 1, 1).csa;
+  var derated = axSelectCable(100, 'Cu', 'PVC', 0.87, 0.7, 1).csa;
+  assert.ok(derated > base, 'derating must require a larger cross-section (' + base + ' -> ' + derated + ')');
+});
+test('autoexam: axVdrop percent is correct (3ph)', function () {
+  var vd = axVdrop(67, 80, 0.727, 0.075, 0.86, 3, 400);
+  assert.ok(Math.abs(vd.pct - 1.54) < 0.05, 'pct got ' + vd.pct);
+  assert.ok(Math.abs(vd.dU - 6.16) < 0.1, 'dU got ' + vd.dU);
+});
+test('autoexam: axAdiabatic Smin = Ik*sqrt(t)/k and ok flag', function () {
+  var ad = axAdiabatic(115, 25, 10000, 0.1);
+  assert.ok(Math.abs(ad.Smin - 27.5) < 0.2, 'Smin got ' + ad.Smin);
+  assert.strictEqual(ad.ok, false, '25mm2 < 27.5mm2 must fail');
+  assert.strictEqual(axAdiabatic(115, 35, 10000, 0.1).ok, true, '35mm2 passes');
+});
+test('autoexam: axZsMax = U0/Ia', function () {
+  assert.ok(Math.abs(axZsMax(230, 160) - 1.438) < 0.01, 'got ' + axZsMax(230, 160));
+});
+test('autoexam: axFmt uses Danish decimal comma in da, dot in en', function () {
+  var prev = lang; lang = 'da'; var da = axFmt(1234.5, 1); lang = 'en'; var en = axFmt(1234.5, 1); lang = prev;
+  assert.strictEqual(da, '1.234,5');
+  assert.strictEqual(en, '1,234.5');
+});
+test('autoexam: axGenerate is deterministic for a given seed', function () {
+  var a = axGenerate(12345, 'fabrik', 'ekspert', 'fuld');
+  var b = axGenerate(12345, 'fabrik', 'ekspert', 'fuld');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+});
+test('autoexam: different seeds produce different exams', function () {
+  assert.notStrictEqual(JSON.stringify(axGenerate(1, 'fabrik', 'ekspert', 'fuld')), JSON.stringify(axGenerate(2, 'fabrik', 'ekspert', 'fuld')));
+});
+test('autoexam: full mode for an HV building yields 3 opgaver weighted 20/60/20', function () {
+  var p = axGenerate(7, 'fabrik', 'ekspert', 'fuld');
+  assert.strictEqual(p.opgaver.length, 3);
+  var w = 0; p.opgaver.forEach(function (o) { w += o.weightPct; });
+  assert.strictEqual(w, 100);
+  assert.strictEqual(p.opgaver[1].weightPct, 60, 'installation is 60%');
+});
+test('autoexam: non-HV building (parcelhus) drops the forsyning part', function () {
+  var p = axGenerate(3, 'parcelhus', 'ekspert', 'fuld');
+  assert.ok(p.opgaver.every(function (o) { return o.type !== 'forsyning'; }), 'no forsyning for a house');
+});
+test('autoexam: mini mode yields one installation opgave with <=2 tasks', function () {
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  assert.strictEqual(p.opgaver.length, 1);
+  assert.ok(p.opgaver[0].tasks.length <= 2);
+});
+test('autoexam: every generated task carries opts + ci + clause (click-only answerable)', function () {
+  var p = axGenerate(42, 'kontor', 'kandidat', 'fuld');
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      assert.ok(Array.isArray(t.opts) && t.opts.length >= 2, 'opts present for ' + t.id);
+      assert.ok(typeof t.ci === 'number' && t.ci >= 0 && t.ci < t.opts.length, 'valid ci for ' + t.id);
+      assert.ok(t.clause && /60364|Sikkerhedsstyrelsen/.test(t.clause), 'DS/HD clause for ' + t.id);
+    });
+  });
+});
+test('autoexam: combo sweep (all buildings x tiers x modes) generates without error', function () {
+  var n = 0, err = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    try {
+      var p = axGenerate(n * 7 + 1, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+      assert.ok(p.opgaver.length >= 1);
+      p.opgaver.forEach(function (o) { assert.ok(o.tasks.length >= 1); });
+    } catch (e) { err++; }
+  }
+  assert.strictEqual(err, 0, n + ' combos, ' + err + ' errors');
+});
+test('autoexam: axSolveTask recomputes the stored reference answer (no drift)', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var bad = 0, checked = 0;
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      var s = axSolveTask(t, op); checked++;
+      if (typeof t.answer === 'number' && s.result && typeof s.result.value === 'number') {
+        if (Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++;
+      }
+    });
+  });
+  assert.ok(checked > 0 && bad === 0, checked + ' checked, ' + bad + ' drift');
+});
+test('autoexam: every worked solution has the full 7-part structure', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  axSolve(p).forEach(function (op) {
+    op.tasks.forEach(function (s) {
+      assert.ok(s.assumptions.length >= 1, 'assumptions');
+      assert.ok(s.standard, 'standard');
+      assert.ok(s.verification, 'verification');
+      assert.ok(s.compliance.length >= 1, 'compliance');
+      assert.ok(s.conclusion, 'conclusion');
+      assert.ok(s.result, 'result');
+    });
+  });
+});
+test('autoexam: solution sweep (all combos) is complete & numerically consistent', function () {
+  var tasks = 0, err = 0, n = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    var p = axGenerate(n * 13 + 5, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+    var sol = axSolve(p);
+    p.opgaver.forEach(function (op, oi) {
+      op.tasks.forEach(function (t, k) {
+        tasks++; var s = sol[oi].tasks[k];
+        if (!s || !s.assumptions.length || !s.verification || !s.conclusion || !s.compliance.length) err++;
+        if (typeof t.answer === 'number' && s.result && typeof s.result.value === 'number' && Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) err++;
+      });
+    });
+  }
+  assert.ok(tasks > 1000 && err === 0, tasks + ' tasks, ' + err + ' errors');
+});
+test('autoexam: axExamine scores a perfect answer 100% and PASS', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  var r = axExamine(p, ans);
+  assert.strictEqual(r.score, 100);
+  assert.strictEqual(r.verdict, 'pass');
+  assert.strictEqual(r.weaknesses.length, 0);
+  assert.ok(r.strengths.length >= 1);
+});
+test('autoexam: axExamine fails an empty answer and lists every task as missing', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var r = axExamine(p, {});
+  assert.strictEqual(r.score, 0);
+  assert.strictEqual(r.verdict, 'fail');
+  assert.strictEqual(r.missing.length, r.totalCount);
+});
+test('autoexam: axExamine all-wrong scores 0 and fails', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = (t.ci + 1) % t.opts.length; }); });
+  var r = axExamine(p, ans);
+  assert.strictEqual(r.score, 0);
+  assert.strictEqual(r.verdict, 'fail');
+});
+test('autoexam: partial answer produces a per-category breakdown', function () {
+  var p = axGenerate(555, 'fabrik', 'kandidat', 'fuld');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.cat === 'overload') ans[t.id] = t.ci; }); });
+  var r = axExamine(p, ans);
+  assert.ok(r.catPct.overload === 100, 'overload mastered');
+  assert.ok(r.score > 0 && r.score < 100, 'partial score, got ' + r.score);
+});
+test('autoexam: laerling pass mark is 70, expert is 80', function () {
+  assert.strictEqual(axTier('laerling').pass, 70);
+  assert.strictEqual(axTier('ekspert').pass, 80);
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(p, ans).passMark, 70);
+});
+test('autoexam: examiner sweep \u2014 perfect always passes, empty always fails', function () {
+  var n = 0, bad = 0;
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) for (var ti = 0; ti < AX_TIERS.length; ti++) for (var mi = 0; mi < AX_MODES.length; mi++) {
+    n++;
+    var p = axGenerate(n * 3 + 2, AX_BUILDINGS[bi].id, AX_TIERS[ti].id, AX_MODES[mi].id);
+    var perf = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { perf[t.id] = t.ci; }); });
+    var rp = axExamine(p, perf);
+    if (rp.verdict !== 'pass' || rp.score !== 100) bad++;
+    if (axExamine(p, {}).verdict !== 'fail') bad++;
+  }
+  assert.strictEqual(bad, 0, n + ' combos, ' + bad + ' anomalies');
+});
+test('autoexam: renderAutoExam returns HTML for all tabs in da and en without leaking undefined', function () {
+  var prevLang = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    autoexamState.seed = 2024; autoexamState.building = 'fabrik'; autoexamState.tier = 'ekspert'; autoexamState.mode = 'fuld';
+    axUIgenerate(true);
+    ['opgave', 'besvar', 'censor'].forEach(function (tab) {
+      autoexamState.tab = tab;
+      var out = renderAutoExam();
+      assert.ok(typeof out === 'string' && out.length > 100, tab + ' renders');
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined leak in ' + lg + '/' + tab);
+    });
+  });
+  lang = prevLang;
+});
+test('autoexam: graded censor view reveals score and full worked solution', function () {
+  var prevLang = lang; lang = 'da';
+  autoexamState.seed = 2024; autoexamState.building = 'fabrik'; autoexamState.tier = 'kandidat'; autoexamState.mode = 'fuld';
+  axUIgenerate(true);
+  var p = autoexamState.project;
+  p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { autoexamState.answers[t.id] = t.ci; }); });
+  autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.tab = 'censor';
+  var out = renderAutoExam();
+  assert.ok(out.indexOf('BEST') >= 0, 'shows pass/fail verdict');
+  assert.ok(out.indexOf('Verifikation') >= 0, 'shows worked-solution verification');
+  assert.ok(out.indexOf('undefined') < 0, 'no undefined leak');
+  lang = prevLang;
+});
+test('autoexam: registered in module label registries (da/en) and nav', function () {
+  assert.ok(T.da.modules.autoexam && T.en.modules.autoexam, 'label registered');
+  var found = false; for (var i = 0; i < NAV_GROUPS.length; i++) if (NAV_GROUPS[i].keys.indexOf('autoexam') >= 0) found = true;
+  assert.ok(found, 'autoexam present in a NAV group');
+});
+
+// ----- Batch 2: complex (Viggo) drills, AI mentor, analytics -----
+test('autoexam/cx: Viggo chain matches hand calc (156MVA/10kV/0.1 + 1000kVA/5% => ~28kA)', function () {
+  var sc = axCxScenario({ U_HV: 10, Sk: 156, cosk: 0.1, SN: 1000, ek: 5, PCu: 10, U_LV: 400, c: 1.1 });
+  assert.ok(Math.abs(sc.ZnetHV - 0.641) < 0.01, 'ZnetHV got ' + sc.ZnetHV);
+  assert.ok(Math.abs(sc.ZT * 1000 - 8.0) < 0.05, 'ZT got ' + (sc.ZT * 1000) + ' mOhm');
+  assert.ok(Math.abs(sc.cosT - 0.20) < 0.01, 'cosT got ' + sc.cosT);
+  assert.ok(Math.abs(sc.Ik / 1000 - 28.2) < 0.5, 'Ik got ' + (sc.Ik / 1000) + ' kA');
+});
+test('autoexam/cx: vector sum differs from scalar sum (proves complex math is used)', function () {
+  var sc = axCxScenario({ U_HV: 10, Sk: 156, cosk: 0.1, SN: 1000, ek: 5, PCu: 10, U_LV: 400, c: 1.1 });
+  var scalar = sc.ZnetLV + sc.ZT;
+  assert.ok(sc.Ztot < scalar, 'vector |Z| (' + sc.Ztot + ') must be < scalar sum (' + scalar + ')');
+});
+test('autoexam/cx: axGenComplex deterministic + 4 tasks all with opts/ci', function () {
+  var a = axGenComplex(77, 'kandidat'), b = axGenComplex(77, 'kandidat');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+  assert.strictEqual(a.opgaver[0].tasks.length, 4);
+  a.opgaver[0].tasks.forEach(function (t) { assert.ok(t.opts.length >= 2 && typeof t.ci === 'number' && t.cxsol === true); });
+});
+test('autoexam/cx: complex worked solutions recompute the reference answer', function () {
+  var p = axGenComplex(123, 'ekspert'); var bad = 0;
+  p.opgaver[0].tasks.forEach(function (t) { var s = axSolveTask(t); if (Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++; assert.ok(s.steps.length >= 1 && s.verification, 'has steps+verification'); });
+  assert.strictEqual(bad, 0);
+});
+test('autoexam/cx: examiner scores a perfect complex drill 100/pass', function () {
+  var p = axGenComplex(123, 'ekspert'); var ans = {}; p.opgaver[0].tasks.forEach(function (t) { ans[t.id] = t.ci; });
+  var r = axExamine(p, ans); assert.strictEqual(r.score, 100); assert.strictEqual(r.verdict, 'pass');
+});
+test('autoexam/cx: complex generator sweep across tiers/seeds is consistent', function () {
+  var n = 0, bad = 0;
+  ['laerling', 'elektriker', 'avanceret', 'kandidat', 'ekspert'].forEach(function (tr) {
+    for (var s = 1; s <= 12; s++) { n++; var p = axGenComplex(s * 31 + 3, tr); p.opgaver[0].tasks.forEach(function (t) { var so = axSolveTask(t); if (Math.abs(so.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++; }); }
+  });
+  assert.ok(n >= 50 && bad === 0, n + ' drills, ' + bad + ' drift');
+});
+test('autoexam/mentor: hints exist for every task kind and never print the numeric answer', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld'); var leak = 0, none = 0;
+  p.opgaver.forEach(function (op) {
+    op.tasks.forEach(function (t) {
+      var hs = axMentorHints(t); if (!hs.length) none++;
+      var joined = hs.map(function (h) { return h.da + ' ' + h.en; }).join(' ');
+      if (typeof t.answer === 'number') { var a = String(t.answer); if (a.length >= 2 && (joined.indexOf(' ' + a + ' ') >= 0 || joined.indexOf('=' + a) >= 0)) leak++; }
+    });
+  });
+  assert.strictEqual(none, 0, 'all kinds have hints');
+  assert.strictEqual(leak, 0, 'no hint leaks the numeric answer');
+});
+test('autoexam/mentor: final hint always points to the governing clause', function () {
+  var hs = axMentorHints({ kind: 'cable', clause: 'DS/HD 60364-5-52 \u00a7523' });
+  assert.ok(hs[hs.length - 1].da.indexOf('60364-5-52') >= 0, 'clause pointer present');
+});
+test('autoexam/analytics: aggregates attempts, pass rate, averages, streak, weakest/strongest', function () {
+  var log = [
+    { ts: 1, building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 60, verdict: 'fail', catPct: { overload: 80, cable: 40, vdrop: 50, shortcircuit: 70, fault: 55 } },
+    { ts: 2, building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 85, verdict: 'pass', catPct: { overload: 100, cable: 60, vdrop: 80, shortcircuit: 90, fault: 80 } },
+    { ts: 3, building: 'kontor', tier: 'avanceret', mode: 'case', score: 90, verdict: 'pass', catPct: { overload: 100, cable: 90, vdrop: 100, fault: 70 } }
+  ];
+  var a = axAnalytics(log);
+  assert.strictEqual(a.attempts, 3);
+  assert.strictEqual(a.passRate, 67);
+  assert.strictEqual(a.avgScore, 78);
+  assert.strictEqual(a.bestScore, 90);
+  assert.strictEqual(a.streak, 2, 'last two are passes');
+  assert.strictEqual(a.weakest, 'cable');
+  assert.strictEqual(a.strongest, 'overload');
+  assert.strictEqual(a.buildAvg.fabrik.n, 2);
+});
+test('autoexam/analytics: empty log yields zeroed analytics (no crash)', function () {
+  var a = axAnalytics([]);
+  assert.strictEqual(a.attempts, 0); assert.strictEqual(a.passRate, 0); assert.strictEqual(a.streak, 0);
+});
+test('autoexam/svg: axSvgLine and axSvgBars produce valid SVG with no NaN', function () {
+  var line = axSvgLine([{ ts: 1, score: 60, verdict: 'fail' }, { ts: 2, score: 90, verdict: 'pass' }]);
+  var bars = axSvgBars([{ label: 'Overload', value: 80 }, { label: 'Cable', value: 40 }]);
+  assert.ok(line.indexOf('<svg') === 0 && line.indexOf('</svg>') > 0, 'valid line svg');
+  assert.ok(bars.indexOf('<svg') === 0, 'valid bar svg');
+  assert.ok((line + bars).indexOf('NaN') < 0, 'no NaN in svg');
+});
+test('autoexam/svg: single-point line chart does not divide by zero', function () {
+  var line = axSvgLine([{ ts: 1, score: 75, verdict: 'pass' }]);
+  assert.ok(line.indexOf('NaN') < 0 && line.indexOf('<circle') > 0, 'single point renders');
+});
+test('autoexam: Kompleks and Analyse tabs render in da and en without leaking', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.cxProject = axGenComplex(5, 'kandidat'); autoexamState.cxAnswers = {}; autoexamState.cxResult = null;
+    autoexamState.tab = 'kompleks'; var k = renderAutoExam();
+    assert.ok(k.length > 200 && k.indexOf('undefined') < 0 && k.indexOf('NaN') < 0, 'kompleks ' + lg);
+    autoexamState.tab = 'analyse'; var d = renderAutoExam();
+    assert.ok(d.length > 100 && d.indexOf('undefined') < 0 && d.indexOf('NaN') < 0, 'analyse ' + lg);
+  });
+  lang = prev;
+});
+
+// ----- Batch 3: SLD diagram error-ID + adaptive difficulty -----
+test('autoexam/diagram: axGenDiagram deterministic, 3 tasks, ci matches injected fault', function () {
+  var a = axGenDiagram(101, 'kandidat'), b = axGenDiagram(101, 'kandidat');
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b));
+  assert.strictEqual(a.opgaver[0].tasks.length, 3);
+  a.opgaver[0].tasks.forEach(function (t) {
+    var expect = -1; for (var i = 0; i < AX_DIAG_FAULTS.length; i++) if (AX_DIAG_FAULTS[i].id === t.model.faultId) expect = i;
+    assert.strictEqual(t.ci, expect, 'ci indexes the injected fault');
+    assert.strictEqual(t.answer, t.ci);
+  });
+});
+test('autoexam/diagram: each fault type actually creates the inconsistency', function () {
+  ['underrated', 'undersized_cable', 'icu_low', 'missing_rcd', 'selectivity', 'no_main_switch', 'none'].forEach(function (fid) {
+    var rng = axRngMake(7); var m = axBuildDiagramModel(rng, AX_BUILDINGS[5], axTier('ekspert')); axInjectFault(m, fid, rng);
+    if (fid === 'underrated') { var f = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f && f.In < f.IB, 'In<IB'); }
+    else if (fid === 'undersized_cable') { var f2 = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f2 && f2.Iz < f2.In, 'Iz<In'); }
+    else if (fid === 'icu_low') { assert.ok(m.main.Icu < m.trafo.IkkA, 'Icu<Ik'); }
+    else if (fid === 'missing_rcd') { assert.ok(m.feeders.some(function (x) { return x.faulty && x.rcd === false; }), 'rcd removed'); }
+    else if (fid === 'selectivity') { var f3 = m.feeders.filter(function (x) { return x.faulty; })[0]; assert.ok(f3 && f3.In >= m.main.In, 'In>=main'); }
+    else if (fid === 'no_main_switch') { assert.strictEqual(m.main.hasSwitch, false); }
+    else { assert.ok(!m.main.faulty && !m.feeders.some(function (x) { return x.faulty; }), 'none has no fault'); }
+  });
+});
+test('autoexam/diagram: worked solution recomputes the answer and explains', function () {
+  var p = axGenDiagram(55, 'avanceret');
+  p.opgaver[0].tasks.forEach(function (t) { var s = axSolveTask(t); assert.strictEqual(s.result.value, t.answer); assert.ok(s.verification && s.conclusion && s.compliance.length); });
+});
+test('autoexam/diagram: axRenderSLD is valid SVG with no NaN; highlight marks the fault', function () {
+  var p = axGenDiagram(9, 'ekspert'); var t = p.opgaver[0].tasks[0];
+  var plain = axRenderSLD(t.model, false), hi = axRenderSLD(t.model, true);
+  assert.ok(plain.indexOf('<svg') === 0 && plain.indexOf('</svg>') > 0 && plain.indexOf('NaN') < 0, 'valid svg');
+  if (t.model.faultId !== 'none') assert.ok(hi.indexOf('#d64545') >= 0 || hi.indexOf('\u26A0') >= 0, 'fault highlighted');
+});
+test('autoexam/diagram: generator+solution+svg sweep (5 tiers x 20 seeds) clean', function () {
+  var n = 0, err = 0;
+  ['laerling', 'elektriker', 'avanceret', 'kandidat', 'ekspert'].forEach(function (tr) {
+    for (var s = 1; s <= 20; s++) { n++; var p = axGenDiagram(s * 17 + 1, tr); p.opgaver[0].tasks.forEach(function (t) { var so = axSolveTask(t); if (so.result.value !== t.answer) err++; if (axRenderSLD(t.model, true).indexOf('NaN') >= 0) err++; }); }
+  });
+  assert.ok(n >= 90 && err === 0, n + ' sets, ' + err + ' errors');
+});
+test('autoexam/diagram: examiner scores a perfect diagram set 100/pass', function () {
+  var p = axGenDiagram(101, 'kandidat'); var ans = {}; p.opgaver[0].tasks.forEach(function (t) { ans[t.id] = t.ci; });
+  var r = axExamine(p, ans); assert.strictEqual(r.score, 100); assert.strictEqual(r.verdict, 'pass');
+});
+test('autoexam/adaptive: empty log stays put; strong run levels up; weak run levels down', function () {
+  assert.strictEqual(axAdaptiveNext([], 'elektriker').tier, 'elektriker');
+  var strong = [{ ts: 1, score: 90, verdict: 'pass', tier: 'kandidat', catPct: { cable: 60, overload: 95 } }, { ts: 2, score: 88, verdict: 'pass', tier: 'kandidat', catPct: { cable: 55, overload: 95 } }, { ts: 3, score: 90, verdict: 'pass', tier: 'kandidat', catPct: { cable: 60, overload: 95 } }];
+  assert.strictEqual(axAdaptiveNext(strong, 'kandidat').tier, 'ekspert');
+  var weak = [{ ts: 1, score: 40, verdict: 'fail', tier: 'kandidat', catPct: { cable: 30 } }, { ts: 2, score: 45, verdict: 'fail', tier: 'kandidat', catPct: { cable: 35 } }];
+  assert.strictEqual(axAdaptiveNext(weak, 'kandidat').tier, 'avanceret');
+});
+test('autoexam/adaptive: never recommends beyond the tier bounds', function () {
+  var maxRun = [{ ts: 1, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }, { ts: 2, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }, { ts: 3, score: 95, verdict: 'pass', tier: 'ekspert', catPct: {} }];
+  assert.strictEqual(axAdaptiveNext(maxRun, 'ekspert').tier, 'ekspert', 'cannot exceed expert');
+  var minRun = [{ ts: 1, score: 20, verdict: 'fail', tier: 'laerling', catPct: {} }, { ts: 2, score: 25, verdict: 'fail', tier: 'laerling', catPct: {} }];
+  assert.strictEqual(axAdaptiveNext(minRun, 'laerling').tier, 'laerling', 'cannot go below apprentice');
+});
+test('autoexam: Diagram tab renders (plain + graded) in da and en; dashboard shows adaptive panel', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.dgProject = axGenDiagram(101, 'kandidat'); autoexamState.dgAnswers = {}; autoexamState.dgResult = null; autoexamState.tab = 'diagram';
+    var plain = renderAutoExam();
+    assert.ok(plain.indexOf('<svg') >= 0 && plain.indexOf('undefined') < 0 && plain.indexOf('NaN') < 0, 'diagram plain ' + lg);
+    autoexamState.dgProject.opgaver[0].tasks.forEach(function (t) { autoexamState.dgAnswers[t.id] = t.ci; });
+    autoexamState.dgResult = axExamine(autoexamState.dgProject, autoexamState.dgAnswers);
+    var graded = renderAutoExam();
+    assert.ok(graded.indexOf('undefined') < 0 && (graded.indexOf('Verifik') >= 0 || graded.indexOf('Verification') >= 0), 'diagram graded ' + lg);
+  });
+  lang = prev;
+  autoexamState.tab = 'analyse';
+  var d = renderAutoExam();
+  assert.ok(d.indexOf('axApplyAdaptive') >= 0, 'adaptive button present');
+});
+
+// ----- Batch 4: continuous-learning ingestion -----
+var AX_SAMPLE_EXAM = 'El-autorisationsprove. Vaegtning: Opgave 1 = 20 % Opgave 2 = 60 % Opgave 3 = 20 %. Opgave 1 Forsyningsanlaeg paa et hospital, tre transformerstationer paa en 10 kV-ringforbindelse. Kortslutningseffekt. Overbelastningsbeskyttet. Beregn Ikmax. Opgave 2 Bygningsinstallation, hoejhus til kontorlejemaal, systemjording TT, dimensioner stikledningen, samtidighedsfaktor, sp\u00e6ndingsfald, HPFI, DS/HD 60364-5-52, BEK 1082, Faellesregulativet, brydeevne Icu, slojfeimpedans Zs. 6 timers prove.';
+test('autoexam/ingest: extracts topics, buildings, clauses, weighting, HV and duration', function () {
+  var f = axIngestText(AX_SAMPLE_EXAM);
+  assert.ok(f.ok && f.words > 30, 'enough text');
+  assert.ok(f.topics.shortcircuit >= 1 && f.topics.fault >= 1 && f.topics.vdrop >= 1, 'topics: ' + JSON.stringify(f.topics));
+  assert.ok(f.buildings.hospital >= 1 && f.buildings.kontor >= 1, 'buildings: ' + JSON.stringify(f.buildings));
+  assert.ok(f.clauses['DS/HD 60364-5-52'] >= 1 && f.clauses['BEK 1082'] >= 1, 'clauses');
+  assert.strictEqual(f.hv, true, 'HV detected');
+  assert.strictEqual(f.durationHint, 6, '6-hour exam');
+  assert.deepStrictEqual(f.weighting, [20, 60, 20], 'weighting parsed');
+});
+test('autoexam/ingest: rejects junk text (ok=false) and is deterministic', function () {
+  assert.strictEqual(axIngestText('hello world').ok, false);
+  assert.strictEqual(JSON.stringify(axIngestText(AX_SAMPLE_EXAM)), JSON.stringify(axIngestText(AX_SAMPLE_EXAM)));
+});
+test('autoexam/ingest: vdrop matches the \u00e6-folded ASCII spelling too', function () {
+  assert.ok(axIngestText('spaendingsfald paa stikledningen og spaendingsfald').topics.vdrop >= 1, 'ascii spaendingsfald');
+  assert.ok(axIngestText('sp\u00e6ndingsfald').topics.vdrop >= 1, 'proper sp\u00e6ndingsfald');
+});
+test('autoexam/ingest: profile merge accumulates counts across documents', function () {
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  p = axProfileMerge(p, axIngestText(AX_SAMPLE_EXAM + ' fabrik produktionshal maskinhal.'));
+  assert.strictEqual(p.ingested, 2);
+  assert.strictEqual(p.hvCount, 2);
+  assert.ok(p.buildings.hospital === 2 && p.buildings.fabrik >= 1, 'cumulative buildings: ' + JSON.stringify(p.buildings));
+});
+test('autoexam/ingest: bias is null without a profile, computed with one', function () {
+  assert.strictEqual(axProfileBias(null), null);
+  assert.strictEqual(axProfileBias({ ingested: 0 }), null);
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  var b = axProfileBias(p);
+  assert.ok(b && b.topBuilding && typeof b.buildingWeights === 'object', 'bias computed');
+  var sum = 0; Object.keys(b.buildingWeights).forEach(function (k) { sum += b.buildingWeights[k]; });
+  assert.ok(Math.abs(sum - 1) < 1e-6, 'building weights normalised to 1');
+});
+test('autoexam/ingest: biased building pick is always a valid building id and favours seen types', function () {
+  var p = axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM));
+  for (var i = 0; i < 50; i++) { var id = axBiasedBuilding(p, axRngMake(i + 1)); assert.ok(AX_BUILDINGS.some(function (b) { return b.id === id; }), 'valid id ' + id); }
+  // count distribution over many seeds: hospital/kontor (seen) should appear
+  var seen = {}; for (var s = 0; s < 300; s++) { var id2 = axBiasedBuilding(p, axRngMake(s * 7 + 1)); seen[id2] = (seen[id2] || 0) + 1; }
+  assert.ok((seen.hospital || 0) + (seen.kontor || 0) > 0, 'seen buildings appear');
+});
+test('autoexam: Laering tab renders in da and en (with and without a profile)', function () {
+  var prev = lang;
+  axProfileClear();
+  ['da', 'en'].forEach(function (lg) { lang = lg; autoexamState.tab = 'laering'; var out = renderAutoExam(); assert.ok(out.indexOf('axIngestFile') >= 0 && out.indexOf('undefined') < 0, 'empty laering ' + lg); });
+  axProfileSave(axProfileMerge(null, axIngestText(AX_SAMPLE_EXAM)));
+  ['da', 'en'].forEach(function (lg) { lang = lg; autoexamState.tab = 'laering'; var out = renderAutoExam(); assert.ok(out.indexOf('<svg') >= 0 && out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'profiled laering ' + lg); });
+  axProfileClear();
+  lang = prev;
+});
+test('autoexam: tab bar includes the Laering tab', function () {
+  autoexamState.tab = 'opgave'; var out = renderAutoExam();
+  assert.ok(out.indexOf("axUITab('laering')") >= 0, 'Laering tab present');
+});
+
+// ----- Batch 5: MathML typesetting of worked solutions -----
+test('autoexam/mathml: worked-solution cards typeset formulas as MathML and preserve raw text', function () {
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var cable = null; axSolve(p).forEach(function (op) { op.tasks.forEach(function (s) { if (s.kind === 'cable') cable = s; }); });
+  assert.ok(cable, 'a cable solution exists');
+  var card = axRenderSolutionCard(cable);
+  assert.ok(card.indexOf('<math') >= 0, 'formula rendered as MathML');
+  assert.ok(card.indexOf('alttext') >= 0, 'MathML carries alttext for accessibility/search');
+  assert.ok(card.indexOf('Iz_tab') >= 0, 'raw ASCII formula preserved (searchable)');
+});
+test('autoexam/mathml: rendering solution cards never throws and leaks no undefined/NaN', function () {
+  var bad = 0, cards = 0;
+  function scan(p) { axSolve(p).forEach(function (op) { op.tasks.forEach(function (s) { cards++; var html; try { html = axRenderSolutionCard(s); } catch (e) { bad++; return; } if (html.indexOf('undefined') >= 0 || html.indexOf('NaN') >= 0) bad++; }); }); }
+  scan(axGenerate(2024, 'fabrik', 'kandidat', 'fuld'));
+  scan(axGenComplex(7, 'ekspert'));
+  scan(axGenDiagram(9, 'kandidat'));
+  assert.ok(cards > 15 && bad === 0, cards + ' cards, ' + bad + ' bad');
+});
+test('autoexam/mathml: mathml() falls back gracefully on prose (never throws)', function () {
+  var out = mathml('I_n = mindste standard \u2265 I_B');
+  assert.ok(typeof out === 'string' && out.length > 0, 'returns a string');
+  assert.ok(out.indexOf('mathml-fallback') >= 0 || out.indexOf('<math') >= 0, 'either typeset or graceful fallback');
+});
+
+// ----- Batch 6: deeper installation tasks (group circuit, RCD, TT earthing) -----
+test('autoexam/tasks: group-circuit, RCD and (TT) earthing tasks are generated', function () {
+  var evKinds = {}; for (var s = 1; s <= 30; s++) { axGenerate(s * 3 + 1, 'ev_anlaeg', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { evKinds[t.kind] = 1; if (t.id === 't_grp') evKinds.group = 1; }); }); }
+  assert.ok(evKinds.rcd, 'RCD task generated');
+  assert.ok(evKinds.group, 'group-circuit task generated');
+  var ttKinds = {}; for (var s2 = 1; s2 <= 30; s2++) { axGenerate(s2 * 7 + 2, 'landbrug', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ttKinds[t.kind] = 1; }); }); }
+  assert.ok(ttKinds.earthing, 'TT building generates an earthing (RA) task');
+});
+test('autoexam/tasks: TT earthing RA = UL/IDn (50 V / 30 mA = 1667 ohm), typeset', function () {
+  var found = null; for (var s = 1; s <= 40 && !found; s++) { axSolve(axGenerate(s * 7 + 2, 'landbrug', 'ekspert', 'case')).forEach(function (op) { op.tasks.forEach(function (x) { if (x.kind === 'earthing') found = x; }); }); }
+  assert.ok(found, 'an earthing solution exists');
+  assert.strictEqual(found.result.value, 1667, 'RA,max = 1667 ohm');
+  assert.ok(axRenderSolutionCard(found).indexOf('<math') >= 0, 'earthing formula typeset');
+});
+test('autoexam/tasks: RCD selection is Type B for EV, Type A otherwise', function () {
+  var evRcd = null; for (var s = 1; s <= 30 && !evRcd; s++) { axGenerate(s * 3 + 1, 'ev_anlaeg', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'rcd' && t.given.hasEV) evRcd = t; }); }); }
+  assert.ok(evRcd && evRcd.opts[evRcd.ci].en.indexOf('Type B') >= 0, 'EV circuit => Type B');
+  var nonRcd = null; for (var s2 = 1; s2 <= 30 && !nonRcd; s2++) { axGenerate(s2 * 5 + 1, 'skole', 'elektriker', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'rcd' && !t.given.hasEV) nonRcd = t; }); }); }
+  assert.ok(nonRcd && nonRcd.opts[nonRcd.ci].en.indexOf('Type A') >= 0, 'non-EV => Type A');
+});
+test('autoexam/tasks: installation exams vary run-to-run but keep the IB->In->cable core first', function () {
+  var a = axGenerate(11, 'ev_anlaeg', 'ekspert', 'case').opgaver[0].tasks.map(function (t) { return t.id; });
+  var b = axGenerate(12, 'ev_anlaeg', 'ekspert', 'case').opgaver[0].tasks.map(function (t) { return t.id; });
+  assert.notStrictEqual(a.join(','), b.join(','), 'different seeds vary the task set/order');
+  assert.deepStrictEqual(a.slice(0, 3), ['t_ib', 't_dev', 't_cab'], 'core chain first');
+  assert.deepStrictEqual(b.slice(0, 3), ['t_ib', 't_dev', 't_cab'], 'core chain first');
+});
+test('autoexam/tasks: mini mode still yields <=2 tasks after the new kinds', function () {
+  var p = axGenerate(9, 'parcelhus', 'laerling', 'mini');
+  assert.ok(p.opgaver[0].tasks.length <= 2);
+});
+test('autoexam/tasks: new kinds solve consistently and grade perfectly across a sweep', function () {
+  var n = 0, err = 0;
+  AX_BUILDINGS.forEach(function (b) { ['laerling', 'ekspert'].forEach(function (tr) { ['case', 'fuld'].forEach(function (md) {
+    n++; var p = axGenerate(n * 13 + 1, b.id, tr, md); var sol = axSolve(p);
+    p.opgaver.forEach(function (op, oi) { op.tasks.forEach(function (t, k) { var sx = sol[oi].tasks[k]; if (typeof t.answer === 'number' && sx.result && typeof sx.result.value === 'number' && Math.abs(sx.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) err++; }); });
+    var ans = {}; p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+    if (axExamine(p, ans).score !== 100) err++;
+  }); }); });
+  assert.ok(n >= 40 && err === 0, n + ' combos, ' + err + ' errors');
+});
+
+// ----- Legacy analyzer fixes: segment de-dup + broader question detection -----
+var ANALYZER_SAMPLE = ['El-autorisationsprove August 2018', 'Vaegtning:', 'Opgave 1 = 20 %', 'Opgave 2 = 60 %', 'Opgave 3 = 20 %', 'Opgavesaettet er opdelt i 3 opgaver:',
+  'Opgave 1', 'Forsyningsanlaeg', 'Paa et hospital er tre transformerstationer paa en 10 kV-ringforbindelse.',
+  'Kontroller om kablerne er overbelastningsbeskyttet af relaebeskyttelserne.',
+  'Beregn Ikmax paa lavspaendingssiden af transformerne i station 4.',
+  'Har neozed-sikringer en tilstraekkelig kortslutningsholdbarhed?',
+  'Opgave 2', 'Bygningsinstallation', 'Systemjording TT.',
+  'Dimensioner stikledningen til tavle A1.', 'Beregn spaendingsfaldet paa stikledningen.',
+  'Dimensioner transformerstationens beskyttende jordingsanlaeg (BJ) og driftsmaessige jordingsanlaeg (DJ).',
+  'Opgave 3', 'Spoergsmaal til staerkstroemsbekendtgoerelserne.', 'Redegoer for kravene til automatisk frakobling.'].join('\n');
+test('analyzer: segmentation merges repeated "Opgave N" into one block per number', function () {
+  var segs = analyzerSegment(ANALYZER_SAMPLE);
+  var ids = segs.map(function (s) { return s.id; });
+  assert.strictEqual(ids.length, 4, 'Generelt + 3 unique opgaver (no duplicates), got ' + ids.join(','));
+  var uniq = {}; ids.forEach(function (i) { uniq[i] = 1; });
+  assert.strictEqual(Object.keys(uniq).length, 4, 'no duplicate opgave ids');
+  assert.deepStrictEqual(ids, [0, 1, 2, 3], 'Generelt first, then 1,2,3 in order');
+});
+test('analyzer: detects imperative/yes-no questions the old patterns missed', function () {
+  var q1 = analyzerDetectQuestions('Kontroller om kablerne er overbelastningsbeskyttet af relaebeskyttelserne.');
+  assert.ok(q1.some(function (q) { return q.type === 'coord'; }), 'Kontroller overbelastning => coord');
+  var q2 = analyzerDetectQuestions('Dimensioner transformerstationens beskyttende jordingsanlaeg (BJ) og driftsmaessige (DJ).');
+  assert.ok(q2.some(function (q) { return q.type === 'earth'; }), 'jordingsanlaeg => earth');
+  var q3 = analyzerDetectQuestions('Beregn Ikmax paa lavspaendingssiden.');
+  assert.ok(q3.some(function (q) { return q.type === 'ik'; }), 'Ikmax => ik');
+});
+test('analyzer: generic fallback surfaces a verbatim question when nothing maps (incl. ASCII redegoer)', function () {
+  var qs = analyzerDetectQuestions('Redegoer for kravene til automatisk frakobling.');
+  assert.ok(qs.length >= 1, 'a generic question is produced');
+  assert.ok(qs[0].qtext && qs[0].qtext.indexOf('Redegoer') >= 0, 'carries the verbatim sentence');
+  assert.strictEqual(analyzerDetectQuestions('Dette er en helt almindelig beskrivende saetning uden opgave.').length, 0, 'plain prose yields no question');
+});
+test('analyzer: full exam build finds questions per opgave (no all-empty wall)', function () {
+  var prevAS = (typeof analyzerState !== 'undefined') ? analyzerState : undefined;
+  var state = { segments: analyzerSegment(ANALYZER_SAMPLE), rawText: ANALYZER_SAMPLE, extracted: analyzerExtract(ANALYZER_SAMPLE), results: [] };
+  var sol = examBuildSolution(state);
+  assert.strictEqual(sol.opgaver.length, 4, '4 opgave blocks');
+  var total = 0; sol.opgaver.forEach(function (o) { total += o.questions.length; });
+  assert.ok(total >= 6, 'detects several questions overall, got ' + total);
+  var op1 = sol.opgaver.filter(function (o) { return o.id === 1; })[0];
+  assert.ok(op1 && op1.questions.length >= 2, 'Opgave 1 has multiple questions');
+  // precise question text, not the whole merged segment
+  var hasPrecise = op1.questions.some(function (q) { return (q.questionText || '').length < 120 && /Beregn|Kontroller/i.test(q.questionText || ''); });
+  assert.ok(hasPrecise, 'question text is the precise triggering sentence');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
