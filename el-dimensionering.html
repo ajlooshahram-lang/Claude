@@ -5499,6 +5499,12 @@ function renderEnergy() {
       <div class="result-row"><span class="label">${tx('Effektfaktor','Power Factor')}</span><span class="value">${pf.pf}</span></div>
       <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${pq.clause}</span></div>
     </div>
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Energikvalitet','Power Quality') + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('EN 50160') + ' ' + mcPrimeRef('IEC 61000') + '</div>';
+  html += '</div>';
+
     <div class="result-box">
       <div class="result-title">${tx('Daglig omkostning','Daily Cost')}</div>
       <div class="result-row"><span class="label">${tx('Total','Total')} DKK</span><span class="value">${cost.totalCost}</span></div>
@@ -19921,6 +19927,14 @@ function renderTrayFill() {
   var needsSeparation = trayCheckSeparation(trayFillState.cables);
 
   // Results
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Kabelrende fyldning','Cable Tray Fill') + '</div>';
+  html += mcPrimeLine(tx('Fyldning','Fill'), '=', '', trayResult.fillPercent, '%', trayResult.fillPercent <= 50 ? mcPrimeRef('DS/EN 50174-2') : '');
+  html += '<div style="margin:6px 0;font-size:1.0rem">' + tx('Fyldning','Fill') + ' \u2264 50% : ' + trayResult.fillPercent + '% ' + (trayResult.fillPercent <= 50 ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/EN 50174-2') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Fyldningsberegning', 'Fill Rate Calculation') + ' - DS/EN 50174-2</div>';
   html += '<div class="result-row"><span class="label">' + tx('Bakketvaerareal', 'Tray Cross-Section') + '</span><span class="value">' + trayArea + ' mm\u00B2</span></div>';
@@ -20283,6 +20297,12 @@ function renderCommission() {
   html += '</div></div>';
 
   // Visual inspection checklist
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Idrifts\u00E6ttelse','Commissioning') + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/HD 60364-6') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Visuel inspektion', 'Visual Inspection') + ' - DS/HD 60364-6 cl.6.2.2</div>';
   items.visual.forEach(function(item) {
@@ -21154,6 +21174,12 @@ function renderDiscrim() {
   var vColor = verdictColors[analysis.verdict] || verdictColors.unresolved;
   var vLabel = verdictLabels[analysis.verdict] || verdictLabels.unresolved;
 
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Selektivitet','Selectivity') + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('IEC 60947-2') + ' ' + mcPrimeRef('DS/HD 60364-4-43') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Selektivitetsdom', 'Selectivity Verdict') + '</span><span class="value" style="color:' + vColor + ';font-weight:bold;font-size:1.1em">' + vLabel + '</span></div>';
@@ -21574,6 +21600,13 @@ function renderPool() {
   html += '<div class="select-group"><div class="select-label">' + tx('Vaelg udstyr', 'Select Equipment') + '</div><div class="select-grid">';
   POOL_EQUIPMENT.forEach(function(eq) { html += '<button class="sel-btn' + (poolState.selectedEquipment === eq.k ? ' selected' : '') + '" onclick="poolState.selectedEquipment=\'' + eq.k + '\';renderModule(\'pool\')">' + tx(eq.da, eq.en) + '</button>'; });
   html += '</div></div>';
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Svoemmebassin','Swimming Pool') + '</div>';
+  html += mcPrimeLine(tx('Zone','Zone'), ':=', '', poolState.zone, '', mcPrimeRef('DS/HD 60364-7-702'));
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/HD 60364-7-702') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Udstyrskontrol', 'Equipment Check') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value" style="color:' + (check.allowed ? 'var(--success)' : 'var(--danger)') + '">' + (check.allowed ? tx('TILLADT','ALLOWED') : tx('IKKE TILLADT','NOT ALLOWED')) + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Begrundelse', 'Reason') + '</span><span class="value">' + check.reason + '</span></div>';
