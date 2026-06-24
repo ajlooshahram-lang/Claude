@@ -9829,9 +9829,9 @@ function renderTrafoRegulation() {
   html += '</div>';
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
-  html += '<div class="result-row"><span class="label">\u0394U%</span><span class="value">' + reg.dU_pct.toFixed(3) + ' %</span></div>';
-  html += '<div class="result-row"><span class="label">\u0394U (400 V)</span><span class="value">' + (reg.dU_pct / 100 * 400).toFixed(2) + ' V</span></div>';
-  html += '<div class="result-row"><span class="label">U2 (' + tx('ved belastning', 'under load') + ')</span><span class="value">' + (400 - reg.dU_pct / 100 * 400).toFixed(1) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">\u0394U%</span><span class="value">' + (isFinite(reg.dU_pct) ? reg.dU_pct.toFixed(3) : '\u2014') + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">\u0394U (400 V)</span><span class="value">' + (isFinite(reg.dU_pct) ? (reg.dU_pct / 100 * 400).toFixed(2) : '\u2014') + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">U2 (' + tx('ved belastning', 'under load') + ')</span><span class="value">' + (isFinite(reg.dU_pct) ? (400 - reg.dU_pct / 100 * 400).toFixed(1) : '\u2014') + ' V</span></div>';
   html += '</div>';
   var sign = trafoState.regLoad === 'capacitive' ? ' - ' : ' + ';
   html += calcDetail({ name: tx('Spaendingsregulering', 'Voltage regulation'), formula: '\u0394U% = er%\u00D7cos\u03C6' + sign + 'ex%\u00D7sin\u03C6', variables: [{ name: 'er%', symbol: 'er', value: sc.erPct, unit: '%' }, { name: 'ex%', symbol: 'ex', value: sc.exPct, unit: '%' }, { name: 'cos\u03C6', symbol: 'cos\u03C6', value: trafoState.regCosPhi }, { name: 'sin\u03C6', symbol: 'sin\u03C6', value: reg.sinPhi }], substitution: sc.erPct.toFixed(2) + '\u00D7' + trafoState.regCosPhi + sign + sc.exPct.toFixed(2) + '\u00D7' + reg.sinPhi.toFixed(4), result: { value: reg.dU_pct, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
@@ -9891,8 +9891,8 @@ function renderTrafoParallel() {
   html += '<div class="result-box"><div class="result-title">' + tx('Belastningsfordeling', 'Load Sharing') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kapacitet', 'Capacity') + '</span><span class="value">' + par.totalCapacity + ' kVA</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Total belastning', 'Total load') + '</span><span class="value">' + totalLoad.toFixed(0) + ' kVA</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Trafo 1', 'Trafo 1') + '</span><span class="value">' + par.S1_load.toFixed(1) + ' kVA (' + (par.ratio1*100).toFixed(1) + '%)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Trafo 2', 'Trafo 2') + '</span><span class="value">' + par.S2_load.toFixed(1) + ' kVA (' + (par.ratio2*100).toFixed(1) + '%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Trafo 1', 'Trafo 1') + '</span><span class="value">' + (isFinite(par.S1_load) ? par.S1_load.toFixed(1) : '\u2014') + ' kVA (' + (isFinite(par.ratio1) ? (par.ratio1*100).toFixed(1) : '\u2014') + '%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Trafo 2', 'Trafo 2') + '</span><span class="value">' + (isFinite(par.S2_load) ? par.S2_load.toFixed(1) : '\u2014') + ' kVA (' + (isFinite(par.ratio2) ? (par.ratio2*100).toFixed(1) : '\u2014') + '%)</span></div>';
   html += '</div>';
   html += calcDetail({ name: tx('Belastningsfordeling', 'Load sharing'), formula: 'S1_load = S_total \u00D7 (S1/uk1) / (S1/uk1 + S2/uk2)', variables: [{ name: 'S1', symbol: 'S1', value: S1, unit: 'kVA' }, { name: 'uk1', symbol: 'uk1', value: uk1, unit: '%' }, { name: 'S2', symbol: 'S2', value: trafoState.parTrafo2size, unit: 'kVA' }, { name: 'uk2', symbol: 'uk2', value: trafoState.parTrafo2uk, unit: '%' }], substitution: totalLoad.toFixed(0) + ' \u00D7 (' + S1 + '/' + uk1 + ') / (' + S1 + '/' + uk1 + ' + ' + trafoState.parTrafo2size + '/' + trafoState.parTrafo2uk + ')', result: { value: par.S1_load, unit: 'kVA' }, reference: 'Opgavesamling Kap. 9' });
   html += '</div>';
@@ -17660,7 +17660,7 @@ function renderLighting() {
   html += '<div style="font-size:0.95rem;line-height:2.2">';
   html += '<div>S/H \u2264 1,5 : ' + (isFinite(calc.spacingRatio) ? calc.spacingRatio : '\u2014') + (calc.uniformityOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
   html += '<div>LENI \u2264 ' + (calc.leniMax||12) + ' W/m\u00B2 : ' + (isFinite(calc.powerDensity) ? calc.powerDensity : '\u2014') + ' W/m\u00B2' + (calc.leniOk ? mcPrimeOk() : mcPrimeFail()) + '</div>';
-  html += '<div>' + tx('Kredse','Circuits') + ': ' + calc.circuitsNeeded + ' \u00D7 B10 MCB (' + calc.totalWattage + ' W ' + tx('total','total') + ')</div>';
+  html += '<div>' + tx('Kredse','Circuits') + ': ' + (isFinite(calc.circuitsNeeded) ? calc.circuitsNeeded : '\u2014') + ' \u00D7 B10 MCB (' + (isFinite(calc.totalWattage) ? calc.totalWattage : '\u2014') + ' W ' + tx('total','total') + ')</div>';
   html += '</div>';
 
   html += '<div style="margin-top:10px;font-family:sans-serif">' + mcPrimeRef('DS/EN 12464-1') + ' ' + mcPrimeRef('DS/EN 15193') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
@@ -18189,7 +18189,7 @@ function renderBusbar() {
   // Thermal Check
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Termisk kontrol', 'Thermal Check') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Belastningsgrad', 'Load Ratio') + '</span><span class="value">' + calc.thermal.loadRatio + '% ' + (calc.thermal.ok ? '\u2705' : '\u274C') + ' (' + calc.thermal.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Belastningsgrad', 'Load Ratio') + '</span><span class="value">' + (calc.thermal && isFinite(calc.thermal.loadRatio) ? calc.thermal.loadRatio : 0) + '% ' + (calc.thermal && calc.thermal.ok ? '\u2705' : '\u274C') + ' (' + calc.thermal.clause + ')</span></div>';
   html += '</div>';
 
   // Voltage Drop
@@ -18203,7 +18203,7 @@ function renderBusbar() {
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Kortslutningskontrol', 'Short-Circuit Check') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Icw (1s)', 'Icw (1s)') + '</span><span class="value">' + calc.sc.icw + ' kA</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Upstream Ik', 'Upstream Ik') + '</span><span class="value">' + calc.sc.upstreamIk + ' kA ' + (calc.sc.ok ? '\u2705 Icw \u2265 Ik' : '\u274C Icw < Ik') + ' (' + calc.sc.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Upstream Ik', 'Upstream Ik') + '</span><span class="value">' + (calc.sc ? calc.sc.upstreamIk : 0) + ' kA ' + (calc.sc && calc.sc.ok ? '\u2705 Icw \u2265 Ik' : '\u274C Icw < Ik') + ' (' + calc.sc.clause + ')</span></div>';
   html += '</div>';
 
   // Expansion & Fire
