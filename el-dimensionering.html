@@ -19661,6 +19661,15 @@ function renderPFC() {
   html += '</div></div>';
 
   // Results - kvar calculation
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Fasekompensering','Power Factor Correction') + '</div>';
+  html += mcPrimeLine('Q<sub>c</sub>', ':= P \u00B7 (tan\u03C6\u2081 \u2212 tan\u03C6\u2082) =', '', calc.kvar, 'kvar', mcPrimeRef('IEC 60831'));
+  html += mcPrimeLine(tx('Standardbank','Standard bank'), ':=', '', standardSize, 'kvar', '');
+  html += mcPrimeResult('Q<sub>c</sub>', standardSize, 'kvar');
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('IEC 60831') + ' ' + mcPrimeRef('DS/HD 60364-5-52') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Kondensatorbankberegning', 'Capacitor Bank Calculation') + ' - ' + calc.clause + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Beregnet Qc', 'Calculated Qc') + '</span><span class="value">' + calc.kvar + ' kvar</span></div>';
@@ -20081,6 +20090,15 @@ function renderZs() {
   html += '</div></div>';
 
   // Calculation results
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid ' + (pass ? 'var(--success)' : 'var(--danger)') + ';border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 Z<sub>s</sub> ' + tx('Fejlsl\u00F8jfe','Fault Loop') + '</div>';
+  html += mcPrimeLine('Z<sub>s</sub>', ':= Z<sub>e</sub> + (R<sub>1</sub>+R<sub>2</sub>) \u00B7 L =', '', zsCalc.toFixed(3), '\u03A9', '');
+  html += mcPrimeLine('Z<sub>s,max</sub>', ':=', '', zsMax.toFixed(2), '\u03A9', mcPrimeRef('DS/HD 60364-4-41 Tabel 41.1'));
+  html += '<div style="margin:6px 0;font-size:1.0rem">Z<sub>s</sub> \u2264 0,8 \u00B7 Z<sub>s,max</sub> : ' + zsCalc.toFixed(3) + ' \u2264 ' + (zsMax*0.8).toFixed(3) + ' ' + (pass ? mcPrimeOk() : mcPrimeFail()) + '</div>';
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/HD 60364-4-41 \u00A7411.3.2') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Impedansberegning', 'Impedance Calculation') + ' - DS/HD 60364-6 cl.6.2.3.5</div>';
   html += '<div class="result-row"><span class="label">Ze (' + tx('kilde', 'source') + ')</span><span class="value">' + zsState.ze.toFixed(2) + ' \u03A9</span></div>';
@@ -21372,6 +21390,13 @@ function renderEarthsys() {
   html += '</div></div>';
 
   // Results
+  // MATHCAD PRIME SUMMARY
+  html += '<div style="font-family:' + "'Cambria Math','Times New Roman'" + ',serif;padding:12px 16px;margin:10px 0;border:2px solid var(--primary);border-radius:10px">';
+  html += '<div style="font-family:sans-serif;font-weight:800;font-size:0.85rem;margin-bottom:6px">\uD83D\uDCD0 ' + tx('Jordingssystem','Earthing System') + '</div>';
+  html += mcPrimeLine(tx('System','System'), ':=', '', earthsysState.system || 'TN-S', '', mcPrimeRef('DS/HD 60364-4-41'));
+  html += '<div style="font-family:sans-serif;margin-top:6px">' + mcPrimeRef('DS/HD 60364-4-41') + ' ' + mcPrimeRef('DS/HD 60364-5-54') + '</div>';
+  html += '</div>';
+
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/HD 60364-5-54</div>';
   html += '<div class="result-row"><span class="label">' + tx('Enkelt elektrode modstand', 'Single Electrode Resistance') + '</span><span class="value">' + singleRe.toFixed(2) + ' Ω</span></div>';
