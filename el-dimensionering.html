@@ -11368,6 +11368,12 @@ function axAdiabatic(kVal, S_mm2, Ik_A, t_s) {
 function axZsMax(U0_V, Ia_A) { return Ia_A > 0 ? Math.round((U0_V / Ia_A) * 1000) / 1000 : Infinity; }
 // Disconnection check: Zs\u00b7Ia <= U0  <=>  Zs <= Zs_max.
 function axDisconnectOK(Zs, U0_V, Ia_A) { return Zs <= axZsMax(U0_V, Ia_A) + 1e-9; }
+// Power-factor correction: capacitor bank Qc to raise cos\u03c61 -> cos\u03c62.
+function axPFC(P_kW, cos1, cos2) {
+  var t1 = Math.tan(Math.acos(Math.max(0.01, Math.min(1, cos1))));
+  var t2 = Math.tan(Math.acos(Math.max(0.01, Math.min(1, cos2))));
+  return Math.round(P_kW * (t1 - t2) * 10) / 10; // kvar
+}
 
 // ===== EXAM SIMULATOR (data + engine) =====
 // --- autoexam: difficulty tiers (L\u00e6rling -> Ekspert) -------------------------
@@ -11676,6 +11682,16 @@ function axTasksInstallation(d, tier, maxTasks, rng, topicWeights) {
     var mCi = motorTrips ? 1 : 0;
     tasks.push({ id: 't_mst', kind: 'motorstart', prompt: { da: 'DOL-motoren (' + axFmt(bigLoad.P) + ' kW, IB = ' + axFmt(bigLoad.IB, 1) + ' A) har Istart \u2248 7\u00d7IB = ' + axFmt(Istart, 0) + ' A. Beskyttes den med en C' + mIn + ' (Ia = 10\u00d7' + mIn + ' = ' + IaC + ' A). Vil den udl\u00f8se ved DOL-start?', en: 'The DOL motor (' + axFmt(bigLoad.P) + ' kW, IB = ' + axFmt(bigLoad.IB, 1) + ' A) has Istart \u2248 7\u00d7IB = ' + axFmt(Istart, 0) + ' A. It is protected by a C' + mIn + ' (Ia = 10\u00d7' + mIn + ' = ' + IaC + ' A). Will it trip on DOL starting?' }, given: { Istart: Istart, IaC: IaC, In: mIn, curve: 'C' }, answer: mCi, opts: mOpts, ci: mCi, unit: '', clause: 'DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1', cat: 'overload' });
   }
+  // T12: power-factor correction (fasekompensering) when aggregate cos\u03c6 is low and motors present
+  if (tier.feat.motor && d.loads.some(function (l) { return l.type === 'motor'; })) {
+    var Ptot = 0, Qtot = 0; d.loads.forEach(function (l) { Ptot += l.P; Qtot += l.P * Math.tan(Math.acos(Math.max(0.01, Math.min(1, l.cos)))); });
+    Ptot = Math.round(Ptot * 10) / 10; var cosAgg = Math.round((Ptot / Math.sqrt(Ptot * Ptot + Qtot * Qtot)) * 100) / 100;
+    if (cosAgg < 0.92) {
+      var Qc = axPFC(Ptot, cosAgg, 0.95);
+      var nPfc = axNumOpts(Qc, [Math.round(Qc * 1.4 * 10) / 10, Math.round(Qc * 0.6 * 10) / 10, axPFC(Ptot, cosAgg, 1.0)]);
+      tasks.push({ id: 't_pfc', kind: 'pfc', prompt: { da: 'Anl\u00e6gget har P \u2248 ' + axFmt(Ptot) + ' kW ved cos\u03c6 \u2248 ' + axFmt(cosAgg) + '. Bestem den n\u00f8dvendige kondensatoreffekt Qc (kvar) for at h\u00e6ve cos\u03c6 til 0,95.', en: 'The installation has P \u2248 ' + axFmt(Ptot) + ' kW at cos\u03c6 \u2248 ' + axFmt(cosAgg) + '. Determine the capacitor power Qc (kvar) needed to raise cos\u03c6 to 0.95.' }, given: { P: Ptot, cos1: cosAgg, cos2: 0.95 }, answer: Qc, opts: nPfc.opts, ci: nPfc.ci, unit: 'kvar', clause: 'IEC 61921 / fasekompensering', cat: 'pfc' });
+    }
+  }
   // Keep the core chain (IB -> In -> cable) first; vary the rest. When topic
   // weights are supplied (from a learned profile), bias the order so emphasized
   // competencies surface first (weighted shuffle); otherwise a plain shuffle.
@@ -11929,6 +11945,20 @@ function axSolveTask(task, opgave) {
     sol.verification = trips ? S('Istart > Ia(C): sikringen vil udl\u00f8se p\u00e5 DOL-startstr\u00f8mmen. L\u00f8sning: v\u00e6lg kurve D (Ia = 20\u00d7In \u21d2 ' + (20 * g.In) + ' A > ' + axFmt(g.Istart, 0) + ' A) eller anvend softstarter/VFD for at reducere startstr\u00f8mmen.', 'Istart > Ia(C): the MCB will trip on the DOL starting current. Solution: choose curve D (Ia = 20\u00d7In \u21d2 ' + (20 * g.In) + ' A > ' + axFmt(g.Istart, 0) + ' A) or use a soft starter/VFD to reduce starting current.') : S('Istart < Ia(C): startstr\u00f8mmen ligger under \u00f8jeblikkelig udl\u00f8sning. Sikringen tillader den kortvarige start uden at klippe. Korrekt valg.', 'Istart < Ia(C): the starting current is below the instantaneous trip. The MCB allows the brief start without tripping. Correct choice.');
     sol.compliance = [S('DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1.', 'DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1.')];
     sol.conclusion = trips ? S('Motoren kan ikke starte med en C-kurve p\u00e5 denne str\u00f8m. V\u00e6lg kurve D eller softstarter.', 'The motor cannot start with a C-curve at this current. Choose curve D or a soft starter.') : S('Motoren kan starte uden at udl\u00f8se beskyttelsen (kurve C).', 'The motor can start without tripping the MCB (curve C).');
+  } else if (task.kind === 'pfc') {
+    var t1 = Math.tan(Math.acos(g.cos1)), t2 = Math.tan(Math.acos(g.cos2)); var qc = axPFC(g.P, g.cos1, g.cos2);
+    sol.assumptions = [S('Fasekompensering reducerer den reaktive effekt og hæver cos\u03c6. Den aktive effekt P er uændret; kondensatoren leverer reaktiv effekt Qc.', 'Power-factor correction reduces reactive power and raises cos\u03c6. Active power P is unchanged; the capacitor supplies reactive power Qc.')];
+    sol.formula = 'Q_c = P \u00b7 (tan\u03c6_1 \u2212 tan\u03c6_2)';
+    sol.substitution = 'Q_c = ' + axFmt(g.P) + ' \u00b7 (tan(arccos ' + axFmt(g.cos1, 2) + ') \u2212 tan(arccos ' + axFmt(g.cos2, 2) + '))';
+    sol.steps = [
+      { da: 'tan\u03c6\u2081 (cos\u03c6 = ' + axFmt(g.cos1, 2) + ')', en: 'tan\u03c6\u2081 (cos\u03c6 = ' + axFmt(g.cos1, 2) + ')', expr: 'tan(arccos ' + axFmt(g.cos1, 2) + ')', result: axFmt(Math.round(t1 * 1000) / 1000, 3) },
+      { da: 'tan\u03c6\u2082 (cos\u03c6 = ' + axFmt(g.cos2, 2) + ')', en: 'tan\u03c6\u2082 (cos\u03c6 = ' + axFmt(g.cos2, 2) + ')', expr: 'tan(arccos ' + axFmt(g.cos2, 2) + ')', result: axFmt(Math.round(t2 * 1000) / 1000, 3) },
+      { da: 'Q_c', en: 'Q_c', expr: axFmt(g.P) + ' \u00b7 (' + axFmt(Math.round(t1 * 1000) / 1000, 3) + ' \u2212 ' + axFmt(Math.round(t2 * 1000) / 1000, 3) + ')', result: axFmt(qc, 1) + ' kvar' }
+    ];
+    sol.result = { value: qc, unit: 'kvar', da: 'Kondensatoreffekt', en: 'Capacitor power' };
+    sol.verification = S('En Qc p\u00e5 ' + axFmt(qc, 1) + ' kvar h\u00e6ver cos\u03c6 fra ' + axFmt(g.cos1, 2) + ' til ' + axFmt(g.cos2, 2) + ', hvilket reducerer den optagne str\u00f8m (I = P/(\u221a3\u00b7U\u00b7cos\u03c6)) og dermed tab og sp\u00e6ndingsfald. Overkompensering (cos\u03c6 \u2192 1 eller kapacitivt) b\u00f8r undg\u00e5s.', 'A Qc of ' + axFmt(qc, 1) + ' kvar raises cos\u03c6 from ' + axFmt(g.cos1, 2) + ' to ' + axFmt(g.cos2, 2) + ', reducing the drawn current (I = P/(\u221a3\u00b7U\u00b7cos\u03c6)) and thus losses and voltage drop. Avoid over-compensation (cos\u03c6 \u2192 1 or capacitive).');
+    sol.compliance = [S('IEC 61921 (effektkondensatorbatterier).', 'IEC 61921 (power capacitor banks).')];
+    sol.conclusion = S('Installér en kondensatorbatteri p\u00e5 ca. ' + axFmt(qc, 1) + ' kvar.', 'Install a capacitor bank of approx. ' + axFmt(qc, 1) + ' kvar.');
   } else if (task.kind === 'rcd') {
     var corr = task.opts[task.ci];
     sol.assumptions = [S('Stikkredse og elbilladning skal beskyttes med fejlstr\u00f8msafbryder (HPFI 30 mA). Elbilladere uden indbygget 6 mA DC-detektion kr\u00e6ver Type B.', 'Socket circuits and EV charging must be protected by a 30 mA RCD. EV chargers without built-in 6 mA DC detection require Type B.')];
@@ -11968,13 +11998,14 @@ function axSolve(project) {
 // Censor-style weighting by competency category (mirrors how a Danish examiner
 // weights an authorization answer): overbelastning 30, kabel 25, fejlbeskyttelse
 // 20, kortslutning 15, sp\u00e6ndingsfald 10.
-var AX_CAT_WEIGHT = { overload: 30, cable: 25, fault: 20, shortcircuit: 15, vdrop: 10 };
+var AX_CAT_WEIGHT = { overload: 30, cable: 25, fault: 20, shortcircuit: 15, vdrop: 10, pfc: 10 };
 var AX_CAT_NAME = {
   overload: { da: 'Overbelastningsbeskyttelse (IB \u2264 In \u2264 Iz)', en: 'Overload protection (IB \u2264 In \u2264 Iz)' },
   cable: { da: 'Kabeldimensionering (Iz/derating)', en: 'Cable sizing (Iz/derating)' },
   fault: { da: 'Fejlbeskyttelse & frakobling (Zs)', en: 'Fault protection & disconnection (Zs)' },
   shortcircuit: { da: 'Kortslutning & brydeevne', en: 'Short-circuit & breaking capacity' },
-  vdrop: { da: 'Sp\u00e6ndingsfald (\u0394U%)', en: 'Voltage drop (\u0394U%)' }
+  vdrop: { da: 'Sp\u00e6ndingsfald (\u0394U%)', en: 'Voltage drop (\u0394U%)' },
+  pfc: { da: 'Fasekompensering (cos\u03c6)', en: 'Power-factor correction (cos\u03c6)' }
 };
 function axCatWeight(cat) { return AX_CAT_WEIGHT[cat] != null ? AX_CAT_WEIGHT[cat] : 15; }
 
@@ -12034,7 +12065,8 @@ function axCatSuggest(cat) {
     cable: { da: 'Husk korrektionsfaktorer (temperatur \u00d7 gruppering) og rund Iz ned (DS/HD 60364-5-52 \u00a7523).', en: 'Remember correction factors (temperature \u00d7 grouping) and round Iz down (DS/HD 60364-5-52 \u00a7523).' },
     fault: { da: 'Repetér Zs \u2264 U0/Ia og frakoblingstider i TN (DS/HD 60364-4-41 \u00a7411).', en: 'Revisit Zs \u2264 U0/Ia and TN disconnection times (DS/HD 60364-4-41 \u00a7411).' },
     shortcircuit: { da: 'Tr\u00e6n Ik = In/(ek/100), Icu \u2265 Ik,max og den adiabatiske kontrol k\u00b2S\u00b2 \u2265 I\u00b2t (DS/HD 60364-4-43 \u00a7434.5).', en: 'Drill Ik = In/(ek/100), Icu \u2265 Ik,max and the adiabatic check k\u00b2S\u00b2 \u2265 I\u00b2t (DS/HD 60364-4-43 \u00a7434.5).' },
-    vdrop: { da: 'Repetér \u0394U-formlen og gr\u00e6nserne 3% (lys) / 5% (\u00f8vrige) (DS/HD 60364-5-52 \u00a7525).', en: 'Revisit the \u0394U formula and the 3% (lighting) / 5% (other) limits (DS/HD 60364-5-52 \u00a7525).' }
+    vdrop: { da: 'Repetér \u0394U-formlen og gr\u00e6nserne 3% (lys) / 5% (\u00f8vrige) (DS/HD 60364-5-52 \u00a7525).', en: 'Revisit the \u0394U formula and the 3% (lighting) / 5% (other) limits (DS/HD 60364-5-52 \u00a7525).' },
+    pfc: { da: 'Tr\u00e6n fasekompensering: Qc = P\u00b7(tan\u03c6\u2081 \u2212 tan\u03c6\u2082). H\u00f8jere cos\u03c6 \u21d2 lavere str\u00f8m og tab.', en: 'Drill power-factor correction: Qc = P\u00b7(tan\u03c6\u2081 \u2212 tan\u03c6\u2082). Higher cos\u03c6 \u21d2 lower current and losses.' }
   };
   return m[cat] || { da: 'Repetér det relevante DS/HD 60364-afsnit.', en: 'Revisit the relevant DS/HD 60364 clause.' };
 }
@@ -12157,6 +12189,7 @@ function axMentorHints(task) {
     zs: [{ da: 'Automatisk frakobling: Zs\u00b7Ia \u2264 U0.', en: 'Automatic disconnection: Zs\u00b7Ia \u2264 U0.' }, { da: 'Zs,max = U0/Ia. For kurve C er Ia = 10\u00b7In.', en: 'Zs,max = U0/Ia. For curve C, Ia = 10\u00b7In.' }],
     breaking: [{ da: 'Brydeevne: Icu \u2265 Ik,max.', en: 'Breaking capacity: Icu \u2265 Ik,max.' }, { da: 'V\u00e6lg n\u00e6rmeste standard Icu over Ik,max.', en: 'Pick the nearest standard Icu above Ik,max.' }],
     motorstart: [{ da: 'DOL-start \u2248 6\u20138\u00d7 m\u00e6rkestr\u00f8m. Sammenlign med \u00f8jeblikkelig udl\u00f8sning Ia.', en: 'DOL start \u2248 6\u20138\u00d7 rated current. Compare with instantaneous trip Ia.' }, { da: 'Kurve C: Ia = 10\u00d7In. Kurve D: Ia = 20\u00d7In. Overstiger startstr\u00f8mmen den t\u00e6rskel?', en: 'Curve C: Ia = 10\u00d7In. Curve D: Ia = 20\u00d7In. Does the starting current exceed that threshold?' }],
+    pfc: [{ da: 'Qc = P\u00b7(tan\u03c6\u2081 \u2212 tan\u03c6\u2082). Find vinklerne med arccos af de to cos\u03c6-v\u00e6rdier.', en: 'Qc = P\u00b7(tan\u03c6\u2081 \u2212 tan\u03c6\u2082). Find the angles with arccos of the two cos\u03c6 values.' }, { da: 'P (aktiv effekt) er u\u00e6ndret \u2014 kun den reaktive effekt reduceres.', en: 'P (active power) is unchanged \u2014 only the reactive power is reduced.' }],
     selectivity: [{ da: 'Selektivitet = nedstr\u00f8ms rydder f\u00f8r opstr\u00f8ms.', en: 'Selectivity = downstream clears before upstream.' }, { da: 'T\u00e6nk p\u00e5 tid/str\u00f8m-graduering over hele fejlomr\u00e5det.', en: 'Think time/current grading across the whole fault range.' }],
     znet_mag: [{ da: '|Z| = U\u00b2/S\u2096. Brug HV-sp\u00e6ndingen i volt.', en: '|Z| = U\u00b2/Sk. Use the HV voltage in volts.' }, { da: 'Vinklen f\u00e5s af arccos(cos\u03c6\u2096).', en: 'The angle is arccos(cos\u03c6k).' }],
     ztrafo_mag: [{ da: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, henf\u00f8rt til 400 V.', en: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, referred to 400 V.' }, { da: 'R_T fra kobbertabet; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).', en: 'R_T from copper loss; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).' }],

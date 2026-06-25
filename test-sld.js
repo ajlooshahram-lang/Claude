@@ -13967,6 +13967,26 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Power-factor correction (fasekompensering) task -----
+test('autoexam/pfc: axPFC computes Qc = P(tan-phi1 - tan-phi2) correctly', function () {
+  assert.ok(Math.abs(axPFC(100, 0.8, 0.95) - 42.1) < 0.3, 'Qc 100kW 0.8->0.95 ~ 42.1, got ' + axPFC(100, 0.8, 0.95));
+  assert.ok(Math.abs(axPFC(50, 0.85, 0.95) - 14.6) < 0.3, 'Qc 50kW 0.85->0.95 ~ 14.6, got ' + axPFC(50, 0.85, 0.95));
+  assert.ok(axPFC(100, 0.95, 0.95) === 0, 'no correction needed when already at target');
+});
+test('autoexam/pfc: PFC task appears for motor-heavy installations and solves consistently', function () {
+  var found = 0;
+  for (var s = 1; s <= 50; s++) { axGenerate(s * 5 + 1, 'fabrik', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'pfc') found++; }); }); }
+  assert.ok(found >= 10, 'PFC task appears in motor-heavy exams (' + found + ' / 50 seeds)');
+  // solution consistency + structure + category
+  var bad = 0, checked = 0;
+  for (var s2 = 1; s2 <= 30; s2++) {
+    var p = axGenerate(s2 * 3 + 1, 'fabrik', 'ekspert', 'fuld'); var sol = axSolve(p);
+    p.opgaver.forEach(function (op, oi) { op.tasks.forEach(function (t, k) { if (t.kind === 'pfc') { checked++; var sx = sol[oi].tasks[k]; if (Math.abs(sx.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) bad++; if (!sx.verification || !sx.conclusion) bad++; assert.strictEqual(t.cat, 'pfc', 'pfc category'); } }); });
+  }
+  assert.ok(checked > 0 && bad === 0, checked + ' pfc tasks, ' + bad + ' issues');
+  assert.ok(AX_CAT_NAME.pfc && AX_CAT_NAME.pfc.da.indexOf('Fasekompensering') >= 0, 'pfc category registered for the examiner');
+});
+
 // ----- Printable progress/training report -----
 test('autoexam/report: training report is empty-safe and self-contained when no history', function () {
   try { localStorage.removeItem('autoexamLog'); } catch (e) {}
