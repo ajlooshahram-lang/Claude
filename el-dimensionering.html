@@ -21251,12 +21251,28 @@ function renderTrayFill() {
     verdictText = tx('Fyldningsgrad overskredet - vaelg stoerre bakke eller fjern kabler', 'Fill rate exceeded - select larger tray or remove cables');
   }
   html += renderVerdict(safe, verdictText);
+  html += calcDetail({
+    name: tx('Bakke-fyldningsgrad', 'Tray fill rate'),
+    formula: tx('Fyldning% = \u03A3A_kabel / A_bakke \u00D7 100', 'Fill% = \u03A3A_cable / A_tray \u00D7 100'),
+    variables: [
+      { name: tx('Bakketv\u00E6rareal', 'Tray cross-section'), symbol: 'A_bakke', value: trayArea, unit: 'mm\u00B2', source: TRAY_SIZES[trayFillState.traySize].w + '\u00D7' + TRAY_SIZES[trayFillState.traySize].h },
+      { name: tx('Samlet kabelareal', 'Total cable area'), symbol: '\u03A3A', value: cableArea.toFixed(0), unit: 'mm\u00B2', source: tx('sum af valgte', 'sum of selected') },
+      { name: tx('Maks. fyldning', 'Max fill'), symbol: 'maks', value: maxFill, unit: '%', source: TRAY_TYPES[trayFillState.trayType].da ? tx(TRAY_TYPES[trayFillState.trayType].da, TRAY_TYPES[trayFillState.trayType].en) : '', source: 'DS/EN 50174-2' },
+      { name: tx('Str\u00F8mf\u00F8rende kredse', 'Current-carrying circuits'), symbol: 'n', value: numCircuits, unit: '', source: tx('beregnet', 'calculated') }
+    ],
+    substitution: cableArea.toFixed(0) + ' / ' + trayArea + ' \u00D7 100',
+    steps: [
+      { desc: tx('Fyldningsgrad', 'Fill rate'), expr: cableArea.toFixed(0) + ' / ' + trayArea, result: fillRate.toFixed(1) + '%' },
+      { desc: tx('Maks. tilladt', 'Max allowed'), expr: '\u2264 ' + maxFill + '%', result: fillRate <= maxFill ? 'OK \u2705' : (tx('OVERSKREDET', 'EXCEEDED') + ' \u274C') },
+      { desc: tx('Grupperingsfaktor', 'Grouping factor'), expr: 'n = ' + numCircuits, result: groupFactor.toFixed(2) }
+    ],
+    result: { value: fillRate.toFixed(1), unit: '%', status: fillRate <= maxFill ? 'ok' : 'fail' },
+    reference: 'DS/EN 50174-2; DS/HD 60364-5-52 Table B.52.17'
+  });
 
   html += '</div>';
   return html;
 }
-
-// ===== EARTH FAULT LOOP IMPEDANCE (DS/HD 60364-6) =====
 
 var ZS_MAX_TABLE = {
   'B6': 7.67, 'B10': 4.60, 'B13': 3.54, 'B16': 2.88, 'B20': 2.30, 'B25': 1.84, 'B32': 1.44, 'B40': 1.15,
