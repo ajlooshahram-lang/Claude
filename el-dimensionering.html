@@ -6165,6 +6165,42 @@ function stdChips(clauses) {
 }
 
 // ===========================================================================
+// NOTATION NORMALIZER — professional engineering subscript/Greek typesetting
+// ===========================================================================
+// Curated, SAFE map: only known electrical symbols are transformed; everything
+// else (abbreviations like COP, FLC, IP, LRA; already-formatted symbols) passes
+// through untouched. Applied at the single rendering point (calcDetail + eng
+// variable tables), so the whole platform gets consistent notation without
+// hand-editing hundreds of literals. Multi-letter subscripts (cu, sd, gg) use
+// <sub> because Unicode has no subscript 'c'/'d'/'g'.
+var SYM_MAP = {
+  // currents
+  'Ia': 'I<sub>a</sub>', 'IB': 'I<sub>B</sub>', 'Ib': 'I<sub>b</sub>', 'Iz': 'I<sub>z</sub>', 'Is': 'I<sub>s</sub>', 'Io': 'I<sub>o</sub>', 'Ii': 'I<sub>i</sub>', 'Ie': 'I<sub>e</sub>', 'Ir': 'I<sub>r</sub>', 'Ig': 'I<sub>g</sub>',
+  'Ics': 'I<sub>cs</sub>', 'Icu': 'I<sub>cu</sub>', 'Icn': 'I<sub>cn</sub>', 'Icw': 'I<sub>cw</sub>', 'Icm': 'I<sub>cm</sub>', 'Isd': 'I<sub>sd</sub>', 'Igg': 'I<sub>gg</sub>', 'Igt': 'I<sub>gt</sub>', 'Iarc': 'I<sub>arc</sub>',
+  'I5': 'I<sub>5</sub>', 'I7': 'I<sub>7</sub>', 'I5s': 'I<sub>5s</sub>', 'I_a': 'I<sub>a</sub>', 'I_f': 'I<sub>f</sub>', 'I_L': 'I<sub>L</sub>', 'I_fuse': 'I<sub>fuse</sub>', 'I_start': 'I<sub>start</sub>', 'I_vfd': 'I<sub>VFD</sub>',
+  'Ik_max': 'I<sub>k,max</sub>', 'Ik_min': 'I<sub>k,min</sub>', 'Iz_eff': 'I<sub>z,eff</sub>', 'Iz_tab': 'I<sub>z,tab</sub>',
+  // voltages / impedances
+  'Un': 'U<sub>n</sub>', 'Ub': 'U<sub>b</sub>', 'UF': 'U<sub>F</sub>', 'UL': 'U<sub>L</sub>', 'Uc': 'U<sub>c</sub>',
+  'Zs': 'Z<sub>s</sub>', 'Ze': 'Z<sub>e</sub>', 'Zn': 'Z<sub>n</sub>', 'Zt': 'Z<sub>t</sub>',
+  'XL': 'X<sub>L</sub>', 'XC': 'X<sub>C</sub>',
+  // powers
+  'Sn': 'S<sub>n</sub>', 'Pn': 'P<sub>n</sub>', 'Qn': 'Q<sub>n</sub>', 'P2': 'P<sub>2</sub>', 'Pag': 'P<sub>ag</sub>',
+  // resistances / misc
+  'Ra': 'R<sub>A</sub>', 'RA': 'R<sub>A</sub>', 'f2': 'f<sub>2</sub>', 'ns': 'n<sub>s</sub>',
+  'CosPhi': 'cos\u00a0\u03C6', 'cosfi': 'cos\u00a0\u03C6',
+  // correction factors
+  'k_temp': 'k<sub>temp</sub>', 'k_inst': 'k<sub>inst</sub>', 'K_temp': 'k<sub>temp</sub>', 'K_group': 'k<sub>group</sub>', 'K_install': 'k<sub>install</sub>', 'k_IP': 'k<sub>IP</sub>',
+  'h_max': 'h<sub>max</sub>', 'L_max': 'L<sub>max</sub>'
+};
+function fmtSym(s) {
+  if (s == null) return '';
+  s = String(s);
+  // Already formatted (HTML sub or a Unicode subscript char) -> leave untouched.
+  if (/<sub>|[\u2080-\u209C\u1D62-\u1D65]/.test(s)) return s;
+  return SYM_MAP[s] || s;
+}
+
+// ===========================================================================
 // INTERACTIVE ENGINEERING TREE — expandable decision tree (click-only, offline)
 // ===========================================================================
 // Every node is a native <details> element: click to expand and see that
@@ -6259,7 +6295,7 @@ function engPresentation(title, steps, opts) {
       body += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse">';
       body += '<tr style="color:var(--text-muted);font-weight:600"><td style="padding:2px 6px">' + (da ? 'Symbol' : 'Symbol') + '</td><td style="padding:2px 6px">' + (da ? 'Betydning' : 'Meaning') + '</td><td style="padding:2px 6px">' + (da ? 'V\u00e6rdi' : 'Value') + '</td><td style="padding:2px 6px">' + (da ? 'Enhed' : 'Unit') + '</td></tr>';
       step.vars.forEach(function (v) {
-        body += '<tr style="border-top:1px solid var(--border-light)"><td style="padding:2px 6px;font-family:monospace">' + (v.sym || '') + '</td><td style="padding:2px 6px">' + (da ? (v.da || v.en || '') : (v.en || v.da || '')) + '</td><td style="padding:2px 6px;font-family:monospace">' + (v.val != null ? v.val : '') + '</td><td style="padding:2px 6px">' + (v.unit || '') + '</td></tr>';
+        body += '<tr style="border-top:1px solid var(--border-light)"><td style="padding:2px 6px;font-family:monospace">' + fmtSym(v.sym || '') + '</td><td style="padding:2px 6px">' + (da ? (v.da || v.en || '') : (v.en || v.da || '')) + '</td><td style="padding:2px 6px;font-family:monospace">' + (v.val != null ? v.val : '') + '</td><td style="padding:2px 6px">' + (v.unit || '') + '</td></tr>';
       });
       body += '</table>';
     } else if (step.type === 'alternatives' && step.alts) {
@@ -9437,7 +9473,7 @@ function calcDetail(calc) {
       var v = calc.variables[vi];
       h += '<tr style="border-bottom:1px solid var(--border-light)">';
       h += '<td style="padding:3px 6px">' + (v.name || v.symbol || '') + '</td>';
-      h += '<td style="padding:3px 6px;font-family:monospace">' + (v.symbol || '') + '</td>';
+      h += '<td style="padding:3px 6px;font-family:monospace">' + fmtSym(v.symbol) + '</td>';
       h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + mathmlUnit(v.unit) : '') + '</td>';
       h += '<td style="padding:3px 6px;color:var(--text-muted);font-size:0.78rem">' + (v.source || '') + '</td>';
       h += '</tr>';

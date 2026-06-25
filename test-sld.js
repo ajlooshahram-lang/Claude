@@ -10212,7 +10212,7 @@ test('calcDetailIk: produces correct short-circuit card', function() {
   assert(html.indexOf('Ik3max') >= 0, 'has Ik3max');
   assert(html.indexOf('Ik2min') >= 0, 'has Ik2min');
   assert(html.indexOf('IEC 60909') >= 0, 'has IEC reference');
-  assert(html.indexOf('Zn') >= 0, 'has network impedance');
+  assert(html.indexOf('Z<sub>n</sub>') >= 0 || html.indexOf('Zn') >= 0, 'has network impedance');
 });
 
 test('calcDetailIB: produces correct load current card', function() {
@@ -15061,6 +15061,22 @@ test('eng: STD_REGISTRY covers the core life-safety clauses', function () {
   ['DS/HD 60364-4-41', 'DS/HD 60364-4-43', 'DS/HD 60364-5-52', 'IEC 60898-1', 'IEC 60269-2', 'IEC 61008-1', 'IEC 60909-0', 'IEC 60947-4-1'].forEach(function (clause) {
     assert.ok(STD_REGISTRY[clause] && STD_REGISTRY[clause].why_da && STD_REGISTRY[clause].affects_en, clause + ' has why + affects in both languages');
   });
+});
+
+test('notation: fmtSym normalizes known symbols but never mangles abbreviations', function () {
+  assert.strictEqual(fmtSym('Icu'), 'I<sub>cu</sub>');
+  assert.strictEqual(fmtSym('Ics'), 'I<sub>cs</sub>');
+  assert.strictEqual(fmtSym('Isd'), 'I<sub>sd</sub>');
+  assert.strictEqual(fmtSym('Zn'), 'Z<sub>n</sub>');
+  assert.strictEqual(fmtSym('Un'), 'U<sub>n</sub>');
+  assert.strictEqual(fmtSym('XL'), 'X<sub>L</sub>');
+  ['COP', 'FLC', 'IP', 'LRA', 'DF', 'EF', 'A', 'k', 'C'].forEach(function (abbr) {
+    assert.strictEqual(fmtSym(abbr), abbr, abbr + ' must not be mangled');
+  });
+  assert.strictEqual(fmtSym('I<sub>cu</sub>'), 'I<sub>cu</sub>', 'idempotent on HTML sub');
+  assert.strictEqual(fmtSym('I\u2099'), 'I\u2099', 'idempotent on Unicode subscript');
+  assert.strictEqual(fmtSym(''), '', 'empty safe');
+  assert.strictEqual(fmtSym(null), '', 'null safe');
 });
 
 test('eng: engTree renders expandable <details> nodes and classifies into exam structure', function () {
