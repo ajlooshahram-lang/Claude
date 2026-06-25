@@ -908,6 +908,94 @@ math,
   .mathml-formula math { display: inline; }
   .math-unit { color: #1565c0; font-weight: bold; }
 }
+
+/* ===========================================================================
+   UX DESIGN SYSTEM — Progressive Disclosure + Smart Panels + User Modes
+   =========================================================================== */
+
+/* --- Collapsible Panel --- */
+.ux-panel { margin-top: 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); overflow: hidden; }
+.ux-panel-header {
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+  cursor: pointer; background: var(--border-light); font-size: 0.82rem; font-weight: 600;
+  color: var(--text); transition: var(--transition); user-select: none;
+}
+.ux-panel-header:hover { background: var(--primary-glow); }
+.ux-panel-header .ux-chevron { transition: transform 0.25s ease; font-size: 0.7rem; }
+.ux-panel.open .ux-panel-header .ux-chevron { transform: rotate(180deg); }
+.ux-panel-body { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), padding 0.25s ease; padding: 0 14px; }
+.ux-panel.open .ux-panel-body { max-height: 2000px; padding: 12px 14px; }
+
+/* --- Executive Summary Card --- */
+.ux-summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.ux-summary-item {
+  flex: 1 1 140px; min-width: 120px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);
+  text-align: center; transition: var(--transition);
+}
+.ux-summary-item:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.ux-summary-item .ux-val { font-size: 1.3rem; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
+.ux-summary-item .ux-lbl { font-size: 0.72rem; color: var(--text-muted); }
+.ux-summary-item.pass { border-color: var(--success); }
+.ux-summary-item.pass .ux-val { color: var(--success); }
+.ux-summary-item.warn { border-color: var(--warning); }
+.ux-summary-item.warn .ux-val { color: #b8860b; }
+.ux-summary-item.fail { border-color: var(--danger); }
+.ux-summary-item.fail .ux-val { color: var(--danger); }
+
+/* --- User Mode Badge --- */
+.ux-mode-bar { display: flex; gap: 4px; margin-bottom: 12px; }
+.ux-mode-btn {
+  padding: 6px 14px; border-radius: 18px; border: 1.5px solid var(--border); background: var(--card);
+  font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: var(--transition);
+}
+.ux-mode-btn:hover { border-color: var(--primary-light); background: var(--primary-glow); }
+.ux-mode-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* --- Smart Card (visual component selector) --- */
+.ux-smart-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 10px 0; }
+.ux-smart-card {
+  padding: 14px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--card); cursor: pointer; transition: var(--transition); text-align: center;
+}
+.ux-smart-card:hover { border-color: var(--primary-light); box-shadow: var(--shadow); transform: translateY(-2px); }
+.ux-smart-card.selected { border-color: var(--primary); background: var(--primary-glow); box-shadow: var(--shadow-glow); }
+.ux-smart-card .ux-sc-icon { font-size: 1.6rem; margin-bottom: 6px; }
+.ux-smart-card .ux-sc-title { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.ux-smart-card .ux-sc-desc { font-size: 0.7rem; color: var(--text-muted); line-height: 1.3; }
+
+/* --- Wizard Step Indicator --- */
+.ux-wizard-steps { display: flex; align-items: center; gap: 0; margin: 14px 0; }
+.ux-wizard-step {
+  flex: 1; text-align: center; padding: 8px 6px; font-size: 0.72rem; font-weight: 600;
+  color: var(--text-muted); position: relative; border-bottom: 3px solid var(--border-light);
+  transition: var(--transition);
+}
+.ux-wizard-step.active { color: var(--primary); border-bottom-color: var(--primary); }
+.ux-wizard-step.done { color: var(--success); border-bottom-color: var(--success); }
+.ux-wizard-step .ux-ws-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; font-size: 0.65rem; font-weight: 800;
+  background: var(--border-light); color: var(--text-muted); margin-bottom: 2px;
+}
+.ux-wizard-step.active .ux-ws-num { background: var(--primary); color: #fff; }
+.ux-wizard-step.done .ux-ws-num { background: var(--success); color: #fff; }
+
+/* --- Progressive Level Gating (content hidden unless user mode >= level) --- */
+[data-ux-level="engineer"] { display: none; }
+[data-ux-level="expert"] { display: none; }
+body.ux-engineer [data-ux-level="engineer"] { display: block; }
+body.ux-expert [data-ux-level="engineer"],
+body.ux-expert [data-ux-level="expert"] { display: block; }
+
+/* --- Touch-friendly targets --- */
+@media (max-width: 600px) {
+  .ux-smart-cards { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .ux-smart-card { padding: 12px 10px; }
+  .ux-summary-item { min-width: 100px; padding: 10px; }
+  .ux-mode-btn { padding: 8px 12px; font-size: 0.72rem; min-height: 44px; }
+}
+
 </style>
 </head>
 <body>
@@ -5226,6 +5314,7 @@ function lsigRenderCurve(settings) {
 
 // Settings table for LSIG (read-only display of current dial positions).
 function lsigRenderSettingsTable(settings) {
+
   var env = lsigCurveEnvelope(settings);
   var da = (typeof lang !== 'undefined' && lang === 'da');
   var rows = [
@@ -5244,6 +5333,409 @@ function lsigRenderSettingsTable(settings) {
   h += '</table></div>';
   return h;
 }
+
+// ===========================================================================
+// PHASOR DIAGRAM + POWER TRIANGLE + COMPLEX-NUMBER ENGINE
+// ===========================================================================
+// Professional inline-SVG phasor diagrams for voltage, current, power, and
+// impedance vectors in 1-phase and 3-phase (balanced + unbalanced) systems.
+// Supports: voltage/current phasors, power triangle (P/Q/S/cosφ), impedance
+// vectors (polar + rectangular), and interactive rotation via click-only
+// angle selectors. Used standalone AND auto-embedded in exam worked solutions.
+
+// --- State ---
+let phasorState = {
+  mode: '3ph',          // '1ph' | '3ph'
+  balanced: true,       // true = balanced, false = unbalanced
+  uLN: 230,            // phase voltage [V]
+  iA: 100, iB: 100, iC: 100,  // phase currents [A]
+  phiA: 30, phiB: 30, phiC: 30,   // power-factor angles [°]
+  view: 'voltage'      // 'voltage' | 'power' | 'impedance'
+};
+
+const PHASOR_VIEWS = ['voltage', 'power', 'impedance'];
+const PHASOR_ANGLES = [0, 10, 15, 20, 25, 30, 36.87, 45, 53.13, 60, 75, 90];
+const PHASOR_CURRENTS = [10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+
+// Utility: deg -> rad, rad -> deg
+function pDeg2Rad(d) { return d * Math.PI / 180; }
+function pRad2Deg(r) { return r * 180 / Math.PI; }
+
+// Polar -> rectangular
+function pPolar2Rect(mag, angleDeg) { return { re: mag * Math.cos(pDeg2Rad(angleDeg)), im: mag * Math.sin(pDeg2Rad(angleDeg)) }; }
+// Rectangular -> polar
+function pRect2Polar(re, im) { return { mag: Math.sqrt(re * re + im * im), ang: pRad2Deg(Math.atan2(im, re)) }; }
+
+// Power triangle from V, I, phi.
+function pPowerTriangle(V, I, phiDeg) {
+  var S = V * I;
+  var P = S * Math.cos(pDeg2Rad(phiDeg));
+  var Q = S * Math.sin(pDeg2Rad(phiDeg));
+  return { P: P, Q: Q, S: S, cosPhi: Math.cos(pDeg2Rad(phiDeg)), phi: phiDeg };
+}
+
+// 3-phase balanced power: S = √3 × ULL × I, P = S cos φ, Q = S sin φ
+function p3phPower(uLN, I, phiDeg) {
+  var uLL = uLN * Math.sqrt(3);
+  var S = Math.sqrt(3) * uLL * I;
+  var P = S * Math.cos(pDeg2Rad(phiDeg));
+  var Q = S * Math.sin(pDeg2Rad(phiDeg));
+  return { P: P, Q: Q, S: S, cosPhi: Math.cos(pDeg2Rad(phiDeg)), phi: phiDeg, uLL: uLL };
+}
+
+// Impedance from V, I, phi
+function pImpedance(V, I, phiDeg) {
+  if (!I || I === 0) return { Z: 0, R: 0, X: 0, phi: 0 };
+  var Z = V / I;
+  var R = Z * Math.cos(pDeg2Rad(phiDeg));
+  var X = Z * Math.sin(pDeg2Rad(phiDeg));
+  return { Z: Z, R: R, X: X, phi: phiDeg };
+}
+
+// Inline-SVG: 3-phase voltage + current phasor diagram.
+function phasorRenderVoltage(state) {
+  var s = state || phasorState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var w = 400, h = 400, cx = w / 2, cy = h / 2;
+  var maxMag = s.uLN * 1.3;
+  var scale = (w / 2 - 40) / maxMag;
+  function vx(mag, ang) { return cx + mag * scale * Math.cos(pDeg2Rad(ang)); }
+  function vy(mag, ang) { return cy - mag * scale * Math.sin(pDeg2Rad(ang)); }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // axes
+  svg += '<line x1="20" y1="' + cy + '" x2="' + (w - 20) + '" y2="' + cy + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+  svg += '<line x1="' + cx + '" y1="20" x2="' + cx + '" y2="' + (h - 20) + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+  svg += '<text x="' + (w - 16) + '" y="' + (cy - 4) + '" font-size="9" fill="#94a3b8">Re</text>';
+  svg += '<text x="' + (cx + 4) + '" y="18" font-size="9" fill="#94a3b8">Im</text>';
+
+  // Voltage phasors (UA at 0°, UB at -120°, UC at +120°)
+  var uA = { mag: s.uLN, ang: 0 }, uB = { mag: s.uLN, ang: -120 }, uC = { mag: s.uLN, ang: 120 };
+  var vColors = ['#dc2626', '#059669', '#2563eb'];
+  var vLabels = ['U\u2081 (L1)', 'U\u2082 (L2)', 'U\u2083 (L3)'];
+  var phasors = [uA, uB, uC];
+  for (var i = 0; i < 3; i++) {
+    var p = phasors[i];
+    var ex = vx(p.mag, p.ang), ey = vy(p.mag, p.ang);
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + vColors[i] + '" stroke-width="2.5" marker-end="url(#arrV' + i + ')"/>';
+    svg += '<text x="' + (ex + 4).toFixed(1) + '" y="' + (ey - 4).toFixed(1) + '" font-size="10" fill="' + vColors[i] + '">' + vLabels[i] + '</text>';
+  }
+  // arrowheads
+  svg += '<defs>';
+  for (var j = 0; j < 3; j++) svg += '<marker id="arrV' + j + '" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="' + vColors[j] + '"/></marker>';
+
+  // Current phasors (lagging by phi)
+  var iMags = s.balanced ? [s.iA, s.iA, s.iA] : [s.iA, s.iB, s.iC];
+  var iPhis = s.balanced ? [s.phiA, s.phiA, s.phiA] : [s.phiA, s.phiB, s.phiC];
+  var iAngs = [0 - iPhis[0], -120 - iPhis[1], 120 - iPhis[2]];
+  var iScale = (w / 2 - 40) / (Math.max.apply(null, iMags) * 1.3 || 1);
+  var iColors = ['#f97316', '#14b8a6', '#8b5cf6'];
+  var iLabels = ['I\u2081', 'I\u2082', 'I\u2083'];
+  for (var k = 0; k < 3; k++) {
+    var im = iMags[k], ia = iAngs[k];
+    var ix = cx + im * iScale * Math.cos(pDeg2Rad(ia));
+    var iy = cy - im * iScale * Math.sin(pDeg2Rad(ia));
+    svg += '<marker id="arrI' + k + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="' + iColors[k] + '"/></marker>';
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ix.toFixed(1) + '" y2="' + iy.toFixed(1) + '" stroke="' + iColors[k] + '" stroke-width="1.8" stroke-dasharray="6,3" marker-end="url(#arrI' + k + ')"/>';
+    svg += '<text x="' + (ix + 4).toFixed(1) + '" y="' + (iy + 10).toFixed(1) + '" font-size="9" fill="' + iColors[k] + '">' + iLabels[k] + ' (' + im + 'A, -' + iPhis[k] + '\u00b0)</text>';
+  }
+  svg += '</defs>';
+  // phi arc for phase A
+  var arcR = 40;
+  var arcEndX = cx + arcR * Math.cos(pDeg2Rad(-iPhis[0]));
+  var arcEndY = cy - arcR * Math.sin(pDeg2Rad(-iPhis[0]));
+  svg += '<path d="M' + (cx + arcR) + ',' + cy + ' A' + arcR + ',' + arcR + ' 0 0,1 ' + arcEndX.toFixed(1) + ',' + arcEndY.toFixed(1) + '" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="2,2"/>';
+  svg += '<text x="' + (cx + arcR + 4) + '" y="' + (cy + 14) + '" font-size="9" fill="#64748b">\u03c6=' + iPhis[0] + '\u00b0</text>';
+  // title
+  svg += '<text x="10" y="16" font-size="10.5" fill="#475467">' + (da ? '3-fase fasordiagram (U fasespænding, I str\u00f8m)' : '3-phase phasor diagram (U phase voltage, I current)') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Power triangle SVG.
+function phasorRenderPowerTriangle(state) {
+  var s = state || phasorState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var pw = s.balanced ? p3phPower(s.uLN, s.iA, s.phiA) : pPowerTriangle(s.uLN, s.iA, s.phiA);
+  var w = 420, h = 260, mL = 60, mB = 40, mT = 30;
+  var maxS = pw.S || 1;
+  var scale = (w - mL - 60) / maxS;
+  var ox = mL, oy = h - mB;
+  var px = ox + pw.P * scale, py = oy;
+  var sx = px, sy = oy - pw.Q * scale;
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // triangle
+  svg += '<polygon points="' + ox + ',' + oy + ' ' + px.toFixed(1) + ',' + py + ' ' + sx.toFixed(1) + ',' + sy.toFixed(1) + '" fill="rgba(37,99,235,0.08)" stroke="#2563eb" stroke-width="2"/>';
+  // P (horizontal)
+  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + px.toFixed(1) + '" y2="' + py + '" stroke="#059669" stroke-width="2.5"/>';
+  svg += '<text x="' + ((ox + px) / 2).toFixed(1) + '" y="' + (oy + 18) + '" text-anchor="middle" font-size="11" fill="#059669">P = ' + (pw.P / 1000).toFixed(2) + ' kW</text>';
+  // Q (vertical)
+  svg += '<line x1="' + px.toFixed(1) + '" y1="' + py + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#dc2626" stroke-width="2.5"/>';
+  svg += '<text x="' + (px + 8).toFixed(1) + '" y="' + ((py + sy) / 2).toFixed(1) + '" font-size="11" fill="#dc2626">Q = ' + (pw.Q / 1000).toFixed(2) + ' kvar</text>';
+  // S (hypotenuse)
+  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
+  svg += '<text x="' + ((ox + sx) / 2 - 10).toFixed(1) + '" y="' + ((oy + sy) / 2 - 6).toFixed(1) + '" font-size="11" fill="#2563eb">S = ' + (pw.S / 1000).toFixed(2) + ' kVA</text>';
+  // phi arc
+  var arcR2 = 30;
+  var arcEndX2 = ox + arcR2 * Math.cos(pDeg2Rad(-s.phiA));
+  var arcEndY2 = oy + arcR2 * Math.sin(pDeg2Rad(-s.phiA));
+  svg += '<path d="M' + (ox + arcR2) + ',' + oy + ' A' + arcR2 + ',' + arcR2 + ' 0 0,0 ' + arcEndX2.toFixed(1) + ',' + arcEndY2.toFixed(1) + '" fill="none" stroke="#64748b" stroke-width="1"/>';
+  svg += '<text x="' + (ox + arcR2 + 4) + '" y="' + (oy - 6) + '" font-size="10" fill="#64748b">\u03c6 = ' + s.phiA + '\u00b0</text>';
+  // cos phi
+  svg += '<text x="' + ox + '" y="' + (mT - 8) + '" font-size="10.5" fill="#475467">' + (da ? 'Effekttrekant' : 'Power triangle') + ' \u2014 cos \u03c6 = ' + pw.cosPhi.toFixed(4) + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Impedance vector SVG.
+function phasorRenderImpedance(state) {
+  var s = state || phasorState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var z = pImpedance(s.uLN, s.iA, s.phiA);
+  var w = 360, h = 300, cx = w / 2, cy = h / 2;
+  var scale = Math.min(w, h) / (z.Z * 3 || 1);
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  svg += '<line x1="20" y1="' + cy + '" x2="' + (w - 20) + '" y2="' + cy + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+  svg += '<line x1="' + cx + '" y1="20" x2="' + cx + '" y2="' + (h - 20) + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+  svg += '<text x="' + (w - 14) + '" y="' + (cy - 4) + '" font-size="9" fill="#94a3b8">R [\u03a9]</text>';
+  svg += '<text x="' + (cx + 4) + '" y="18" font-size="9" fill="#94a3b8">X [\u03a9]</text>';
+  // Z vector
+  var zx = cx + z.R * scale, zy = cy - z.X * scale;
+  svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
+  svg += '<text x="' + ((cx + zx) / 2 + 6).toFixed(1) + '" y="' + ((cy + zy) / 2 - 6).toFixed(1) + '" font-size="10" fill="#2563eb">Z = ' + z.Z.toFixed(3) + ' \u03a9</text>';
+  // R (horizontal component)
+  svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + cy + '" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + ((cx + zx) / 2).toFixed(1) + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="9" fill="#059669">R = ' + z.R.toFixed(3) + ' \u03a9</text>';
+  // X (vertical component)
+  svg += '<line x1="' + zx.toFixed(1) + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (zx + 6).toFixed(1) + '" y="' + ((cy + zy) / 2).toFixed(1) + '" font-size="9" fill="#dc2626">X = ' + z.X.toFixed(3) + ' \u03a9</text>';
+  // annotations
+  svg += '<text x="10" y="16" font-size="10" fill="#475467">' + (da ? 'Impedansvektor' : 'Impedance vector') + '</text>';
+  svg += '<text x="10" y="' + (h - 10) + '" font-size="9" fill="#64748b">Z = ' + z.Z.toFixed(3) + '\u2220' + z.phi + '\u00b0 = ' + z.R.toFixed(3) + ' + j' + z.X.toFixed(3) + ' \u03a9</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// State manipulation (click-only)
+function phasorSetView(v) { phasorState.view = v; renderModule('standards'); }
+function phasorSetMode(m) { phasorState.mode = m; renderModule('standards'); }
+function phasorSetBalanced(b) { phasorState.balanced = b; renderModule('standards'); }
+function phasorSetI(phase, val) {
+  val = Number(val) || 100;
+  if (phase === 'A') phasorState.iA = val;
+  else if (phase === 'B') phasorState.iB = val;
+  else phasorState.iC = val;
+  renderModule('standards');
+}
+function phasorSetPhi(phase, val) {
+  val = Number(val);
+  if (phase === 'A') phasorState.phiA = val;
+  else if (phase === 'B') phasorState.phiB = val;
+  else phasorState.phiC = val;
+  renderModule('standards');
+}
+
+// ===========================================================================
+// MOTOR STARTING CURVE ENGINE (DOL / Star-Delta / Soft Starter / VFD)
+// ===========================================================================
+// Compares starting methods by current envelope and torque profile over time.
+// Used for component selection (MCB curve, cable, fuse vs. inrush) and exam
+// interpretation. All relative to In (= rated motor current at full load).
+const MOTOR_START_METHODS = {
+  'DOL': {
+    label: 'DOL', full_da: 'Direkte start', full_en: 'Direct on-line',
+    iStartMult: 7, iStartDur: 5, torqueStart: 1.5, torqueFull: 1.0,
+    profile: function (tNorm) {
+      // tNorm: 0..1 normalised start time. Returns {iMult, torque} at that instant.
+      if (tNorm < 0.95) return { iMult: 7, torque: 1.5 - 0.5 * tNorm };
+      return { iMult: 1.0, torque: 1.0 };
+    }
+  },
+  'SD': {
+    label: 'Y-\u0394', full_da: 'Stjerne-trekant', full_en: 'Star-Delta',
+    iStartMult: 2.3, iStartDur: 8, torqueStart: 0.5, torqueFull: 1.0,
+    profile: function (tNorm) {
+      // Star phase: 0-0.6, transition dip 0.6-0.65, delta phase 0.65-0.95
+      if (tNorm < 0.6) return { iMult: 2.3, torque: 0.5 };
+      if (tNorm < 0.65) return { iMult: 7, torque: 1.5 }; // transient spike at changeover
+      if (tNorm < 0.95) return { iMult: 2.3, torque: 1.0 };
+      return { iMult: 1.0, torque: 1.0 };
+    }
+  },
+  'Soft': {
+    label: 'Soft', full_da: 'Softstarter', full_en: 'Soft Starter',
+    iStartMult: 3.5, iStartDur: 10, torqueStart: 0.4, torqueFull: 1.0,
+    profile: function (tNorm) {
+      if (tNorm < 0.9) { var ramp = tNorm / 0.9; return { iMult: 1.0 + 2.5 * (1 - ramp * ramp), torque: 0.4 + 0.6 * ramp }; }
+      return { iMult: 1.0, torque: 1.0 };
+    }
+  },
+  'VFD': {
+    label: 'VFD', full_da: 'Frekvensomformer', full_en: 'Variable Frequency Drive',
+    iStartMult: 1.5, iStartDur: 12, torqueStart: 1.0, torqueFull: 1.0,
+    profile: function (tNorm) {
+      if (tNorm < 0.85) return { iMult: 1.2 + 0.3 * (1 - tNorm), torque: 1.0 };
+      return { iMult: 1.0, torque: 1.0 };
+    }
+  }
+};
+
+let motorCurveState = { In: 100, methods: ['DOL', 'SD', 'Soft', 'VFD'] };
+const MOTOR_IN_OPTIONS = [5, 10, 16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+
+function motorToggleMethod(m) {
+  var i = motorCurveState.methods.indexOf(m);
+  if (i >= 0) { if (motorCurveState.methods.length > 1) motorCurveState.methods.splice(i, 1); }
+  else motorCurveState.methods.push(m);
+  renderModule('standards');
+}
+function motorSetCurveIn(v) { motorCurveState.In = Number(v) || 100; renderModule('standards'); }
+
+// Inline-SVG motor starting current comparison. x = time [s], y = I/In.
+function motorRenderStartCurves(state) {
+  var s = state || motorCurveState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var w = 560, h = 320, mL = 52, mR = 16, mT = 26, mB = 44;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  var tMax = 14; // seconds
+  var iMax = 8; // multiples of In
+  function xPos(t) { return mL + (t / tMax) * plotW; }
+  function yPos(iMult) { return mT + (1 - iMult / iMax) * plotH; }
+
+  var colors = { 'DOL': '#dc2626', 'SD': '#7c3aed', 'Soft': '#059669', 'VFD': '#2563eb' };
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // grid x (time)
+  for (var t = 0; t <= tMax; t += 2) {
+    var gx = xPos(t);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 14) + '" text-anchor="middle" font-size="9" fill="#475467">' + t + ' s</text>';
+  }
+  // grid y (multiples of In)
+  for (var m = 0; m <= iMax; m++) {
+    var gy = yPos(m);
+    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#475467">' + m + '\u00d7</text>';
+  }
+  // In=1 line
+  svg += '<line x1="' + mL + '" y1="' + yPos(1).toFixed(1) + '" x2="' + (w - mR) + '" y2="' + yPos(1).toFixed(1) + '" stroke="#64748b" stroke-width="1" stroke-dasharray="3,3"/>';
+  svg += '<text x="' + (w - mR - 2) + '" y="' + (yPos(1) - 4).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#64748b">In=' + s.In + ' A</text>';
+
+  var legIdx = 0;
+  for (var mi = 0; mi < s.methods.length; mi++) {
+    var meth = s.methods[mi], info = MOTOR_START_METHODS[meth];
+    if (!info) continue;
+    var col = colors[meth] || '#334155';
+    var samples = 60;
+    var d = '';
+    for (var j = 0; j <= samples; j++) {
+      var tNorm = j / samples;
+      var tSec = tNorm * info.iStartDur;
+      var pt = info.profile(tNorm);
+      d += (j === 0 ? 'M' : 'L') + xPos(tSec).toFixed(1) + ',' + yPos(pt.iMult).toFixed(1);
+    }
+    svg += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<rect x="' + (w - 150) + '" y="' + (mT + 6 + legIdx * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.6" stroke="' + col + '"/>';
+    svg += '<text x="' + (w - 135) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="10" fill="' + col + '">' + info.label + ' (' + info.iStartMult + '\u00d7)</text>';
+    legIdx++;
+  }
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Tid [s]' : 'Time [s]') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Str\u00f8m I / In' : 'Current I / In') + '</text>';
+  svg += '<text x="' + mL + '" y="' + (mT - 9) + '" font-size="10" fill="#475467">' + (da ? 'Motorstartstr\u00f8m vs. tid \u2014 sammenligning af startmetoder' : 'Motor starting current vs. time \u2014 starting method comparison') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Method comparison table.
+function motorRenderTable(state) {
+  var s = state || motorCurveState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin:6px 0">';
+  h += '<tr style="background:var(--border-light);font-weight:700"><td style="padding:5px 7px">' + (da ? 'Metode' : 'Method') + '</td><td style="padding:5px 7px">' + (da ? 'Start I' : 'Start I') + '</td><td style="padding:5px 7px">' + (da ? 'Absolut' : 'Absolute') + '</td><td style="padding:5px 7px">' + (da ? 'Startmoment' : 'Start torque') + '</td><td style="padding:5px 7px">' + (da ? 'Varighed' : 'Duration') + '</td><td style="padding:5px 7px">' + (da ? 'MCB-kurve' : 'MCB curve') + '</td></tr>';
+  for (var i = 0; i < s.methods.length; i++) {
+    var m = s.methods[i], info = MOTOR_START_METHODS[m];
+    if (!info) continue;
+    var absI = (info.iStartMult * s.In).toFixed(0);
+    var mcb = info.iStartMult <= 5 ? 'B/C' : (info.iStartMult <= 10 ? 'C/D' : 'D/K');
+    h += '<tr style="border-bottom:1px solid var(--border-light)">';
+    h += '<td style="padding:5px 7px;font-weight:700">' + (da ? info.full_da : info.full_en) + '</td>';
+    h += '<td style="padding:5px 7px">' + info.iStartMult + '\u00d7 In</td>';
+    h += '<td style="padding:5px 7px">' + absI + ' A</td>';
+    h += '<td style="padding:5px 7px">' + info.torqueStart + '\u00d7 Tn</td>';
+    h += '<td style="padding:5px 7px">~' + info.iStartDur + ' s</td>';
+    h += '<td style="padding:5px 7px">' + mcb + '</td>';
+    h += '</tr>';
+  }
+  h += '</table></div>';
+  return h;
+}
+
+// ===========================================================================
+// VOLTAGE DROP PROFILE VISUALIZATION
+// ===========================================================================
+// Renders the voltage profile along a cable from source to load, showing:
+// 1. Incremental drop per metre
+// 2. Cumulative drop vs. compliance limits (3% / 5%)
+// 3. Impact of cable size and length
+
+let vdropProfileState = { size: 6, length: 50, In: 25, cosPhi: 0.9, voltage: 230 };
+const VDROP_SIZES = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+const VDROP_LENGTHS = [10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 200];
+
+// mΩ/m resistance per mm² (copper, approximate, IEC 60228 20°C)
+function vdropResPerM(mm2) { return 18.51 / mm2; } // [mΩ/m]
+
+// Voltage drop at distance d [m] from source.
+function vdropAtDistance(d, mm2, In, cosPhi) {
+  var rPerM = vdropResPerM(mm2) / 1000; // Ω/m
+  var drop = 2 * d * rPerM * In * cosPhi; // single-phase, 2 conductors
+  return drop;
+}
+
+// SVG voltage profile.
+function vdropRenderProfile(state) {
+  var s = state || vdropProfileState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var w = 560, h = 280, mL = 52, mR = 16, mT = 26, mB = 44;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  var maxL = s.length;
+  var totalDrop = vdropAtDistance(s.length, s.size, s.In, s.cosPhi);
+  var dropPct = (totalDrop / s.voltage) * 100;
+  var yMax = Math.max(5, Math.ceil(dropPct * 1.3));
+  function xPos(d) { return mL + (d / maxL) * plotW; }
+  function yPos(pct) { return mT + (pct / yMax) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // compliance limits
+  var limit3 = yPos(3), limit5 = yPos(5);
+  if (3 <= yMax) { svg += '<line x1="' + mL + '" y1="' + limit3.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + limit3.toFixed(1) + '" stroke="#d97706" stroke-width="1" stroke-dasharray="5,3"/>'; svg += '<text x="' + (w - mR - 2) + '" y="' + (limit3 - 4).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#d97706">3% (' + (da ? 'belysning' : 'lighting') + ')</text>'; }
+  if (5 <= yMax) { svg += '<line x1="' + mL + '" y1="' + limit5.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + limit5.toFixed(1) + '" stroke="#dc2626" stroke-width="1" stroke-dasharray="5,3"/>'; svg += '<text x="' + (w - mR - 2) + '" y="' + (limit5 - 4).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#dc2626">5% (' + (da ? 'andre' : 'other') + ')</text>'; }
+  // profile curve
+  var samples = 40;
+  var d = '';
+  for (var i = 0; i <= samples; i++) {
+    var dist = (i / samples) * maxL;
+    var drop = vdropAtDistance(dist, s.size, s.In, s.cosPhi);
+    var pct = (drop / s.voltage) * 100;
+    d += (i === 0 ? 'M' : 'L') + xPos(dist).toFixed(1) + ',' + yPos(pct).toFixed(1);
+  }
+  svg += '<path d="' + d + '" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+  // endpoint annotation
+  svg += '<circle cx="' + xPos(maxL).toFixed(1) + '" cy="' + yPos(dropPct).toFixed(1) + '" r="4" fill="' + (dropPct > 5 ? '#dc2626' : (dropPct > 3 ? '#d97706' : '#059669')) + '"/>';
+  svg += '<text x="' + (xPos(maxL) - 6).toFixed(1) + '" y="' + (yPos(dropPct) - 8).toFixed(1) + '" text-anchor="end" font-size="10" fill="' + (dropPct > 5 ? '#dc2626' : (dropPct > 3 ? '#d97706' : '#059669')) + '">' + dropPct.toFixed(2) + ' %</text>';
+  // axes
+  for (var j = 0; j <= 5; j++) { var gx = mL + (j / 5) * plotW; svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>'; svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 14) + '" text-anchor="middle" font-size="9" fill="#475467">' + Math.round((j / 5) * maxL) + ' m</text>'; }
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Afstand fra kilde [m]' : 'Distance from source [m]') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Spændingsfald [%]' : 'Voltage drop [%]') + '</text>';
+  svg += '<text x="' + mL + '" y="' + (mT - 9) + '" font-size="10" fill="#475467">' + s.size + ' mm\u00b2 Cu, ' + s.In + ' A, cos\u03c6=' + s.cosPhi + ', ' + s.voltage + ' V</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function vdropSetSize(v) { vdropProfileState.size = Number(v) || 6; renderModule('standards'); }
+function vdropSetLength(v) { vdropProfileState.length = Number(v) || 50; renderModule('standards'); }
+function vdropSetIn(v) { vdropProfileState.In = Number(v) || 25; renderModule('standards'); }
 
 function getEarthInfo(sys) {  const info = {
     'TN-S': {
@@ -5838,6 +6330,105 @@ function sldInit() {
 // the navigation reads like a professional engineering workbench and teaches the
 // natural project workflow. Each group carries a plain-language description, and
 // the core dimensioning chain is numbered so beginners learn the safe-design order
+// ===========================================================================
+// UX DESIGN SYSTEM — User-Mode Engine, Progressive Disclosure, Smart UI
+// ===========================================================================
+// Four complexity levels: apprentice (guided, simple language, fewer params),
+// electrician (fast workflows, practical info), engineer (full depth),
+// expert (every parameter exposed). Stored in localStorage.
+const UX_MODES = ['apprentice', 'electrician', 'engineer', 'expert'];
+const UX_MODE_LABELS = {
+  apprentice: { da: 'Lærling', en: 'Apprentice', icon: '\uD83D\uDC68\u200D\uD83C\uDFEB' },
+  electrician: { da: 'Elektriker', en: 'Electrician', icon: '\u26A1' },
+  engineer: { da: 'Ingeniør', en: 'Engineer', icon: '\uD83D\uDCCF' },
+  expert: { da: 'Ekspert', en: 'Expert', icon: '\uD83E\uDDE0' }
+};
+
+let uxMode = (function() {
+  try { var m = localStorage.getItem('ux_mode'); return UX_MODES.indexOf(m) >= 0 ? m : 'electrician'; } catch(e) { return 'electrician'; }
+})();
+
+function uxSetMode(mode) {
+  if (UX_MODES.indexOf(mode) < 0) return;
+  uxMode = mode;
+  try { localStorage.setItem('ux_mode', mode); } catch(e) {}
+  // Apply body class for CSS-level gating
+  document.body.classList.remove('ux-apprentice', 'ux-electrician', 'ux-engineer', 'ux-expert');
+  document.body.classList.add('ux-' + mode);
+  renderModule(activeModule);
+}
+
+function uxModeLevel() {
+  return UX_MODES.indexOf(uxMode);
+}
+
+// Render the user-mode selector bar (click-only pill buttons).
+function uxRenderModeBar() {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  return '<div class="ux-mode-bar">' + UX_MODES.map(function(m) {
+    var info = UX_MODE_LABELS[m];
+    return '<button class="ux-mode-btn ' + (uxMode === m ? 'active' : '') + '" onclick="uxSetMode(\'' + m + '\')">' + info.icon + ' ' + (da ? info.da : info.en) + '</button>';
+  }).join('') + '</div>';
+}
+
+// Collapsible panel helper. Returns HTML. Body is only shown when open.
+// level: 'advanced' (hidden for apprentice/electrician) or 'expert' (hidden unless expert).
+// id: unique DOM id (for toggle state persistence in sessionStorage).
+function uxPanel(title, bodyHtml, opts) {
+  opts = opts || {};
+  var id = opts.id || ('uxp_' + Math.random().toString(36).slice(2, 8));
+  var level = opts.level || null;
+  var startOpen = opts.open || false;
+  // Check sessionStorage for persisted state
+  try { var s = sessionStorage.getItem(id); if (s === '1') startOpen = true; else if (s === '0') startOpen = false; } catch(e) {}
+  // Level gating: if user mode is below the panel's level, hide entirely
+  if (level === 'engineer' && uxModeLevel() < 2) return '';
+  if (level === 'expert' && uxModeLevel() < 3) return '';
+  var openCls = startOpen ? ' open' : '';
+  return '<div class="ux-panel' + openCls + '" id="' + id + '">'
+    + '<div class="ux-panel-header" onclick="uxTogglePanel(\'' + id + '\')">'
+    + '<span>' + (opts.icon || '\u25B6') + ' ' + title + '</span>'
+    + '<span class="ux-chevron">\u25BC</span>'
+    + '</div>'
+    + '<div class="ux-panel-body">' + bodyHtml + '</div>'
+    + '</div>';
+}
+
+function uxTogglePanel(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+  try { sessionStorage.setItem(id, el.classList.contains('open') ? '1' : '0'); } catch(e) {}
+}
+
+// Executive summary builder. items: [{label, value, status:'pass'|'warn'|'fail'|''}]
+function uxSummary(items) {
+  return '<div class="ux-summary">' + items.map(function(it) {
+    var cls = it.status ? ' ' + it.status : '';
+    return '<div class="ux-summary-item' + cls + '"><div class="ux-val">' + it.value + '</div><div class="ux-lbl">' + it.label + '</div></div>';
+  }).join('') + '</div>';
+}
+
+// Smart card selector. items: [{id, icon, title, desc}], selected: current id, onclick: fn name.
+function uxSmartCards(items, selected, onClickFn) {
+  return '<div class="ux-smart-cards">' + items.map(function(it) {
+    var sel = it.id === selected ? ' selected' : '';
+    return '<div class="ux-smart-card' + sel + '" onclick="' + onClickFn + '(\'' + it.id + '\')">'
+      + '<div class="ux-sc-icon">' + (it.icon || '') + '</div>'
+      + '<div class="ux-sc-title">' + it.title + '</div>'
+      + '<div class="ux-sc-desc">' + (it.desc || '') + '</div>'
+      + '</div>';
+  }).join('') + '</div>';
+}
+
+// Wizard step indicator. steps: [{label}], activeIdx: current 0-based.
+function uxWizardSteps(steps, activeIdx) {
+  return '<div class="ux-wizard-steps">' + steps.map(function(s, i) {
+    var cls = i < activeIdx ? 'done' : (i === activeIdx ? 'active' : '');
+    return '<div class="ux-wizard-step ' + cls + '"><div class="ux-ws-num">' + (i < activeIdx ? '\u2713' : (i + 1)) + '</div><div>' + s.label + '</div></div>';
+  }).join('') + '</div>';
+}
+
 // (IB -> In -> Iz -> voltage drop -> short-circuit -> Zs ...).
 // Every module key MUST appear exactly once; any key not listed is auto-appended
 // to the "more" group as a safety net so nothing can ever disappear from the UI.
@@ -7402,7 +7993,7 @@ function renderModule(mod) {
       else main.classList.add('module-switch');
     }
   } catch (e) { /* non-DOM env */ }
-  main.innerHTML = content;
+  main.innerHTML = uxRenderModeBar() + content;
   if (_sameModule) {
     _restoreScrollState(_savedScroll);                       // synchronous restore (no visible flash)
     _restoreFocusKey(_savedFocus);                           // keep focus on the control just used
@@ -9606,6 +10197,133 @@ function renderStandards() {
         <div class="result-title">${tx('Engineering-data', 'Engineering data')}</div>
         ${mcbRenderTypeTable(mcbCurveSel, mcbCurveIn)}
         <div class="info-row" style="margin-top:6px">${tx('IEC 60898-1 termiske prøvepunkter: 1,13× In → ingen udløsning inden konventionel tid; 1,45× In → udløsning inden konventionel tid; 2,55× In → udløsning på 1–60 s (In ≤ 32 A).', 'IEC 60898-1 thermal test points: 1.13× In → no trip within conventional time; 1.45× In → trip within conventional time; 2.55× In → trip in 1–60 s (In ≤ 32 A).')}</div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${tx('Fasordiagram & Effekttrekant', 'Phasor Diagram & Power Triangle')}</div>
+      <div class="info-row">${tx('Interaktivt 3-fase fasordiagram med spændings- og strømvektorer, effekttrekant (P/Q/S/cos φ) og impedansvektor. Vælg strøm og vinkel — alle grafer opdateres automatisk.', 'Interactive 3-phase phasor diagram with voltage and current vectors, power triangle (P/Q/S/cos φ) and impedance vector. Select current and angle — all graphs update automatically.')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Visning', 'View')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${phasorState.view === 'voltage' ? 'selected' : ''}" onclick="phasorSetView('voltage')">${tx('Fasor (U + I)', 'Phasor (U + I)')}</button>
+          <button class="sel-btn ${phasorState.view === 'power' ? 'selected' : ''}" onclick="phasorSetView('power')">${tx('Effekttrekant', 'Power triangle')}</button>
+          <button class="sel-btn ${phasorState.view === 'impedance' ? 'selected' : ''}" onclick="phasorSetView('impedance')">${tx('Impedans (Z)', 'Impedance (Z)')}</button>
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Strøm I₁ [A]', 'Current I₁ [A]')}</div>
+        <div class="select-grid">
+          ${PHASOR_CURRENTS.map(c =>
+            `<button class="sel-btn ${phasorState.iA === c ? 'selected' : ''}" onclick="phasorSetI('A',${c})">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Fasevinkel φ [°] (strøm bagud spænding)', 'Phase angle φ [°] (current lagging voltage)')}</div>
+        <div class="select-grid">
+          ${PHASOR_ANGLES.map(a =>
+            `<button class="sel-btn ${phasorState.phiA === a ? 'selected' : ''}" onclick="phasorSetPhi('A',${a})">${a}\u00b0</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        ${phasorState.view === 'voltage' ? phasorRenderVoltage(phasorState) : (phasorState.view === 'power' ? phasorRenderPowerTriangle(phasorState) : phasorRenderImpedance(phasorState))}
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Beregnet', 'Computed')}</div>
+        ${(function() {
+          var pw = p3phPower(phasorState.uLN, phasorState.iA, phasorState.phiA);
+          var z = pImpedance(phasorState.uLN, phasorState.iA, phasorState.phiA);
+          return '<div class="result-row"><span class="label">P</span><span class="value">' + (pw.P / 1000).toFixed(2) + ' kW</span></div>'
+            + '<div class="result-row"><span class="label">Q</span><span class="value">' + (pw.Q / 1000).toFixed(2) + ' kvar</span></div>'
+            + '<div class="result-row"><span class="label">S</span><span class="value">' + (pw.S / 1000).toFixed(2) + ' kVA</span></div>'
+            + '<div class="result-row"><span class="label">cos \u03c6</span><span class="value">' + pw.cosPhi.toFixed(4) + '</span></div>'
+            + '<div class="result-row"><span class="label">Z</span><span class="value">' + z.Z.toFixed(3) + ' \u03a9 \u2220 ' + z.phi + '\u00b0</span></div>'
+            + '<div class="result-row"><span class="label">R + jX</span><span class="value">' + z.R.toFixed(3) + ' + j' + z.X.toFixed(3) + ' \u03a9</span></div>';
+        })()}
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${tx('Motorstartkurver (DOL / Y-Δ / Soft / VFD)', 'Motor Starting Curves (DOL / Y-Δ / Soft / VFD)')}</div>
+      <div class="info-row">${tx('Sammenlign startstr\u00f8m og -tid for de fire startmetoder. Bruges til valg af MCB-kurve, sikringsstørrelse og kabeltværsnit.', 'Compare starting current and duration for the four starting methods. Used for MCB curve selection, fuse sizing and cable cross-section.')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Startmetoder (flere mulige)', 'Starting methods (multiple)')}</div>
+        <div class="select-grid">
+          ${Object.keys(MOTOR_START_METHODS).map(m =>
+            `<button class="sel-btn ${motorCurveState.methods.indexOf(m) >= 0 ? 'selected' : ''}" onclick="motorToggleMethod('${m}')">${MOTOR_START_METHODS[m].label}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Motor mærkestrøm In [A]', 'Motor rated current In [A]')}</div>
+        <div class="select-grid">
+          ${MOTOR_IN_OPTIONS.map(i =>
+            `<button class="sel-btn ${motorCurveState.In === i ? 'selected' : ''}" onclick="motorSetCurveIn(${i})">${i} A</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        ${motorRenderStartCurves(motorCurveState)}
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Sammenligning', 'Comparison')}</div>
+        ${motorRenderTable(motorCurveState)}
+        <div class="info-row" style="margin-top:6px">${tx('Y-Δ giver en transient spike ved omkobling. Soft reducerer strømmen jævnt. VFD holder ~1,2–1,5×In hele starten. DOL giver fuld startstr\u00f8m (~6–8×In) men kortest tid. Vælg MCB-kurve D/K for DOL, C for Y-Δ, B/C for VFD.', 'Y-Δ produces a transient spike at changeover. Soft ramps current gradually. VFD holds ~1.2–1.5×In throughout start. DOL gives full inrush (~6–8×In) but shortest time. Select MCB curve D/K for DOL, C for Y-Δ, B/C for VFD.')}</div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${tx('Spændingsfaldsprofil langs kabel', 'Voltage Drop Profile Along Cable')}</div>
+      <div class="info-row">${tx('Viser kumulativt spændingsfald fra kilde til last. DS/HD 60364: maks. 3 % for belysning, 5 % for andre. Klik størrelse og længde.', 'Shows cumulative voltage drop from source to load. DS/HD 60364: max 3% for lighting, 5% for other. Click size and length.')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Kabeltværsnit [mm²]', 'Cable cross-section [mm²]')}</div>
+        <div class="select-grid">
+          ${VDROP_SIZES.map(s =>
+            `<button class="sel-btn ${vdropProfileState.size === s ? 'selected' : ''}" onclick="vdropSetSize(${s})">${s}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Kabellængde [m]', 'Cable length [m]')}</div>
+        <div class="select-grid">
+          ${VDROP_LENGTHS.map(l =>
+            `<button class="sel-btn ${vdropProfileState.length === l ? 'selected' : ''}" onclick="vdropSetLength(${l})">${l} m</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Belastningsstrøm [A]', 'Load current [A]')}</div>
+        <div class="select-grid">
+          ${[10, 16, 20, 25, 32, 40, 50, 63, 80, 100].map(i =>
+            `<button class="sel-btn ${vdropProfileState.In === i ? 'selected' : ''}" onclick="vdropSetIn(${i})">${i} A</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        ${vdropRenderProfile(vdropProfileState)}
+        <div style="margin-top:8px;font-size:0.8rem">
+          ${(function() {
+            var d = vdropAtDistance(vdropProfileState.length, vdropProfileState.size, vdropProfileState.In, vdropProfileState.cosPhi);
+            var pct = (d / vdropProfileState.voltage) * 100;
+            var verdict = pct > 5 ? '\u274c ' + tx('OVERSTIGER 5 % — forstør kabel!', 'EXCEEDS 5% — increase cable size!') : (pct > 3 ? '\u26a0\ufe0f ' + tx('Over 3 % (belysningsgrænse) — ok for andre forbrugere.', 'Over 3% (lighting limit) — OK for other loads.') : '\u2705 ' + tx('Under 3 % — OK.', 'Below 3% — OK.'));
+            return '<span style="font-weight:700">\u0394U = ' + d.toFixed(2) + ' V (' + pct.toFixed(2) + ' %)</span> — ' + verdict;
+          })()}
+        </div>
       </div>
     </div>
 

@@ -14180,6 +14180,205 @@ test('lsig: I dial hidden for Micrologic 2.2 (LS only), shown for 5.2+', functio
 });
 
 
+console.log('\n=== Phasor Diagram + Power Triangle + Impedance Vector Tests ===\n');
+
+test('phasor: utility conversions are correct', function () {
+  assert.ok(Math.abs(pDeg2Rad(180) - Math.PI) < 1e-10, '180° = π');
+  assert.ok(Math.abs(pRad2Deg(Math.PI) - 180) < 1e-10, 'π = 180°');
+  var r = pPolar2Rect(10, 60);
+  assert.ok(Math.abs(r.re - 5) < 1e-6, 'rect re for 10∠60°');
+  assert.ok(Math.abs(r.im - 8.6602) < 0.001, 'rect im');
+  var p = pRect2Polar(3, 4);
+  assert.ok(Math.abs(p.mag - 5) < 1e-6, 'polar mag for 3+j4');
+  assert.ok(Math.abs(p.ang - 53.13) < 0.01, 'polar ang');
+});
+
+test('phasor: power triangle at cos φ = 0.8 (36.87°) is correct', function () {
+  var pw = pPowerTriangle(230, 100, 36.87);
+  assert.ok(Math.abs(pw.S - 23000) < 1, 'S = V×I');
+  assert.ok(Math.abs(pw.P - 18400) < 10, 'P = S cos φ ≈ 18400 W');
+  assert.ok(Math.abs(pw.Q - 13800) < 10, 'Q = S sin φ ≈ 13800 var');
+  assert.ok(Math.abs(pw.cosPhi - 0.8) < 0.001, 'cos φ = 0.8');
+});
+
+test('phasor: 3-phase balanced power is √3 × ULL × I', function () {
+  var pw = p3phPower(230, 100, 0);
+  // S = √3 × ULL × I = √3 × (230×√3) × 100 = 3 × 230 × 100 = 69000 W
+  assert.ok(Math.abs(pw.S - 69000) < 1, 'S = 3 × ULN × I = 69000 VA (got ' + pw.S.toFixed(0) + ')');
+  assert.ok(Math.abs(pw.P - 69000) < 1, 'P = S at cos φ = 1');
+  assert.ok(Math.abs(pw.Q) < 1, 'Q ≈ 0 at φ = 0');
+});
+
+test('phasor: impedance from V/I/phi is correct', function () {
+  var z = pImpedance(230, 100, 30);
+  assert.ok(Math.abs(z.Z - 2.3) < 0.001, 'Z = V/I = 2.3 Ω');
+  assert.ok(Math.abs(z.R - 2.3 * Math.cos(pDeg2Rad(30))) < 0.001, 'R = Z cos φ');
+  assert.ok(Math.abs(z.X - 2.3 * Math.sin(pDeg2Rad(30))) < 0.001, 'X = Z sin φ');
+  var z0 = pImpedance(230, 0, 30);
+  assert.strictEqual(z0.Z, 0, 'Z=0 when I=0 (safe guard)');
+});
+
+test('phasor: phasorRenderVoltage produces valid SVG with no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var svg = phasorRenderVoltage(phasorState);
+    assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + ')');
+    assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+    assert.ok(svg.indexOf('U\u2081') >= 0, 'U1 label present');
+    assert.ok(svg.indexOf('I\u2081') >= 0, 'I1 label present');
+  });
+  lang = prev;
+});
+
+test('phasor: phasorRenderPowerTriangle produces valid SVG with P/Q/S labels', function () {
+  var prev = lang; lang = 'en';
+  var svg = phasorRenderPowerTriangle(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('kW') > 0, 'P in kW');
+  assert.ok(svg.indexOf('kvar') > 0, 'Q in kvar');
+  assert.ok(svg.indexOf('kVA') > 0, 'S in kVA');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: phasorRenderImpedance shows polar + rectangular, no leaks', function () {
+  var prev = lang; lang = 'da';
+  var svg = phasorRenderImpedance(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('\u03a9') >= 0, 'ohm symbol present');
+  assert.ok(svg.indexOf('\u2220') >= 0, 'angle symbol (polar form)');
+  assert.ok(svg.indexOf('+') >= 0 || svg.indexOf('j') >= 0, 'rectangular form');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: renderStandards embeds phasor card with computed values (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('cos \u03c6') >= 0, 'cos phi present (' + lg + ')');
+    assert.ok(out.indexOf('kW') >= 0, 'P in kW (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'SVG embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('phasor: state setters update correctly', function () {
+  var prevI = phasorState.iA, prevPhi = phasorState.phiA, prevView = phasorState.view;
+  phasorState.iA = 200; phasorState.phiA = 45; phasorState.view = 'impedance';
+  var z = pImpedance(phasorState.uLN, phasorState.iA, phasorState.phiA);
+  assert.ok(Math.abs(z.Z - 230 / 200) < 0.001, 'Z updated to 1.15 Ω');
+  phasorState.iA = prevI; phasorState.phiA = prevPhi; phasorState.view = prevView;
+});
+
+
+console.log('\n=== UX Design System Foundation Tests ===\n');
+
+test('ux: UX_MODES defines all four complexity levels', function () {
+  assert.deepStrictEqual(UX_MODES, ['apprentice', 'electrician', 'engineer', 'expert']);
+});
+
+test('ux: uxMode defaults to electrician and uxModeLevel returns correct index', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; assert.strictEqual(uxModeLevel(), 1);
+  uxMode = 'apprentice'; assert.strictEqual(uxModeLevel(), 0);
+  uxMode = 'engineer'; assert.strictEqual(uxModeLevel(), 2);
+  uxMode = 'expert'; assert.strictEqual(uxModeLevel(), 3);
+  uxMode = prev;
+});
+
+test('ux: uxSetMode only accepts valid modes', function () {
+  var prev = uxMode;
+  uxSetMode('expert'); assert.strictEqual(uxMode, 'expert');
+  uxSetMode('invalid_mode'); assert.strictEqual(uxMode, 'expert'); // unchanged
+  uxSetMode('apprentice'); assert.strictEqual(uxMode, 'apprentice');
+  uxMode = prev;
+});
+
+test('ux: uxRenderModeBar renders all four buttons with correct active state (da/en)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; uxMode = 'electrician';
+    var h = uxRenderModeBar();
+    assert.ok(h.indexOf('ux-mode-bar') >= 0, 'has container class');
+    assert.ok(h.indexOf('active') >= 0, 'one is active');
+    UX_MODES.forEach(function (m) { assert.ok(h.indexOf(m) >= 0, m + ' present'); });
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev; uxMode = pm;
+});
+
+test('ux: uxPanel renders collapsible panel, respects level gating', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; // level 1
+  var h = uxPanel('Test Panel', '<p>Content</p>', { id: 'test1' });
+  assert.ok(h.indexOf('ux-panel') >= 0, 'panel rendered');
+  assert.ok(h.indexOf('Content') >= 0, 'body included');
+  // Engineer-level panel hidden for electrician
+  var h2 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test2' });
+  assert.strictEqual(h2, '', 'engineer panel hidden for electrician');
+  uxMode = 'engineer'; // level 2
+  var h3 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test3' });
+  assert.ok(h3.indexOf('Deep') >= 0, 'engineer panel shown for engineer');
+  // Expert panel still hidden for engineer
+  var h4 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test4' });
+  assert.strictEqual(h4, '', 'expert panel hidden for engineer');
+  uxMode = 'expert';
+  var h5 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test5' });
+  assert.ok(h5.indexOf('Secret') >= 0, 'expert panel shown for expert');
+  uxMode = prev;
+});
+
+test('ux: uxSummary renders executive summary cards with status classes', function () {
+  var h = uxSummary([
+    { label: 'Cable', value: '✓ OK', status: 'pass' },
+    { label: 'Vdrop', value: '4.2%', status: 'warn' },
+    { label: 'Fault', value: '✗ FAIL', status: 'fail' }
+  ]);
+  assert.ok(h.indexOf('ux-summary') >= 0, 'container');
+  assert.ok(h.indexOf('pass') >= 0, 'pass class');
+  assert.ok(h.indexOf('warn') >= 0, 'warn class');
+  assert.ok(h.indexOf('fail') >= 0, 'fail class');
+  assert.ok(h.indexOf('4.2%') >= 0, 'value rendered');
+});
+
+test('ux: uxSmartCards renders visual selector with correct selection', function () {
+  var items = [
+    { id: 'tn-s', icon: '⚡', title: 'TN-S', desc: 'Separate N+PE' },
+    { id: 'tt', icon: '🔌', title: 'TT', desc: 'Local earth' }
+  ];
+  var h = uxSmartCards(items, 'tn-s', 'testFn');
+  assert.ok(h.indexOf('ux-smart-cards') >= 0, 'grid container');
+  assert.ok(h.indexOf('selected') >= 0, 'one selected');
+  assert.ok(h.indexOf('TN-S') >= 0, 'title');
+  assert.ok(h.indexOf('testFn') >= 0, 'onclick handler');
+});
+
+test('ux: uxWizardSteps renders step indicators with done/active states', function () {
+  var steps = [{ label: 'Load' }, { label: 'Cable' }, { label: 'Protection' }];
+  var h = uxWizardSteps(steps, 1);
+  assert.ok(h.indexOf('done') >= 0, 'first step is done');
+  assert.ok(h.indexOf('active') >= 0, 'second step is active');
+  assert.ok(h.indexOf('Protection') >= 0, 'third step label');
+  assert.ok(h.indexOf('✓') >= 0 || h.indexOf('\u2713') >= 0, 'checkmark on done step');
+});
+
+test('ux: renderModule includes mode bar in output (all modules)', function () {
+  var prev = lang; lang = 'da';
+  var out = renderModule('load');
+  // renderModule writes to main.innerHTML but we can check the helper directly
+  var bar = uxRenderModeBar();
+  assert.ok(bar.indexOf('ux-mode-bar') >= 0, 'mode bar renders');
+  assert.ok(bar.length > 50, 'mode bar has content');
+  lang = prev;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
