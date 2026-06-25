@@ -14757,6 +14757,31 @@ test('trafo: renderTrafoEfficiency embeds the efficiency curve', function () {
   lang = prev;
 });
 
+test('motor: torque/speed curve renders valid animated SVG for all methods, no leaks', function () {
+  var prev = lang, pm = motorCurveState.methods.slice();
+  motorCurveState.methods = ['DOL', 'SD', 'Soft', 'VFD'];
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var svg = motorRenderTorqueCurve(motorCurveState);
+    assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + ')');
+    assert.ok(svg.indexOf('svg-animated') >= 0, 'animated class present (' + lg + ')');
+    assert.ok(svg.indexOf('svg-curve-path') >= 0, 'torque curve path drawn (' + lg + ')');
+    assert.ok(svg.indexOf('undefined') < 0 && svg.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  // every defined starting method has a torque profile model
+  Object.keys(MOTOR_START_METHODS).forEach(function (m) {
+    assert.ok(Array.isArray(MOTOR_TORQUE_PROFILES[m]) && MOTOR_TORQUE_PROFILES[m].length > 1, 'torque profile for ' + m);
+  });
+  motorCurveState.methods = pm; lang = prev;
+});
+
+test('motor: torque card embeds the torque/speed curve in the motor module', function () {
+  var prev = lang; lang = 'da';
+  var out = renderStandards();
+  assert.ok(out.indexOf('Moment-/hastighedskurve') >= 0, 'torque card titled');
+  lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
