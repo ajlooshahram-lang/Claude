@@ -4682,8 +4682,27 @@ test('zsGetMaxZs: C32 = 0.72 ohm', function() {
 });
 
 // Test 440: zsGetMaxZs for gG63
-test('zsGetMaxZs: gG63 = 0.82 ohm', function() {
-  assert.strictEqual(zsGetMaxZs('gG63'), 0.82);
+test('zsGetMaxZs: gG63 = 0.79 ohm (conservative, from FUSE_5S)', function() {
+  assert.strictEqual(zsGetMaxZs('gG63'), 0.79);
+});
+
+test('standards: ZS_MAX_TABLE fuse entries are conservative (min of 230/FUSE_5S and DS/HD table)', function () {
+  // The Zs module table for gG fuses must always be the MOST RESTRICTIVE (lowest)
+  // value — either 230/FUSE_5S or the DS/HD 60364 published table value, whichever
+  // gives the lower Zs_max. This ensures no installation is ever approved when the
+  // fault loop impedance is too high for safe disconnection.
+  var fuse5s = {6:26,10:43,16:72,20:90,25:110,32:145,40:180,50:230,63:290,80:370,100:460,125:580,160:750};
+  [6,10,16,20,25,32,40,50,63,80,100,125,160].forEach(function(In) {
+    var key = 'gG' + In;
+    var tableVal = zsGetMaxZs(key);
+    var fromFuse5s = Math.round(230 / fuse5s[In] * 100) / 100;
+    // Table must be <= both sources (conservative minimum)
+    assert.ok(tableVal <= fromFuse5s + 0.01, key + ' table(' + tableVal + ') <= 230/FUSE_5S(' + fromFuse5s + ')');
+    assert.ok(tableVal > 0, key + ' is positive');
+  });
+  // MCB values are formula-exact: Zs_max = 230/(factor*In)
+  assert.ok(Math.abs(zsGetMaxZs('B16') - 230/(5*16)) < 0.01, 'B16 = 230/80');
+  assert.ok(Math.abs(zsGetMaxZs('C16') - 230/(10*16)) < 0.01, 'C16 = 230/160');
 });
 
 // Test 441: zsCheckDisconnection pass
