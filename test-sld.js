@@ -14852,6 +14852,23 @@ test('trafo: inrush sub-module renders in trafo card with peak selector and calc
   trafoState.calcType = 'sizing'; lang = prev;
 });
 
+test('autoexam: auto-curves embedded in worked solutions (device, cable, vdrop, adiabatic)', function () {
+  var prev = lang; lang = 'da';
+  var p = axGenerate(42, 'parcelhus', 'elektriker', 'beregning');
+  var sols = axSolve(p);
+  var curveCount = 0, leaks = 0;
+  sols.forEach(function (op) { op.tasks.forEach(function (s) {
+    if (s.curve) { curveCount++; if (s.curve.indexOf('<svg') < 0 || /undefined|NaN/.test(s.curve)) leaks++; }
+  }); });
+  assert.ok(curveCount >= 2, 'at least 2 tasks have auto-curves (got ' + curveCount + ')');
+  assert.ok(leaks === 0, 'no leaks in curves');
+  // Verify the solution card renderer includes the curve
+  var rendered = '';
+  sols.forEach(function (op) { op.tasks.forEach(function (s) { rendered += axRenderSolutionCard(s); }); });
+  assert.ok(rendered.indexOf('<svg') >= 0, 'SVG embedded in rendered solution');
+  lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
