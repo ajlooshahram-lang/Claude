@@ -9019,7 +9019,7 @@ function renderLoad() {
             ).join('')}
           </div>
         </div>
-      `, { level: null, id: 'load_advanced', open: (uxModeLevel() >= 2 || loadState.cosPhi !== 0.95 || loadState.simFactor !== 1.0 || loadState.expFactor !== 1.0) })}
+      `, { level: null, id: 'load_advanced', open: (loadState.cosPhi !== 0.95 || loadState.simFactor !== 1.0 || loadState.expFactor !== 1.0) })}
     </div>
 
     ${ib > 0 ? `
@@ -9198,7 +9198,7 @@ function renderFuse() {
       <div class="result-title">${tx('Sikringsklasser (IEC 60269)', 'Fuse classes (IEC 60269)')}</div>
       ${fuseRenderClassTable(fuseCurveSel)}
     </div>
-    `, {id: 'uxp_fuse_classes', icon: '\uD83D\uDCC8', open: fuseEngPlus || fuseClassNonDefault})}
+    `, {id: 'uxp_fuse_classes', icon: '\uD83D\uDCC8', open: fuseClassNonDefault})}
     ` : ''}
   `;
 }
@@ -9263,7 +9263,7 @@ function renderMCB() {
             <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
           </div>
         </div>
-      `, {id: 'uxp_mcb_poles', icon: '\uD83D\uDD0C', open: mcbEngPlus || mcbPolesNonDefault})}
+      `, {id: 'uxp_mcb_poles', icon: '\uD83D\uDD0C', open: mcbPolesNonDefault})}
     </div>
 
     ${mcbState.rating ? `
@@ -9438,7 +9438,7 @@ function renderMCCB() {
         </div>
       </div>
 
-      ${uxPanel(tx('Io/Isd indstilling', 'Io/Isd Dial Settings'), dialsBody, {id: 'uxp_mccb_dials', icon: '\uD83D\uDD27', open: mccbEngPlus || mccbDialsNonDefault})}
+      ${uxPanel(tx('Io/Isd indstilling', 'Io/Isd Dial Settings'), dialsBody, {id: 'uxp_mccb_dials', icon: '\uD83D\uDD27', open: mccbDialsNonDefault})}
     </div>
 
     <div class="card fade-in">
@@ -9477,7 +9477,7 @@ function renderMCCB() {
     <div class="card fade-in">
       <div class="card-title">${tx('LSIG Beskyttelseskurve', 'LSIG Protection Curve')}</div>
       <div class="info-row">${tx('Juster trip-unit parametre og se den resulterende beskyttelseskonvolut.', 'Adjust trip-unit parameters and view the resulting protection envelope.')}</div>
-      ${uxPanel(tx('LSIG parametre og kurve', 'LSIG Parameters & Curve'), lsigBody, {id: 'uxp_mccb_lsig', icon: '\uD83D\uDCC8', open: mccbEngPlus})}
+      ${uxPanel(tx('LSIG parametre og kurve', 'LSIG Parameters & Curve'), lsigBody, {id: 'uxp_mccb_lsig', icon: '\uD83D\uDCC8', open: false})}
     </div>
   `;
 }
@@ -9591,7 +9591,7 @@ function renderCable() {
           ).join('')}
         </div>
       </div>
-    `, { id: 'cable_corrections', open: (uxModeLevel() >= 2 || kTotal !== 1.0) })}
+    `, { id: 'cable_corrections', open: (kTotal !== 1.0) })}
 
     ${cableState.crossSection && selectedCable ? `
     <div class="card fade-in">
@@ -17026,7 +17026,7 @@ function renderEV() {
   });
   evPanelBody += '</div></div>';
 
-  html += uxPanel(tx('Installation detaljer', 'Installation Details'), evPanelBody, {id: 'uxp_ev_details', icon: '\uD83D\uDD27', open: evEngPlus || evNonDefault});
+  html += uxPanel(tx('Installation detaljer', 'Installation Details'), evPanelBody, {id: 'uxp_ev_details', icon: '\uD83D\uDD27', open: evNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -17299,7 +17299,7 @@ function renderSolar() {
   });
   solarPanelBody += '</div></div>';
 
-  html += uxPanel(tx('Systemkonfiguration', 'System Configuration'), solarPanelBody, {id: 'uxp_solar_config', icon: '\u2699\uFE0F', open: solarEngPlus || solarNonDefault});
+  html += uxPanel(tx('Systemkonfiguration', 'System Configuration'), solarPanelBody, {id: 'uxp_solar_config', icon: '\u2699\uFE0F', open: solarNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -17896,7 +17896,7 @@ function renderMotor() {
   });
   motorPanelBody += '</div></div>';
 
-  html += uxPanel(tx('Motor parametre', 'Motor Parameters'), motorPanelBody, {id: 'uxp_motor_params', icon: '\u2699\uFE0F', open: motorEngPlus || motorNonDefault});
+  html += uxPanel(tx('Motor parametre', 'Motor Parameters'), motorPanelBody, {id: 'uxp_motor_params', icon: '\u2699\uFE0F', open: motorNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -18165,7 +18165,7 @@ function renderHarmonic() {
   });
   harmPanelBody += '</div></div>';
 
-  html += uxPanel(tx('Lastdetaljer', 'Load Details'), harmPanelBody, {id: 'uxp_harmonic_loads', icon: '\u26A1', open: harmEngPlus || harmNonDefault});
+  html += uxPanel(tx('Lastdetaljer', 'Load Details'), harmPanelBody, {id: 'uxp_harmonic_loads', icon: '\u26A1', open: harmNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -18457,7 +18457,7 @@ function renderVFD() {
   });
   vfdPanelBody += '</div></div>';
 
-  html += uxPanel(tx('EMC og kabling', 'EMC & Cabling'), vfdPanelBody, {id: 'uxp_vfd_emc', icon: '\uD83D\uDD0C', open: vfdEngPlus || vfdNonDefault});
+  html += uxPanel(tx('EMC og kabling', 'EMC & Cabling'), vfdPanelBody, {id: 'uxp_vfd_emc', icon: '\uD83D\uDD0C', open: vfdNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -18745,7 +18745,7 @@ function renderLighting() {
   lightPanelBody += '</div></div>';
 
   var lightNonDefault = (lightingState.wattage !== 40) || (lightingState.length !== 6) || (lightingState.width !== 4) || (lightingState.maintenanceFactor !== 0.8);
-  html += uxPanel(tx('Rum- og armaturdetaljer', 'Room & Luminaire Details'), lightPanelBody, {id: 'uxp_light_details', icon: '\uD83D\uDCA1', open: uxModeLevel() >= 2 || lightNonDefault});
+  html += uxPanel(tx('Rum- og armaturdetaljer', 'Room & Luminaire Details'), lightPanelBody, {id: 'uxp_light_details', icon: '\uD83D\uDCA1', open: lightNonDefault});
 
   // Results
   html += '<div class="result-box">';
@@ -18999,7 +18999,7 @@ function renderHeatPump() {
   hpPanelBody += '</div></div>';
 
   var hpNonDefault = (heatpumpState.cop !== 3.5) || (heatpumpState.inrushFactor !== 4) || (heatpumpState.cableLength !== 15);
-  html += uxPanel(tx('Installationsparametre', 'Installation Parameters'), hpPanelBody, {id: 'uxp_hp_details', icon: '\uD83D\uDD27', open: uxModeLevel() >= 2 || hpNonDefault});
+  html += uxPanel(tx('Installationsparametre', 'Installation Parameters'), hpPanelBody, {id: 'uxp_hp_details', icon: '\uD83D\uDD27', open: hpNonDefault});
 
   // Results - Electrical
   html += '<div class="result-box">';
@@ -19324,7 +19324,7 @@ function renderBusbar() {
     envBody += '<button class="sel-btn' + (busbarState.ipRating === ip.v ? ' selected' : '') + '" onclick="busbarState.ipRating=' + ip.v + ';renderModule(\'busbar\')">' + tx(ip.da, ip.en) + '</button>';
   });
   envBody += '</div></div>';
-  html += uxPanel(tx('Installation og milj\u00F8', 'Installation & Environment'), envBody, {id: 'uxp_busbar_env', icon: '\uD83C\uDF21\uFE0F', open: engPlus || envNonDefault});
+  html += uxPanel(tx('Installation og milj\u00F8', 'Installation & Environment'), envBody, {id: 'uxp_busbar_env', icon: '\uD83C\uDF21\uFE0F', open: envNonDefault});
 
   // Collapsible: Load Configuration
   var loadBody = '';
@@ -19343,7 +19343,7 @@ function renderBusbar() {
     loadBody += '<button class="sel-btn' + (busbarState.sections === s ? ' selected' : '') + '" onclick="busbarState.sections=' + s + ';renderModule(\'busbar\')">' + s + ' (' + (s*3) + 'm)</button>';
   }
   loadBody += '</div></div>';
-  html += uxPanel(tx('Belastningskonfiguration', 'Load Configuration'), loadBody, {id: 'uxp_busbar_load', icon: '\uD83D\uDD0C', open: engPlus || loadNonDefault});
+  html += uxPanel(tx('Belastningskonfiguration', 'Load Configuration'), loadBody, {id: 'uxp_busbar_load', icon: '\uD83D\uDD0C', open: loadNonDefault});
 
   // Collapsible: Upstream Supply (engineer+ level)
   var supplyBody = '';
@@ -19352,7 +19352,7 @@ function renderBusbar() {
     supplyBody += '<button class="sel-btn' + (busbarState.upstreamIk === ik ? ' selected' : '') + '" onclick="busbarState.upstreamIk=' + ik + ';renderModule(\'busbar\')">' + ik + '</button>';
   });
   supplyBody += '</div></div>';
-  html += uxPanel(tx('Opstr\u00F8ms forsyning', 'Upstream Supply'), supplyBody, {id: 'uxp_busbar_supply', icon: '\u26A1', level: 'engineer', open: engPlus || supplyNonDefault});
+  html += uxPanel(tx('Opstr\u00F8ms forsyning', 'Upstream Supply'), supplyBody, {id: 'uxp_busbar_supply', icon: '\u26A1', level: 'engineer', open: supplyNonDefault});
 
   // Results - Derating
   html += '<div class="result-box">';
@@ -19618,7 +19618,7 @@ function renderBathroom() {
   });
   bathPanelBody += '</div></div>';
 
-  html += uxPanel(tx('Rumdimensioner', 'Room Dimensions'), bathPanelBody, {id: 'uxp_bath_room', icon: '\uD83D\uDCCF', open: uxModeLevel() >= 2});
+  html += uxPanel(tx('Rumdimensioner', 'Room Dimensions'), bathPanelBody, {id: 'uxp_bath_room', icon: '\uD83D\uDCCF', open: false});
 
   // Zone Selector (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Vaelg zone', 'Select Zone') + '</div><div class="select-grid">';
@@ -19892,7 +19892,7 @@ function renderFireAlarm() {
   faPanelBody += '</div></div>';
 
   var faNonDefault = (firealarmState.buildingType !== 'hospital') || (firealarmState.roomArea !== 100) || (firealarmState.ceilingHeight !== 3.0);
-  html += uxPanel(tx('Bygningsparametre', 'Building Parameters'), faPanelBody, {id: 'uxp_fa_building', icon: '\uD83C\uDFE2', open: uxModeLevel() >= 2 || faNonDefault});
+  html += uxPanel(tx('Bygningsparametre', 'Building Parameters'), faPanelBody, {id: 'uxp_fa_building', icon: '\uD83C\uDFE2', open: faNonDefault});
 
   // Results - Detector Count
   html += '<div class="result-box">';
@@ -20216,7 +20216,7 @@ function renderData() {
   dataPanelBody += '</div></div>';
 
   var dataNonDefault = (dataState.cableType !== 'uutp') || (dataState.distance !== 50) || (dataState.fiberType !== null) || (dataState.poePortCount !== 24);
-  html += uxPanel(tx('Kabel, afstand og PoE', 'Cable, Distance & PoE'), dataPanelBody, {id: 'uxp_data_details', icon: '\uD83D\uDD0C', open: uxModeLevel() >= 2 || dataNonDefault});
+  html += uxPanel(tx('Kabel, afstand og PoE', 'Cable, Distance & PoE'), dataPanelBody, {id: 'uxp_data_details', icon: '\uD83D\uDD0C', open: dataNonDefault});
 
   // Results - Distance Check
   html += '<div class="result-box">';
@@ -20463,7 +20463,7 @@ function renderSPD() {
   spdPanelBody += '</div></div>';
 
   var spdNonDefault = (spdState.ng !== 1.0) || (spdState.length !== 30) || (spdState.width !== 20) || (spdState.height !== 6);
-  html += uxPanel(tx('Bygningsgeometri og miljo', 'Building Geometry & Environment'), spdPanelBody, {id: 'uxp_spd_geom', icon: '\uD83C\uDF29\uFE0F', open: uxModeLevel() >= 2 || spdNonDefault});
+  html += uxPanel(tx('Bygningsgeometri og miljo', 'Building Geometry & Environment'), spdPanelBody, {id: 'uxp_spd_geom', icon: '\uD83C\uDF29\uFE0F', open: spdNonDefault});
 
   // Results
   html += '<div class="result-box">';
@@ -20669,7 +20669,7 @@ function renderUPS() {
   });
 
   var upsHasEquipment = Object.keys(upsState.equipment).some(function(k) { return upsState.equipment[k] > 0; });
-  html += uxPanel(tx('Udstyrsliste', 'Equipment List'), upsPanelBody, {id: 'uxp_ups_equip', icon: '\uD83D\uDDA5\uFE0F', open: uxModeLevel() >= 2 || upsHasEquipment});
+  html += uxPanel(tx('Udstyrsliste', 'Equipment List'), upsPanelBody, {id: 'uxp_ups_equip', icon: '\uD83D\uDDA5\uFE0F', open: upsHasEquipment});
 
   // Battery & Autonomy panel
   var upsBatBody = '';
@@ -20689,7 +20689,7 @@ function renderUPS() {
   upsBatBody += '</div></div>';
 
   var upsAutoNonDefault = (upsState.autonomy !== 15) || (upsState.batteryType !== 'agm');
-  html += uxPanel(tx('Batteri og autonomi', 'Battery & Autonomy'), upsBatBody, {id: 'uxp_ups_batt', icon: '\uD83D\uDD0B', open: uxModeLevel() >= 2 || upsAutoNonDefault});
+  html += uxPanel(tx('Batteri og autonomi', 'Battery & Autonomy'), upsBatBody, {id: 'uxp_ups_batt', icon: '\uD83D\uDD0B', open: upsAutoNonDefault});
 
   // Results - Load Calculation
   html += '<div class="result-box">';
@@ -20916,7 +20916,7 @@ function renderPFC() {
   pfcPanelBody += '</div></div>';
 
   var pfcNonDefault = (pfcState.activePower !== 100) || (pfcState.correctionType !== 'auto') || (pfcState.detuning !== 0) || (pfcState.skMVA !== 20);
-  html += uxPanel(tx('Systemparametre', 'System Parameters'), pfcPanelBody, {id: 'uxp_pfc_sys', icon: '\u26A1', open: uxModeLevel() >= 2 || pfcNonDefault});
+  html += uxPanel(tx('Systemparametre', 'System Parameters'), pfcPanelBody, {id: 'uxp_pfc_sys', icon: '\u26A1', open: pfcNonDefault});
 
   // Results - kvar calculation
   html += '<div class="result-box">';
@@ -21189,7 +21189,7 @@ function renderTrayFill() {
   trayPanelBody += '</div>';
 
   var trayHasCables = Object.keys(trayFillState.cables).some(function(k) { return (trayFillState.cables[k] || 0) > 0; });
-  html += uxPanel(tx('Kabelinventar', 'Cable Inventory'), trayPanelBody, {id: 'uxp_tray_cables', icon: '\uD83D\uDCE6', open: uxModeLevel() >= 2 || trayHasCables});
+  html += uxPanel(tx('Kabelinventar', 'Cable Inventory'), trayPanelBody, {id: 'uxp_tray_cables', icon: '\uD83D\uDCE6', open: trayHasCables});
 
   // Results
   html += '<div class="result-box">';
