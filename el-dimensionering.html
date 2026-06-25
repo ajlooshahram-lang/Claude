@@ -1216,7 +1216,7 @@ const T = {
     mcbCurve: 'Kurve',
     mcbRating: 'Mærkestrøm [A]',
     mcbPoles: 'Poler',
-    mcbIcu: 'Icu [kA]',
+    mcbIcu: 'I<sub>cu</sub> [kA]',
     mcbIsd: 'Isd-område',
     mcbResult: 'Valgt automatsikring',
     mcbStandard: 'Standard',
@@ -1227,7 +1227,7 @@ const T = {
     mccbIn: 'Mærkestrøm In [A]',
     mccbIo: 'Langsom udløser Io',
     mccbIsd2: 'Isd multiplikator',
-    mccbIcu2: 'Icu [kA]',
+    mccbIcu2: 'I<sub>cu</sub> [kA]',
     mccbResult: 'Indstillinger',
     mccbIr: 'Ir (indstillet)',
     mccbIsdCalc: 'Isd (beregnet)',
@@ -1370,7 +1370,7 @@ const T = {
     mcbCurve: 'Curve',
     mcbRating: 'Rated Current [A]',
     mcbPoles: 'Poles',
-    mcbIcu: 'Icu [kA]',
+    mcbIcu: 'I<sub>cu</sub> [kA]',
     mcbIsd: 'Isd Range',
     mcbResult: 'Selected MCB',
     mcbStandard: 'Standard',
@@ -1380,7 +1380,7 @@ const T = {
     mccbIn: 'Rated Current In [A]',
     mccbIo: 'Long-time Io',
     mccbIsd2: 'Isd Multiplier',
-    mccbIcu2: 'Icu [kA]',
+    mccbIcu2: 'I<sub>cu</sub> [kA]',
     mccbResult: 'Settings',
     mccbIr: 'Ir (set)',
     mccbIsdCalc: 'Isd (calculated)',
@@ -1519,7 +1519,7 @@ const T = {
     mcbCurve: 'منحنی',
     mcbRating: 'جریان نامی [A]',
     mcbPoles: 'قطب‌ها',
-    mcbIcu: 'Icu [kA]',
+    mcbIcu: 'I<sub>cu</sub> [kA]',
     mcbIsd: 'محدوده Isd',
     mcbResult: 'MCB انتخاب‌شده',
     mcbStandard: 'استاندارد',
@@ -1529,7 +1529,7 @@ const T = {
     mccbIn: 'جریان نامی In [A]',
     mccbIo: 'تریپ کند Io',
     mccbIsd2: 'ضریب Isd',
-    mccbIcu2: 'Icu [kA]',
+    mccbIcu2: 'I<sub>cu</sub> [kA]',
     mccbResult: 'تنظیمات',
     mccbIr: 'Ir (تنظیم‌شده)',
     mccbIsdCalc: 'Isd (محاسبه‌شده)',
@@ -3625,9 +3625,9 @@ function renderRecommendations(title, products, type) {
   if (type === 'cable') {
     rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${tl(p, 'use')} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
   } else if (type === 'mcb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `Icu = ${p.icu} kA`)).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `I<sub>cu</sub> = ${p.icu} kA`)).join('');
   } else if (type === 'mccb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `Icu = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`)).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `I<sub>cu</sub> = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`)).join('');
   } else if (type === 'fuse') {
     rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`)).join('');
   } else if (type === 'contactor') {
@@ -6319,7 +6319,7 @@ function engBreakerReasoning(data) {
       { sym: 'I\u1D2E', da: 'Belastningsstr\u00f8m', en: 'Design current', val: data.ib ? data.ib.toFixed(1) : '?', unit: 'A' },
       { sym: 'I\u2099', da: 'M\u00e6rkestr\u00f8m', en: 'Rated current', val: data.deviceIn || '?', unit: 'A' },
       { sym: 'Iz', da: 'Kabel-str\u00f8mv\u00e6rdi', en: 'Cable ampacity', val: data.izCorrected ? data.izCorrected.toFixed(0) : '?', unit: 'A' },
-      { sym: 'Icu', da: 'Brydeevne', en: 'Breaking capacity', val: data.deviceIcu || '?', unit: 'kA' },
+      { sym: 'I<sub>cu</sub>', da: 'Brydeevne', en: 'Breaking capacity', val: data.deviceIcu || '?', unit: 'kA' },
       { sym: 'Ik,max', da: 'Prospektiv kortslutning', en: 'Prospective short-circuit', val: data.ikMax ? (data.ikMax / 1000).toFixed(1) : '?', unit: 'kA' }
     ] },
     { type: 'formula', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub>  &  I<sub>cu</sub> \u2265 I<sub>k,max</sub>' },
@@ -9827,7 +9827,7 @@ function renderFuse() {
         variables: [
           { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
           { name: tx('5s strøm', '5s current'), symbol: 'I5s', value: FUSE_5S[fuseState.size] || 0, unit: 'A', source: 'IEC 60269 / ' + tx('fabrikantdata', 'manufacturer data') },
-          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: holder.ikMax, unit: 'kA', source: fuseState.holder },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'I<sub>cu</sub>', value: holder.ikMax, unit: 'kA', source: fuseState.holder },
           { name: tx('Holder', 'Holder'), symbol: fuseState.holder, value: holder.range, unit: '', source: tx('valgt system', 'selected system') }
         ],
         substitution: 'I\u00b2t = I5s\u00b2 \u00d7 5 = ' + (FUSE_5S[fuseState.size] || 0) + '\u00b2 \u00d7 5 = ' + ((FUSE_5S[fuseState.size] || 0) * (FUSE_5S[fuseState.size] || 0) * 5 / 1000000).toFixed(2) + ' \u00d7 10\u2076 A\u00b2s',
@@ -9953,7 +9953,7 @@ function renderMCB() {
         formula: 'IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max',
         variables: [
           { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
-          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mcbState.type + ' (' + mcb.standard + ')' },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'I<sub>cu</sub>', value: icu, unit: 'kA', source: mcbState.type + ' (' + mcb.standard + ')' },
           { name: tx('Kurve', 'Curve'), symbol: mcbState.curve, value: isdMin + '-' + isdMax, unit: 'A', source: 'Isd = ' + curve.isdMin + '-' + curve.isdMax + '\u00d7In' },
           { name: tx('Serviceevne', 'Service capacity'), symbol: 'Ics', value: (icu * mcb.ics).toFixed(1), unit: 'kA', source: mcb.ics + '\u00d7Icu' }
         ],
@@ -10126,7 +10126,7 @@ function renderMCCB() {
         formula: 'IB \u2264 Ir \u2264 In, Isd = Io \u00d7 multiplier, Icu \u2265 Ik,max',
         variables: [
           { name: tx('M\u00e6rkestr\u00f8m', 'Rated current'), symbol: 'Iₙ', value: mccbState.inVal, unit: 'A', source: mccbState.frame },
-          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mccbState.trip },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'I<sub>cu</sub>', value: icu, unit: 'kA', source: mccbState.trip },
           { name: tx('Overbelastning Io', 'Overload Io'), symbol: 'Io', value: io.toFixed(0), unit: 'A', source: mccbState.ioMult + ' \u00d7 In' },
           { name: tx('Kortslutning Isd', 'Short-time Isd'), symbol: 'Isd', value: isdCalc.toFixed(0), unit: 'A', source: mccbState.isdMult + ' \u00d7 Io' },
           { name: tx('Momentan Ii', 'Instantaneous Ii'), symbol: 'Ii', value: ii, unit: 'A', source: '12 \u00d7 In' }
@@ -27180,7 +27180,7 @@ function upRenderFindingDetail(finding) {
         name: tx('Brydeevne', 'Breaking capacity'),
         formula: 'Icu \u2265 Ik3max',
         variables: [
-          { symbol: 'Icu', value: mi[1], unit: 'kA', source: tx('apparat datablad', 'device datasheet') },
+          { symbol: 'I<sub>cu</sub>', value: mi[1], unit: 'kA', source: tx('apparat datablad', 'device datasheet') },
           { symbol: 'Iₖ₃ₘₐₓ', value: mi[2], unit: 'kA', source: 'IEC 60909-0 (c=1.05)' }
         ],
         substitution: mi[1] + ' kA \u2265 ' + mi[2] + ' kA',
@@ -27396,7 +27396,7 @@ function provBuildSegment(opts) {
       key: 'icu', kind: 'check', title: tx('Brydeevne: Icu \u2265 Ikmax', 'Breaking capacity: Icu \u2265 Ikmax'),
       formula: 'Icu \u2265 Ik3max',
       inputs: [
-        { sym: 'Icu', val: provNum(dev.icuKA, 1) + ' kA', src: (dev.product.brand || '') + ' ' + (dev.product.model || '') },
+        { sym: 'I<sub>cu</sub>', val: provNum(dev.icuKA, 1) + ' kA', src: (dev.product.brand || '') + ' ' + (dev.product.model || '') },
         { sym: 'Ik3max', val: provNum(opts.ikBoardA / 1000, 2) + ' kA', src: 'IEC 60909-0 (c=1.05)' }
       ],
       steps: [ sti ? sti.detail : (tx('Auditor mangler data.', 'Auditor missing data.')) ],
