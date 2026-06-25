@@ -4455,7 +4455,7 @@ let fuseCurveSel = ['gG']; // selected fuse classes for the curve comparison
 // MCB state
 let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
 // MCCB state
-let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
+let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12, igMult: 0.3, tg: 0.1 };
 // Cable state
 let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
 // Voltage drop state
@@ -5058,6 +5058,191 @@ function fuseToggleClass(cls) {
   if (i >= 0) { if (fuseCurveSel.length > 1) fuseCurveSel.splice(i, 1); }
   else fuseCurveSel.push(cls);
   renderModule('fuse');
+}
+
+// ===========================================================================
+// MCCB / ACB LSIG PROTECTION ENVELOPE ENGINE
+// ===========================================================================
+// LSIG = Long-time / Short-time / Instantaneous / Ground-fault.
+// Models Schneider Micrologic 2.2 (LS) / 5.2 (LSI) / 6.2 (LSIG) trip units
+// and a generic ACB LSIG (Eaton/ABB/Schneider Masterpact style).
+//
+// All values from DS/HD 60364-4-43 & IEC 60947-2 Annex F. The adjustable
+// ranges are the REAL Micrologic dials (Io 0.4–1.0, Isd 1.5–10, tr L/S).
+// The envelope is rendered as the adjustable band (max / min setting shown).
+
+const LSIG_TRIP_UNITS = {
+  'Micrologic 2.2': { segments: 'LS', gFault: false, desc_da: 'Termisk + kort-tids magnetisk', desc_en: 'Thermal + short-time magnetic' },
+  'Micrologic 5.2': { segments: 'LSI', gFault: false, desc_da: 'Termisk + kort-tid + momentan', desc_en: 'Thermal + short-time + instantaneous' },
+  'Micrologic 6.2': { segments: 'LSIG', gFault: true, desc_da: 'Fuld LSIG inkl. jordfejl', desc_en: 'Full LSIG incl. ground fault' },
+  'ACB LSIG': { segments: 'LSIG', gFault: true, desc_da: 'Effektafbryder (ACB) med fuld LSIG', desc_en: 'Air Circuit Breaker (ACB) with full LSIG' }
+};
+
+// Adjustable parameters with standard ranges.
+const LSIG_LONG_TIME_DELAYS = [4, 8, 16, 24, 32]; // tr L [s] at 6x Ir
+const LSIG_SHORT_TIME_DELAYS = [0, 0.1, 0.2, 0.3, 0.4]; // tr S [s]
+const LSIG_GROUND_MULT = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]; // Ig = x * In
+const LSIG_GROUND_DELAY = [0, 0.1, 0.2, 0.3, 0.4]; // tg [s]
+
+// Returns {L, S, I, G} arrays of {i, tMin, tMax} points for the given settings.
+// settings: {In, ioMult, isdMult, trL, trS, iiMult, igMult, tg, tripUnit}
+function lsigCurveEnvelope(settings) {
+  var In = settings.In || 400;
+  var io = (settings.ioMult || 1.0) * In;     // Ir = Io (long-time pickup)
+  var isd = (settings.isdMult || 5) * io;     // Isd (short-time pickup)
+  var ii = (settings.iiMult || 12) * In;       // Ii (instantaneous pickup)
+  var trL = settings.trL || 16;                // long-time delay at 6x Ir
+  var trS = typeof settings.trS === 'number' ? settings.trS : 0.1;
+  var ig = (settings.igMult || 0.3) * In;      // ground-fault pickup
+  var tg = typeof settings.tg === 'number' ? settings.tg : 0.1;
+  var tripUnit = settings.tripUnit || 'Micrologic 5.2';
+  var info = LSIG_TRIP_UNITS[tripUnit] || LSIG_TRIP_UNITS['Micrologic 5.2'];
+  var hasI = info.segments.indexOf('I') >= 0;
+  var hasG = info.gFault;
+
+  var L = [], S = [], I = [], G = [];
+  // --- L (Long-time, thermal/inverse-time) ---
+  // IEC 60947-2 inverse-time: t = trL * (6*Ir/I)^2. Band between hot/cold.
+  var lMults = [1.05, 1.1, 1.2, 1.3, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10];
+  for (var j = 0; j < lMults.length; j++) {
+    var m = lMults[j];
+    var curr = m * io;
+    if (curr >= isd) break; // above S pickup, L region ends
+    // Inverse-time: t = trL * (6*Ir / I)^2, bounded
+    var ratio = (6 * io) / curr;
+    var tMax = trL * ratio * ratio;
+    var tMin = tMax * 0.5; // hot start
+    if (tMax > 600) tMax = 600;
+    if (tMin < 0.5) tMin = 0.5;
+    L.push({ i: curr, tMin: tMin, tMax: tMax });
+  }
+  // --- S (Short-time) ---
+  // Definite-time delay between isd and ii (or above if no I segment).
+  var sMults = [0.9, 1.0, 1.2, 1.5, 2, 3, 5, 8, 10, 12];
+  for (var k = 0; k < sMults.length; k++) {
+    var sm = sMults[k];
+    var curr2 = sm * isd;
+    if (hasI && curr2 >= ii) break;
+    var st = trS + 0.01;  // definite time + mechanism time
+    S.push({ i: curr2, tMin: trS + 0.004, tMax: st });
+  }
+  // --- I (Instantaneous) ---
+  if (hasI) {
+    I.push({ i: ii * 0.95, tMin: 0.004, tMax: 0.02 });
+    I.push({ i: ii, tMin: 0.003, tMax: 0.01 });
+    I.push({ i: ii * 2, tMin: 0.003, tMax: 0.005 });
+    I.push({ i: ii * 5, tMin: 0.003, tMax: 0.004 });
+  }
+  // --- G (Ground fault) ---
+  if (hasG) {
+    G.push({ i: ig * 0.9, tMin: tg + 0.004, tMax: tg + 0.05 });
+    G.push({ i: ig, tMin: tg + 0.004, tMax: tg + 0.03 });
+    G.push({ i: ig * 1.5, tMin: tg + 0.004, tMax: tg + 0.02 });
+    G.push({ i: ig * 3, tMin: tg + 0.004, tMax: tg + 0.01 });
+  }
+  return { L: L, S: S, I: I, G: G, settings: { io: io, isd: isd, ii: ii, ig: ig, trL: trL, trS: trS, tg: tg }, tripUnit: tripUnit, info: info };
+}
+
+// Inline-SVG LSIG protection envelope. x = current [A], y = time [s], log-log.
+function lsigRenderCurve(settings) {
+  var env = lsigCurveEnvelope(settings);
+  var In = settings.In || 400;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var w = 600, h = 440, mL = 60, mR = 16, mT = 28, mB = 50;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  // Dynamic x range: from 0.8*Io to 3*Ii (or 20*In if no Ii)
+  var xLo = env.settings.io * 0.8;
+  var xHi = env.I.length ? env.settings.ii * 3 : In * 20;
+  if (xHi < xLo * 10) xHi = xLo * 10;
+  var tMin = 0.002, tMax = 1000;
+  var lxMin = Math.log10(xLo), lxMax = Math.log10(xHi);
+  var lyMin = Math.log10(tMin), lyMax = Math.log10(tMax);
+  function xPos(curr) { return mL + (Math.log10(Math.max(xLo, Math.min(xHi, curr))) - lxMin) / (lxMax - lxMin) * plotW; }
+  function yPos(t) { return mT + (1 - (Math.log10(Math.max(tMin, Math.min(tMax, t))) - lyMin) / (lyMax - lyMin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // grid x
+  var xTicks = [];
+  for (var exp = Math.floor(Math.log10(xLo)); exp <= Math.ceil(Math.log10(xHi)); exp++) {
+    var base = Math.pow(10, exp);
+    [1, 2, 5].forEach(function (f) { var v = base * f; if (v >= xLo && v <= xHi) xTicks.push(v); });
+  }
+  for (var a = 0; a < xTicks.length; a++) {
+    var gx = xPos(xTicks[a]);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>';
+    var lbl = xTicks[a] >= 1000 ? (xTicks[a] / 1000).toFixed(xTicks[a] % 1000 === 0 ? 0 : 1) + 'k' : Math.round(xTicks[a]);
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 15) + '" text-anchor="middle" font-size="9" fill="#475467">' + lbl + ' A</text>';
+  }
+  // grid y
+  var yTicks = [0.01, 0.1, 1, 10, 100, 1000];
+  for (var b = 0; b < yTicks.length; b++) {
+    var gy = yPos(yTicks[b]);
+    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3"/>';
+    var tLbl = yTicks[b] >= 1 ? yTicks[b] + ' s' : Math.round(yTicks[b] * 1000) + ' ms';
+    svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#475467">' + tLbl + '</text>';
+  }
+  // segments
+  var segColors = { L: '#2563eb', S: '#7c3aed', I: '#dc2626', G: '#059669' };
+  var segLabels = { L: (da ? 'Langsom (L)' : 'Long-time (L)'), S: (da ? 'Kort-tid (S)' : 'Short-time (S)'), I: (da ? 'Momentan (I)' : 'Instantaneous (I)'), G: (da ? 'Jordfejl (G)' : 'Ground (G)') };
+  var segs = ['L', 'S', 'I', 'G'];
+  var legIdx = 0;
+  for (var s = 0; s < segs.length; s++) {
+    var seg = segs[s], pts = env[seg];
+    if (!pts || !pts.length) continue;
+    var col = segColors[seg];
+    // band
+    var maxPath = '', minPath = '';
+    for (var p = 0; p < pts.length; p++) {
+      maxPath += (p === 0 ? 'M' : 'L') + xPos(pts[p].i).toFixed(1) + ',' + yPos(pts[p].tMax).toFixed(1);
+      minPath += (p === 0 ? 'M' : 'L') + xPos(pts[p].i).toFixed(1) + ',' + yPos(pts[p].tMin).toFixed(1);
+    }
+    var band = maxPath;
+    for (var r = pts.length - 1; r >= 0; r--) band += 'L' + xPos(pts[r].i).toFixed(1) + ',' + yPos(pts[r].tMin).toFixed(1);
+    band += 'Z';
+    svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.12" stroke="none"/>';
+    svg += '<path d="' + maxPath + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<path d="' + minPath + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    // legend
+    svg += '<rect x="' + (w - 160) + '" y="' + (mT + 6 + legIdx * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '"/>';
+    svg += '<text x="' + (w - 145) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="10" fill="' + col + '">' + segLabels[seg] + '</text>';
+    legIdx++;
+  }
+  // pickup annotations (vertical markers)
+  var pickups = [{ v: env.settings.io, l: 'Ir=' + Math.round(env.settings.io) + ' A' }, { v: env.settings.isd, l: 'Isd=' + Math.round(env.settings.isd) + ' A' }];
+  if (env.I.length) pickups.push({ v: env.settings.ii, l: 'Ii=' + Math.round(env.settings.ii) + ' A' });
+  if (env.G.length) pickups.push({ v: env.settings.ig, l: 'Ig=' + Math.round(env.settings.ig) + ' A' });
+  for (var q = 0; q < pickups.length; q++) {
+    var px = xPos(pickups[q].v);
+    svg += '<line x1="' + px.toFixed(1) + '" y1="' + mT + '" x2="' + px.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#64748b" stroke-width="0.7" stroke-dasharray="3,3"/>';
+    svg += '<text x="' + (px + 3).toFixed(1) + '" y="' + (mT + 12 + q * 11) + '" font-size="8.5" fill="#475467">' + pickups[q].l + '</text>';
+  }
+  // titles
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Str\u00f8m [A]' : 'Current [A]') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Tid t [s]' : 'Time t [s]') + '</text>';
+  svg += '<text x="' + mL + '" y="' + (mT - 10) + '" font-size="10" fill="#475467">' + (env.tripUnit || '') + ' \u2014 ' + (da ? env.info.desc_da : env.info.desc_en) + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Settings table for LSIG (read-only display of current dial positions).
+function lsigRenderSettingsTable(settings) {
+  var env = lsigCurveEnvelope(settings);
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var rows = [
+    [da ? 'Langsom opsamling Ir' : 'Long-time pickup Ir', Math.round(env.settings.io) + ' A', 'Io = ' + (settings.ioMult || 1.0) + ' \u00d7 In'],
+    [da ? 'Langsom forsinkelse tr L' : 'Long-time delay tr L', (settings.trL || 16) + ' s', da ? 'ved 6\u00d7Ir' : 'at 6\u00d7Ir'],
+    [da ? 'Kort-tid opsamling Isd' : 'Short-time pickup Isd', Math.round(env.settings.isd) + ' A', 'Isd = ' + (settings.isdMult || 5) + ' \u00d7 Ir'],
+    [da ? 'Kort-tid forsinkelse tr S' : 'Short-time delay tr S', (typeof settings.trS === 'number' ? settings.trS : 0.1) + ' s', '']
+  ];
+  if (env.I.length) rows.push([da ? 'Momentan Ii' : 'Instantaneous Ii', Math.round(env.settings.ii) + ' A', 'Ii = ' + (settings.iiMult || 12) + ' \u00d7 In']);
+  if (env.G.length) rows.push([(da ? 'Jordfejl Ig' : 'Ground Ig'), Math.round(env.settings.ig) + ' A', 'Ig = ' + (settings.igMult || 0.3) + ' \u00d7 In, tg = ' + (typeof settings.tg === 'number' ? settings.tg : 0.1) + ' s']);
+  var h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin:6px 0">';
+  h += '<tr style="background:var(--border-light);font-weight:700"><td style="padding:5px 7px">' + (da ? 'Parameter' : 'Parameter') + '</td><td style="padding:5px 7px">' + (da ? 'V\u00e6rdi' : 'Value') + '</td><td style="padding:5px 7px">' + (da ? 'Indstilling' : 'Setting') + '</td></tr>';
+  for (var i = 0; i < rows.length; i++) {
+    h += '<tr style="border-bottom:1px solid var(--border-light)"><td style="padding:5px 7px">' + rows[i][0] + '</td><td style="padding:5px 7px;font-weight:700">' + rows[i][1] + '</td><td style="padding:5px 7px;color:var(--text-muted)">' + rows[i][2] + '</td></tr>';
+  }
+  h += '</table></div>';
+  return h;
 }
 
 function getEarthInfo(sys) {  const info = {
@@ -8156,6 +8341,79 @@ function renderMCCB() {
         <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
         <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
         <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${tx('LSIG Beskyttelseskurve', 'LSIG Protection Curve')}</div>
+      <div class="info-row">${tx('Juster trip-unit parametre og se den resulterende beskyttelseskonvolut. L = langsom (overbelastning), S = kort-tid, I = momentan, G = jordfejl.', 'Adjust trip-unit parameters and view the resulting protection envelope. L = long-time (overload), S = short-time, I = instantaneous, G = ground fault.')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Trip-unit', 'Trip unit')}</div>
+        <div class="select-grid">
+          ${Object.keys(LSIG_TRIP_UNITS).map(tu =>
+            `<button class="sel-btn ${mccbState.tripUnit === tu ? 'selected' : ''}" onclick="mccbState.tripUnit='${tu}';renderModule('mccb')">${tu}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Lang-tid forsinkelse tr L [s] (ved 6×Ir)', 'Long-time delay tr L [s] (at 6×Ir)')}</div>
+        <div class="select-grid">
+          ${LSIG_LONG_TIME_DELAYS.map(d =>
+            `<button class="sel-btn ${mccbState.trL === d ? 'selected' : ''}" onclick="mccbState.trL=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('Kort-tid forsinkelse tr S [s]', 'Short-time delay tr S [s]')}</div>
+        <div class="select-grid">
+          ${LSIG_SHORT_TIME_DELAYS.map(d =>
+            `<button class="sel-btn ${mccbState.trS === d ? 'selected' : ''}" onclick="mccbState.trS=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].segments.indexOf('I') >= 0 ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Momentan Ii [×In]', 'Instantaneous Ii [×In]')}</div>
+        <div class="select-grid">
+          ${[8, 10, 12, 15, 20].map(m =>
+            `<button class="sel-btn ${mccbState.iiMult === m ? 'selected' : ''}" onclick="mccbState.iiMult=${m};renderModule('mccb')">${m}\u00d7</button>`
+          ).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].gFault ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Jordfejl Ig [×In]', 'Ground fault Ig [×In]')}</div>
+        <div class="select-grid">
+          ${LSIG_GROUND_MULT.map(m =>
+            `<button class="sel-btn ${mccbState.igMult === m ? 'selected' : ''}" onclick="mccbState.igMult=${m};renderModule('mccb')">${m}\u00d7</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${tx('Jordfejl forsinkelse tg [s]', 'Ground fault delay tg [s]')}</div>
+        <div class="select-grid">
+          ${LSIG_GROUND_DELAY.map(d =>
+            `<button class="sel-btn ${mccbState.tg === d ? 'selected' : ''}" onclick="mccbState.tg=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Beskyttelseskonvolut', 'Protection envelope')} — ${mccbState.tripUnit}</div>
+        ${lsigRenderCurve({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Indstillinger', 'Settings')}</div>
+        ${lsigRenderSettingsTable({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
+        <div class="info-row" style="margin-top:6px">${tx('IEC 60947-2 Annex F; DS/HD 60364-4-43. Kurven repræsenterer den VALGTE indstilling — koordinér mod nedstrøms- og opstrømsenheder via TCC-modulet.', 'IEC 60947-2 Annex F; DS/HD 60364-4-43. The curve represents the SELECTED setting — coordinate against downstream and upstream devices via the TCC module.')}</div>
       </div>
     </div>
   `;
