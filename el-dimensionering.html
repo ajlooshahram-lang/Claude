@@ -1256,8 +1256,8 @@ const T = {
     scTitle: 'Kortslutningskontrol',
     scZnet: 'Znet [m\u03A9]',
     scZtrafo: 'Ztrafo [m\u03A9]',
-    scIkmax: 'Iₖ,max [kA]',
-    scIkmin: 'Iₖ,min [A]',
+    scIkmax: 'Iₖ,ₘₐₓ [kA]',
+    scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'Kortslutningskontrol',
     scCheck1: 'Icu \u2265 Ik max',
     scCheck2: 'Isd \u2264 Ik min',
@@ -1406,8 +1406,8 @@ const T = {
     scTitle: 'Short Circuit Check',
     scZnet: 'Znet [m\u03A9]',
     scZtrafo: 'Ztrafo [m\u03A9]',
-    scIkmax: 'Iₖ,max [kA]',
-    scIkmin: 'Iₖ,min [A]',
+    scIkmax: 'Iₖ,ₘₐₓ [kA]',
+    scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'Short Circuit Check',
     scCheck1: 'Icu \u2265 Ik max',
     scCheck2: 'Isd \u2264 Ik min',
@@ -1555,8 +1555,8 @@ const T = {
     scTitle: 'کنترل اتصال کوتاه',
     scZnet: 'Znet [mΩ]',
     scZtrafo: 'Ztrafo [mΩ]',
-    scIkmax: 'Iₖ,max [kA]',
-    scIkmin: 'Iₖ,min [A]',
+    scIkmax: 'Iₖ,ₘₐₓ [kA]',
+    scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'کنترل اتصال کوتاه',
     scCheck1: 'Icu ≥ Ik max',
     scCheck2: 'Isd ≤ Ik min',
@@ -6129,8 +6129,8 @@ const STD_REGISTRY = {
   },
   'IEC 60909-0': {
     title_da: 'Kortslutningsstr\u00f8mme', title_en: 'Short-circuit currents',
-    why_da: 'Ik3max = c\u00b7Un/(\u221a3\u00b7Z) med c=1,05 (DK 400V); bestemmer kravet Icu \u2265 Ik,max.',
-    why_en: 'Ik3max = c\u00b7Un/(\u221a3\u00b7Z) with c=1.05 (DK 400V); sets the requirement Icu \u2265 Ik,max.',
+    why_da: 'I\u2096\u2083\u2098\u2090\u2093 = c\u00b7U\u2099/(\u221a3\u00b7Z) med c=1,05 (DK 400V); bestemmer kravet Icu \u2265 I\u2096,\u2098\u2090\u2093.',
+    why_en: 'I\u2096\u2083\u2098\u2090\u2093 = c\u00b7U\u2099/(\u221a3\u00b7Z) with c=1.05 (DK 400V); sets the requirement Icu \u2265 I\u2096,\u2098\u2090\u2093.',
     affects_da: 'Brydeevne, magnetisk udl\u00f8sning, selektivitet.',
     affects_en: 'Breaking capacity, magnetic trip, selectivity.'
   },
@@ -11078,7 +11078,7 @@ function renderTrafoEMF() {
   html += '<div class="result-row"><span class="label">E (EMF)</span><span class="value">' + E.toFixed(2) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Flux', 'Flux') + ' \u03A6_max</span><span class="value">' + (trafoState.emfBmax * trafoState.emfArea * 1000).toFixed(3) + ' mWb</span></div>';
   html += '</div>';
-  html += calcDetail({ name: tx('EMF-ligning', 'EMF equation'), formula: 'E = 4.44 \u00D7 f \u00D7 N \u00D7 Bmax \u00D7 A', variables: [{ name: 'f', symbol: 'f', value: trafoState.emfFreq, unit: 'Hz', source: tx('Valgt', 'Selected') }, { name: 'N', symbol: 'N', value: trafoState.emfN, unit: tx('vindinger', 'turns') }, { name: 'Bmax', symbol: 'Bmax', value: trafoState.emfBmax, unit: 'T' }, { name: 'A', symbol: 'A', value: trafoState.emfArea, unit: 'm\u00B2' }], substitution: '4.44 \u00D7 ' + trafoState.emfFreq + ' \u00D7 ' + trafoState.emfN + ' \u00D7 ' + trafoState.emfBmax + ' \u00D7 ' + trafoState.emfArea, result: { value: E, unit: 'V' }, reference: 'Opgavesamling Kap. 9 / IEC 60076' });
+  html += calcDetail({ name: tx('EMF-ligning', 'EMF equation'), formula: 'E = 4.44 \u00D7 f \u00D7 N \u00D7 Bmax \u00D7 A', variables: [{ name: 'f', symbol: 'f', value: trafoState.emfFreq, unit: 'Hz', source: tx('Valgt', 'Selected') }, { name: 'N', symbol: 'N', value: trafoState.emfN, unit: tx('vindinger', 'turns') }, { name: 'Bmax', symbol: 'Bₘₐₓ', value: trafoState.emfBmax, unit: 'T' }, { name: 'A', symbol: 'A', value: trafoState.emfArea, unit: 'm\u00B2' }], substitution: '4.44 \u00D7 ' + trafoState.emfFreq + ' \u00D7 ' + trafoState.emfN + ' \u00D7 ' + trafoState.emfBmax + ' \u00D7 ' + trafoState.emfArea, result: { value: E, unit: 'V' }, reference: 'Opgavesamling Kap. 9 / IEC 60076' });
   html += '</div>';
   return html;
 }
@@ -27181,7 +27181,7 @@ function upRenderFindingDetail(finding) {
         formula: 'Icu \u2265 Ik3max',
         variables: [
           { symbol: 'Icu', value: mi[1], unit: 'kA', source: tx('apparat datablad', 'device datasheet') },
-          { symbol: 'Ik3max', value: mi[2], unit: 'kA', source: 'IEC 60909-0 (c=1.05)' }
+          { symbol: 'Iₖ₃ₘₐₓ', value: mi[2], unit: 'kA', source: 'IEC 60909-0 (c=1.05)' }
         ],
         substitution: mi[1] + ' kA \u2265 ' + mi[2] + ' kA',
         steps: [{ desc: tx('Kontrol', 'Check'), expr: mi[1] + ' \u2265 ' + mi[2], result: parseFloat(mi[1]) >= parseFloat(mi[2]) ? '\u2713 OK' : '\u2717 FAIL' }],
