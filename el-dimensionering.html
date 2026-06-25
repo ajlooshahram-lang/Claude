@@ -9028,6 +9028,23 @@ function renderMCB() {
         <div class="result-row"><span class="label">${t('mcbIsd')}</span><span class="value">${isdMin} - ${isdMax} A</span></div>
         <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
       </div>
+      ${calcDetail({
+        name: tx('MCB Dimensionering', 'MCB Dimensioning'),
+        formula: 'IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max',
+        variables: [
+          { name: tx('Mærkestrøm', 'Rated current'), symbol: 'In', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mcbState.type + ' (' + mcb.standard + ')' },
+          { name: tx('Kurve', 'Curve'), symbol: mcbState.curve, value: isdMin + '-' + isdMax, unit: 'A', source: 'Isd = ' + curve.isdMin + '-' + curve.isdMax + '\u00d7In' },
+          { name: tx('Serviceevne', 'Service capacity'), symbol: 'Ics', value: (icu * mcb.ics).toFixed(1), unit: 'kA', source: mcb.ics + '\u00d7Icu' }
+        ],
+        substitution: tx('Kurve ', 'Curve ') + mcbState.curve + ': Isd = ' + curve.isdMin + '\u00d7' + mcbState.rating + ' til ' + curve.isdMax + '\u00d7' + mcbState.rating + ' = ' + isdMin + ' - ' + isdMax + ' A',
+        steps: [
+          { desc: tx('Magnetisk udløsning min', 'Magnetic trip min'), expr: curve.isdMin + ' \u00d7 ' + mcbState.rating, result: isdMin + ' A' },
+          { desc: tx('Magnetisk udløsning max', 'Magnetic trip max'), expr: curve.isdMax + ' \u00d7 ' + mcbState.rating, result: isdMax + ' A' }
+        ],
+        result: { value: mcbState.rating, unit: 'A', status: 'ok' },
+        reference: mcb.standard + '; DS/HD 60364-4-43 cl.433'
+      })}
     </div>
     ` : ''}
   `;
