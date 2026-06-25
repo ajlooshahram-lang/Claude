@@ -13967,6 +13967,36 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 12: motor starting-current verification task -----
+test('autoexam/motorstart: DOL motor starting task appears for motor-tier buildings and solves correctly', function () {
+  var found = 0;
+  for (var s = 1; s <= 40; s++) {
+    var p = axGenerate(s * 5 + 1, 'fabrik', 'ekspert', 'case');
+    p.opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'motorstart') found++; }); });
+  }
+  assert.ok(found >= 10, 'motorstart task appears in motor-heavy exams (' + found + ' / 40 seeds)');
+  // solution consistency + structure
+  var bad = 0;
+  for (var s2 = 1; s2 <= 20; s2++) {
+    var pp = axGenerate(s2 * 3 + 1, 'fabrik', 'ekspert', 'case'); var sol = axSolve(pp);
+    pp.opgaver.forEach(function (op, oi) { op.tasks.forEach(function (t, k) { var sx = sol[oi].tasks[k]; if (t.kind === 'motorstart') { if (!sx.verification || !sx.conclusion || !sx.result) bad++; } }); });
+  }
+  assert.strictEqual(bad, 0, 'all motorstart solutions structurally complete');
+  // non-motor-tier (laerling) should NOT generate the task
+  var foundL = 0;
+  for (var s3 = 1; s3 <= 30; s3++) { axGenerate(s3, 'parcelhus', 'laerling', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'motorstart') foundL++; }); }); }
+  assert.strictEqual(foundL, 0, 'motorstart absent at laerling tier');
+});
+test('autoexam/motorstart: Istart vs Ia(C) comparison is physically correct', function () {
+  // Find a task where the answer is known; verify the physics
+  var mt = null;
+  for (var s = 1; s <= 60 && !mt; s++) { axGenerate(s * 5 + 1, 'fabrik', 'ekspert', 'case').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'motorstart' && !mt) mt = t; }); }); }
+  assert.ok(mt, 'found a motorstart task');
+  var trips = mt.given.Istart > mt.given.IaC;
+  assert.strictEqual(mt.ci, trips ? 1 : 0, 'ci matches the physical comparison');
+  assert.ok(mt.given.IaC === 10 * mt.given.In, 'Ia(C) = 10 * In');
+});
+
 // ----- Batch 11: 'Eksisterende installation' block for renovation exams -----
 test('autoexam/renovation: renovation exams carry an existing-installation descriptor; others do not', function () {
   var ren = axGenerate(2024, 'renovering', 'avanceret', 'fuld');

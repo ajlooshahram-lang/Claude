@@ -11666,6 +11666,16 @@ function axTasksInstallation(d, tier, maxTasks, rng, topicWeights) {
     var nRa = axNumOpts(raMax, [Math.round(raMax / 3), Math.round(raMax * 2), Math.round(raMax / 10)]);
     tasks.push({ id: 't_ra', kind: 'earthing', prompt: { da: 'Bestem den maksimalt tilladte udbredelsesmodstand RA for jordelektroden i TT-systemet (HPFI I\u0394n = 30 mA, UL = 50 V).', en: 'Determine the maximum permissible earth-electrode resistance RA in the TT system (RCD I\u0394n = 30 mA, UL = 50 V).' }, given: { IDn: IDn, UL: UL }, answer: raMax, opts: nRa.opts, ci: nRa.ci, unit: '\u03a9', clause: 'DS/HD 60364-4-41 \u00a7411.5.3', cat: 'fault' });
   }
+  // T11: motor starting-current verification (DOL: Istart = 7\u00d7In motor; curve C trips at 10\u00d7In MCB)
+  if (tier.feat.motor && bigLoad && bigLoad.type === 'motor') {
+    var mIn = gIn; // MCB protecting this motor (from the group-circuit task)
+    var IstartRatio = 7; var Istart = Math.round(bigLoad.IB * IstartRatio * 10) / 10;
+    var IaC = 10 * mIn; // instantaneous trip threshold for curve C
+    var motorTrips = Istart > IaC;
+    var mOpts = [{ da: 'Nej \u2014 Istart < Ia(C), beskyttelsen udl\u00f8ser IKKE p\u00e5 start', en: 'No \u2014 Istart < Ia(C), the MCB does NOT trip on starting' }, { da: 'Ja \u2014 Istart > Ia(C), beskyttelsen udl\u00f8ser p\u00e5 start (v\u00e6lg kurve D eller softstarter)', en: 'Yes \u2014 Istart > Ia(C), the MCB trips on starting (choose curve D or soft starter)' }];
+    var mCi = motorTrips ? 1 : 0;
+    tasks.push({ id: 't_mst', kind: 'motorstart', prompt: { da: 'DOL-motoren (' + axFmt(bigLoad.P) + ' kW, IB = ' + axFmt(bigLoad.IB, 1) + ' A) har Istart \u2248 7\u00d7IB = ' + axFmt(Istart, 0) + ' A. Beskyttes den med en C' + mIn + ' (Ia = 10\u00d7' + mIn + ' = ' + IaC + ' A). Vil den udl\u00f8se ved DOL-start?', en: 'The DOL motor (' + axFmt(bigLoad.P) + ' kW, IB = ' + axFmt(bigLoad.IB, 1) + ' A) has Istart \u2248 7\u00d7IB = ' + axFmt(Istart, 0) + ' A. It is protected by a C' + mIn + ' (Ia = 10\u00d7' + mIn + ' = ' + IaC + ' A). Will it trip on DOL starting?' }, given: { Istart: Istart, IaC: IaC, In: mIn, curve: 'C' }, answer: mCi, opts: mOpts, ci: mCi, unit: '', clause: 'DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1', cat: 'overload' });
+  }
   // Keep the core chain (IB -> In -> cable) first; vary the rest. When topic
   // weights are supplied (from a learned profile), bias the order so emphasized
   // competencies surface first (weighted shuffle); otherwise a plain shuffle.
@@ -11889,6 +11899,16 @@ function axSolveTask(task, opgave) {
     sol.verification = S('Kr\u00e6ver at hovedets udl\u00f8sekurve (incl. korttidsforsinkelse) ligger over afgangens i HELE fejlomr\u00e5det op til Ik,max. Bekr\u00e6ftes mod fabrikantens selektivitetstabel.', 'Requires the main trip curve (incl. short-time delay) to sit above the feeder curve across the WHOLE fault range up to Ik,max. Confirm against the manufacturer selectivity table.');
     sol.compliance = [S('DS/HD 60364-5-53 \u00a7536.', 'DS/HD 60364-5-53 \u00a7536.')];
     sol.conclusion = S(task.opts[task.ci].da, task.opts[task.ci].en);
+  } else if (task.kind === 'motorstart') {
+    var trips = g.Istart > g.IaC;
+    sol.assumptions = [S('DOL-start giver ca. 6\u20138\u00d7 m\u00e6rkestr\u00f8m. Curve C udl\u00f8ser \u00f8jeblikkeligt ved \u2265 10\u00d7In; curve D ved \u2265 20\u00d7In.', 'DOL start draws approx. 6\u20138\u00d7 rated current. Curve C trips instantaneously at \u2265 10\u00d7In; curve D at \u2265 20\u00d7In.')];
+    sol.formula = 'Udl\u00f8sning: I_start \u2265 I_a(C) = 10 \u00b7 I_n';
+    sol.substitution = 'I_start = ' + axFmt(g.Istart, 0) + ' A ' + (trips ? '\u2265' : '<') + ' I_a = ' + g.IaC + ' A';
+    sol.steps = [{ da: 'Sammenlign', en: 'Compare', expr: axFmt(g.Istart, 0) + ' vs ' + g.IaC, result: trips ? 'UDLØSER' : 'udløser IKKE' }];
+    sol.result = { value: task.answer, unit: '', da: trips ? 'Udl\u00f8ser ved start' : 'Udl\u00f8ser IKKE', en: trips ? 'Trips on starting' : 'Does NOT trip' };
+    sol.verification = trips ? S('Istart > Ia(C): sikringen vil udl\u00f8se p\u00e5 DOL-startstr\u00f8mmen. L\u00f8sning: v\u00e6lg kurve D (Ia = 20\u00d7In \u21d2 ' + (20 * g.In) + ' A > ' + axFmt(g.Istart, 0) + ' A) eller anvend softstarter/VFD for at reducere startstr\u00f8mmen.', 'Istart > Ia(C): the MCB will trip on the DOL starting current. Solution: choose curve D (Ia = 20\u00d7In \u21d2 ' + (20 * g.In) + ' A > ' + axFmt(g.Istart, 0) + ' A) or use a soft starter/VFD to reduce starting current.') : S('Istart < Ia(C): startstr\u00f8mmen ligger under \u00f8jeblikkelig udl\u00f8sning. Sikringen tillader den kortvarige start uden at klippe. Korrekt valg.', 'Istart < Ia(C): the starting current is below the instantaneous trip. The MCB allows the brief start without tripping. Correct choice.');
+    sol.compliance = [S('DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1.', 'DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1.')];
+    sol.conclusion = trips ? S('Motoren kan ikke starte med en C-kurve p\u00e5 denne str\u00f8m. V\u00e6lg kurve D eller softstarter.', 'The motor cannot start with a C-curve at this current. Choose curve D or a soft starter.') : S('Motoren kan starte uden at udl\u00f8se beskyttelsen (kurve C).', 'The motor can start without tripping the MCB (curve C).');
   } else if (task.kind === 'rcd') {
     var corr = task.opts[task.ci];
     sol.assumptions = [S('Stikkredse og elbilladning skal beskyttes med fejlstr\u00f8msafbryder (HPFI 30 mA). Elbilladere uden indbygget 6 mA DC-detektion kr\u00e6ver Type B.', 'Socket circuits and EV charging must be protected by a 30 mA RCD. EV chargers without built-in 6 mA DC detection require Type B.')];
@@ -12116,6 +12136,7 @@ function axMentorHints(task) {
     adiabatic: [{ da: 'Betingelsen er k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t.', en: 'The condition is k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t.' }, { da: 'Beregn Smin = Ik\u00b7\u221at/k og sammenlign med det valgte tv\u00e6rsnit.', en: 'Compute Smin = Ik\u00b7\u221at/k and compare with the chosen cross-section.' }],
     zs: [{ da: 'Automatisk frakobling: Zs\u00b7Ia \u2264 U0.', en: 'Automatic disconnection: Zs\u00b7Ia \u2264 U0.' }, { da: 'Zs,max = U0/Ia. For kurve C er Ia = 10\u00b7In.', en: 'Zs,max = U0/Ia. For curve C, Ia = 10\u00b7In.' }],
     breaking: [{ da: 'Brydeevne: Icu \u2265 Ik,max.', en: 'Breaking capacity: Icu \u2265 Ik,max.' }, { da: 'V\u00e6lg n\u00e6rmeste standard Icu over Ik,max.', en: 'Pick the nearest standard Icu above Ik,max.' }],
+    motorstart: [{ da: 'DOL-start \u2248 6\u20138\u00d7 m\u00e6rkestr\u00f8m. Sammenlign med \u00f8jeblikkelig udl\u00f8sning Ia.', en: 'DOL start \u2248 6\u20138\u00d7 rated current. Compare with instantaneous trip Ia.' }, { da: 'Kurve C: Ia = 10\u00d7In. Kurve D: Ia = 20\u00d7In. Overstiger startstr\u00f8mmen den t\u00e6rskel?', en: 'Curve C: Ia = 10\u00d7In. Curve D: Ia = 20\u00d7In. Does the starting current exceed that threshold?' }],
     selectivity: [{ da: 'Selektivitet = nedstr\u00f8ms rydder f\u00f8r opstr\u00f8ms.', en: 'Selectivity = downstream clears before upstream.' }, { da: 'T\u00e6nk p\u00e5 tid/str\u00f8m-graduering over hele fejlomr\u00e5det.', en: 'Think time/current grading across the whole fault range.' }],
     znet_mag: [{ da: '|Z| = U\u00b2/S\u2096. Brug HV-sp\u00e6ndingen i volt.', en: '|Z| = U\u00b2/Sk. Use the HV voltage in volts.' }, { da: 'Vinklen f\u00e5s af arccos(cos\u03c6\u2096).', en: 'The angle is arccos(cos\u03c6k).' }],
     ztrafo_mag: [{ da: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, henf\u00f8rt til 400 V.', en: '|Z_T| = (ek/100)\u00b7U\u00b2/SN, referred to 400 V.' }, { da: 'R_T fra kobbertabet; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).', en: 'R_T from copper loss; X_T = \u221a(Z_T\u00b2\u2212R_T\u00b2).' }],
