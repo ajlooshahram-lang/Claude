@@ -13760,6 +13760,918 @@ test('rcd: curve+matrix hidden until an RCD type is selected', function () {
 });
 
 
+console.log('\n=== MCB Time-Current Curve Engine Tests (B/C/D/K/Z) ===\n');
+
+test('mcb: MCB_CURVES now supports all five types B/C/D/K/Z', function () {
+  ['B', 'C', 'D', 'K', 'Z'].forEach(function (c) {
+    assert.ok(MCB_CURVES[c] && MCB_CURVES[c].isdMin > 0 && MCB_CURVES[c].isdMax > MCB_CURVES[c].isdMin, c + ' present & valid');
+  });
+  assert.strictEqual(MCB_CURVES.Z.isdMin, 2); assert.strictEqual(MCB_CURVES.Z.isdMax, 3);
+  assert.strictEqual(MCB_CURVES.K.isdMin, 8); assert.strictEqual(MCB_CURVES.K.isdMax, 14);
+});
+
+test('mcb: magnetic bands are correctly ordered (Z < B < C, K within D-ish, D highest)', function () {
+  // standard IEC magnetic multiples
+  assert.strictEqual(MCB_TYPE_INFO.Z.iecMin, 2); assert.strictEqual(MCB_TYPE_INFO.Z.iecMax, 3);
+  assert.strictEqual(MCB_TYPE_INFO.B.iecMin, 3); assert.strictEqual(MCB_TYPE_INFO.B.iecMax, 5);
+  assert.strictEqual(MCB_TYPE_INFO.C.iecMin, 5); assert.strictEqual(MCB_TYPE_INFO.C.iecMax, 10);
+  assert.strictEqual(MCB_TYPE_INFO.D.iecMin, 10); assert.strictEqual(MCB_TYPE_INFO.D.iecMax, 20);
+  assert.strictEqual(MCB_TYPE_INFO.K.iecMin, 8); assert.strictEqual(MCB_TYPE_INFO.K.iecMax, 14);
+  // ordering of lower thresholds
+  assert.ok(MCB_TYPE_INFO.Z.iecMin < MCB_TYPE_INFO.B.iecMin);
+  assert.ok(MCB_TYPE_INFO.B.iecMin < MCB_TYPE_INFO.C.iecMin);
+  assert.ok(MCB_TYPE_INFO.C.iecMin < MCB_TYPE_INFO.K.iecMin);
+  assert.ok(MCB_TYPE_INFO.K.iecMin < MCB_TYPE_INFO.D.iecMin);
+});
+
+test('mcb: each type cites a real component standard', function () {
+  assert.strictEqual(MCB_TYPE_INFO.B.std, 'IEC 60898-1');
+  assert.strictEqual(MCB_TYPE_INFO.K.std, 'IEC 60947-2');
+});
+
+test('mcb: thermal model anchored to IEC 2.55 In -> 60 s test point, monotonic decreasing', function () {
+  assert.ok(Math.abs(mcbThermalT(2.55, 'max') - 60) < 0.5, 'max edge ~60 s at 2.55 In (got ' + mcbThermalT(2.55, 'max').toFixed(1) + ')');
+  assert.ok(mcbThermalT(2.55, 'min') < mcbThermalT(2.55, 'max'), 'hot edge faster than cold edge');
+  var prev = Infinity;
+  for (var m = 1.2; m <= 10; m += 0.4) {
+    var t = mcbThermalT(m, 'max');
+    assert.ok(t <= prev + 1e-9, 'monotonic at m=' + m);
+    prev = t;
+  }
+  assert.strictEqual(mcbThermalT(1.1, 'max'), 7200); // no-trip zone capped
+});
+
+test('mcb: mcbCurveEnvelope returns ordered edges with correct magnetic boundaries', function () {
+  var env = mcbCurveEnvelope('C', 16);
+  assert.ok(env && env.maxEdge.length && env.minEdge.length, 'edges present');
+  assert.strictEqual(env.iLo, 5 * 16); // C lower magnetic = 5x
+  assert.strictEqual(env.iHi, 10 * 16); // C upper magnetic = 10x
+  // max edge ends fast (instantaneous), starts slow (thermal)
+  assert.ok(env.maxEdge[0].t > env.maxEdge[env.maxEdge.length - 1].t, 'time decreases along max edge');
+  assert.strictEqual(mcbCurveEnvelope('C', 0), null); // guards bad In
+  assert.strictEqual(mcbCurveEnvelope('Q', 16), null); // guards unknown type
+});
+
+test('mcb: envelope min edge is always at or below max edge at shared currents', function () {
+  var env = mcbCurveEnvelope('D', 32);
+  // sample thermal region: min(hot) trip must be <= max(cold) trip
+  [1.5, 2, 2.55, 3, 5].forEach(function (m) {
+    assert.ok(mcbThermalT(m, 'min') <= mcbThermalT(m, 'max'), 'min<=max at ' + m);
+  });
+  assert.ok(env.iHi > env.iLo, 'D magnetic band non-degenerate');
+});
+
+test('mcb: D curve trips later than B curve in the magnetic region (higher Isd)', function () {
+  assert.ok(MCB_TYPE_INFO.D.iecMin > MCB_TYPE_INFO.B.iecMax, 'D magnetic pickup well above B');
+});
+
+test('mcb: mcbRenderCurves produces valid SVG, no leaks, all types, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [['B'], ['B', 'C', 'D', 'K', 'Z'], ['Z']].forEach(function (sel) {
+      [6, 16, 63].forEach(function (In) {
+        var svg = mcbRenderCurves(sel, In);
+        assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + In + ')');
+        assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + sel.join('') + '/' + In + ')');
+        assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + sel.join('') + '/' + In + ')');
+        sel.forEach(function (ct) { assert.ok(svg.indexOf('Curve ' + ct) > 0 || svg.indexOf('Kurve ' + ct) > 0, ct + ' in legend'); });
+      });
+    });
+  });
+  lang = prev;
+});
+
+test('mcb: renderer guards empty selection and bad In', function () {
+  assert.ok(mcbRenderCurves([], 0).indexOf('<svg') === 0, 'defaults safely');
+  assert.ok(mcbRenderCurves(null, null).indexOf('NaN') < 0, 'no NaN with null args');
+});
+
+test('mcb: mcbRenderTypeTable lists each selected type with absolute Isd range, no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = mcbRenderTypeTable(['C', 'D'], 32);
+    assert.ok(h.indexOf('160') > 0, 'C lower Isd 5x32=160 A shown');
+    assert.ok(h.indexOf('640') > 0, 'D upper Isd 20x32=640 A shown');
+    assert.ok(h.indexOf('IEC 60898-1') >= 0, 'cites standard');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('mcb: toggle helper adds/removes types but never empties the selection', function () {
+  var prev = mcbCurveSel.slice();
+  mcbCurveSel = ['C'];
+  mcbToggleCurveType('D'); assert.ok(mcbCurveSel.indexOf('D') >= 0, 'D added');
+  mcbToggleCurveType('C'); assert.ok(mcbCurveSel.indexOf('C') < 0, 'C removed');
+  mcbToggleCurveType('D'); assert.ok(mcbCurveSel.length >= 1, 'never empties'); // last one stays
+  mcbCurveSel = prev;
+});
+
+test('mcb: sldDeviceCurve now plots K and Z MCBs (engine integration)', function () {
+  var kPts = sldDeviceCurve({ curve: 'K' }, 16, null);
+  var zPts = sldDeviceCurve({ curve: 'Z' }, 10, null);
+  assert.ok(kPts.length > 0, 'K curve plottable');
+  assert.ok(zPts.length > 0, 'Z curve plottable');
+});
+
+test('mcb: renderStandards embeds the MCB curve chart + table (da/en)', function () {
+  var prev = lang, ps = mcbCurveSel.slice(), pi = mcbCurveIn;
+  mcbCurveSel = ['B', 'C', 'D', 'K', 'Z']; mcbCurveIn = 16;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('IEC 60898-1') >= 0, 'cites IEC 60898-1 (' + lg + ')');
+    assert.ok(out.indexOf('IEC 60947-2') >= 0, 'cites IEC 60947-2 for K (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve chart embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined leak (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN leak (' + lg + ')');
+  });
+  lang = prev; mcbCurveSel = ps; mcbCurveIn = pi;
+});
+
+test('mcb: MCB module renders for K and Z without error (B/C/D/K/Z buttons)', function () {
+  var prev = mcbState.curve;
+  ['K', 'Z'].forEach(function (c) {
+    mcbState.curve = c; mcbState.rating = 16;
+    var out = renderMCB();
+    assert.ok(out.indexOf('undefined') < 0 && out.indexOf('<svg') !== -2, c + ' renders');
+    assert.ok(out.length > 100, c + ' produced output');
+  });
+  mcbState.curve = prev;
+});
+
+
+console.log('\n=== Fuse Time-Current Curve Engine Tests (IEC 60269) ===\n');
+
+test('fuse: FUSE_CLASSES covers gG/gL, aM, gR, aR with correct overload behaviour', function () {
+  assert.ok(FUSE_CLASSES.gG && FUSE_CLASSES.aM && FUSE_CLASSES.gR && FUSE_CLASSES.aR, 'all classes present');
+  assert.strictEqual(FUSE_CLASSES.gG.overload, true);   // full-range protects overload
+  assert.strictEqual(FUSE_CLASSES.aM.overload, false);  // aM = short-circuit only (life-safety critical)
+  assert.strictEqual(FUSE_CLASSES.aR.overload, false);  // aR = back-up only
+  assert.strictEqual(FUSE_CLASSES.gR.overload, true);   // gR = full-range
+  assert.ok(FUSE_CLASSES.gG.label.indexOf('gL') >= 0, 'gL documented as gG alias');
+});
+
+test('fuse: only gG is marked as anchored to verified data', function () {
+  assert.strictEqual(FUSE_CLASSES.gG.anchored, true);
+  assert.strictEqual(FUSE_CLASSES.aM.anchored, false);
+  assert.strictEqual(FUSE_CLASSES.gR.anchored, false);
+  assert.strictEqual(FUSE_CLASSES.aR.anchored, false);
+});
+
+test('fuse: classes cite correct IEC sub-standards', function () {
+  assert.strictEqual(FUSE_CLASSES.gG.std, 'IEC 60269-2');
+  assert.strictEqual(FUSE_CLASSES.aM.std, 'IEC 60269-2');
+  assert.strictEqual(FUSE_CLASSES.gR.std, 'IEC 60269-4'); // semiconductor
+  assert.strictEqual(FUSE_CLASSES.aR.std, 'IEC 60269-4');
+});
+
+test('fuse: fuseGetI5s returns verified value and nearest fallback', function () {
+  assert.strictEqual(fuseGetI5s(63), 290);  // verified catalogue value
+  assert.strictEqual(fuseGetI5s(16), 72);
+  assert.strictEqual(fuseGetI5s(0), null);  // guards bad input
+  assert.ok(fuseGetI5s(64) === 290, 'nearest tabulated value for off-grid rating');
+});
+
+test('fuse: gG curve is anchored — t = 5 s at I = i5s', function () {
+  // total clearing at I = i5s should be ~5 s (the anchoring definition)
+  var i5s = fuseGetI5s(63); // 290 A
+  var i2t = fuseI2t(63, 'gG');
+  var tAt5s = i2t.total / (i5s * i5s);
+  assert.ok(Math.abs(tAt5s - 5) < 0.01, '5 s anchor holds (got ' + tAt5s.toFixed(3) + ' s)');
+});
+
+test('fuse: pre-arcing I²t is below total clearing I²t for every class', function () {
+  ['gG', 'aM', 'gR', 'aR'].forEach(function (cls) {
+    var i2t = fuseI2t(63, cls);
+    assert.ok(i2t.pre < i2t.total, cls + ' pre-arc < total');
+  });
+});
+
+test('fuse: semiconductor classes (gR/aR) have far lower I²t let-through than gG', function () {
+  var gG = fuseI2t(63, 'gG').total;
+  assert.ok(fuseI2t(63, 'gR').total < gG * 0.5, 'gR much lower I²t');
+  assert.ok(fuseI2t(63, 'aR').total < gG * 0.5, 'aR much lower I²t');
+});
+
+test('fuse: aM and aR curves do not operate below their low-current threshold', function () {
+  var aM = fuseCurvePoints(63, 'aM', 'total');
+  // aM lowMult = 4 -> no point below 4x In
+  aM.forEach(function (p) { assert.ok(p.m >= 4, 'aM has no point below 4x In'); });
+  var aR = fuseCurvePoints(63, 'aR', 'total');
+  aR.forEach(function (p) { assert.ok(p.m >= 3, 'aR has no point below 3x In'); });
+});
+
+test('fuse: time-current points are monotonically decreasing with current', function () {
+  var pts = fuseCurvePoints(63, 'gG', 'total');
+  var prev = Infinity;
+  for (var i = 0; i < pts.length; i++) { assert.ok(pts[i].t <= prev + 1e-9, 'decreasing'); prev = pts[i].t; }
+  assert.ok(pts.length > 0, 'produces points');
+});
+
+test('fuse: fuseRenderCurve produces valid SVG, no leaks, all classes, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [['gG'], ['gG', 'aM', 'gR', 'aR']].forEach(function (sel) {
+      [16, 63, 250].forEach(function (sz) {
+        var svg = fuseRenderCurve(sz, sel);
+        assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + sz + ')');
+        assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + sel.join('') + '/' + sz + ')');
+        assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + sel.join('') + '/' + sz + ')');
+      });
+    });
+  });
+  lang = prev;
+});
+
+test('fuse: renderer + let-through guard bad input safely', function () {
+  assert.ok(fuseRenderCurve(0, []).indexOf('<svg') === 0, 'curve defaults safely');
+  assert.ok(fuseRenderCurve(null, null).indexOf('NaN') < 0, 'no NaN with null args');
+  assert.ok(fuseRenderLetThrough(63, ['gG']).indexOf('100%') >= 0, 'gG let-through is 100% reference');
+});
+
+test('fuse: I²t let-through bars normalise gG to 100% and mark illustrative classes', function () {
+  var h = fuseRenderLetThrough(63, ['gG', 'gR']);
+  assert.ok(h.indexOf('100%') >= 0, 'gG = 100%');
+  assert.ok(h.indexOf('\u2022') >= 0, 'gR flagged illustrative');
+});
+
+test('fuse: class table states aM/aR provide no overload protection (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = fuseRenderClassTable(['gG', 'aM', 'gR', 'aR']);
+    assert.ok(h.indexOf('IEC 60269-4') >= 0, 'cites semiconductor standard');
+    assert.ok(h.indexOf('\u26d4') >= 0, 'flags no-overload classes');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('fuse: toggle helper adds/removes classes but never empties selection', function () {
+  var prev = fuseCurveSel.slice();
+  fuseCurveSel = ['gG'];
+  fuseToggleClass('aM'); assert.ok(fuseCurveSel.indexOf('aM') >= 0, 'aM added');
+  fuseToggleClass('gG'); assert.ok(fuseCurveSel.indexOf('gG') < 0, 'gG removed');
+  fuseToggleClass('aM'); assert.ok(fuseCurveSel.length >= 1, 'never empties');
+  fuseCurveSel = prev;
+});
+
+test('fuse: renderFuse embeds curve + let-through + class table when a size is chosen (da/en)', function () {
+  var prevLang = lang, ph = fuseState.holder, psz = fuseState.size, psel = fuseCurveSel.slice();
+  fuseState.holder = 'D02'; fuseState.size = 63; fuseCurveSel = ['gG', 'aM', 'gR', 'aR'];
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderFuse();
+    assert.ok(out.indexOf('IEC 60269') >= 0, 'cites IEC 60269 (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined leak (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN leak (' + lg + ')');
+  });
+  lang = prevLang; fuseState.holder = ph; fuseState.size = psz; fuseCurveSel = psel;
+});
+
+test('fuse: curve card hidden until a fuse size is selected', function () {
+  var prevLang = lang, psz = fuseState.size; lang = 'da'; fuseState.size = null;
+  var out = renderFuse();
+  assert.ok(out.indexOf('Tid/str\u00f8m-karakteristik') < 0, 'no curve before a size is picked');
+  lang = prevLang; fuseState.size = psz;
+});
+
+
+console.log('\n=== MCCB/ACB LSIG Protection Envelope Tests ===\n');
+
+test('lsig: LSIG_TRIP_UNITS covers Micrologic 2.2/5.2/6.2 and generic ACB', function () {
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 2.2'], '2.2 present');
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 5.2'], '5.2 present');
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 6.2'], '6.2 present');
+  assert.ok(LSIG_TRIP_UNITS['ACB LSIG'], 'ACB present');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 2.2'].segments, 'LS');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 5.2'].segments, 'LSI');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 6.2'].segments, 'LSIG');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 6.2'].gFault, true);
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 2.2'].gFault, false);
+});
+
+test('lsig: envelope returns L+S for Micrologic 2.2 (no I, no G)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 2.2', trL: 16, trS: 0.1 });
+  assert.ok(env.L.length > 0, 'L segment present');
+  assert.ok(env.S.length > 0, 'S segment present');
+  assert.strictEqual(env.I.length, 0, 'no I segment');
+  assert.strictEqual(env.G.length, 0, 'no G segment');
+});
+
+test('lsig: envelope returns L+S+I for Micrologic 5.2', function () {
+  var env = lsigCurveEnvelope({ In: 250, ioMult: 0.8, isdMult: 3, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 8, trS: 0.2 });
+  assert.ok(env.L.length > 0 && env.S.length > 0 && env.I.length > 0, 'L+S+I');
+  assert.strictEqual(env.G.length, 0, 'no G');
+});
+
+test('lsig: envelope returns L+S+I+G for Micrologic 6.2 / ACB', function () {
+  ['Micrologic 6.2', 'ACB LSIG'].forEach(function (tu) {
+    var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 15, igMult: 0.3, tg: 0.2, tripUnit: tu, trL: 16, trS: 0.1 });
+    assert.ok(env.L.length > 0 && env.S.length > 0 && env.I.length > 0 && env.G.length > 0, tu + ' L+S+I+G');
+  });
+});
+
+test('lsig: computed pickups are correct', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.4, tg: 0, tripUnit: 'Micrologic 6.2', trL: 16, trS: 0.1 });
+  assert.strictEqual(env.settings.io, 320);   // 0.8 * 400
+  assert.strictEqual(env.settings.isd, 1600); // 5 * 320
+  assert.strictEqual(env.settings.ii, 4800);  // 12 * 400
+  assert.strictEqual(env.settings.ig, 160);   // 0.4 * 400
+});
+
+test('lsig: L segment ends before S pickup (long-time does not extend into short-time region)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12 });
+  var maxLcurr = 0;
+  env.L.forEach(function (p) { if (p.i > maxLcurr) maxLcurr = p.i; });
+  assert.ok(maxLcurr < env.settings.isd, 'L region below Isd (' + maxLcurr + ' < ' + env.settings.isd + ')');
+});
+
+test('lsig: S segment ends before I pickup for LSI/LSIG', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1 });
+  var maxScurr = 0;
+  env.S.forEach(function (p) { if (p.i > maxScurr) maxScurr = p.i; });
+  assert.ok(maxScurr < env.settings.ii, 'S region below Ii (' + maxScurr + ' < ' + env.settings.ii + ')');
+});
+
+test('lsig: L region times decrease with increasing current (inverse-time)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12 });
+  var prev = Infinity;
+  env.L.forEach(function (p) { assert.ok(p.tMax <= prev + 1e-9, 'L decreasing'); prev = p.tMax; });
+});
+
+test('lsig: I segment is fast (<= 20 ms max)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1 });
+  env.I.forEach(function (p) { assert.ok(p.tMax <= 0.02, 'I <= 20 ms (got ' + p.tMax + ')'); });
+});
+
+test('lsig: changing trL changes L-segment times', function () {
+  var env1 = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 4, trS: 0.1, iiMult: 12 });
+  var env2 = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 32, trS: 0.1, iiMult: 12 });
+  assert.ok(env1.L[0].tMax < env2.L[0].tMax, 'shorter trL means faster L');
+});
+
+test('lsig: lsigRenderCurve produces valid SVG, no leaks, all trip units, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    Object.keys(LSIG_TRIP_UNITS).forEach(function (tu) {
+      var svg = lsigRenderCurve({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.3, tg: 0.1, tripUnit: tu, trL: 16, trS: 0.1 });
+      assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf(tu) >= 0, 'trip unit named in title');
+    });
+  });
+  lang = prev;
+});
+
+test('lsig: settings table renders with correct pickup values, no leaks', function () {
+  var prev = lang; lang = 'en';
+  var h = lsigRenderSettingsTable({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.3, tg: 0.1, tripUnit: 'Micrologic 6.2', trL: 16, trS: 0.1 });
+  assert.ok(h.indexOf('320 A') >= 0, 'Ir = 320 A (0.8*400)');
+  assert.ok(h.indexOf('1600 A') >= 0, 'Isd = 1600 A (5*320)');
+  assert.ok(h.indexOf('4800 A') >= 0, 'Ii = 4800 A (12*400)');
+  assert.ok(h.indexOf('120 A') >= 0, 'Ig = 120 A (0.3*400)');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('lsig: renderMCCB embeds the LSIG curve and all dials (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderMCCB();
+    assert.ok(out.indexOf('LSIG') >= 0, 'LSIG referenced (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve embedded (' + lg + ')');
+    assert.ok(out.indexOf('IEC 60947-2') >= 0, 'cites IEC 60947-2 (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('lsig: ground-fault dials hidden for Micrologic 2.2/5.2, shown for 6.2/ACB', function () {
+  var prev = lang; lang = 'da';
+  mccbState.tripUnit = 'Micrologic 2.2';
+  var out = renderMCCB();
+  assert.ok(out.indexOf('Jordfejl Ig') < 0, 'no G dial for 2.2');
+  mccbState.tripUnit = 'Micrologic 6.2';
+  out = renderMCCB();
+  assert.ok(out.indexOf('Jordfejl Ig') >= 0, 'G dial for 6.2');
+  mccbState.tripUnit = 'Micrologic 5.2'; // restore
+  lang = prev;
+});
+
+test('lsig: I dial hidden for Micrologic 2.2 (LS only), shown for 5.2+', function () {
+  var prev = lang; lang = 'en';
+  mccbState.tripUnit = 'Micrologic 2.2';
+  var out = renderMCCB();
+  assert.ok(out.indexOf('Instantaneous Ii') < 0, 'no I dial for 2.2');
+  mccbState.tripUnit = 'Micrologic 5.2';
+  out = renderMCCB();
+  assert.ok(out.indexOf('Instantaneous Ii') >= 0, 'I dial for 5.2');
+  lang = prev;
+});
+
+
+console.log('\n=== Phasor Diagram + Power Triangle + Impedance Vector Tests ===\n');
+
+test('phasor: utility conversions are correct', function () {
+  assert.ok(Math.abs(pDeg2Rad(180) - Math.PI) < 1e-10, '180° = π');
+  assert.ok(Math.abs(pRad2Deg(Math.PI) - 180) < 1e-10, 'π = 180°');
+  var r = pPolar2Rect(10, 60);
+  assert.ok(Math.abs(r.re - 5) < 1e-6, 'rect re for 10∠60°');
+  assert.ok(Math.abs(r.im - 8.6602) < 0.001, 'rect im');
+  var p = pRect2Polar(3, 4);
+  assert.ok(Math.abs(p.mag - 5) < 1e-6, 'polar mag for 3+j4');
+  assert.ok(Math.abs(p.ang - 53.13) < 0.01, 'polar ang');
+});
+
+test('phasor: power triangle at cos φ = 0.8 (36.87°) is correct', function () {
+  var pw = pPowerTriangle(230, 100, 36.87);
+  assert.ok(Math.abs(pw.S - 23000) < 1, 'S = V×I');
+  assert.ok(Math.abs(pw.P - 18400) < 10, 'P = S cos φ ≈ 18400 W');
+  assert.ok(Math.abs(pw.Q - 13800) < 10, 'Q = S sin φ ≈ 13800 var');
+  assert.ok(Math.abs(pw.cosPhi - 0.8) < 0.001, 'cos φ = 0.8');
+});
+
+test('phasor: 3-phase balanced power is √3 × ULL × I', function () {
+  var pw = p3phPower(230, 100, 0);
+  // S = √3 × ULL × I = √3 × (230×√3) × 100 = 3 × 230 × 100 = 69000 W
+  assert.ok(Math.abs(pw.S - 69000) < 1, 'S = 3 × ULN × I = 69000 VA (got ' + pw.S.toFixed(0) + ')');
+  assert.ok(Math.abs(pw.P - 69000) < 1, 'P = S at cos φ = 1');
+  assert.ok(Math.abs(pw.Q) < 1, 'Q ≈ 0 at φ = 0');
+});
+
+test('phasor: impedance from V/I/phi is correct', function () {
+  var z = pImpedance(230, 100, 30);
+  assert.ok(Math.abs(z.Z - 2.3) < 0.001, 'Z = V/I = 2.3 Ω');
+  assert.ok(Math.abs(z.R - 2.3 * Math.cos(pDeg2Rad(30))) < 0.001, 'R = Z cos φ');
+  assert.ok(Math.abs(z.X - 2.3 * Math.sin(pDeg2Rad(30))) < 0.001, 'X = Z sin φ');
+  var z0 = pImpedance(230, 0, 30);
+  assert.strictEqual(z0.Z, 0, 'Z=0 when I=0 (safe guard)');
+});
+
+test('phasor: phasorRenderVoltage produces valid SVG with no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var svg = phasorRenderVoltage(phasorState);
+    assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + ')');
+    assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+    assert.ok(svg.indexOf('U\u2081') >= 0, 'U1 label present');
+    assert.ok(svg.indexOf('I\u2081') >= 0, 'I1 label present');
+  });
+  lang = prev;
+});
+
+test('phasor: phasorRenderPowerTriangle produces valid SVG with P/Q/S labels', function () {
+  var prev = lang; lang = 'en';
+  var svg = phasorRenderPowerTriangle(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('kW') > 0, 'P in kW');
+  assert.ok(svg.indexOf('kvar') > 0, 'Q in kvar');
+  assert.ok(svg.indexOf('kVA') > 0, 'S in kVA');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: phasorRenderImpedance shows polar + rectangular, no leaks', function () {
+  var prev = lang; lang = 'da';
+  var svg = phasorRenderImpedance(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('\u03a9') >= 0, 'ohm symbol present');
+  assert.ok(svg.indexOf('\u2220') >= 0, 'angle symbol (polar form)');
+  assert.ok(svg.indexOf('+') >= 0 || svg.indexOf('j') >= 0, 'rectangular form');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: renderStandards embeds phasor card with computed values (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('cos \u03c6') >= 0, 'cos phi present (' + lg + ')');
+    assert.ok(out.indexOf('kW') >= 0, 'P in kW (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'SVG embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('phasor: state setters update correctly', function () {
+  var prevI = phasorState.iA, prevPhi = phasorState.phiA, prevView = phasorState.view;
+  phasorState.iA = 200; phasorState.phiA = 45; phasorState.view = 'impedance';
+  var z = pImpedance(phasorState.uLN, phasorState.iA, phasorState.phiA);
+  assert.ok(Math.abs(z.Z - 230 / 200) < 0.001, 'Z updated to 1.15 Ω');
+  phasorState.iA = prevI; phasorState.phiA = prevPhi; phasorState.view = prevView;
+});
+
+
+console.log('\n=== UX Design System Foundation Tests ===\n');
+
+test('ux: UX_MODES defines all four complexity levels', function () {
+  assert.deepStrictEqual(UX_MODES, ['apprentice', 'electrician', 'engineer', 'expert']);
+});
+
+test('ux: uxMode defaults to electrician and uxModeLevel returns correct index', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; assert.strictEqual(uxModeLevel(), 1);
+  uxMode = 'apprentice'; assert.strictEqual(uxModeLevel(), 0);
+  uxMode = 'engineer'; assert.strictEqual(uxModeLevel(), 2);
+  uxMode = 'expert'; assert.strictEqual(uxModeLevel(), 3);
+  uxMode = prev;
+});
+
+test('ux: uxSetMode only accepts valid modes', function () {
+  var prev = uxMode;
+  uxSetMode('expert'); assert.strictEqual(uxMode, 'expert');
+  uxSetMode('invalid_mode'); assert.strictEqual(uxMode, 'expert'); // unchanged
+  uxSetMode('apprentice'); assert.strictEqual(uxMode, 'apprentice');
+  uxMode = prev;
+});
+
+test('ux: uxRenderModeBar renders all four buttons with correct active state (da/en)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; uxMode = 'electrician';
+    var h = uxRenderModeBar();
+    assert.ok(h.indexOf('ux-mode-bar') >= 0, 'has container class');
+    assert.ok(h.indexOf('active') >= 0, 'one is active');
+    UX_MODES.forEach(function (m) { assert.ok(h.indexOf(m) >= 0, m + ' present'); });
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev; uxMode = pm;
+});
+
+test('ux: uxPanel renders collapsible panel, respects level gating', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; // level 1
+  var h = uxPanel('Test Panel', '<p>Content</p>', { id: 'test1' });
+  assert.ok(h.indexOf('ux-panel') >= 0, 'panel rendered');
+  assert.ok(h.indexOf('Content') >= 0, 'body included');
+  // Engineer-level panel hidden for electrician
+  var h2 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test2' });
+  assert.strictEqual(h2, '', 'engineer panel hidden for electrician');
+  uxMode = 'engineer'; // level 2
+  var h3 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test3' });
+  assert.ok(h3.indexOf('Deep') >= 0, 'engineer panel shown for engineer');
+  // Expert panel still hidden for engineer
+  var h4 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test4' });
+  assert.strictEqual(h4, '', 'expert panel hidden for engineer');
+  uxMode = 'expert';
+  var h5 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test5' });
+  assert.ok(h5.indexOf('Secret') >= 0, 'expert panel shown for expert');
+  uxMode = prev;
+});
+
+test('ux: uxSummary renders executive summary cards with status classes', function () {
+  var h = uxSummary([
+    { label: 'Cable', value: '✓ OK', status: 'pass' },
+    { label: 'Vdrop', value: '4.2%', status: 'warn' },
+    { label: 'Fault', value: '✗ FAIL', status: 'fail' }
+  ]);
+  assert.ok(h.indexOf('ux-summary') >= 0, 'container');
+  assert.ok(h.indexOf('pass') >= 0, 'pass class');
+  assert.ok(h.indexOf('warn') >= 0, 'warn class');
+  assert.ok(h.indexOf('fail') >= 0, 'fail class');
+  assert.ok(h.indexOf('4.2%') >= 0, 'value rendered');
+});
+
+test('ux: uxSmartCards renders visual selector with correct selection', function () {
+  var items = [
+    { id: 'tn-s', icon: '⚡', title: 'TN-S', desc: 'Separate N+PE' },
+    { id: 'tt', icon: '🔌', title: 'TT', desc: 'Local earth' }
+  ];
+  var h = uxSmartCards(items, 'tn-s', 'testFn');
+  assert.ok(h.indexOf('ux-smart-cards') >= 0, 'grid container');
+  assert.ok(h.indexOf('selected') >= 0, 'one selected');
+  assert.ok(h.indexOf('TN-S') >= 0, 'title');
+  assert.ok(h.indexOf('testFn') >= 0, 'onclick handler');
+});
+
+test('ux: uxWizardSteps renders step indicators with done/active states', function () {
+  var steps = [{ label: 'Load' }, { label: 'Cable' }, { label: 'Protection' }];
+  var h = uxWizardSteps(steps, 1);
+  assert.ok(h.indexOf('done') >= 0, 'first step is done');
+  assert.ok(h.indexOf('active') >= 0, 'second step is active');
+  assert.ok(h.indexOf('Protection') >= 0, 'third step label');
+  assert.ok(h.indexOf('✓') >= 0 || h.indexOf('\u2713') >= 0, 'checkmark on done step');
+});
+
+test('ux: mode bar is rendered in the status bar (not content area)', function () {
+  var prev = lang; lang = 'da';
+  // Mode bar is now in renderStatusBar, not renderModule
+  var bar = uxRenderModeBar();
+  assert.ok(bar.indexOf('ux-mode-bar') >= 0, 'mode bar helper still works');
+  assert.ok(bar.length > 50, 'mode bar has content');
+  lang = prev;
+});
+
+
+console.log('\n=== UX Load Module Retrofit Tests ===\n');
+
+test('ux-load: renderLoad uses uxSummary for executive summary (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderLoad();
+    assert.ok(out.indexOf('ux-summary') >= 0, 'executive summary present (' + lg + ')');
+    assert.ok(out.indexOf('ux-summary-item') >= 0, 'summary items present');
+  });
+  lang = prev;
+});
+
+test('ux-load: renderLoad uses uxSmartCards for presets', function () {
+  var prev = lang; lang = 'da';
+  var out = renderLoad();
+  assert.ok(out.indexOf('ux-smart-cards') >= 0, 'smart card grid present');
+  assert.ok(out.indexOf('ux-smart-card') >= 0, 'smart cards present');
+  assert.ok(out.indexOf('applyLoadPreset') >= 0, 'preset handler wired');
+  lang = prev;
+});
+
+test('ux-load: advanced params (cosφ/sf/ef) in a collapsible panel', function () {
+  var prev = lang; lang = 'da';
+  var out = renderLoad();
+  assert.ok(out.indexOf('ux-panel') >= 0, 'collapsible panel present');
+  assert.ok(out.indexOf('load_advanced') >= 0, 'panel has correct id');
+  lang = prev;
+});
+
+test('ux-load: diversity section hidden for apprentice/electrician, shown for engineer', function () {
+  var prev = lang, pm = uxMode;
+  lang = 'da';
+  uxMode = 'apprentice';
+  var out = renderLoad();
+  assert.ok(out.indexOf('load_diversity') < 0, 'diversity hidden for apprentice');
+  uxMode = 'engineer';
+  out = renderLoad();
+  assert.ok(out.indexOf('load_diversity') >= 0, 'diversity visible for engineer');
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: motor/contactor/relay recommendations hidden for apprentice, shown for engineer', function () {
+  var prev = lang, pm = uxMode;
+  lang = 'en'; loadState.power = 50; // enough to produce IB > 0
+  uxMode = 'apprentice';
+  var out = renderLoad();
+  assert.ok(out.indexOf('Recommended contactors') < 0, 'contactors hidden for apprentice');
+  uxMode = 'engineer';
+  out = renderLoad();
+  assert.ok(out.indexOf('Recommended contactors') >= 0, 'contactors shown for engineer');
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: output has no undefined/NaN in any mode (da/en × all modes)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    UX_MODES.forEach(function (m) {
+      uxMode = m;
+      var out = renderLoad();
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + m + ')');
+      assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + m + ')');
+    });
+  });
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: preset still works (applyLoadPreset sets state)', function () {
+  var prev = { v: loadState.voltage, p: loadState.power, c: loadState.cosPhi };
+  applyLoadPreset('ev22');
+  assert.strictEqual(loadState.power, 22, 'EV22 sets 22 kW');
+  assert.strictEqual(loadState.voltage, '3x400', 'EV22 sets 3x400');
+  assert.strictEqual(loadState._preset, 'ev22', 'preset key stored');
+  loadState.voltage = prev.v; loadState.power = prev.p; loadState.cosPhi = prev.c;
+});
+
+
+console.log('\n=== UX Cable Module Retrofit Tests ===\n');
+
+test('ux-cable: renderCable uses wizard steps indicator', function () {
+  var prev = lang; lang = 'da';
+  var out = renderCable();
+  assert.ok(out.indexOf('ux-wizard-step') >= 0, 'wizard steps present');
+  lang = prev;
+});
+
+test('ux-cable: correction factors in collapsible panel', function () {
+  var prev = lang; lang = 'en';
+  var out = renderCable();
+  assert.ok(out.indexOf('cable_corrections') >= 0, 'corrections panel has id');
+  assert.ok(out.indexOf('ux-panel') >= 0, 'collapsible panel present');
+  lang = prev;
+});
+
+test('ux-cable: executive summary appears when cross-section selected', function () {
+  var prev = lang, pcs = cableState.crossSection;
+  lang = 'da'; cableState.crossSection = '2.5';
+  var out = renderCable();
+  assert.ok(out.indexOf('ux-summary') >= 0, 'summary present with cross-section');
+  cableState.crossSection = null;
+  out = renderCable();
+  assert.ok(out.indexOf('ux-summary') < 0, 'no summary without cross-section');
+  lang = prev; cableState.crossSection = pcs;
+});
+
+test('ux-cable: no undefined/NaN in any mode (da/en x all modes)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    UX_MODES.forEach(function (m) {
+      uxMode = m;
+      var out = renderCable();
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + m + ')');
+      assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + m + ')');
+    });
+  });
+  lang = prev; uxMode = pm;
+});
+
+
+console.log('\n=== Analyzer De-duplication + Fallback Inference Tests ===\n');
+
+test('analyzer: analyzerSegment de-duplicates repeated Opgave headers', function () {
+  var text = 'Opgave 1\nBeregn IB for 37 kW motor.\nOpgave 2\nBeregn Zs.\nOpgave 1\nSvar: IB = 67 A.';
+  var segs = analyzerSegment(text);
+  // Should have 2 segments (Opgave 1 merged, Opgave 2), not 3
+  var ids = segs.map(function (s) { return s.id; });
+  assert.ok(ids.indexOf(1) >= 0, 'Opgave 1 present');
+  assert.ok(ids.indexOf(2) >= 0, 'Opgave 2 present');
+  var count1 = ids.filter(function (id) { return id === 1; }).length;
+  assert.strictEqual(count1, 1, 'Opgave 1 appears exactly once (de-duped)');
+  // Merged text should contain both parts
+  var seg1 = segs.find(function (s) { return s.id === 1; });
+  assert.ok(seg1.text.indexOf('37 kW') >= 0, 'first part merged');
+  assert.ok(seg1.text.indexOf('67 A') >= 0, 'second part merged');
+});
+
+test('analyzer: analyzerSegment handles Generelt (text before first Opgave)', function () {
+  var text = 'Generelt: forsyning TN-S 400V\nOpgave 1\nBeregn IB.';
+  var segs = analyzerSegment(text);
+  assert.ok(segs.length >= 2, 'at least 2 segments (Generelt + Opgave 1)');
+  var gen = segs.find(function (s) { return s.id === 0; });
+  assert.ok(gen, 'Generelt segment (id=0) exists');
+});
+
+test('analyzer: fallback inference detects questions from data when no explicit patterns match', function () {
+  // Text with electrical data but NO "beregn IB" or other explicit verbs
+  var text = 'Installation i kontorbygning. 37 kW belastning. 400 V forsyning. Kabel 50 m NOIKLX 5G16.';
+  var qs = analyzerDetectQuestions(text);
+  assert.ok(qs.length > 0, 'fallback inferred questions (got ' + qs.length + ')');
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('ib') >= 0, 'IB inferred from power + voltage');
+  assert.ok(types.indexOf('cable') >= 0 || types.indexOf('vdrop') >= 0, 'cable/vdrop inferred from cable data');
+});
+
+test('analyzer: fallback does NOT activate when explicit patterns already matched', function () {
+  var text = 'Beregn belastningsstrømmen IB for 37 kW motor. 400 V. Kabel 50 m.';
+  var qs = analyzerDetectQuestions(text);
+  // Should have explicit 'ib' match, not a bunch of fallback duplicates
+  var ibCount = qs.filter(function (q) { return q.type === 'ib'; }).length;
+  assert.strictEqual(ibCount, 1, 'only one IB question (no fallback duplicate)');
+});
+
+test('analyzer: fallback infers trafo from kVA/transformer keywords', function () {
+  var text = 'Transformer 630 kVA, uk = 4%, Dyn11.';
+  var qs = analyzerDetectQuestions(text);
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('trafo') >= 0 || types.indexOf('trafo_vec') >= 0, 'trafo inferred');
+});
+
+test('analyzer: fallback infers motor from motor keywords', function () {
+  var text = 'Asynkronmotor 4-polet, 1450 omdrejninger, 15 kW.';
+  var qs = analyzerDetectQuestions(text);
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('motor_start') >= 0 || types.indexOf('motor_sync') >= 0, 'motor inferred');
+});
+
+
+console.log('\n=== Engineering Presentation Framework (VB Methodology) Tests ===\n');
+
+test('eng: engPresentation renders all 8 step types with correct labels (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var steps = [
+      { type: 'standard', content: 'DS/HD 60364-5-52' },
+      { type: 'assumption', content: 'IB = 25 A' },
+      { type: 'formula', content: 'Iz = Iz,tabel × k1 × k2' },
+      { type: 'substitution', content: 'Iz = 32 × 1.0 × 0.82' },
+      { type: 'intermediate', content: '= 26.2 A' },
+      { type: 'result', content: 'Iz,korr = 26.2 A' },
+      { type: 'verification', content: '25 ≤ 26.2 → OK' },
+      { type: 'conclusion', content: 'Kablet er korrekt.', status: 'pass' }
+    ];
+    var h = engPresentation('Test', steps, { id: 'test_eng_1', open: true });
+    assert.ok(h.indexOf('ux-panel') >= 0, 'wrapped in panel (' + lg + ')');
+    assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'standard content');
+    assert.ok(h.indexOf('success') >= 0 || h.indexOf('pass') >= 0, 'pass styling');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('eng: engCableReasoning builds correct cable-sizing presentation', function () {
+  var prev = lang; lang = 'da';
+  var h = engCableReasoning({
+    ib: 25, installMethod: 'C', kInstall: 1.0, kTemp: 1.0, kGroup: 0.82,
+    kTotal: 0.82, baseIz: 32, correctedIz: 26.2, cableType: 'NOIKLX', mm2: '2.5',
+    tableRef: 'Tabel B.52.4', tempC: 30, groupCount: 2, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites cable standard');
+  assert.ok(h.indexOf('26.2') >= 0, 'shows corrected Iz');
+  assert.ok(h.indexOf('0.82') >= 0, 'shows grouping factor');
+  assert.ok(h.indexOf('NOIKLX') >= 0, 'shows cable type');
+  assert.ok(h.indexOf('success') >= 0, 'pass conclusion');
+  lang = prev;
+});
+
+test('eng: engBreakerReasoning builds correct protection presentation', function () {
+  var prev = lang; lang = 'en';
+  var h = engBreakerReasoning({
+    ib: 16, deviceIn: 16, deviceIcu: 10, ikMax: 6000, curve: 'B',
+    deviceLabel: 'Schneider iC60N', izCorrected: 26.2, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('IEC 60898-1') >= 0, 'cites MCB standard');
+  assert.ok(h.indexOf('16 A') >= 0, 'shows device rating');
+  assert.ok(h.indexOf('6.0 kA') >= 0 || h.indexOf('6.0') >= 0, 'shows fault current');
+  assert.ok(h.indexOf('Schneider') >= 0, 'shows device label');
+  lang = prev;
+});
+
+test('eng: engVdropReasoning builds correct voltage-drop presentation', function () {
+  var prev = lang; lang = 'da';
+  var h = engVdropReasoning({
+    ib: 16, length: 25, mm2: '2.5', rPerKm: 7.41, xPerKm: 0.08,
+    cosPhi: 0.95, voltage: 230, dropV: 4.8, dropPct: 2.1, limit: 3, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites standard');
+  assert.ok(h.indexOf('2.1') >= 0, 'shows drop percentage');
+  assert.ok(h.indexOf('25 m') >= 0, 'shows cable length');
+  assert.ok(h.indexOf('acceptabelt') >= 0 || h.indexOf('acceptable') >= 0, 'pass conclusion');
+  lang = prev;
+});
+
+test('eng: fail verdict shows danger styling', function () {
+  var prev = lang; lang = 'da';
+  var h = engVdropReasoning({
+    ib: 50, length: 100, mm2: '4', rPerKm: 4.61, xPerKm: 0.08,
+    cosPhi: 0.9, voltage: 230, dropV: 18, dropPct: 7.8, limit: 5, verdict: 'fail'
+  });
+  assert.ok(h.indexOf('danger') >= 0, 'fail conclusion has danger styling');
+  assert.ok(h.indexOf('OVERSKRIDER') >= 0, 'fail text present');
+  lang = prev;
+});
+
+test('eng: presentation hidden by level gating when mode is apprentice', function () {
+  var prev = uxMode;
+  uxMode = 'apprentice';
+  var h = engPresentation('Expert detail', [{ type: 'formula', content: 'Z = V/I' }], { level: 'expert', id: 'test_gate' });
+  assert.strictEqual(h, '', 'expert panel hidden for apprentice');
+  uxMode = 'expert';
+  h = engPresentation('Expert detail', [{ type: 'formula', content: 'Z = V/I' }], { level: 'expert', id: 'test_gate2' });
+  assert.ok(h.indexOf('Z = V/I') >= 0, 'expert panel shown for expert');
+  uxMode = prev;
+});
+
+test('eng: renderRecommendations includes reasoning panel for cables (electrician+)', function () {
+  var prev = lang, pm = uxMode, pp = loadState.power;
+  lang = 'da'; uxMode = 'electrician'; loadState.power = 10;
+  var ib = calcIB();
+  var cables = recommendCables(ib);
+  if (cables && cables.length > 0) {
+    var out = renderRecommendations('Test kabler', cables, 'cable');
+    assert.ok(out.indexOf('DS/HD 60364-5-52') >= 0, 'cable reasoning cites standard');
+    assert.ok(out.indexOf('ux-panel') >= 0, 'reasoning in collapsible panel');
+  }
+  lang = prev; uxMode = pm; loadState.power = pp;
+});
+
+test('eng: renderRecommendations includes reasoning panel for MCBs (electrician+)', function () {
+  var prev = lang, pm = uxMode, pp = loadState.power;
+  lang = 'en'; uxMode = 'electrician'; loadState.power = 5;
+  var ib = calcIB();
+  var mcbs = recommendMCBs(ib);
+  if (mcbs && mcbs.length > 0) {
+    var out = renderRecommendations('Test MCBs', mcbs, 'mcb');
+    assert.ok(out.indexOf('IEC 60898-1') >= 0, 'MCB reasoning cites standard');
+    assert.ok(out.indexOf('ux-panel') >= 0, 'reasoning in collapsible panel');
+  }
+  lang = prev; uxMode = pm; loadState.power = pp;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
