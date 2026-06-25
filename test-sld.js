@@ -13903,6 +13903,145 @@ test('mcb: MCB module renders for K and Z without error (B/C/D/K/Z buttons)', fu
 });
 
 
+console.log('\n=== Fuse Time-Current Curve Engine Tests (IEC 60269) ===\n');
+
+test('fuse: FUSE_CLASSES covers gG/gL, aM, gR, aR with correct overload behaviour', function () {
+  assert.ok(FUSE_CLASSES.gG && FUSE_CLASSES.aM && FUSE_CLASSES.gR && FUSE_CLASSES.aR, 'all classes present');
+  assert.strictEqual(FUSE_CLASSES.gG.overload, true);   // full-range protects overload
+  assert.strictEqual(FUSE_CLASSES.aM.overload, false);  // aM = short-circuit only (life-safety critical)
+  assert.strictEqual(FUSE_CLASSES.aR.overload, false);  // aR = back-up only
+  assert.strictEqual(FUSE_CLASSES.gR.overload, true);   // gR = full-range
+  assert.ok(FUSE_CLASSES.gG.label.indexOf('gL') >= 0, 'gL documented as gG alias');
+});
+
+test('fuse: only gG is marked as anchored to verified data', function () {
+  assert.strictEqual(FUSE_CLASSES.gG.anchored, true);
+  assert.strictEqual(FUSE_CLASSES.aM.anchored, false);
+  assert.strictEqual(FUSE_CLASSES.gR.anchored, false);
+  assert.strictEqual(FUSE_CLASSES.aR.anchored, false);
+});
+
+test('fuse: classes cite correct IEC sub-standards', function () {
+  assert.strictEqual(FUSE_CLASSES.gG.std, 'IEC 60269-2');
+  assert.strictEqual(FUSE_CLASSES.aM.std, 'IEC 60269-2');
+  assert.strictEqual(FUSE_CLASSES.gR.std, 'IEC 60269-4'); // semiconductor
+  assert.strictEqual(FUSE_CLASSES.aR.std, 'IEC 60269-4');
+});
+
+test('fuse: fuseGetI5s returns verified value and nearest fallback', function () {
+  assert.strictEqual(fuseGetI5s(63), 290);  // verified catalogue value
+  assert.strictEqual(fuseGetI5s(16), 72);
+  assert.strictEqual(fuseGetI5s(0), null);  // guards bad input
+  assert.ok(fuseGetI5s(64) === 290, 'nearest tabulated value for off-grid rating');
+});
+
+test('fuse: gG curve is anchored — t = 5 s at I = i5s', function () {
+  // total clearing at I = i5s should be ~5 s (the anchoring definition)
+  var i5s = fuseGetI5s(63); // 290 A
+  var i2t = fuseI2t(63, 'gG');
+  var tAt5s = i2t.total / (i5s * i5s);
+  assert.ok(Math.abs(tAt5s - 5) < 0.01, '5 s anchor holds (got ' + tAt5s.toFixed(3) + ' s)');
+});
+
+test('fuse: pre-arcing I²t is below total clearing I²t for every class', function () {
+  ['gG', 'aM', 'gR', 'aR'].forEach(function (cls) {
+    var i2t = fuseI2t(63, cls);
+    assert.ok(i2t.pre < i2t.total, cls + ' pre-arc < total');
+  });
+});
+
+test('fuse: semiconductor classes (gR/aR) have far lower I²t let-through than gG', function () {
+  var gG = fuseI2t(63, 'gG').total;
+  assert.ok(fuseI2t(63, 'gR').total < gG * 0.5, 'gR much lower I²t');
+  assert.ok(fuseI2t(63, 'aR').total < gG * 0.5, 'aR much lower I²t');
+});
+
+test('fuse: aM and aR curves do not operate below their low-current threshold', function () {
+  var aM = fuseCurvePoints(63, 'aM', 'total');
+  // aM lowMult = 4 -> no point below 4x In
+  aM.forEach(function (p) { assert.ok(p.m >= 4, 'aM has no point below 4x In'); });
+  var aR = fuseCurvePoints(63, 'aR', 'total');
+  aR.forEach(function (p) { assert.ok(p.m >= 3, 'aR has no point below 3x In'); });
+});
+
+test('fuse: time-current points are monotonically decreasing with current', function () {
+  var pts = fuseCurvePoints(63, 'gG', 'total');
+  var prev = Infinity;
+  for (var i = 0; i < pts.length; i++) { assert.ok(pts[i].t <= prev + 1e-9, 'decreasing'); prev = pts[i].t; }
+  assert.ok(pts.length > 0, 'produces points');
+});
+
+test('fuse: fuseRenderCurve produces valid SVG, no leaks, all classes, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [['gG'], ['gG', 'aM', 'gR', 'aR']].forEach(function (sel) {
+      [16, 63, 250].forEach(function (sz) {
+        var svg = fuseRenderCurve(sz, sel);
+        assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + sz + ')');
+        assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + sel.join('') + '/' + sz + ')');
+        assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + sel.join('') + '/' + sz + ')');
+      });
+    });
+  });
+  lang = prev;
+});
+
+test('fuse: renderer + let-through guard bad input safely', function () {
+  assert.ok(fuseRenderCurve(0, []).indexOf('<svg') === 0, 'curve defaults safely');
+  assert.ok(fuseRenderCurve(null, null).indexOf('NaN') < 0, 'no NaN with null args');
+  assert.ok(fuseRenderLetThrough(63, ['gG']).indexOf('100%') >= 0, 'gG let-through is 100% reference');
+});
+
+test('fuse: I²t let-through bars normalise gG to 100% and mark illustrative classes', function () {
+  var h = fuseRenderLetThrough(63, ['gG', 'gR']);
+  assert.ok(h.indexOf('100%') >= 0, 'gG = 100%');
+  assert.ok(h.indexOf('\u2022') >= 0, 'gR flagged illustrative');
+});
+
+test('fuse: class table states aM/aR provide no overload protection (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = fuseRenderClassTable(['gG', 'aM', 'gR', 'aR']);
+    assert.ok(h.indexOf('IEC 60269-4') >= 0, 'cites semiconductor standard');
+    assert.ok(h.indexOf('\u26d4') >= 0, 'flags no-overload classes');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('fuse: toggle helper adds/removes classes but never empties selection', function () {
+  var prev = fuseCurveSel.slice();
+  fuseCurveSel = ['gG'];
+  fuseToggleClass('aM'); assert.ok(fuseCurveSel.indexOf('aM') >= 0, 'aM added');
+  fuseToggleClass('gG'); assert.ok(fuseCurveSel.indexOf('gG') < 0, 'gG removed');
+  fuseToggleClass('aM'); assert.ok(fuseCurveSel.length >= 1, 'never empties');
+  fuseCurveSel = prev;
+});
+
+test('fuse: renderFuse embeds curve + let-through + class table when a size is chosen (da/en)', function () {
+  var prevLang = lang, ph = fuseState.holder, psz = fuseState.size, psel = fuseCurveSel.slice();
+  fuseState.holder = 'D02'; fuseState.size = 63; fuseCurveSel = ['gG', 'aM', 'gR', 'aR'];
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderFuse();
+    assert.ok(out.indexOf('IEC 60269') >= 0, 'cites IEC 60269 (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined leak (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN leak (' + lg + ')');
+  });
+  lang = prevLang; fuseState.holder = ph; fuseState.size = psz; fuseCurveSel = psel;
+});
+
+test('fuse: curve card hidden until a fuse size is selected', function () {
+  var prevLang = lang, psz = fuseState.size; lang = 'da'; fuseState.size = null;
+  var out = renderFuse();
+  assert.ok(out.indexOf('Tid/str\u00f8m-karakteristik') < 0, 'no curve before a size is picked');
+  lang = prevLang; fuseState.size = psz;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
