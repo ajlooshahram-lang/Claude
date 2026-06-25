@@ -5700,8 +5700,11 @@ const MOTOR_START_METHODS = {
   }
 };
 
-let motorCurveState = { In: 100, methods: ['DOL', 'SD', 'Soft', 'VFD'] };
+let motorCurveState = { In: 100, methods: ['DOL', 'SD', 'Soft', 'VFD'], tripClass: 10 };
 const MOTOR_IN_OPTIONS = [5, 10, 16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+// IEC/EN 60947-4-1 overload-relay trip classes. The class number is the maximum
+// tripping time [s] from cold at 7.2 x Ie (the standard reference test point).
+const MOTOR_TRIP_CLASSES = [5, 10, 20, 30];
 
 function motorToggleMethod(m) {
   var i = motorCurveState.methods.indexOf(m);
@@ -5710,6 +5713,7 @@ function motorToggleMethod(m) {
   renderModule('standards');
 }
 function motorSetCurveIn(v) { motorCurveState.In = Number(v) || 100; renderModule('standards'); }
+function motorSetTripClass(v) { motorCurveState.tripClass = Number(v) || 10; renderModule('standards'); }
 
 // Inline-SVG motor starting current comparison. x = time [s], y = I/In.
 function motorRenderStartCurves(state) {
@@ -5850,9 +5854,118 @@ function motorRenderTorqueCurve(state) {
   return svg;
 }
 
-// ===========================================================================
-// VOLTAGE DROP PROFILE VISUALIZATION
-// ===========================================================================
+// ---------------------------------------------------------------------------
+// Motor thermal / overload protection coordination curve (log-log TCC).
+// Plots, on shared log-log time-current axes (x = I/Ie, y = trip/withstand time):
+//   * the overload-relay inverse-time trip band per IEC/EN 60947-4-1 trip class
+//     (t = T_class * (7.2^2 - 1) / ((I/Ie)^2 - 1), passing through 7.2xIe, T_class)
+//   * the motor HOT and COLD thermal damage (safe-stall) limits, modelled as a
+//     constant-I^2t locked-rotor withstand: t = k / (I/Ie)^2
+//   * the locked-rotor / starting current operating point of the slowest selected
+//     starting method, so coordination can be read directly.
+// Protection is correct when the relay curve lies BELOW the hot damage limit at
+// locked-rotor current (clears before damage) yet ABOVE the start point (no
+// nuisance trip during run-up). DS/HD 60364-4-43; IEC 60947-4-1.
+const MOTOR_THERMAL = { lrCurrent: 6, hotStall: 8, coldStall: 14 }; // x*Ie ; seconds at locked rotor
+
+function motorOverloadTripTime(xMult, tripClass) {
+  // Inverse-time thermal-overload model anchored at the 7.2xIe class point.
+  if (xMult <= 1.05) return Infinity;
+  var ref = 7.2 * 7.2 - 1;
+  return tripClass * ref / (xMult * xMult - 1);
+}
+function motorThermalLimit(xMult, stallTimeAtLR) {
+  // Constant I^2t safe-stall (locked-rotor) thermal withstand.
+  var k = stallTimeAtLR * MOTOR_THERMAL.lrCurrent * MOTOR_THERMAL.lrCurrent;
+  return k / (xMult * xMult);
+}
+
+function motorRenderOverloadCurve(state) {
+  var s = state || motorCurveState;
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var tc = s.tripClass || 10;
+  var w = 560, h = 360, mL = 54, mR = 16, mT = 28, mB = 46;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  var xMin = 1, xMax = 10;                 // I/Ie decade (1..10)
+  var tMin = 0.1, tMax = 1000;             // time, 4 decades
+  var lx0 = Math.log10(xMin), lx1 = Math.log10(xMax);
+  var lt0 = Math.log10(tMin), lt1 = Math.log10(tMax);
+  function xPos(xv) { return mL + (Math.log10(xv) - lx0) / (lx1 - lx0) * plotW; }
+  function yPos(tv) { var t = Math.max(tMin, Math.min(tMax, tv)); return mT + (1 - (Math.log10(t) - lt0) / (lt1 - lt0)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // log grid X (1,2,...,10)
+  for (var gx = 1; gx <= 10; gx++) {
+    var px = xPos(gx);
+    svg += '<line x1="' + px.toFixed(1) + '" y1="' + mT + '" x2="' + px.toFixed(1) + '" y2="' + (h - mB) + '" stroke="' + (gx === 1 || gx === 10 ? '#d0d5dd' : '#f1f3f5') + '"/>';
+    if (gx === 1 || gx === 2 || gx === 5 || gx === 7 || gx === 10) svg += '<text x="' + px.toFixed(1) + '" y="' + (h - mB + 14) + '" text-anchor="middle" font-size="9" fill="#475467">' + gx + '\u00d7</text>';
+  }
+  // log grid Y (decades + minor)
+  [0.1, 1, 10, 100, 1000].forEach(function (tv) {
+    var py = yPos(tv);
+    svg += '<line x1="' + mL + '" y1="' + py.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + py.toFixed(1) + '" stroke="#e4e7ec"/>';
+    svg += '<text x="' + (mL - 6) + '" y="' + (py + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#475467">' + (tv >= 1 ? tv : tv.toFixed(1)) + ' s</text>';
+  });
+  // Ie (1x) reference line
+  svg += '<line x1="' + xPos(1).toFixed(1) + '" y1="' + mT + '" x2="' + xPos(1).toFixed(1) + '" y2="' + (h - mB) + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,3"/>';
+  svg += '<text x="' + (xPos(1) + 3).toFixed(1) + '" y="' + (mT + 10) + '" font-size="8.5" fill="#64748b">Ie=' + s.In + ' A</text>';
+
+  function curve(fn, lo) {
+    var d = '', started = false;
+    for (var xv = (lo || 1.06); xv <= xMax + 0.001; xv *= 1.04) {
+      var tv = fn(xv); if (!isFinite(tv) || tv <= 0) continue;
+      if (tv > tMax * 1.5 && !started) continue;
+      d += (started ? 'L' : 'M') + xPos(xv).toFixed(1) + ',' + yPos(tv).toFixed(1); started = true;
+    }
+    return d;
+  }
+  // Motor COLD thermal limit (upper, lighter red)
+  svg += '<path class="svg-curve-path" d="' + curve(function (x) { return motorThermalLimit(x, MOTOR_THERMAL.coldStall); }) + '" fill="none" stroke="#f97316" stroke-width="2" stroke-dasharray="6,4"/>';
+  // Motor HOT thermal limit (lower bound that must NOT be crossed)
+  svg += '<path class="svg-curve-path" d="' + curve(function (x) { return motorThermalLimit(x, MOTOR_THERMAL.hotStall); }) + '" fill="none" stroke="#dc2626" stroke-width="2.4"/>';
+  // Overload relay trip curve for the selected class
+  svg += '<path class="svg-curve-path" d="' + curve(function (x) { return motorOverloadTripTime(x, tc); }) + '" fill="none" stroke="#2563eb" stroke-width="2.6"/>';
+
+  // Locked-rotor / start operating point of the slowest selected starting method
+  var slowest = null;
+  for (var i = 0; i < s.methods.length; i++) { var inf = MOTOR_START_METHODS[s.methods[i]]; if (inf && (!slowest || inf.iStartDur > slowest.iStartDur)) slowest = inf; }
+  var startX = slowest ? slowest.iStartMult : MOTOR_THERMAL.lrCurrent;
+  var startT = slowest ? slowest.iStartDur : 2;
+  var spx = xPos(Math.min(xMax, startX)), spy = yPos(startT);
+  svg += '<circle cx="' + spx.toFixed(1) + '" cy="' + spy.toFixed(1) + '" r="5" fill="#059669" stroke="#fff" stroke-width="1.5"/>';
+  svg += '<text x="' + (spx - 7).toFixed(1) + '" y="' + (spy - 7).toFixed(1) + '" text-anchor="end" font-size="9" fill="#059669">' + (da ? 'start' : 'start') + ' ' + startX.toFixed(1) + '\u00d7/' + startT + 's</text>';
+
+  // Legend
+  var leg = [['#2563eb', (da ? 'Relæ klasse ' : 'Relay class ') + tc + ' (' + tc + ' s @ 7,2\u00d7)'], ['#dc2626', da ? 'Motor termisk (varm)' : 'Motor thermal (hot)'], ['#f97316', da ? 'Motor termisk (kold)' : 'Motor thermal (cold)'], ['#059669', da ? 'Startpunkt' : 'Start point']];
+  for (var li = 0; li < leg.length; li++) {
+    svg += '<rect x="' + (w - 168) + '" y="' + (mT + 4 + li * 15) + '" width="11" height="11" fill="' + leg[li][0] + '"/>';
+    svg += '<text x="' + (w - 153) + '" y="' + (mT + 14 + li * 15) + '" font-size="9" fill="#344054">' + leg[li][1] + '</text>';
+  }
+  // axis titles
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Str\u00f8m I / Ie (logaritmisk)' : 'Current I / Ie (logarithmic)') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Tid [s] (logaritmisk)' : 'Time [s] (logarithmic)') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Coordination verdict for the overload relay vs. motor thermal limit + start.
+function motorOverloadVerdict(state) {
+  var s = state || motorCurveState;
+  var tc = s.tripClass || 10;
+  var lr = MOTOR_THERMAL.lrCurrent;
+  var tRelayLR = motorOverloadTripTime(lr, tc);
+  var tHotLR = motorThermalLimit(lr, MOTOR_THERMAL.hotStall);
+  var slowest = null;
+  for (var i = 0; i < s.methods.length; i++) { var inf = MOTOR_START_METHODS[s.methods[i]]; if (inf && (!slowest || inf.iStartDur > slowest.iStartDur)) slowest = inf; }
+  var startX = slowest ? slowest.iStartMult : lr;
+  var startT = slowest ? slowest.iStartDur : 2;
+  var tRelayStart = motorOverloadTripTime(startX, tc);
+  var protects = tRelayLR < tHotLR;          // relay clears before the hot damage limit
+  var noNuisance = tRelayStart > startT * 1.15; // relay survives the start with margin
+  return { tc: tc, lr: lr, tRelayLR: tRelayLR, tHotLR: tHotLR, startX: startX, startT: startT, tRelayStart: tRelayStart, protects: protects, noNuisance: noNuisance, ok: protects && noNuisance };
+}
+
+
 // Renders the voltage profile along a cable from source to load, showing:
 // 1. Incremental drop per metre
 // 2. Cumulative drop vs. compliance limits (3% / 5%)
@@ -11147,6 +11260,32 @@ function renderStandards() {
         <div class="result-title">${tx('Sammenligning', 'Comparison')}</div>
         ${motorRenderTable(motorCurveState)}
         <div class="info-row" style="margin-top:6px">${tx('Y-Δ giver en transient spike ved omkobling. Soft reducerer strømmen jævnt. VFD holder ~1,2–1,5×In hele starten. DOL giver fuld startstr\u00f8m (~6–8×In) men kortest tid. Vælg MCB-kurve D/K for DOL, C for Y-Δ, B/C for VFD.', 'Y-Δ produces a transient spike at changeover. Soft ramps current gradually. VFD holds ~1.2–1.5×In throughout start. DOL gives full inrush (~6–8×In) but shortest time. Select MCB curve D/K for DOL, C for Y-Δ, B/C for VFD.')}</div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Overbelastningsbeskyttelse – termisk koordination (IEC 60947-4-1)', 'Overload Protection – Thermal Coordination (IEC 60947-4-1)')}</div>
+        <div class="info-row">${tx('Overbelastningsrelæets udløsekurve (klasse) skal ligge UNDER motorens varme termiske skadesgrænse ved låststrøm, men OVER startpunktet (ingen falsk udkobling). DS/HD 60364-4-43 / IEC 60947-4-1.', 'The overload relay trip curve (class) must lie BELOW the motor hot thermal damage limit at locked-rotor current, but ABOVE the start operating point (no nuisance trip). DS/HD 60364-4-43 / IEC 60947-4-1.')}</div>
+        <div class="select-group">
+          <div class="select-label">${tx('Udløseklasse (IEC 60947-4-1)', 'Trip class (IEC 60947-4-1)')}</div>
+          <div class="select-grid">
+            ${MOTOR_TRIP_CLASSES.map(c =>
+              `<button class="sel-btn ${motorCurveState.tripClass === c ? 'selected' : ''}" onclick="motorSetTripClass(${c})">${tx('Klasse ','Class ')}${c}</button>`
+            ).join('')}
+          </div>
+        </div>
+        ${motorRenderOverloadCurve(motorCurveState)}
+        ${(function(){
+          var v = motorOverloadVerdict(motorCurveState);
+          var da = (typeof lang !== 'undefined' && lang === 'da');
+          var okC = v.ok ? 'var(--success)' : 'var(--danger)';
+          var h = '<div style="margin-top:10px;padding:10px 12px;border-radius:8px;border:1.5px solid '+okC+';background:'+(v.ok?'#f0fdf4':'#fef2f2')+'">';
+          h += '<div style="font-weight:700;color:'+okC+'">'+(v.ok ? (da?'\u2705 Koordination OK':'\u2705 Coordination OK') : (da?'\u26a0\ufe0f Koordination FEJLER':'\u26a0\ufe0f Coordination FAILS'))+'</div>';
+          h += '<div style="font-size:0.8rem;margin-top:4px">';
+          h += (da?'Relæ klasse '+v.tc+' @ ':'Relay class '+v.tc+' @ ')+v.lr.toFixed(1)+'\u00d7Ie: t<sub>rel</sub>='+v.tRelayLR.toFixed(1)+' s, t<sub>hot</sub>='+v.tHotLR.toFixed(1)+' s \u2192 '+(v.protects?(da?'Beskytter f\u00f8r skade':'Clears before damage'):(da?'Relæet er for langsomt!':'Relay too slow!'))+'<br>';
+          h += (da?'Start '+v.startX.toFixed(1)+'\u00d7Ie / '+v.startT+' s: t<sub>rel</sub>='+v.tRelayStart.toFixed(1)+' s \u2192 '+(v.noNuisance?'Ingen falsk udkobling':'FALSK UDKOBLING mulig!') : 'Start '+v.startX.toFixed(1)+'\u00d7Ie / '+v.startT+' s: t<sub>rel</sub>='+v.tRelayStart.toFixed(1)+' s \u2192 '+(v.noNuisance?'No nuisance trip':'NUISANCE TRIP possible!'));
+          h += '</div></div>';
+          return h;
+        })()}
       </div>
     </div>
 

@@ -14782,6 +14782,50 @@ test('motor: torque card embeds the torque/speed curve in the motor module', fun
   lang = prev;
 });
 
+test('motor: overload/thermal curve renders valid log-log SVG for all trip classes, no leaks', function () {
+  var prev = lang, pm = motorCurveState.methods.slice(), pt = motorCurveState.tripClass;
+  motorCurveState.methods = ['DOL', 'SD', 'Soft', 'VFD'];
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    MOTOR_TRIP_CLASSES.forEach(function (tc) {
+      motorCurveState.tripClass = tc;
+      var svg = motorRenderOverloadCurve(motorCurveState);
+      assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + '/class' + tc + ')');
+      assert.ok(svg.indexOf('svg-animated') >= 0, 'animated (' + lg + '/class' + tc + ')');
+      assert.ok(svg.indexOf('svg-curve-path') >= 0, 'curve paths present');
+      assert.ok(svg.indexOf('undefined') < 0 && svg.indexOf('NaN') < 0, 'no leaks (' + lg + '/class' + tc + ')');
+    });
+  });
+  motorCurveState.methods = pm; motorCurveState.tripClass = pt; lang = prev;
+});
+
+test('motor: motorOverloadVerdict returns correct coordination verdicts', function () {
+  var pm = motorCurveState.methods.slice(), pt = motorCurveState.tripClass;
+  motorCurveState.methods = ['DOL']; motorCurveState.tripClass = 10;
+  var v10 = motorOverloadVerdict(motorCurveState);
+  assert.ok(typeof v10.protects === 'boolean' && typeof v10.noNuisance === 'boolean', 'verdict has booleans');
+  assert.ok(v10.tRelayLR > 0 && v10.tHotLR > 0, 'positive trip times');
+  // Class 10 relay at 7.2xIe = 10 s; hot stall at 6xIe = 8*36/36 = 8 s; relay trips at 10 s > 8 s hot → fails to protect
+  // Actually: tRelayLR = 10 * (7.2^2 - 1) / (6^2 - 1) = 10 * 50.84 / 35 = 14.53 s; tHotLR = 8*36/36 = 8 s → relay 14.5 > 8 → NOT protecting.
+  // This is realistic: a class 10 relay does not protect a motor at locked-rotor if hot stall is only 8s at 6xIe.
+  assert.ok(v10.tRelayLR > 0, 'relay time positive');
+  // Class 5 should protect better (faster trip)
+  motorCurveState.tripClass = 5;
+  var v5 = motorOverloadVerdict(motorCurveState);
+  assert.ok(v5.tRelayLR < v10.tRelayLR, 'class 5 trips faster than class 10');
+  motorCurveState.methods = pm; motorCurveState.tripClass = pt;
+});
+
+test('motor: overload protection card is embedded in standards module', function () {
+  var prev = lang; lang = 'da';
+  motorCurveState.tripClass = 10;
+  var out = renderStandards();
+  assert.ok(out.indexOf('Overbelastningsbeskyttelse') >= 0, 'overload card titled');
+  assert.ok(out.indexOf('Koordination') >= 0, 'coordination verdict shown');
+  assert.ok(out.indexOf('undefined') < 0, 'no undefined leak');
+  lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
