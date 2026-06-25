@@ -18832,7 +18832,7 @@ function renderHarmonic() {
 
   // Harmonic Spectrum SVG
   html += '<div class="result-box"><div class="result-title">' + tx('Harmonisk spektrum', 'Harmonic Spectrum') + '</div>';
-  html += '<svg viewBox="0 0 300 120" style="width:100%;max-width:400px;height:auto">';
+  html += '<svg class="svg-animated" viewBox="0 0 300 120" style="width:100%;max-width:400px;height:auto">';
   var barW = 40;
   var harmonics = thdResult.harmonics;
   var maxH = Math.max(harmonics.h3, harmonics.h5, harmonics.h7, harmonics.h11, harmonics.h13, 1);
@@ -20217,7 +20217,7 @@ function renderBathroom() {
 
   // Zone SVG diagram
   html += '<div class="result-box"><div class="result-title">' + tx('Zonediagram', 'Zone Diagram') + '</div>';
-  html += '<svg viewBox="0 0 400 250" style="width:100%;max-width:400px;height:auto;display:block;margin:0 auto">';
+  html += '<svg class="svg-animated" viewBox="0 0 400 250" style="width:100%;max-width:400px;height:auto;display:block;margin:0 auto">';
   html += '<rect x="10" y="10" width="380" height="230" fill="#f0f9ff" stroke="#333" stroke-width="1"/>';
   html += '<text x="350" y="30" font-size="10" fill="#666">' + tx('Uden for zoner','Outside zones') + '</text>';
   // Floor
@@ -23490,7 +23490,7 @@ function renderPool() {
   html += '<div class="card-title">' + tx('Svømmehal / Springvand (DS/HD 60364-7-702)', 'Pool & Fountain Electrical (DS/HD 60364-7-702)') + '</div>';
   html += '<div class="info-row">' + tx('Zoneklassifikation og krav til elektrisk installation ved pools iht. DS/HD 60364-7-702', 'Zone classification and electrical installation requirements for pools per DS/HD 60364-7-702') + '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Zonediagram (pool)', 'Zone Diagram (pool)') + '</div>';
-  html += '<svg viewBox="0 0 420 220" style="width:100%;max-width:420px;height:auto;display:block;margin:0 auto">';
+  html += '<svg class="svg-animated" viewBox="0 0 420 220" style="width:100%;max-width:420px;height:auto;display:block;margin:0 auto">';
   html += '<rect x="5" y="5" width="410" height="210" fill="#f0f9ff" stroke="#333" stroke-width="1"/>';
   html += '<rect x="60" y="130" width="100" height="70" fill="#0369a1" opacity="0.3" stroke="#0369a1" stroke-width="2"/>';
   html += '<text x="80" y="170" font-size="11" fill="#0369a1" font-weight="bold">Zone 0</text>';
@@ -28840,7 +28840,7 @@ function impedansRenderPhasor(res) {
   var zLen = Math.sqrt(rLen * rLen + xNet * xNet);
   if (zLen > maxLen) { var zScale = maxLen / zLen; rLen *= zScale; xlLen *= zScale; xcLen *= zScale; xNet *= zScale; zLen = maxLen; }
 
-  var svg = '<svg width="' + w + '" height="' + h + '" style="display:block;margin:0 auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg class="svg-animated" width="' + w + '" height="' + h + '" style="display:block;margin:0 auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += '<defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--primary)"/></marker>';
   svg += '<marker id="ahR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--success)"/></marker>';
   svg += '<marker id="ahX" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--danger)"/></marker>';
