@@ -15063,6 +15063,19 @@ test('eng: STD_REGISTRY covers the core life-safety clauses', function () {
   });
 });
 
+test('sld: sldLoadState restores a saved tree object; sldLoad(x,y) stays the SVG drawer (name-collision fix)', function () {
+  if (typeof localStorage !== 'undefined' && localStorage.setItem) {
+    sldTree = sldCreateTree();
+    var rootId = sldTree.rootId;
+    sldSave();
+    var loaded = sldLoadState();
+    assert.ok(loaded && typeof loaded === 'object' && !Array.isArray(loaded), 'sldLoadState returns an object, not an SVG string');
+    assert.strictEqual(loaded.rootId, rootId, 'restored tree has the same rootId');
+  }
+  var sym = sldLoad(10, 20);
+  assert.ok(typeof sym === 'string' && sym.indexOf('<') >= 0, 'sldLoad(x,y) is the SVG load-symbol drawer');
+});
+
 test('notation: fmtSym normalizes known symbols but never mangles abbreviations', function () {
   assert.strictEqual(fmtSym('Icu'), 'I<sub>cu</sub>');
   assert.strictEqual(fmtSym('Ics'), 'I<sub>cs</sub>');

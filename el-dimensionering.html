@@ -7107,7 +7107,7 @@ function sldSave() {
   } catch (e) { /* localStorage may be unavailable */ }
 }
 
-function sldLoad() {
+function sldLoadState() {
   try {
     const raw = localStorage.getItem('sld_installation');
     if (!raw) return null;
@@ -7167,7 +7167,7 @@ function sldFromJSON(data) {
 }
 
 function sldInit() {
-  sldTree = sldLoad();
+  sldTree = sldLoadState();
   if (!sldTree) {
     sldTree = sldCreateTree();
     sldPropagateAll(sldTree);
