@@ -14557,6 +14557,95 @@ test('analyzer: fallback infers motor from motor keywords', function () {
 });
 
 
+console.log('\n=== Engineering Presentation Framework (VB Methodology) Tests ===\n');
+
+test('eng: engPresentation renders all 8 step types with correct labels (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var steps = [
+      { type: 'standard', content: 'DS/HD 60364-5-52' },
+      { type: 'assumption', content: 'IB = 25 A' },
+      { type: 'formula', content: 'Iz = Iz,tabel × k1 × k2' },
+      { type: 'substitution', content: 'Iz = 32 × 1.0 × 0.82' },
+      { type: 'intermediate', content: '= 26.2 A' },
+      { type: 'result', content: 'Iz,korr = 26.2 A' },
+      { type: 'verification', content: '25 ≤ 26.2 → OK' },
+      { type: 'conclusion', content: 'Kablet er korrekt.', status: 'pass' }
+    ];
+    var h = engPresentation('Test', steps, { id: 'test_eng_1', open: true });
+    assert.ok(h.indexOf('ux-panel') >= 0, 'wrapped in panel (' + lg + ')');
+    assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'standard content');
+    assert.ok(h.indexOf('success') >= 0 || h.indexOf('pass') >= 0, 'pass styling');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('eng: engCableReasoning builds correct cable-sizing presentation', function () {
+  var prev = lang; lang = 'da';
+  var h = engCableReasoning({
+    ib: 25, installMethod: 'C', kInstall: 1.0, kTemp: 1.0, kGroup: 0.82,
+    kTotal: 0.82, baseIz: 32, correctedIz: 26.2, cableType: 'NOIKLX', mm2: '2.5',
+    tableRef: 'Tabel B.52.4', tempC: 30, groupCount: 2, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites cable standard');
+  assert.ok(h.indexOf('26.2') >= 0, 'shows corrected Iz');
+  assert.ok(h.indexOf('0.82') >= 0, 'shows grouping factor');
+  assert.ok(h.indexOf('NOIKLX') >= 0, 'shows cable type');
+  assert.ok(h.indexOf('success') >= 0, 'pass conclusion');
+  lang = prev;
+});
+
+test('eng: engBreakerReasoning builds correct protection presentation', function () {
+  var prev = lang; lang = 'en';
+  var h = engBreakerReasoning({
+    ib: 16, deviceIn: 16, deviceIcu: 10, ikMax: 6000, curve: 'B',
+    deviceLabel: 'Schneider iC60N', izCorrected: 26.2, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('IEC 60898-1') >= 0, 'cites MCB standard');
+  assert.ok(h.indexOf('16 A') >= 0, 'shows device rating');
+  assert.ok(h.indexOf('6.0 kA') >= 0 || h.indexOf('6.0') >= 0, 'shows fault current');
+  assert.ok(h.indexOf('Schneider') >= 0, 'shows device label');
+  lang = prev;
+});
+
+test('eng: engVdropReasoning builds correct voltage-drop presentation', function () {
+  var prev = lang; lang = 'da';
+  var h = engVdropReasoning({
+    ib: 16, length: 25, mm2: '2.5', rPerKm: 7.41, xPerKm: 0.08,
+    cosPhi: 0.95, voltage: 230, dropV: 4.8, dropPct: 2.1, limit: 3, verdict: 'pass'
+  });
+  assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites standard');
+  assert.ok(h.indexOf('2.1') >= 0, 'shows drop percentage');
+  assert.ok(h.indexOf('25 m') >= 0, 'shows cable length');
+  assert.ok(h.indexOf('acceptabelt') >= 0 || h.indexOf('acceptable') >= 0, 'pass conclusion');
+  lang = prev;
+});
+
+test('eng: fail verdict shows danger styling', function () {
+  var prev = lang; lang = 'da';
+  var h = engVdropReasoning({
+    ib: 50, length: 100, mm2: '4', rPerKm: 4.61, xPerKm: 0.08,
+    cosPhi: 0.9, voltage: 230, dropV: 18, dropPct: 7.8, limit: 5, verdict: 'fail'
+  });
+  assert.ok(h.indexOf('danger') >= 0, 'fail conclusion has danger styling');
+  assert.ok(h.indexOf('OVERSKRIDER') >= 0, 'fail text present');
+  lang = prev;
+});
+
+test('eng: presentation hidden by level gating when mode is apprentice', function () {
+  var prev = uxMode;
+  uxMode = 'apprentice';
+  var h = engPresentation('Expert detail', [{ type: 'formula', content: 'Z = V/I' }], { level: 'expert', id: 'test_gate' });
+  assert.strictEqual(h, '', 'expert panel hidden for apprentice');
+  uxMode = 'expert';
+  h = engPresentation('Expert detail', [{ type: 'formula', content: 'Z = V/I' }], { level: 'expert', id: 'test_gate2' });
+  assert.ok(h.indexOf('Z = V/I') >= 0, 'expert panel shown for expert');
+  uxMode = prev;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

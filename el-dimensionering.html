@@ -5737,6 +5737,103 @@ function vdropSetSize(v) { vdropProfileState.size = Number(v) || 6; renderModule
 function vdropSetLength(v) { vdropProfileState.length = Number(v) || 50; renderModule('standards'); }
 function vdropSetIn(v) { vdropProfileState.In = Number(v) || 25; renderModule('standards'); }
 
+// ===========================================================================
+// ENGINEERING PRESENTATION FRAMEWORK (Viggo Bisch Methodology)
+// ===========================================================================
+// Replicates the exact engineering transparency demonstrated in the Danish
+// Authorization Examination solutions (VB løsningsforslag). Every calculation
+// result can use this framework to present:
+//   1. Regelhenvisning (standards/clauses)
+//   2. Antagelser (assumptions/given data)
+//   3. Formel (formula with variable definitions)
+//   4. Indsætning (substitution with actual values)
+//   5. Mellemregning (intermediate calculations)
+//   6. Resultat (result with units)
+//   7. Verifikation (compliance check: IB≤In≤Iz, Ik≥Ia, etc.)
+//   8. Konklusion (pass/fail + engineering reasoning)
+
+// Builds a professional engineering reasoning panel (collapsible).
+// steps: array of { type, content } where type is one of:
+//   'standard' | 'assumption' | 'formula' | 'substitution' | 'intermediate' |
+//   'result' | 'verification' | 'conclusion'
+function engPresentation(title, steps, opts) {
+  opts = opts || {};
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var typeLabels = {
+    standard: { da: 'Regelhenvisning', en: 'Standard reference', icon: '\uD83D\uDCD6' },
+    assumption: { da: 'Antagelser / Givne data', en: 'Assumptions / Given data', icon: '\uD83D\uDCCB' },
+    formula: { da: 'Formel', en: 'Formula', icon: '\uD83D\uDD23' },
+    substitution: { da: 'Inds\u00e6tning', en: 'Substitution', icon: '\u270F\uFE0F' },
+    intermediate: { da: 'Mellemregning', en: 'Intermediate calculation', icon: '\u2699\uFE0F' },
+    result: { da: 'Resultat', en: 'Result', icon: '\u2705' },
+    verification: { da: 'Verifikation', en: 'Verification', icon: '\uD83D\uDD0D' },
+    conclusion: { da: 'Konklusion', en: 'Conclusion', icon: '\uD83C\uDFAF' }
+  };
+  var statusIcons = { pass: '\u2705', fail: '\u26D4', warn: '\u26A0\uFE0F' };
+
+  var body = '';
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
+    var tl = typeLabels[step.type] || typeLabels.intermediate;
+    var stepBg = step.type === 'conclusion' ? (step.status === 'pass' ? 'background:var(--success-bg);border-left:3px solid var(--success)' : (step.status === 'fail' ? 'background:var(--danger-bg);border-left:3px solid var(--danger)' : '')) : '';
+    body += '<div style="margin:6px 0;padding:6px 10px;border-radius:6px;' + stepBg + '">';
+    body += '<div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px">' + tl.icon + ' ' + (da ? tl.da : tl.en) + '</div>';
+    body += '<div style="font-size:0.82rem;line-height:1.5">' + step.content + '</div>';
+    body += '</div>';
+  }
+
+  // Wrap in a collapsible panel with "Vis begrundelse / Show reasoning" header
+  var panelTitle = (opts.showIcon || '\uD83D\uDCDD') + ' ' + (title || (da ? 'Vis begrundelse' : 'Show reasoning'));
+  return uxPanel(panelTitle, body, { id: opts.id || ('eng_' + Math.random().toString(36).slice(2, 8)), open: opts.open || false, level: opts.level || null });
+}
+
+// Shortcut: builds a standard cable-dimensioning reasoning presentation.
+function engCableReasoning(data) {
+  // data: {ib, installMethod, kInstall, kTemp, kGroup, kTotal, baseIz, correctedIz,
+  //         cableType, mm2, tableRef, tempC, groupCount, verdict}
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var steps = [
+    { type: 'standard', content: 'DS/HD 60364-5-52 ' + (da ? 'Anneks B (str\u00f8mv\u00e6rdier og korrektionsfaktorer)' : 'Annex B (current-carrying capacities and correction factors)') },
+    { type: 'assumption', content: (da ? 'Fremf\u00f8ringsmetode: ' : 'Installation method: ') + '<strong>' + (data.installMethod || 'C') + '</strong>' + (data.tableRef ? ' (' + data.tableRef + ')' : '') + '<br>' + (da ? 'Temperatur: ' : 'Temperature: ') + (data.tempC || 30) + ' \u00b0C<br>' + (da ? 'Gruppering: ' : 'Grouping: ') + (data.groupCount || 1) + (da ? ' kredsløb' : ' circuits') },
+    { type: 'formula', content: 'I<sub>Z,korr</sub> = I<sub>Z,tabel</sub> \u00d7 k<sub>1</sub> \u00d7 k<sub>2</sub> \u00d7 k<sub>3</sub>' },
+    { type: 'substitution', content: 'I<sub>Z,korr</sub> = ' + (data.baseIz || '?') + ' \u00d7 ' + (data.kInstall || 1.0) + ' \u00d7 ' + (data.kTemp || 1.0) + ' \u00d7 ' + (data.kGroup || 1.0) },
+    { type: 'result', content: '<strong>I<sub>Z,korr</sub> = ' + (data.correctedIz ? data.correctedIz.toFixed(1) : '?') + ' A</strong> (' + (data.cableType || '') + ' ' + (data.mm2 || '') + ' mm\u00b2)' },
+    { type: 'verification', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub>: <strong>' + (data.ib ? data.ib.toFixed(1) : '?') + ' A \u2264 I<sub>n</sub> \u2264 ' + (data.correctedIz ? data.correctedIz.toFixed(1) : '?') + ' A</strong>' },
+    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Kablet er korrekt dimensioneret.' : 'Cable is correctly sized.') : (da ? 'Kablet er IKKE tilstr\u00e6kkeligt!' : 'Cable is NOT adequate!'), status: data.verdict || 'pass' }
+  ];
+  return engPresentation(da ? 'Kabeldimensionering' : 'Cable sizing', steps, { id: 'eng_cable_' + (data.mm2 || '0') });
+}
+
+// Shortcut: builds a standard breaker-selection reasoning presentation.
+function engBreakerReasoning(data) {
+  // data: {ib, deviceIn, deviceIcu, ikMax, curve, deviceLabel, izCorrected, verdict}
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var steps = [
+    { type: 'standard', content: 'DS/HD 60364-4-43 ' + (da ? '(overstr\u00f8msbeskyttelse) + IEC 60898-1' : '(overcurrent protection) + IEC 60898-1') },
+    { type: 'assumption', content: 'I<sub>B</sub> = ' + (data.ib ? data.ib.toFixed(1) : '?') + ' A<br>I<sub>k,max</sub> = ' + (data.ikMax ? (data.ikMax / 1000).toFixed(1) + ' kA' : '?') },
+    { type: 'formula', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub><br>I<sub>cu</sub> \u2265 I<sub>k,max</sub>' },
+    { type: 'verification', content: (data.ib ? data.ib.toFixed(1) : '?') + ' A \u2264 <strong>' + (data.deviceIn || '?') + ' A</strong> \u2264 ' + (data.izCorrected ? data.izCorrected.toFixed(1) : '?') + ' A<br>I<sub>cu</sub> = ' + (data.deviceIcu || '?') + ' kA \u2265 ' + (data.ikMax ? (data.ikMax / 1000).toFixed(1) : '?') + ' kA' },
+    { type: 'result', content: (da ? 'Valg: ' : 'Selection: ') + '<strong>' + (data.deviceLabel || '?') + '</strong> ' + (data.curve || '') + (data.deviceIn || '') + ' A' },
+    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Beskyttelsen opfylder kravene.' : 'Protection meets requirements.') : (da ? 'Beskyttelsen er UTILSTR\u00c6KKELIG!' : 'Protection is INADEQUATE!'), status: data.verdict || 'pass' }
+  ];
+  return engPresentation(da ? 'Beskyttelsesvalg' : 'Protection selection', steps, { id: 'eng_breaker_' + (data.deviceIn || '0') });
+}
+
+// Shortcut: builds a voltage-drop reasoning presentation.
+function engVdropReasoning(data) {
+  // data: {ib, length, mm2, rPerKm, xPerKm, cosPhi, voltage, dropV, dropPct, limit, verdict}
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var steps = [
+    { type: 'standard', content: 'DS/HD 60364-5-52 ' + (da ? '(sp\u00e6ndingsfald: \u22643% belysning, \u22645% andre)' : '(voltage drop: \u22643% lighting, \u22645% other)') },
+    { type: 'assumption', content: 'I<sub>B</sub> = ' + (data.ib || '?') + ' A, L = ' + (data.length || '?') + ' m, ' + (data.mm2 || '?') + ' mm\u00b2<br>r = ' + (data.rPerKm || '?') + ' \u03a9/km, x = ' + (data.xPerKm || '?') + ' \u03a9/km, cos\u03c6 = ' + (data.cosPhi || '?') },
+    { type: 'formula', content: '\u0394U = \u221a3 \u00d7 I<sub>B</sub> \u00d7 L \u00d7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6) / 1000' },
+    { type: 'result', content: '\u0394U = <strong>' + (data.dropV ? data.dropV.toFixed(2) : '?') + ' V (' + (data.dropPct ? data.dropPct.toFixed(2) : '?') + ' %)</strong>' },
+    { type: 'verification', content: '\u0394U% = ' + (data.dropPct ? data.dropPct.toFixed(2) : '?') + ' % ' + (data.dropPct <= data.limit ? '\u2264' : '>') + ' ' + (data.limit || 5) + ' % (' + (da ? 'gr\u00e6nse' : 'limit') + ')' },
+    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Sp\u00e6ndingsfaldet er acceptabelt.' : 'Voltage drop is acceptable.') : (da ? 'Sp\u00e6ndingsfaldet OVERSKRIDER gr\u00e6nsen!' : 'Voltage drop EXCEEDS limit!'), status: data.verdict || 'pass' }
+  ];
+  return engPresentation(da ? 'Sp\u00e6ndingsfald' : 'Voltage drop', steps, { id: 'eng_vdrop_' + (data.length || '0') });
+}
+
 function getEarthInfo(sys) {  const info = {
     'TN-S': {
       desc: tx('Separat N og PE hele vejen fra trafo til forbruger', 'Separate N and PE throughout from transformer to consumer'),
