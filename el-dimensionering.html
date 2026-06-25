@@ -18990,6 +18990,26 @@ function renderHeatPump() {
     reference: 'DS/HD 60364-4-43; Installationsbekendtg\u00F8relsen'
   });
 
+  // Energy Savings Comparison — show how much the heat pump REDUCES consumption
+  var annualHeatDemand = heatpumpState.heatingKW * 2000; // kWh heating demand (2000 hrs/yr Denmark)
+  var hpConsumption = annualHeatDemand / heatpumpState.cop; // kWh electricity consumed by HP
+  var directElectricConsumption = annualHeatDemand; // if pure electric heating (COP=1)
+  var gasConsumption = annualHeatDemand / 0.9; // gas boiler at 90% efficiency
+  var hpSavingVsElectric = directElectricConsumption - hpConsumption;
+  var hpSavingVsGas = gasConsumption * 0.65 - hpConsumption; // gas: 0.65 DKK/kWh equiv
+  var elPrice = 2.5; // DKK/kWh
+  var co2PerKwh = 0.085; // kg CO2/kWh Danish grid
+
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — Varmepumpen vs. alternativer', 'Energy Savings — Heat pump vs. alternatives') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Årligt varmebehov', 'Annual heating demand') + '</span><span class="value">' + annualHeatDemand.toFixed(0) + ' kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('VP elforbrug (COP ' + heatpumpState.cop + ')', 'HP electricity use (COP ' + heatpumpState.cop + ')') + '</span><span class="value" style="color:var(--success);font-weight:700">' + hpConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Direkte elvarme (COP 1)', 'Direct electric heating (COP 1)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + directElectricConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse vs. elvarme', 'Savings vs. electric heating') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + hpSavingVsElectric.toFixed(0) + ' kWh (' + (hpSavingVsElectric * elPrice / 1000).toFixed(1) + 'k DKK/\u00e5r)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (hpSavingVsElectric * co2PerKwh / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling (vs. elvarme)', 'Payback (vs. electric heating)') + '</span><span class="value">\u2248 ' + Math.round(80000 / (hpSavingVsElectric * elPrice)) + ' ' + tx('\u00e5r', 'years') + '</span></div>';
+  html += '</div>';
+
   html += renderVerdict(allOk, allOk ? tx('Varmepumpeinstallation opfylder DS/HD 60364', 'Heat pump installation complies with DS/HD 60364') : tx('Spaendingsfald for hoejt - vaelg stoerre kabel eller kortere laengde', 'Voltage drop too high - select larger cable or shorter length'));
 
   html += '</div>';
