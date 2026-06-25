@@ -7327,6 +7327,19 @@ function renderThermal() {
       <div class="result-row"><span class="label">${tx('Kombineret','Combined')}</span><span class="value">${dr.combined}</span></div>
       <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${dr.clause}</span></div>
     </div>
+    ${calcDetail({
+      name: tx('Termisk derating', 'Thermal Derating'),
+      formula: 'Iz_korr = Iz_tab \u00d7 K_temp \u00d7 K_group',
+      variables: [
+        { name: tx('Omgivelsestemperatur', 'Ambient temperature'), symbol: '\u03b8_amb', value: thermalState.ambientTemp, unit: '\u00b0C' },
+        { name: tx('Antal kabler', 'Number of cables'), symbol: 'n', value: thermalState.groupingCount },
+        { name: tx('Temperaturfaktor', 'Temperature factor'), symbol: 'K_temp', value: dr.ambientFactor, source: 'DS/HD 60364-5-52 Tabel B.52.14' },
+        { name: tx('Grupperingsfaktor', 'Grouping factor'), symbol: 'K_group', value: dr.groupFactor, source: 'DS/HD 60364-5-52 Tabel B.52.17' }
+      ],
+      substitution: 'K_total = ' + dr.ambientFactor + ' \u00d7 ' + dr.groupFactor + ' = ' + dr.combined,
+      result: { value: dr.combined, unit: '', status: dr.combined >= 0.5 ? 'ok' : 'warn' },
+      reference: 'DS/HD 60364-5-52 cl.523'
+    })}
   </div>`;
 }
 
@@ -7809,6 +7822,20 @@ function renderEnergy() {
     <div class="card-title">\uD83C\uDF31 ${tx('Energioptimering — Anbefalinger til reduktion', 'Energy Optimization — Reduction Recommendations')}</div>
     <div class="info-row">${tx('Baseret på din lastprofil og installerede udstyr beregner systemet konkrete besparelsesmuligheder med investering, tilbagebetalingstid og CO\u2082-reduktion.', 'Based on your load profile and installed equipment, the system calculates specific savings opportunities with investment, payback time and CO\u2082 reduction.')}</div>
     ${energyRenderOptimization(energyState)}
+    ${calcDetail({
+      name: tx('Energianalyse', 'Energy Analysis'),
+      formula: 'Pf = cos\u03c6 = P / S ;  Q_c = P \u00d7 (tan\u03c61 - tan\u03c62)',
+      variables: [
+        { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03c6', value: pf.pf, source: tx('beregnet fra laster', 'calculated from loads') },
+        { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: energyState.powerKW, unit: 'kW' },
+        { name: tx('Kondensatorbehov', 'Capacitor bank'), symbol: 'Q_c', value: capSize.kvar, unit: 'kvar', source: 'IEC 60831-1' },
+        { name: tx('Daglig energiomkostning', 'Daily energy cost'), symbol: 'C_dag', value: cost.dailyCostDKK, unit: 'DKK/dag' },
+        { name: tx('Peak shaving-potentiale', 'Peak shaving potential'), symbol: '\u0394P', value: peak.potentialSaving, unit: 'DKK/m\u00e5ned' }
+      ],
+      substitution: 'Q_c = ' + energyState.powerKW + ' \u00d7 (tan(arccos ' + pf.pf.toFixed(2) + ') - tan(arccos ' + energyState.targetPF + ')) = ' + capSize.kvar + ' kvar',
+      result: { value: capSize.kvar, unit: 'kvar', status: capSize.kvar > 0 ? 'ok' : 'info' },
+      reference: 'IEC 60831-1; EN 50160 cl.4.2.3'
+    })}
   </div>`;
 }
 
@@ -24129,6 +24156,22 @@ function renderBESS() {
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling', 'Payback') + '</span><span class="value">\u2248 ' + bessPayback + ' \u00e5r</span></div>';
   html += '</div>';
   html += renderVerdict(safe, safe ? tx('Systemet er korrekt dimensioneret iht. DS/EN 62619 + DS/HD 60364-5-56', 'System correctly sized per DS/EN 62619 + DS/HD 60364-5-56') : tx('ADVARSEL: Kabelkapacitet overskredet. DS/HD 60364-5-56.', 'WARNING: Cable capacity exceeded. DS/HD 60364-5-56.'));
+  var bessChemData = BESS_CHEMISTRY[bessState.chemistry] || {};
+  html += calcDetail({
+    name: tx('BESS-dimensionering', 'BESS Sizing'),
+    formula: 'E_req = P_peak \u00d7 t_backup / \u03b7_round ;  I_dc = P / U_dc ;  Icu \u2265 Ik,dc',
+    variables: [
+      { name: tx('Kemi', 'Chemistry'), symbol: bessState.chemistry, value: bessChemData.voltageRange || bessState.voltDC + ' V', unit: '', source: 'DS/EN 62619' },
+      { name: tx('Kapacitet', 'Capacity'), symbol: 'E', value: bessState.capacityKWh, unit: 'kWh' },
+      { name: tx('Inverterstørrelse', 'Inverter size'), symbol: 'P_inv', value: inv.kW, unit: 'kW' },
+      { name: tx('DC-sikring', 'DC fuse'), symbol: 'I_fuse', value: prot.dcFuse.rating, unit: 'A', source: 'IEC 60269' },
+      { name: tx('AC MCB', 'AC MCB'), symbol: 'In', value: prot.acMCB.rating, unit: 'A', source: 'IEC 60898' },
+      { name: tx('RCD type', 'RCD type'), symbol: prot.rcd.type, value: prot.rcd.rating, unit: 'mA', source: prot.rcd.clause }
+    ],
+    substitution: 'I_dc = ' + inv.kW + '\u00d710\u00b3 / ' + bessState.voltDC + ' V = ' + dcI.current.toFixed(1) + ' A',
+    result: { value: bessState.capacityKWh, unit: 'kWh', status: safe ? 'ok' : 'fail' },
+    reference: 'DS/EN 62619; DS/HD 60364-5-56 cl.551'
+  });
   html += '</div>';
   return html;
 }
