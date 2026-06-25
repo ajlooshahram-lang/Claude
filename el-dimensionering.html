@@ -10706,6 +10706,63 @@ function renderTrafoRegulation() {
   return html;
 }
 
+// Inline-SVG transformer efficiency curve: η vs load %, marks current point + optimum.
+function trafoRenderEffCurve(SN, P0, Pcu, cosPhi, currentLoadPct) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var w = 560, h = 300, mL = 52, mR = 16, mT = 26, mB = 44;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  // sample η across 5..120% load
+  var pts = [];
+  var etaMin = 1, etaMax = 0;
+  for (var L = 5; L <= 120; L += 5) {
+    var e = trafoCalcEfficiency(SN, P0, Pcu, L, cosPhi).eta * 100;
+    pts.push({ L: L, e: e });
+    if (e < etaMin) etaMin = e; if (e > etaMax) etaMax = e;
+  }
+  var yLo = Math.max(90, Math.floor(etaMin) - 1), yHi = Math.min(100, Math.ceil(etaMax) + 0.5);
+  if (yHi - yLo < 2) { yLo = Math.max(90, yHi - 5); }
+  function xPos(L) { return mL + (L / 120) * plotW; }
+  function yPos(e) { return mT + (1 - (e - yLo) / (yHi - yLo)) * plotH; }
+  var optLoad = (Pcu > 0) ? Math.sqrt(P0 / Pcu) * 100 : 50;
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // gridlines x (load %)
+  [0, 25, 50, 75, 100].forEach(function (L) {
+    var gx = xPos(L);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 15) + '" text-anchor="middle" font-size="9" fill="#475467">' + L + '%</text>';
+  });
+  // gridlines y (η)
+  var yticks = 4;
+  for (var i = 0; i <= yticks; i++) {
+    var ev = yLo + (yHi - yLo) * i / yticks;
+    var gy = yPos(ev);
+    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#475467">' + ev.toFixed(1) + '%</text>';
+  }
+  // optimum-load vertical marker
+  var ox = xPos(optLoad);
+  svg += '<line x1="' + ox.toFixed(1) + '" y1="' + mT + '" x2="' + ox.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#059669" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (ox + 4).toFixed(1) + '" y="' + (mT + 12) + '" font-size="9" fill="#059669">' + (da ? 'optimum ' : 'optimum ') + optLoad.toFixed(0) + '%</text>';
+  // curve path
+  var d = '';
+  for (var p = 0; p < pts.length; p++) d += (p === 0 ? 'M' : 'L') + xPos(pts[p].L).toFixed(1) + ',' + yPos(pts[p].e).toFixed(1);
+  svg += '<path class="svg-curve-path" d="' + d + '" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+  // current operating point
+  var ce = trafoCalcEfficiency(SN, P0, Pcu, currentLoadPct, cosPhi).eta * 100;
+  if (currentLoadPct <= 120) {
+    var cx = xPos(currentLoadPct), cy = yPos(ce);
+    svg += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4.5" fill="#dc2626"/>';
+    svg += '<text x="' + (cx + 6).toFixed(1) + '" y="' + (cy - 6).toFixed(1) + '" font-size="10" fill="#b42318" font-weight="700">' + ce.toFixed(2) + '% @ ' + currentLoadPct + '%</text>';
+  }
+  // axis titles
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Belastning [% af SN]' : 'Load [% of SN]') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Virkningsgrad \u03B7 [%]' : 'Efficiency \u03B7 [%]') + '</text>';
+  svg += '<text x="' + mL + '" y="' + (mT - 10) + '" font-size="10" fill="#475467">' + SN + ' kVA, cos\u03C6=' + cosPhi + ' \u2014 ' + (da ? '\u03B7 topper ved optimal belastning (P0=Pcu\u00D7(S/SN)\u00B2)' : '\u03B7 peaks at optimum load (P0=Pcu\u00D7(S/SN)\u00B2)') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
 function renderTrafoEfficiency() {
   var S = trafoState.size;
   var losses = TRAFO_LOSSES[S] || { p0: 610, pk: 6900 };
@@ -10726,6 +10783,7 @@ function renderTrafoEfficiency() {
   html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + eff.Plosses.toFixed(0) + ' W</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Optimal belastning', 'Optimum load') + '</span><span class="value">' + (eff.optLoad * 100).toFixed(1) + '% (' + (eff.optLoad * S).toFixed(0) + ' kVA)</span></div>';
   html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Virkningsgradskurve (\u03B7 vs. belastning)', 'Efficiency curve (\u03B7 vs. load)') + '</div>' + trafoRenderEffCurve(S, losses.p0, losses.pk, trafoState.effCosPhi, trafoState.effLoadPct) + '</div>';
   html += calcDetail({ name: tx('Virkningsgrad', 'Efficiency'), formula: '\u03B7 = P2 / (P2 + P0 + Pcu\u00D7(S/SN)\u00B2)', variables: [{ name: 'P2', symbol: 'P2', value: eff.P2, unit: 'W' }, { name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }, { name: 'S/SN', symbol: 'S/SN', value: trafoState.effLoadPct/100 }], substitution: eff.P2.toFixed(0) + ' / (' + eff.P2.toFixed(0) + ' + ' + losses.p0 + ' + ' + eff.Pcu_load.toFixed(0) + ')', result: { value: eff.eta * 100, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
   html += calcDetail({ name: tx('Optimal belastning', 'Optimum load'), formula: 'S_opt/SN = \u221A(P0/Pcu)', variables: [{ name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }], substitution: '\u221A(' + losses.p0 + '/' + losses.pk + ')', result: { value: eff.optLoad * 100, unit: '% af SN' }, reference: 'Opgavesamling Kap. 9' });
   html += '</div>';

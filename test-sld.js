@@ -14731,6 +14731,32 @@ test('eng: renderRecommendations includes reasoning panel for MCBs (electrician+
   lang = prev; uxMode = pm; loadState.power = pp;
 });
 
+test('trafo: efficiency curve renders valid SVG, marks operating point + optimum, no leaks', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var svg = trafoRenderEffCurve(630, 610, 6900, 0.9, 75);
+    assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + ')');
+    assert.ok(svg.indexOf('svg-animated') >= 0, 'animated class present');
+    assert.ok(svg.indexOf('optimum') >= 0, 'optimum load marked');
+    assert.ok(svg.indexOf('undefined') < 0 && svg.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  // efficiency peaks near sqrt(P0/Pcu) optimum
+  var eOpt = trafoCalcEfficiency(630, 610, 6900, Math.sqrt(610 / 6900) * 100, 0.9).eta;
+  var eFull = trafoCalcEfficiency(630, 610, 6900, 100, 0.9).eta;
+  assert.ok(eOpt >= eFull, 'efficiency at optimum >= at full load');
+  lang = prev;
+});
+
+test('trafo: renderTrafoEfficiency embeds the efficiency curve', function () {
+  var prev = lang; lang = 'da';
+  var out = renderTrafoEfficiency();
+  assert.ok(out.indexOf('<svg') >= 0, 'efficiency curve embedded');
+  assert.ok(out.indexOf('Virkningsgradskurve') >= 0, 'curve titled');
+  assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
