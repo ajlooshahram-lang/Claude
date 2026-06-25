@@ -13721,6 +13721,61 @@ test('rcd: RCD_TYPE_CAP — AC not allowed in DK, A/F/B allowed', function () {
   assert.ok(RCD_TYPE_CAP['Type B+'].detects_en.indexOf('20 kHz') >= 0, 'B+ extends HF detection to 20 kHz');
 });
 
+test('curveAI: CURVE_KB covers all major curve types with 6 analysis facets', function () {
+  ['mcb_B', 'mcb_C', 'mcb_D', 'fuse_gG', 'fuse_aM', 'rcd_general', 'lsig', 'phasor', 'motor'].forEach(function (k) {
+    var kb = CURVE_KB[k];
+    assert.ok(kb, k + ' present');
+    ['meaning_da', 'why_da', 'settings_da', 'compliance_da', 'coord_da', 'alt_da', 'std'].forEach(function (f) {
+      assert.ok(kb[f] && kb[f].length > 3, k + ' has ' + f);
+    });
+    ['meaning_en', 'why_en', 'settings_en', 'compliance_en', 'coord_en', 'alt_en'].forEach(function (f) {
+      assert.ok(kb[f] && kb[f].length > 3, k + ' has ' + f);
+    });
+  });
+});
+
+test('curveAI: curveAnalyze renders all 6 facets + standard, no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = curveAnalyze('mcb_C');
+    assert.ok(h.indexOf('AI') >= 0, 'labelled AI analysis (' + lg + ')');
+    assert.ok(h.indexOf('IEC 60898-1') >= 0, 'cites standard');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('curveAI: aM analysis warns it provides no overload protection', function () {
+  var prev = lang; lang = 'en';
+  var h = curveAnalyze('fuse_aM');
+  assert.ok(h.indexOf('NOT provide overload') >= 0 || h.indexOf('short-circuit protection ONLY') >= 0, 'aM no-overload warning present');
+  lang = prev;
+});
+
+test('curveAI: D-curve analysis flags the critical Ik verification', function () {
+  var h = curveAnalyze('mcb_D');
+  assert.ok(h.indexOf('Ik,min') >= 0, 'D-curve flags Ik,min check');
+});
+
+test('curveAI: curveAnalyze falls back to mcb_C for unknown key (no crash)', function () {
+  var h = curveAnalyze('nonexistent_key');
+  assert.ok(h.indexOf('<div') === 0 && h.indexOf('undefined') < 0, 'safe fallback');
+});
+
+test('curveAI: renderCurveAnalyzer embeds selector + analysis in Standards (da/en)', function () {
+  var prev = lang, psel = curveAnalyzerSel;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    curveAnalyzerSel = 'lsig';
+    var out = renderStandards();
+    assert.ok(out.indexOf('Curve Analyzer') >= 0 || out.indexOf('Kurve-analyse') >= 0, 'analyzer card present (' + lg + ')');
+    assert.ok(out.indexOf('curveAnalyzerSetSel') >= 0, 'selector wired');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+  });
+  lang = prev; curveAnalyzerSel = psel;
+});
+
 test('rcd: rcdRenderTypeMatrix lists all four types and flags AC, no leaks (da/en)', function () {
   var prev = lang;
   ['da', 'en'].forEach(function (lg) {

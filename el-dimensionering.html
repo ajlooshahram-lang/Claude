@@ -5952,6 +5952,218 @@ function engVdropReasoning(data) {
   return engPresentation(da ? 'Sp\u00e6ndingsfald' : 'Voltage drop', steps, { id: 'eng_vdrop_' + (data.length || '0') });
 }
 
+// ===========================================================================
+// AI CURVE ANALYZER — click any curve, get a plain-language engineering reading
+// ===========================================================================
+// Deterministic, offline knowledge base (no external AI). For each curve type
+// it explains: what it means, why it matters, which settings influence it,
+// compliance status, coordination behaviour, and better alternatives. This
+// fulfils the directive "Allow users to click any curve. The AI must explain...".
+const CURVE_KB = {
+  'mcb_B': {
+    title_da: 'MCB kurve B', title_en: 'MCB curve B',
+    meaning_da: 'Magnetisk udl\u00f8sning ved 3\u20135\u00d7In. Termisk (overlast) omr\u00e5de til venstre, magnetisk (kortslutning) til h\u00f8jre.',
+    meaning_en: 'Magnetic trip at 3\u20135\u00d7In. Thermal (overload) region on the left, magnetic (short-circuit) on the right.',
+    why_da: 'Den laveste udl\u00f8setærskel \u2014 velegnet hvor fejlstr\u00f8mmen (Ik) er lav, fx lange kabler eller generatordrift.',
+    why_en: 'The lowest trip threshold \u2014 ideal where fault current (Ik) is low, e.g. long cables or generator supply.',
+    settings_da: 'In (m\u00e6rkestr\u00f8m) skalerer hele kurven. Kurvetypen B/C/D flytter det magnetiske b\u00e5nd.',
+    settings_en: 'In (rated current) scales the whole curve. Curve type B/C/D shifts the magnetic band.',
+    compliance_da: 'Skal opfylde IB\u2264In\u2264Iz og Zs\u2264U0/Ia (DS/HD 60364-4-41). Verific\u00e9r at Ik,min n\u00e5r 5\u00d7In.',
+    compliance_en: 'Must satisfy IB\u2264In\u2264Iz and Zs\u2264U0/Ia (DS/HD 60364-4-41). Verify Ik,min reaches 5\u00d7In.',
+    coord_da: 'God selektivitet nedstr\u00f8ms mod tr\u00e6ge enheder. Kan falske-udl\u00f8se ved induktive startstr\u00f8mme.',
+    coord_en: 'Good downstream selectivity against slower devices. May nuisance-trip on inductive inrush.',
+    alt_da: 'Ved startstr\u00f8m \u2192 kurve C/D. Ved meget lav Ik \u2192 tilf\u00f8j RCD som suppl. beskyttelse.',
+    alt_en: 'For inrush \u2192 curve C/D. For very low Ik \u2192 add RCD as supplementary protection.',
+    std: 'IEC 60898-1; DS/HD 60364-4-41/4-43'
+  },
+  'mcb_C': {
+    title_da: 'MCB kurve C', title_en: 'MCB curve C',
+    meaning_da: 'Magnetisk udl\u00f8sning ved 5\u201310\u00d7In \u2014 standard til blandet/induktiv last.',
+    meaning_en: 'Magnetic trip at 5\u201310\u00d7In \u2014 standard for mixed/inductive loads.',
+    why_da: 'T\u00e5ler moderate startstr\u00f8mme (sm\u00e5 motorer, transformere) uden falsk udl\u00f8sning.',
+    why_en: 'Tolerates moderate inrush (small motors, transformers) without nuisance tripping.',
+    settings_da: 'In skalerer kurven. Isd-b\u00e5ndet 5\u201310\u00d7In best\u00e6mmer kortslutnings-udl\u00f8sningen.',
+    settings_en: 'In scales the curve. The 5\u201310\u00d7In Isd band sets the short-circuit trip.',
+    compliance_da: 'Verific\u00e9r Ik,min \u2265 10\u00d7In for sikker magnetisk udl\u00f8sning (DS/HD 60364-4-41).',
+    compliance_en: 'Verify Ik,min \u2265 10\u00d7In for reliable magnetic trip (DS/HD 60364-4-41).',
+    coord_da: 'Standardvalg til boliger/erhverv. Selektivitet mod B-kurver nedstr\u00f8ms.',
+    coord_en: 'Default for residential/commercial. Selectivity against downstream B-curves.',
+    alt_da: 'Lav Ik \u2192 kurve B. H\u00f8j startstr\u00f8m (DOL-motor) \u2192 kurve D / motorv\u00e6rn.',
+    alt_en: 'Low Ik \u2192 curve B. High inrush (DOL motor) \u2192 curve D / motor protector.',
+    std: 'IEC 60898-1; DS/HD 60364-4-41/4-43'
+  },
+  'mcb_D': {
+    title_da: 'MCB kurve D', title_en: 'MCB curve D',
+    meaning_da: 'Magnetisk udl\u00f8sning ved 10\u201320\u00d7In \u2014 til h\u00f8j startstr\u00f8m.',
+    meaning_en: 'Magnetic trip at 10\u201320\u00d7In \u2014 for high inrush.',
+    why_da: 'Transformere, motorer, r\u00f8ntgen, svejsere giver h\u00f8j kortvarig startstr\u00f8m som B/C ville udl\u00f8se p\u00e5.',
+    why_en: 'Transformers, motors, X-ray, welders draw high brief inrush that would trip B/C.',
+    settings_da: 'In skalerer kurven; det h\u00f8je Isd-b\u00e5nd (10\u201320\u00d7In) kr\u00e6ver h\u00f8j Ik for at udl\u00f8se.',
+    settings_en: 'In scales the curve; the high Isd band (10\u201320\u00d7In) needs high Ik to trip.',
+    compliance_da: 'KRITISK: verific\u00e9r Ik,min \u2265 20\u00d7In \u2014 ellers udl\u00f8ser den ikke ved fejl. Ofte n\u00f8dvendigt med RCD.',
+    compliance_en: 'CRITICAL: verify Ik,min \u2265 20\u00d7In \u2014 otherwise it will not trip on a fault. Often needs an RCD.',
+    coord_da: 'Bedst til motorafgange. Risiko for manglende udl\u00f8sning ved lav Ik.',
+    coord_en: 'Best for motor feeders. Risk of non-operation at low Ik.',
+    alt_da: 'Hvis Ik er for lav til 20\u00d7In \u2192 brug motorv\u00e6rn med separat termisk+magnetisk, eller RCD.',
+    alt_en: 'If Ik is too low for 20\u00d7In \u2192 use a motor protector with separate thermal+magnetic, or RCD.',
+    std: 'IEC 60898-1; DS/HD 60364-4-41'
+  },
+  'fuse_gG': {
+    title_da: 'Sikring gG/gL', title_en: 'Fuse gG/gL',
+    meaning_da: 'Fuldomr\u00e5desikring: beskytter mod b\u00e5de overlast og kortslutning. Smelte- + lysbuetid vist.',
+    meaning_en: 'Full-range fuse: protects against both overload and short-circuit. Melting + arcing time shown.',
+    why_da: 'Standard til kabel-/ledningsbeskyttelse. I\u00b2t-gennemslip best\u00e6mmer om kablet er beskyttet (k\u00b2S\u00b2\u2265I\u00b2t).',
+    why_en: 'Standard for cable protection. The I\u00b2t let-through decides if the cable is protected (k\u00b2S\u00b2\u2265I\u00b2t).',
+    settings_da: 'M\u00e6rkestr\u00f8m In; 5-sekunders str\u00f8m i5s forankrer kurven.',
+    settings_en: 'Rated current In; the 5-second current i5s anchors the curve.',
+    compliance_da: 'Verific\u00e9r IB\u2264In, I\u00b2t\u2264k\u00b2S\u00b2 (DS/HD 60364-4-43 \u00a7434.5.2) og Icu\u2265Ik,max.',
+    compliance_en: 'Verify IB\u2264In, I\u00b2t\u2264k\u00b2S\u00b2 (DS/HD 60364-4-43 \u00a7434.5.2) and Icu\u2265Ik,max.',
+    coord_da: 'Selektivitet ved 1,6:1 str\u00f8mforhold mellem sikringer i serie.',
+    coord_en: 'Selectivity at a 1.6:1 current ratio between series fuses.',
+    alt_da: 'Motorkreds \u2192 aM (kun kortslutning). Halvleder \u2192 gR/aR (ultrahurtig).',
+    alt_en: 'Motor circuit \u2192 aM (short-circuit only). Semiconductor \u2192 gR/aR (ultra-fast).',
+    std: 'IEC 60269-2; DS/HD 60364-4-43'
+  },
+  'fuse_aM': {
+    title_da: 'Sikring aM', title_en: 'Fuse aM',
+    meaning_da: 'Delomr\u00e5desikring (backup): KUN kortslutningsbeskyttelse \u2014 IKKE overlast.',
+    meaning_en: 'Partial-range (back-up) fuse: short-circuit protection ONLY \u2014 NOT overload.',
+    why_da: 'Til motorkredse: t\u00e5ler startstr\u00f8m, overlast h\u00e5ndteres af termorel\u00e6.',
+    why_en: 'For motor circuits: withstands inrush; overload is handled by a thermal relay.',
+    settings_da: 'In; udl\u00f8ser ikke under ~4\u00d7In.',
+    settings_en: 'In; does not operate below ~4\u00d7In.',
+    compliance_da: 'ADVARSEL: giver IKKE overlastbeskyttelse \u2014 SKAL kombineres med termorel\u00e6/motorv\u00e6rn.',
+    compliance_en: 'WARNING: does NOT provide overload protection \u2014 MUST be combined with a thermal relay/motor protector.',
+    coord_da: 'Koordineres med kontaktor + termorel\u00e6 (type 2 koordinering, IEC 60947-4-1).',
+    coord_en: 'Coordinated with contactor + thermal relay (type 2 coordination, IEC 60947-4-1).',
+    alt_da: 'Ren kabelbeskyttelse \u2192 gG. Halvleder \u2192 aR.',
+    alt_en: 'Pure cable protection \u2192 gG. Semiconductor \u2192 aR.',
+    std: 'IEC 60269-2; IEC 60947-4-1'
+  },
+  'rcd_general': {
+    title_da: 'HPFI/RCD momentan', title_en: 'RCD instantaneous',
+    meaning_da: 'Maksimal afbrydetid: 300/150/40 ms ved 1\u00d7/2\u00d7/5\u00d7I\u0394n. Den r\u00f8de linje er den senest tilladte udl\u00f8sning.',
+    meaning_en: 'Maximum break time: 300/150/40 ms at 1\u00d7/2\u00d7/5\u00d7I\u0394n. The red line is the latest allowed trip.',
+    why_da: 'Beskytter mod elektrisk st\u00f8d (ber\u00f8ring) og brand. Kr\u00e6ves p\u00e5 alle nye danske boliginstallationer.',
+    why_en: 'Protects against electric shock (contact) and fire. Required on all new Danish residential installations.',
+    settings_da: 'I\u0394n (30 mA pers.beskyttelse, 300 mA brand). Udl\u00f8sningsklasse (momentan vs. selektiv type S).',
+    settings_en: 'I\u0394n (30 mA personal protection, 300 mA fire). Operating class (instantaneous vs. selective type S).',
+    compliance_da: '30 mA p\u00e5 stikkontakter \u226420 A og slutkredse \u226432 A (DS/HD 60364-4-41 \u00a7411.3.3).',
+    compliance_en: '30 mA on socket circuits \u226420 A and final circuits \u226432 A (DS/HD 60364-4-41 \u00a7411.3.3).',
+    coord_da: 'Selektivitet: opstr\u00f8ms type S (tidsforsinket) over nedstr\u00f8ms momentan 30 mA.',
+    coord_en: 'Selectivity: upstream type S (time-delayed) over downstream instantaneous 30 mA.',
+    alt_da: 'EV/PV/3-faset VFD \u2192 type B/B+. 1-faset VFD \u2192 type F.',
+    alt_en: 'EV/PV/3-phase VFD \u2192 type B/B+. 1-phase VFD \u2192 type F.',
+    std: 'IEC 61008-1; DS/HD 60364-4-41'
+  },
+  'lsig': {
+    title_da: 'MCCB/ACB LSIG', title_en: 'MCCB/ACB LSIG',
+    meaning_da: 'Justerbar beskyttelseskonvolut: L=langsom (overlast), S=kort-tid, I=momentan, G=jordfejl.',
+    meaning_en: 'Adjustable protection envelope: L=long-time (overload), S=short-time, I=instantaneous, G=ground fault.',
+    why_da: 'Tillader pr\u00e6cis koordinering i store anl\u00e6g \u2014 hver afgang ryddes f\u00f8r hovedet.',
+    why_en: 'Enables precise coordination in large installations \u2014 each feeder clears before the main.',
+    settings_da: 'Ir (langsom opsamling), tr L, Isd (kort-tid), tr S, Ii (momentan), Ig+tg (jordfejl).',
+    settings_en: 'Ir (long-time pickup), tr L, Isd (short-time), tr S, Ii (instantaneous), Ig+tg (ground).',
+    compliance_da: 'Ir\u2265IB, Isd over nedstr\u00f8ms udl\u00f8sekurve, Icu\u2265Ik,max (IEC 60947-2 Annex F).',
+    compliance_en: 'Ir\u2265IB, Isd above downstream trip curve, Icu\u2265Ik,max (IEC 60947-2 Annex F).',
+    coord_da: 'Tidsgraduering: hovedets tr S l\u00e6gges over afgangenes kurve i hele fejlomr\u00e5det.',
+    coord_en: 'Time grading: the main\u2019s tr S sits above the feeders\u2019 curves across the fault range.',
+    alt_da: 'Mindre anl\u00e6g \u2192 MCB. Bedre selektivitet \u2192 ACB med fuld LSIG + ZSI.',
+    alt_en: 'Smaller installs \u2192 MCB. Better selectivity \u2192 ACB with full LSIG + ZSI.',
+    std: 'IEC 60947-2; DS/HD 60364-5-53 \u00a7536'
+  },
+  'phasor': {
+    title_da: 'Fasordiagram', title_en: 'Phasor diagram',
+    meaning_da: 'Sp\u00e6ndings- og str\u00f8mvektorer i kompleks plan. Vinklen \u03c6 mellem U og I giver effektfaktoren.',
+    meaning_en: 'Voltage and current vectors in the complex plane. The angle \u03c6 between U and I gives the power factor.',
+    why_da: 'Viser om lasten er induktiv (I bagud) eller kapacitiv (I foran) \u2014 grundlag for fasekompensering.',
+    why_en: 'Shows whether the load is inductive (I lagging) or capacitive (I leading) \u2014 basis for PF correction.',
+    settings_da: 'Str\u00f8m I, fasevinkel \u03c6, antal faser (1/3), balanceret/usymmetrisk.',
+    settings_en: 'Current I, phase angle \u03c6, number of phases (1/3), balanced/unbalanced.',
+    compliance_da: 'Netselskab kr\u00e6ver typisk cos\u03c6 \u2265 0,9 for at undg\u00e5 reaktiv-afgift.',
+    compliance_en: 'Grid company typically requires cos\u03c6 \u2265 0.9 to avoid reactive-power charges.',
+    coord_da: 'Lav cos\u03c6 \u2192 h\u00f8jere str\u00f8m for samme effekt \u2192 st\u00f8rre kabel + tab.',
+    coord_en: 'Low cos\u03c6 \u2192 higher current for the same power \u2192 larger cable + losses.',
+    alt_da: 'Lav cos\u03c6 \u2192 kondensatorbatteri (fasekompensering, se Effekttrekant).',
+    alt_en: 'Low cos\u03c6 \u2192 capacitor bank (PF correction, see Power triangle).',
+    std: 'IEC 60038; Elektroteknik Opgavesamling Kap. 6'
+  },
+  'motor': {
+    title_da: 'Motorstartkurver', title_en: 'Motor starting curves',
+    meaning_da: 'Startstr\u00f8m vs. tid for DOL/Y-\u0394/soft/VFD. DOL = h\u00f8jest (6\u20138\u00d7In), VFD = lavest (~1,5\u00d7In).',
+    meaning_en: 'Starting current vs. time for DOL/Y-\u0394/soft/VFD. DOL = highest (6\u20138\u00d7In), VFD = lowest (~1.5\u00d7In).',
+    why_da: 'Startmetoden best\u00e6mmer kurvevalg, kabeltv\u00e6rsnit og net-belastning.',
+    why_en: 'The starting method drives MCB curve choice, cable cross-section and grid loading.',
+    settings_da: 'Motor In, startmetode. Y-\u0394 giver transient spike ved omkobling.',
+    settings_en: 'Motor In, starting method. Y-\u0394 produces a transient spike at changeover.',
+    compliance_da: 'Beskyttelse m\u00e5 IKKE udl\u00f8se p\u00e5 start (kurve D/K) men SKAL beskytte ved fastbremset rotor (LRC).',
+    compliance_en: 'Protection must NOT trip on start (curve D/K) but MUST protect at locked-rotor (LRC).',
+    coord_da: 'VFD reducerer startstr\u00f8m og sparer energi ved dellast (20\u201350%).',
+    coord_en: 'VFD reduces inrush and saves energy at partial load (20\u201350%).',
+    alt_da: 'DOL \u2192 kurve D/K + motorv\u00e6rn. Energibesparelse \u2192 VFD.',
+    alt_en: 'DOL \u2192 curve D/K + motor protector. Energy saving \u2192 VFD.',
+    std: 'IEC 60947-4-1; IEC 61800-9-2'
+  }
+};
+
+const CURVE_ANALYZER_OPTIONS = [
+  { id: 'mcb_B', da: 'MCB kurve B', en: 'MCB curve B' },
+  { id: 'mcb_C', da: 'MCB kurve C', en: 'MCB curve C' },
+  { id: 'mcb_D', da: 'MCB kurve D', en: 'MCB curve D' },
+  { id: 'fuse_gG', da: 'Sikring gG', en: 'Fuse gG' },
+  { id: 'fuse_aM', da: 'Sikring aM', en: 'Fuse aM' },
+  { id: 'rcd_general', da: 'HPFI/RCD', en: 'RCD' },
+  { id: 'lsig', da: 'MCCB/ACB LSIG', en: 'MCCB/ACB LSIG' },
+  { id: 'phasor', da: 'Fasordiagram', en: 'Phasor' },
+  { id: 'motor', da: 'Motorstart', en: 'Motor start' }
+];
+
+let curveAnalyzerSel = 'mcb_C';
+
+// Returns a structured analysis (HTML) of the selected curve.
+function curveAnalyze(curveKey) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var kb = CURVE_KB[curveKey] || CURVE_KB['mcb_C'];
+  var rows = [
+    { icon: '\uD83D\uDCD0', label: da ? 'Hvad betyder kurven?' : 'What does the curve mean?', val: da ? kb.meaning_da : kb.meaning_en },
+    { icon: '\u2757', label: da ? 'Hvorfor er den vigtig?' : 'Why does it matter?', val: da ? kb.why_da : kb.why_en },
+    { icon: '\uD83C\uDF9B\uFE0F', label: da ? 'Hvilke indstillinger p\u00e5virker den?' : 'What settings influence it?', val: da ? kb.settings_da : kb.settings_en },
+    { icon: '\u2705', label: da ? 'Er den i overensstemmelse?' : 'Is it compliant?', val: da ? kb.compliance_da : kb.compliance_en },
+    { icon: '\uD83D\uDD17', label: da ? 'Koordinerer den korrekt?' : 'Does it coordinate correctly?', val: da ? kb.coord_da : kb.coord_en },
+    { icon: '\uD83D\uDD04', label: da ? 'Bedre alternativer?' : 'Better alternatives?', val: da ? kb.alt_da : kb.alt_en }
+  ];
+  var h = '<div class="result-box" style="border-left:4px solid var(--primary)">';
+  h += '<div class="result-title">\uD83E\uDD16 ' + (da ? kb.title_da : kb.title_en) + ' \u2014 ' + (da ? 'AI-analyse' : 'AI analysis') + '</div>';
+  for (var i = 0; i < rows.length; i++) {
+    h += '<div style="margin:8px 0;padding:6px 10px;background:var(--border-light);border-radius:6px">';
+    h += '<div style="font-size:0.74rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px">' + rows[i].icon + ' ' + rows[i].label + '</div>';
+    h += '<div style="font-size:0.83rem;line-height:1.5">' + rows[i].val + '</div>';
+    h += '</div>';
+  }
+  h += '<div class="result-row" style="margin-top:6px"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value" style="font-size:0.78rem;color:var(--text-muted)">' + kb.std + '</span></div>';
+  h += '</div>';
+  return h;
+}
+
+function curveAnalyzerSetSel(key) { curveAnalyzerSel = key; renderModule('standards'); }
+
+// Full AI Curve Analyzer card (click-only) for the Standards module.
+function renderCurveAnalyzer() {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83E\uDD16 ' + (da ? 'AI Kurve-analyse' : 'AI Curve Analyzer') + '</div>';
+  h += '<div class="info-row">' + (da ? 'V\u00e6lg en kurvetype \u2014 AIen forklarer hvad den betyder, hvorfor den er vigtig, hvilke indstillinger der p\u00e5virker den, om den er i overensstemmelse, hvordan den koordinerer, og bedre alternativer.' : 'Select a curve type \u2014 the AI explains what it means, why it matters, which settings influence it, whether it complies, how it coordinates, and better alternatives.') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + (da ? 'V\u00e6lg kurve' : 'Select curve') + '</div><div class="select-grid">';
+  for (var i = 0; i < CURVE_ANALYZER_OPTIONS.length; i++) {
+    var o = CURVE_ANALYZER_OPTIONS[i];
+    h += '<button class="sel-btn ' + (curveAnalyzerSel === o.id ? 'selected' : '') + '" onclick="curveAnalyzerSetSel(\'' + o.id + '\')">' + (da ? o.da : o.en) + '</button>';
+  }
+  h += '</div></div>';
+  h += curveAnalyze(curveAnalyzerSel);
+  h += '</div>';
+  return h;
+}
+
 function getEarthInfo(sys) {  const info = {
     'TN-S': {
       desc: tx('Separat N og PE hele vejen fra trafo til forbruger', 'Separate N and PE throughout from transformer to consumer'),
@@ -10856,6 +11068,8 @@ function renderStandards() {
         </div>
       </div>
     </div>
+
+    ${renderCurveAnalyzer()}
 
     <div class="card fade-in">
       <div class="card-title">${tx('Jordingssystemer', 'Earthing Systems')}</div>
