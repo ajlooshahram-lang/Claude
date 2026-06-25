@@ -14814,6 +14814,24 @@ test('motor: motorOverloadVerdict returns correct coordination verdicts', functi
   motorCurveState.methods = pm; motorCurveState.tripClass = pt;
 });
 
+test('motor: overload verdict picks WORST-CASE start method for nuisance trip (life-safety)', function () {
+  var pm = motorCurveState.methods.slice(), pt = motorCurveState.tripClass;
+  // With all methods selected, the worst case is the one closest to the relay
+  // curve (highest startT/tRelay), NOT simply the longest start. DOL (7x) sits
+  // far closer to a class-10 trip curve than VFD (1.5x), so DOL must be chosen.
+  motorCurveState.methods = ['DOL', 'SD', 'Soft', 'VFD']; motorCurveState.tripClass = 10;
+  var v = motorOverloadVerdict(motorCurveState);
+  assert.strictEqual(v.startX, MOTOR_START_METHODS['DOL'].iStartMult, 'worst-case start = DOL at 7xIe');
+  // Sanity: the chosen point must have the minimum relay margin among all methods.
+  ['DOL', 'SD', 'Soft', 'VFD'].forEach(function (mk) {
+    var inf = MOTOR_START_METHODS[mk];
+    var margin = motorOverloadTripTime(inf.iStartMult, 10) / inf.iStartDur;
+    var chosenMargin = v.tRelayStart / v.startT;
+    assert.ok(chosenMargin <= margin + 1e-6, 'chosen has smallest margin vs ' + mk);
+  });
+  motorCurveState.methods = pm; motorCurveState.tripClass = pt;
+});
+
 test('motor: overload trip time anchored to IEC 60947-4-1 class point (life-safety)', function () {
   // Class number = max trip time [s] from cold at 7.2xIe — the curve MUST pass through it.
   [5, 10, 20, 30].forEach(function (tc) {

@@ -5934,9 +5934,16 @@ function motorRenderOverloadCurve(state) {
   // Overload relay trip curve for the selected class
   svg += '<path class="svg-curve-path" d="' + curve(function (x) { return motorOverloadTripTime(x, tc); }) + '" fill="none" stroke="#2563eb" stroke-width="2.6"/>';
 
-  // Locked-rotor / start operating point of the slowest selected starting method
-  var slowest = null;
-  for (var i = 0; i < s.methods.length; i++) { var inf = MOTOR_START_METHODS[s.methods[i]]; if (inf && (!slowest || inf.iStartDur > slowest.iStartDur)) slowest = inf; }
+  // Locked-rotor / start operating point of the WORST-CASE selected method for
+  // nuisance tripping (closest to the relay curve), consistent with the verdict.
+  var slowest = null, worstRatio = -1;
+  for (var i = 0; i < s.methods.length; i++) {
+    var inf = MOTOR_START_METHODS[s.methods[i]];
+    if (!inf) continue;
+    var tRel = motorOverloadTripTime(inf.iStartMult, tc);
+    var ratio = isFinite(tRel) ? (inf.iStartDur / tRel) : Infinity;
+    if (ratio > worstRatio) { worstRatio = ratio; slowest = inf; }
+  }
   var startX = slowest ? slowest.iStartMult : MOTOR_THERMAL.lrCurrent;
   var startT = slowest ? slowest.iStartDur : 2;
   var spx = xPos(Math.min(xMax, startX)), spy = yPos(startT);
@@ -5963,14 +5970,25 @@ function motorOverloadVerdict(state) {
   var lr = MOTOR_THERMAL.lrCurrent;
   var tRelayLR = motorOverloadTripTime(lr, tc);
   var tHotLR = motorThermalLimit(lr, MOTOR_THERMAL.hotStall);
-  var slowest = null;
-  for (var i = 0; i < s.methods.length; i++) { var inf = MOTOR_START_METHODS[s.methods[i]]; if (inf && (!slowest || inf.iStartDur > slowest.iStartDur)) slowest = inf; }
-  var startX = slowest ? slowest.iStartMult : lr;
-  var startT = slowest ? slowest.iStartDur : 2;
+  // Worst case for nuisance tripping = the selected starting method whose start
+  // operating point sits CLOSEST to (or above) the relay trip curve, i.e. the
+  // largest ratio startT / tRelay(startX). Picking by duration alone is wrong:
+  // a long VFD start at 1.5xIe is far below the curve, whereas a short DOL start
+  // at 7xIe is much closer to tripping. Always evaluate the most demanding case.
+  var worst = null, worstRatio = -1;
+  for (var i = 0; i < s.methods.length; i++) {
+    var inf = MOTOR_START_METHODS[s.methods[i]];
+    if (!inf) continue;
+    var tRel = motorOverloadTripTime(inf.iStartMult, tc);
+    var ratio = isFinite(tRel) ? (inf.iStartDur / tRel) : Infinity;
+    if (ratio > worstRatio) { worstRatio = ratio; worst = inf; }
+  }
+  var startX = worst ? worst.iStartMult : lr;
+  var startT = worst ? worst.iStartDur : 2;
   var tRelayStart = motorOverloadTripTime(startX, tc);
   var protects = tRelayLR < tHotLR;          // relay clears before the hot damage limit
-  var noNuisance = tRelayStart > startT * 1.15; // relay survives the start with margin
-  return { tc: tc, lr: lr, tRelayLR: tRelayLR, tHotLR: tHotLR, startX: startX, startT: startT, tRelayStart: tRelayStart, protects: protects, noNuisance: noNuisance, ok: protects && noNuisance };
+  var noNuisance = tRelayStart > startT * 1.15; // relay survives the worst start with margin
+  return { tc: tc, lr: lr, tRelayLR: tRelayLR, tHotLR: tHotLR, startX: startX, startT: startT, tRelayStart: tRelayStart, startMethod: (worst && worst.label) || '', protects: protects, noNuisance: noNuisance, ok: protects && noNuisance };
 }
 
 
