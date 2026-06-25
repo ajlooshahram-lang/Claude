@@ -13488,7 +13488,7 @@ test('autoexam: every generated task carries opts + ci + clause (click-only answ
     op.tasks.forEach(function (t) {
       assert.ok(Array.isArray(t.opts) && t.opts.length >= 2, 'opts present for ' + t.id);
       assert.ok(typeof t.ci === 'number' && t.ci >= 0 && t.ci < t.opts.length, 'valid ci for ' + t.id);
-      assert.ok(t.clause && /60364|Sikkerhedsstyrelsen/.test(t.clause), 'DS/HD clause for ' + t.id);
+      assert.ok(t.clause && /60364|6026|60529|60898|60947|60909|60076|BEK|F\u00e6llesregulativ|Sikkerhedsstyrelsen|IEC|Viggo/.test(t.clause), 'recognised standard/clause for ' + t.id);
     });
   });
 });
@@ -13966,6 +13966,30 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
   assert.ok(hasPrecise, 'question text is the precise triggering sentence');
 });
 
+
+// ----- Expanded regulatory question bank -----
+test('autoexam/reg-bank: question bank is expanded and every entry is well-formed', function () {
+  assert.ok(AX_REG_BANK.length >= 18, 'bank expanded to >= 18 questions, got ' + AX_REG_BANK.length);
+  AX_REG_BANK.forEach(function (q, i) {
+    assert.ok(q.q && q.q.da && q.q.en, 'entry ' + i + ' has bilingual question');
+    assert.ok(Array.isArray(q.opts) && q.opts.length >= 2, 'entry ' + i + ' has options');
+    assert.ok(typeof q.ci === 'number' && q.ci >= 0 && q.ci < q.opts.length, 'entry ' + i + ' has a valid correct index');
+    assert.ok(q.clause && q.clause.length > 0, 'entry ' + i + ' cites a clause/standard');
+    assert.ok(['overload', 'cable', 'vdrop', 'shortcircuit', 'fault'].indexOf(q.cat) >= 0, 'entry ' + i + ' has a valid category');
+  });
+  // PE-sizing answers are correct per DS/HD 60364-5-54 (S<=16 => SPE=S; S>35 => S/2)
+  var pe50 = AX_REG_BANK.filter(function (q) { return /50 mm/.test(q.q.da) && q.cat === 'cable'; })[0];
+  assert.ok(pe50 && pe50.opts[pe50.ci] === '25 mm\u00b2', 'PE for 50 mm\u00b2 phase = 25 mm\u00b2 (S/2)');
+});
+test('autoexam/reg-bank: spoergsmaal opgave draws unique, valid questions', function () {
+  var p = axGenerate(2024, 'fabrik', 'ekspert', 'fuld');
+  var sp = p.opgaver.filter(function (o) { return o.type === 'spoergsmaal'; })[0];
+  assert.ok(sp && sp.tasks.length >= 2, 'has regulation questions');
+  var ids = {}; sp.tasks.forEach(function (t) { assert.ok(t.opts.length >= 2 && typeof t.ci === 'number', 'valid q'); });
+  // grading the reference answers yields 100
+  var ans = {}; p.opgaver.forEach(function (o) { o.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(p, ans).score, 100, 'reference answers grade to 100');
+});
 
 // ----- Train-weakest focused drill -----
 test('autoexam/weakest: train-weakest generates a gradable exam emphasizing the weak competency', function () {
