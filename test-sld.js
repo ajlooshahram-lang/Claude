@@ -13967,6 +13967,27 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Standards quick-reference tab -----
+test('autoexam/standards: Standards tab renders the DS/HD 60364 reference with MathML in da and en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.tab = 'standarder';
+    var out = renderAutoExam();
+    assert.ok(out.indexOf('DS/HD 60364') >= 0, 'shows DS/HD 60364 references in ' + lg);
+    assert.ok(out.indexOf('<math') >= 0, 'MathML-typeset formulas in ' + lg);
+    assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks in ' + lg);
+    assert.ok(out.length > 5000, 'substantial content (' + out.length + ' chars)');
+  });
+  lang = prev;
+  // contains all competency areas
+  autoexamState.tab = 'standarder'; lang = 'da'; var da = renderAutoExam(); lang = prev;
+  assert.ok(da.indexOf('Overbelastning') >= 0, 'overload section');
+  assert.ok(da.indexOf('ndingsfald') >= 0, 'vdrop section');
+  assert.ok(da.indexOf('Kortslutning') >= 0, 'short-circuit section');
+  assert.ok(da.indexOf('Fejlbeskyttelse') >= 0 || da.indexOf('frakobling') >= 0, 'fault section');
+  assert.ok(da.indexOf('Motorstart') >= 0, 'motor-start section');
+});
+
 // ----- HV ring-network diagram in forsyning exams -----
 test('autoexam/hv-ring: forsyning exams carry a ring-network diagram with stations and cable data', function () {
   var p = axGenerate(7, 'fabrik', 'ekspert', 'fuld');

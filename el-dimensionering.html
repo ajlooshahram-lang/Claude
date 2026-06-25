@@ -13267,6 +13267,32 @@ function axRenderDiagram() {
   return h;
 }
 
+// --- Standards quick-reference (Standardoversigt) for exam training -----------
+var AX_STD_REF = [
+  { cat: 'overload', clause: 'DS/HD 60364-4-43 \u00a7433.1', title: { da: 'Overbelastningsbeskyttelse', en: 'Overload protection' }, rule: { da: 'IB \u2264 In \u2264 Iz \u2014 dimensionsgivende str\u00f8m skal ligge under beskyttelsens m\u00e6rkestr\u00f8m, som igen skal ligge under kablets strømbæreevne.', en: 'IB \u2264 In \u2264 Iz \u2014 the dimensioning current must sit below the device rating, which sits below the cable ampacity.' }, formula: 'I_B \u2264 I_n \u2264 I_z', tip: { da: 'Husk: In v\u00e6lges som MINDSTE standardv\u00e6rdi \u2265 IB. Rund aldrig Iz opad.', en: 'Remember: In is the SMALLEST standard value \u2265 IB. Never round Iz up.' } },
+  { cat: 'cable', clause: 'DS/HD 60364-5-52 \u00a7523', title: { da: 'Str\u00f8mb\u00e6reevne / kabeldimensionering', en: 'Current-carrying capacity / cable sizing' }, rule: { da: 'Iz_korr = Iz_tabel \u00d7 K_temp \u00d7 K_group \u00d7 K_install. Mindste tv\u00e6rsnit hvor Iz_korr \u2265 In.', en: 'Iz_corr = Iz_table \u00d7 K_temp \u00d7 K_group \u00d7 K_install. Smallest cross-section where Iz_corr \u2265 In.' }, formula: 'Iz_korr = Iz_tab \u00b7 K_temp \u00b7 K_group', tip: { da: 'Korrektionsfaktorerne sl\u00e5s op i DS/HD 60364-5-52 Tabel B.52.14 (temperatur) og B.52.17 (gruppering).', en: 'Correction factors from DS/HD 60364-5-52 Table B.52.14 (temperature) and B.52.17 (grouping).' } },
+  { cat: 'vdrop', clause: 'DS/HD 60364-5-52 \u00a7525', title: { da: 'Sp\u00e6ndingsfald', en: 'Voltage drop' }, rule: { da: '\u0394U% \u2264 3% (belysning) / 5% (\u00f8vrige). Formel: \u0394U = \u221a3 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6).', en: '\u0394U% \u2264 3% (lighting) / 5% (other). Formula: \u0394U = \u221a3 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6).' }, formula: '\u0394U = \u221a3 \u00b7 I_B \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)', tip: { da: 'L i km (ikke meter). Husk at dividere med Un (400 V / 230 V) og gange med 100 for at f\u00e5 procent.', en: 'L in km (not metres). Divide by Un (400 V / 230 V) and multiply by 100 for percent.' } },
+  { cat: 'shortcircuit', clause: 'DS/HD 60364-4-43 \u00a7434.5', title: { da: 'Kortslutning & brydeevne', en: 'Short-circuit & breaking capacity' }, rule: { da: 'Icu \u2265 Ik,max. Ik = In/(ek/100) for en trafo med stift net. Adiabatisk: k\u00b2S\u00b2 \u2265 I\u00b2t.', en: 'Icu \u2265 Ik,max. Ik = In/(ek/100) for a transformer on a stiff grid. Adiabatic: k\u00b2S\u00b2 \u2265 I\u00b2t.' }, formula: 'I_k = I_n / (ek/100)\nk^2 \u00b7 S^2 \u2265 I^2 \u00b7 t', tip: { da: 'Se bort fra netimpedansen for KONSERVATIVT Ik,max. k-v\u00e6rdier i Tabel 43A.', en: 'Ignore grid impedance for CONSERVATIVE Ik,max. k-values in Table 43A.' } },
+  { cat: 'fault', clause: 'DS/HD 60364-4-41 \u00a7411', title: { da: 'Fejlbeskyttelse & frakobling', en: 'Fault protection & disconnection' }, rule: { da: 'Zs \u2264 U0/Ia. For TN: 0,4 s (endegruppe \u2264 32 A) / 5 s (fordeling). Ia(C) = 10\u00d7In.', en: 'Zs \u2264 U0/Ia. For TN: 0.4 s (final circuit \u2264 32 A) / 5 s (distribution). Ia(C) = 10\u00d7In.' }, formula: 'Z_s \u2264 U_0 / I_a', tip: { da: 'Konservativt: m\u00e5l Zs kold og check mod 0,8\u00b7Zs,max (varm leder giver h\u00f8jere R).', en: 'Conservative: measure Zs cold and check against 0.8\u00d7Zs,max (hot conductor gives higher R).' } },
+  { cat: 'fault', clause: 'DS/HD 60364-4-41 \u00a7411.5.3', title: { da: 'TT jordingsmodstand RA', en: 'TT earth-electrode resistance RA' }, rule: { da: 'RA \u2264 UL/I\u0394n. Med HPFI 30 mA og UL = 50 V: RA \u2264 1667 \u03a9.', en: 'RA \u2264 UL/I\u0394n. With RCD 30 mA and UL = 50 V: RA \u2264 1667 \u03a9.' }, formula: 'R_A \u2264 U_L / I_{\u0394n}', tip: { da: 'UL = 25 V i v\u00e5de rum / medicinske omr\u00e5der.', en: 'UL = 25 V in wet rooms / medical locations.' } },
+  { cat: 'fault', clause: 'DS/HD 60364-7-722 \u00a7722.531.3', title: { da: 'RCD-type for elbilladning', en: 'RCD type for EV charging' }, rule: { da: 'Type B (eller Type A + 6 mA DC) kr\u00e6ves til elbilladere der kan afgive glat DC-fejlstr\u00f8m.', en: 'Type B (or Type A + 6 mA DC) required for EV chargers that can produce smooth DC residual current.' }, formula: '', tip: { da: 'Kun hvis laderen IKKE har indbygget 6 mA DC-detektion. Check datablad.', en: 'Only if the charger does NOT have built-in 6 mA DC detection. Check the datasheet.' } },
+  { cat: 'overload', clause: 'DS/HD 60364-5-52 \u00a7523.6 / IEC 60947-4-1', title: { da: 'Motorstart & beskyttelseskurve', en: 'Motor starting & protection curve' }, rule: { da: 'DOL Istart \u2248 6\u20138\u00d7In. Kurve C: Ia = 10\u00d7In. Kurve D: Ia = 20\u00d7In. Startstr\u00f8mmen m\u00e5 ikke overskride Ia.', en: 'DOL Istart \u2248 6\u20138\u00d7In. Curve C: Ia = 10\u00d7In. Curve D: Ia = 20\u00d7In. Starting current must not exceed Ia.' }, formula: 'I_start < I_a', tip: { da: 'V\u00e6lg kurve D til store motorer (Istart/In > 8). Alternativt: softstarter / VFD.', en: 'Choose curve D for large motors (Istart/In > 8). Alternative: soft starter / VFD.' } }
+];
+
+function axRenderStdRef() {
+  var h = '<div class="info-row">' + tx('Hurtigoversigt over de vigtigste DS/HD 60364-regler til autorisationspr\u00f8ven. Brug den som opslag under tr\u00e6ningen \u2014 men husk at pr\u00f8ven kr\u00e6ver at DU kan huske dem.', 'Quick reference of the key DS/HD 60364 rules for the authorization exam. Use it during training \u2014 but remember the exam expects YOU to recall them.') + '</div>';
+  AX_STD_REF.forEach(function (r) {
+    var nm = AX_CAT_NAME[r.cat] || { da: r.cat, en: r.cat };
+    h += '<div class="result-box" style="margin:8px 0"><div class="result-title" style="font-size:0.92rem">' + axL(r.title) + ' <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem">[' + r.clause + ']</span></div>';
+    h += '<div style="padding:4px 2px;line-height:1.6">';
+    h += '<div>' + axL(r.rule) + '</div>';
+    if (r.formula) h += '<div style="margin:4px 0"><span class="ax-math">' + mathml(r.formula) + '</span></div>';
+    h += '<div style="color:var(--text-muted);font-size:0.82rem;margin-top:4px">\uD83D\uDCA1 ' + axL(r.tip) + '</div>';
+    h += '</div></div>';
+  });
+  return h;
+}
+
 function axRenderLaering() {
   var prof = axProfileLoad(); var bias = axProfileBias(prof);
   var h = '<div class="info-row">' + tx('L\u00e6r systemet at generere som DINE pr\u00f8ver: upload en autorisationspr\u00f8ve (.pdf/.docx/.txt). Teksten analyseres lokalt i din browser \u2014 ingen upload til en server, fuldt offline. Systemet udtr\u00e6kker bygningstyper, emner og standardhenvisninger og lader fremtidige pr\u00f8ver drive mod de m\u00f8nstre.', 'Teach the system to generate like YOUR exams: upload an authorization exam (.pdf/.docx/.txt). The text is analysed locally in your browser \u2014 no server upload, fully offline. It extracts building types, topics and standard references and drifts future exams toward those patterns.') + '</div>';
@@ -13438,6 +13464,7 @@ function renderAutoExam() {
   h += '<button class="sel-btn' + (autoexamState.tab === 'kompleks' ? ' selected' : '') + '" onclick="axUITab(\'kompleks\')">\uD83E\uDDEE ' + tx('Kompleks (Viggo)', 'Complex (Viggo)') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'diagram' ? ' selected' : '') + '" onclick="axUITab(\'diagram\')">\uD83D\uDCD0 ' + tx('Diagram', 'Diagram') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'laering' ? ' selected' : '') + '" onclick="axUITab(\'laering\')">\uD83D\uDCE5 ' + tx('L\u00e6ring', 'Learning') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'standarder' ? ' selected' : '') + '" onclick="axUITab(\'standarder\')">\uD83D\uDCDA ' + tx('Standarder', 'Standards') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'analyse' ? ' selected' : '') + '" onclick="axUITab(\'analyse\')">\uD83D\uDCCA ' + tx('Analyse', 'Analytics') + '</button>';
   h += '</div>';
   var body = '';
@@ -13446,6 +13473,7 @@ function renderAutoExam() {
   else if (autoexamState.tab === 'kompleks') body = axRenderKompleks();
   else if (autoexamState.tab === 'diagram') body = axRenderDiagram();
   else if (autoexamState.tab === 'laering') body = axRenderLaering();
+  else if (autoexamState.tab === 'standarder') body = axRenderStdRef();
   else if (autoexamState.tab === 'analyse') body = axRenderDashboard();
   else body = axRenderCensorTab(p);
   return h + body;
