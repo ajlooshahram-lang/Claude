@@ -11437,7 +11437,16 @@ function renderStandards() {
           h += '<div style="font-size:0.8rem;margin-top:4px">';
           h += (da?'Relæ klasse '+v.tc+' @ ':'Relay class '+v.tc+' @ ')+v.lr.toFixed(1)+'\u00d7Ie: t<sub>rel</sub>='+v.tRelayLR.toFixed(1)+' s, t<sub>hot</sub>='+v.tHotLR.toFixed(1)+' s \u2192 '+(v.protects?(da?'Beskytter f\u00f8r skade':'Clears before damage'):(da?'Relæet er for langsomt!':'Relay too slow!'))+'<br>';
           h += (da?'Start '+v.startX.toFixed(1)+'\u00d7Ie / '+v.startT+' s: t<sub>rel</sub>='+v.tRelayStart.toFixed(1)+' s \u2192 '+(v.noNuisance?'Ingen falsk udkobling':'FALSK UDKOBLING mulig!') : 'Start '+v.startX.toFixed(1)+'\u00d7Ie / '+v.startT+' s: t<sub>rel</sub>='+v.tRelayStart.toFixed(1)+' s \u2192 '+(v.noNuisance?'No nuisance trip':'NUISANCE TRIP possible!'));
-          h += '</div></div>';
+          h += '</div>';
+          // Actionable recommendation (life-safety: always tell the user the safer fix)
+          if (!v.ok) {
+            var rec;
+            if (!v.protects && !v.noNuisance) rec = da ? '\u2192 Anbefaling: Konflikt \u2014 relæet er b\u00e5de for langsomt ved l\u00e5st rotor OG udkobler ved start. Verific\u00e9r motorens reelle l\u00e5st-rotor-tid og startstr\u00f8m; overvej en lavere udløseklasse OG en blød-/Y\u0394-starter for at reducere startstr\u00f8mmen.' : '\u2192 Recommendation: Conflict \u2014 the relay is both too slow at locked rotor AND nuisance-trips at start. Verify the motor\u2019s actual locked-rotor time and starting current; consider a lower trip class AND a soft/Y\u0394 starter to reduce starting current.';
+            else if (!v.protects) rec = da ? '\u2192 Anbefaling: V\u00e6lg en LAVERE udløseklasse (hurtigere) eller en motor med l\u00e6ngere sikker l\u00e5st-rotor-tid, s\u00e5 relæet rydder fejlen f\u00f8r motoren tager termisk skade. IEC 60947-4-1.' : '\u2192 Recommendation: Choose a LOWER trip class (faster) or a motor with a longer safe locked-rotor time so the relay clears before thermal damage. IEC 60947-4-1.';
+            else rec = da ? '\u2192 Anbefaling: V\u00e6lg en H\u00d8JERE udløseklasse (langsommere) eller reducér startstr\u00f8mmen (blød-/Y\u0394-/VFD-start), s\u00e5 relæet ikke kobler ud under normal opstart.' : '\u2192 Recommendation: Choose a HIGHER trip class (slower) or reduce starting current (soft/Y\u0394/VFD start) so the relay does not trip during normal start-up.';
+            h += '<div style="font-size:0.8rem;margin-top:6px;font-weight:600;color:var(--danger)">' + rec + '</div>';
+          }
+          h += '</div>';
           return h;
         })()}
       </div>

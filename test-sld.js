@@ -14859,6 +14859,18 @@ test('motor: overload protection card is embedded in standards module', function
   lang = prev;
 });
 
+test('motor: overload card gives actionable recommendation when coordination fails (life-safety)', function () {
+  var prev = lang, pm = motorCurveState.methods.slice(), pt = motorCurveState.tripClass;
+  lang = 'da';
+  // Class 30 (slow) + DOL → relay too slow at locked rotor → must recommend a fix.
+  motorCurveState.tripClass = 30; motorCurveState.methods = ['DOL'];
+  var v = motorOverloadVerdict(motorCurveState);
+  assert.ok(!v.ok, 'class 30 DOL fails coordination');
+  var out = renderStandards();
+  assert.ok(out.indexOf('Anbefaling:') >= 0, 'failing verdict shows an actionable recommendation');
+  motorCurveState.methods = pm; motorCurveState.tripClass = pt; lang = prev;
+});
+
 test('trafo: inrush curve renders valid SVG with MCB zones, no leaks', function () {
   var prev = lang;
   ['da', 'en'].forEach(function (lg) {
