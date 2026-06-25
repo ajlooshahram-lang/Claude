@@ -4755,6 +4755,14 @@ const RCD_TYPE_CAP = {
     use_da: '3-fasede frekvensomformere, DC-ladning af elbiler, solcelleanlæg',
     use_en: '3-phase frequency converters, EV DC charging, PV installations',
     std: 'IEC 62423', allowDK: true
+  },
+  'Type B+': {
+    detects_da: 'Type B + udvidet HF-detektion op til 20 kHz (brandbeskyttelse)',
+    detects_en: 'Type B + extended HF detection up to 20 kHz (fire protection)',
+    dc_da: 'Detekterer glat DC + HF til 20 kHz', dc_en: 'Detects smooth DC + HF up to 20 kHz',
+    use_da: 'Brandkritiske EV-ladestationer og industrielle VFD-anlæg (lavere udløsetærskel ved HF)',
+    use_en: 'Fire-critical EV charging and industrial VFD systems (lower HF trip threshold)',
+    std: 'IEC 62423 (B+)', allowDK: true
   }
 };
 
@@ -4881,7 +4889,7 @@ function rcdRenderTypeMatrix(highlightType) {
   const da = (typeof lang !== 'undefined' && lang === 'da');
   let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin:6px 0">';
   h += '<tr style="background:var(--border-light);font-weight:700"><td style="padding:5px 7px">' + (da ? 'Type' : 'Type') + '</td><td style="padding:5px 7px">' + (da ? 'Detekterer' : 'Detects') + '</td><td style="padding:5px 7px">DC</td><td style="padding:5px 7px">' + (da ? 'Typisk anvendelse' : 'Typical use') + '</td><td style="padding:5px 7px">' + (da ? 'Standard' : 'Standard') + '</td></tr>';
-  const order = ['Type AC', 'Type A', 'Type F', 'Type B'];
+  const order = ['Type AC', 'Type A', 'Type F', 'Type B', 'Type B+'];
   for (let i = 0; i < order.length; i++) {
     const k = order[i], c = RCD_TYPE_CAP[k];
     const hi = (highlightType === k);

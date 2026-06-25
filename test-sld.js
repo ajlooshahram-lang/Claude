@@ -13716,6 +13716,9 @@ test('rcd: RCD_TYPE_CAP — AC not allowed in DK, A/F/B allowed', function () {
   assert.strictEqual(RCD_TYPE_CAP['Type A'].allowDK, true);
   assert.strictEqual(RCD_TYPE_CAP['Type F'].allowDK, true);
   assert.strictEqual(RCD_TYPE_CAP['Type B'].allowDK, true);
+  assert.ok(RCD_TYPE_CAP['Type B+'], 'Type B+ present');
+  assert.strictEqual(RCD_TYPE_CAP['Type B+'].allowDK, true);
+  assert.ok(RCD_TYPE_CAP['Type B+'].detects_en.indexOf('20 kHz') >= 0, 'B+ extends HF detection to 20 kHz');
 });
 
 test('rcd: rcdRenderTypeMatrix lists all four types and flags AC, no leaks (da/en)', function () {
