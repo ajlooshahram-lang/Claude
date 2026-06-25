@@ -14645,6 +14645,32 @@ test('eng: presentation hidden by level gating when mode is apprentice', functio
   uxMode = prev;
 });
 
+test('eng: renderRecommendations includes reasoning panel for cables (electrician+)', function () {
+  var prev = lang, pm = uxMode, pp = loadState.power;
+  lang = 'da'; uxMode = 'electrician'; loadState.power = 10;
+  var ib = calcIB();
+  var cables = recommendCables(ib);
+  if (cables && cables.length > 0) {
+    var out = renderRecommendations('Test kabler', cables, 'cable');
+    assert.ok(out.indexOf('DS/HD 60364-5-52') >= 0, 'cable reasoning cites standard');
+    assert.ok(out.indexOf('ux-panel') >= 0, 'reasoning in collapsible panel');
+  }
+  lang = prev; uxMode = pm; loadState.power = pp;
+});
+
+test('eng: renderRecommendations includes reasoning panel for MCBs (electrician+)', function () {
+  var prev = lang, pm = uxMode, pp = loadState.power;
+  lang = 'en'; uxMode = 'electrician'; loadState.power = 5;
+  var ib = calcIB();
+  var mcbs = recommendMCBs(ib);
+  if (mcbs && mcbs.length > 0) {
+    var out = renderRecommendations('Test MCBs', mcbs, 'mcb');
+    assert.ok(out.indexOf('IEC 60898-1') >= 0, 'MCB reasoning cites standard');
+    assert.ok(out.indexOf('ux-panel') >= 0, 'reasoning in collapsible panel');
+  }
+  lang = prev; uxMode = pm; loadState.power = pp;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

@@ -3557,6 +3557,40 @@ function renderRecommendations(title, products, type) {
     rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`)).join('');
   }
 
+  // Engineering reasoning panel (VB methodology) — shows WHY these are recommended
+  var reasoningHtml = '';
+  if (uxModeLevel() >= 1) { // show for electrician and above
+    var ib = calcIB();
+    if (type === 'cable' && products.length > 0 && ib > 0) {
+      var topCable = products[0];
+      var kI = INSTALL_METHODS[cableState.installMethod] || 1.0;
+      var kT = TEMP_FACTORS[cableState.temp] || 1.0;
+      var kG = GROUP_FACTORS[cableState.grouping] || 1.0;
+      var baseIzVal = officialIz(topCable);
+      reasoningHtml = engCableReasoning({
+        ib: ib, installMethod: cableState.installMethod, kInstall: kI, kTemp: kT, kGroup: kG,
+        kTotal: kI * kT * kG, baseIz: baseIzVal, correctedIz: baseIzVal * kI * kT * kG,
+        cableType: topCable.model, mm2: topCable.mm2,
+        tableRef: 'DS/HD 60364-5-52 Tabel B.52.4', tempC: cableState.temp, groupCount: cableState.grouping,
+        verdict: (ib <= baseIzVal * kI * kT * kG) ? 'pass' : 'fail'
+      });
+    } else if (type === 'mcb' && products.length > 0 && ib > 0) {
+      var topMcb = products[0];
+      reasoningHtml = engBreakerReasoning({
+        ib: ib, deviceIn: topMcb.rating, deviceIcu: topMcb.icu, ikMax: 6000,
+        curve: topMcb.curve, deviceLabel: topMcb.brand + ' ' + topMcb.model,
+        izCorrected: null, verdict: (ib <= topMcb.rating) ? 'pass' : 'fail'
+      });
+    } else if (type === 'fuse' && products.length > 0 && ib > 0) {
+      var topFuse = products[0];
+      reasoningHtml = engBreakerReasoning({
+        ib: ib, deviceIn: topFuse.rating, deviceIcu: topFuse.icu, ikMax: 6000,
+        curve: 'gG', deviceLabel: topFuse.brand + ' ' + topFuse.model + ' ' + topFuse.size,
+        izCorrected: null, verdict: (ib <= topFuse.rating) ? 'pass' : 'fail'
+      });
+    }
+  }
+
   return `
     <div class="card fade-in">
       <div class="card-title">\u2705 ${title}</div>
@@ -3565,6 +3599,7 @@ function renderRecommendations(title, products, type) {
         <div class="result-title">${tx('Anbefalede produkter', 'Recommended Products')}</div>
         ${rows}
       </div>
+      ${reasoningHtml}
     </div>
   `;
 }
