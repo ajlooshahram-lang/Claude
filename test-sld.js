@@ -13967,6 +13967,21 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- CT + relay primary pickup task (forsyning) -----
+test('autoexam/ct-relay: relay primary pickup = factor x ki, present in every forsyning opgave', function () {
+  var ct = null;
+  for (var s = 1; s <= 20 && !ct; s++) { axGenerate(s * 3 + 1, 'fabrik', 'ekspert', 'fuld').opgaver.forEach(function (op) { op.tasks.forEach(function (t) { if (t.kind === 'ct_relay' && !ct) ct = t; }); }); }
+  assert.ok(ct, 'a ct_relay task is generated');
+  assert.strictEqual(ct.answer, Math.round(ct.given.factor * ct.given.kiPrimary), 'pickup = factor x ki_primary');
+  var sol = axSolveTask(ct);
+  assert.strictEqual(sol.result.value, ct.answer, 'solver matches the stored answer');
+  assert.ok(sol.steps.length >= 2 && sol.verification, 'worked solution with steps + verification');
+  // every forsyning opgave includes the relay task
+  var fc = 0, withRelay = 0;
+  for (var s2 = 1; s2 <= 20; s2++) { var f = axGenerate(s2 * 5 + 1, 'hospital', 'ekspert', 'fuld').opgaver.filter(function (o) { return o.type === 'forsyning'; })[0]; if (f) { fc++; if (f.tasks.some(function (t) { return t.kind === 'ct_relay'; })) withRelay++; } }
+  assert.ok(fc > 0 && withRelay === fc, 'relay task in all ' + fc + ' forsyning opgaver');
+});
+
 // ----- Power-factor correction (fasekompensering) task -----
 test('autoexam/pfc: axPFC computes Qc = P(tan-phi1 - tan-phi2) correctly', function () {
   assert.ok(Math.abs(axPFC(100, 0.8, 0.95) - 42.1) < 0.3, 'Qc 100kW 0.8->0.95 ~ 42.1, got ' + axPFC(100, 0.8, 0.95));
