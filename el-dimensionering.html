@@ -8945,13 +8945,25 @@ function renderMCB() {
   const mcb = MCB_TYPES[mcbState.type];
   const curve = MCB_CURVES[mcbState.curve];
   const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
-  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
-  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
+  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '\u2014';
+  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '\u2014';
+  const mcbPolesNonDefault = (mcbState.poles !== 'multi');
+  const mcbEngPlus = uxModeLevel() >= 2;
+
+  // Executive summary (when rating is selected)
+  const mcbSummaryHtml = mcbState.rating ? uxSummary([
+    {label: tx('Komponent', 'Component'), value: mcbState.type + ' ' + mcbState.curve + mcbState.rating, status: ''},
+    {label: 'Icu', value: icu + ' kA', status: 'pass'},
+    {label: 'Isd', value: isdMin + '-' + isdMax + ' A', status: ''},
+    {label: tx('Poler', 'Poles'), value: mcbState.poles === '1p' ? '1P' : 'Multi', status: ''}
+  ]) : '';
 
   return `
     <div class="card fade-in">
       <div class="card-title">${t('mcbTitle')}</div>
       <div class="info-row">${t('infoClick')}</div>
+
+      ${mcbSummaryHtml}
 
       <div class="select-group">
         <div class="select-label">${t('mcbType')}</div>
@@ -8972,14 +8984,6 @@ function renderMCB() {
       </div>
 
       <div class="select-group">
-        <div class="select-label">${t('mcbPoles')}</div>
-        <div class="select-grid">
-          <button class="sel-btn ${mcbState.poles === '1p' ? 'selected' : ''}" onclick="mcbState.poles='1p';renderModule('mcb')">1P</button>
-          <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
-        </div>
-      </div>
-
-      <div class="select-group">
         <div class="select-label">${t('mcbRating')}</div>
         <div class="select-grid">
           ${mcb.ratings.map(r =>
@@ -8987,6 +8991,16 @@ function renderMCB() {
           ).join('')}
         </div>
       </div>
+
+      ${uxPanel(tx('Polkonfiguration', 'Pole Configuration'), `
+        <div class="select-group">
+          <div class="select-label">${t('mcbPoles')}</div>
+          <div class="select-grid">
+            <button class="sel-btn ${mcbState.poles === '1p' ? 'selected' : ''}" onclick="mcbState.poles='1p';renderModule('mcb')">1P</button>
+            <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
+          </div>
+        </div>
+      `, {id: 'uxp_mcb_poles', icon: '\uD83D\uDD0C', open: mcbEngPlus || mcbPolesNonDefault})}
     </div>
 
     ${mcbState.rating ? `
@@ -9016,11 +9030,106 @@ function renderMCCB() {
   const isdMin = isdCalc * 0.9;
   const isdMax = isdCalc * 1.1;
   const ii = mccbState.inVal * 12; // Ii typically 12x In for Micrologic
+  const mccbEngPlus = uxModeLevel() >= 2;
+  const mccbDialsNonDefault = (mccbState.ioMult !== 0.8 || mccbState.isdMult !== 2);
+
+  // Executive summary
+  const mccbSummaryHtml = uxSummary([
+    {label: tx('Ramme', 'Frame'), value: mccbState.frame, status: ''},
+    {label: 'In', value: mccbState.inVal + ' A', status: ''},
+    {label: 'Icu', value: icu + ' kA', status: 'pass'},
+    {label: 'Isd', value: isdMin.toFixed(0) + '-' + isdMax.toFixed(0) + ' A', status: ''}
+  ]);
+
+  // Io/Isd dials panel body
+  const dialsBody = `
+      <div class="select-group">
+        <div class="select-label">${t('mccbIo')} (Io = x \u00D7 In)</div>
+        <div class="select-grid">
+          ${MCCB_IO_RANGE.map(m =>
+            `<button class="sel-btn ${mccbState.ioMult === m ? 'selected' : ''}" onclick="mccbState.ioMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${t('mccbIsd2')} (Isd = x \u00D7 Io)</div>
+        <div class="select-grid">
+          ${MCCB_ISD_MULT.map(m =>
+            `<button class="sel-btn ${mccbState.isdMult === m ? 'selected' : ''}" onclick="mccbState.isdMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>`;
+
+  // LSIG panel body
+  const lsigBody = `
+      <div class="select-group">
+        <div class="select-label">${tx('Trip-unit', 'Trip unit')}</div>
+        <div class="select-grid">
+          ${Object.keys(LSIG_TRIP_UNITS).map(tu =>
+            `<button class="sel-btn ${mccbState.tripUnit === tu ? 'selected' : ''}" onclick="mccbState.tripUnit='${tu}';renderModule('mccb')">${tu}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${tx('Lang-tid forsinkelse tr L [s] (ved 6\u00D7Ir)', 'Long-time delay tr L [s] (at 6\u00D7Ir)')}</div>
+        <div class="select-grid">
+          ${LSIG_LONG_TIME_DELAYS.map(d =>
+            `<button class="sel-btn ${mccbState.trL === d ? 'selected' : ''}" onclick="mccbState.trL=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${tx('Kort-tid forsinkelse tr S [s]', 'Short-time delay tr S [s]')}</div>
+        <div class="select-grid">
+          ${LSIG_SHORT_TIME_DELAYS.map(d =>
+            `<button class="sel-btn ${mccbState.trS === d ? 'selected' : ''}" onclick="mccbState.trS=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].segments.indexOf('I') >= 0 ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Momentan Ii [\u00D7In]', 'Instantaneous Ii [\u00D7In]')}</div>
+        <div class="select-grid">
+          ${[8, 10, 12, 15, 20].map(m =>
+            `<button class="sel-btn ${mccbState.iiMult === m ? 'selected' : ''}" onclick="mccbState.iiMult=${m};renderModule('mccb')">${m}\u00d7</button>`
+          ).join('')}
+        </div>
+      </div>
+      ` : ''}
+      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].gFault ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Jordfejl Ig [\u00D7In]', 'Ground fault Ig [\u00D7In]')}</div>
+        <div class="select-grid">
+          ${LSIG_GROUND_MULT.map(m =>
+            `<button class="sel-btn ${mccbState.igMult === m ? 'selected' : ''}" onclick="mccbState.igMult=${m};renderModule('mccb')">${m}\u00d7</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${tx('Jordfejl forsinkelse tg [s]', 'Ground fault delay tg [s]')}</div>
+        <div class="select-grid">
+          ${LSIG_GROUND_DELAY.map(d =>
+            `<button class="sel-btn ${mccbState.tg === d ? 'selected' : ''}" onclick="mccbState.tg=${d};renderModule('mccb')">${d} s</button>`
+          ).join('')}
+        </div>
+      </div>
+      ` : ''}
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Beskyttelseskonvolut', 'Protection envelope')} \u2014 ${mccbState.tripUnit}</div>
+        ${lsigRenderCurve({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
+      </div>
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Indstillinger', 'Settings')}</div>
+        ${lsigRenderSettingsTable({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
+        <div class="info-row" style="margin-top:6px">${tx('IEC 60947-2 Annex F; DS/HD 60364-4-43. Kurven repr\u00E6senterer den VALGTE indstilling \u2014 koordin\u00E9r mod nedstr\u00F8ms- og opstr\u00F8msenheder via TCC-modulet.', 'IEC 60947-2 Annex F; DS/HD 60364-4-43. The curve represents the SELECTED setting \u2014 coordinate against downstream and upstream devices via the TCC module.')}</div>
+      </div>`;
 
   return `
     <div class="card fade-in">
       <div class="card-title">${t('mccbTitle')}</div>
       <div class="info-row">${t('infoClick')}</div>
+
+      ${mccbSummaryHtml}
 
       <div class="select-group">
         <div class="select-label">${t('mccbFrame')}</div>
@@ -9049,27 +9158,11 @@ function renderMCCB() {
         </div>
       </div>
 
-      <div class="select-group">
-        <div class="select-label">${t('mccbIo')} (Io = x \u00D7 In)</div>
-        <div class="select-grid">
-          ${MCCB_IO_RANGE.map(m =>
-            `<button class="sel-btn ${mccbState.ioMult === m ? 'selected' : ''}" onclick="mccbState.ioMult=${m};renderModule('mccb')">${m}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${t('mccbIsd2')} (Isd = x \u00D7 Io)</div>
-        <div class="select-grid">
-          ${MCCB_ISD_MULT.map(m =>
-            `<button class="sel-btn ${mccbState.isdMult === m ? 'selected' : ''}" onclick="mccbState.isdMult=${m};renderModule('mccb')">${m}</button>`
-          ).join('')}
-        </div>
-      </div>
+      ${uxPanel(tx('Io/Isd indstilling', 'Io/Isd Dial Settings'), dialsBody, {id: 'uxp_mccb_dials', icon: '\uD83D\uDD27', open: mccbEngPlus || mccbDialsNonDefault})}
     </div>
 
     <div class="card fade-in">
-      <div class="card-title">${t('mccbResult')} — Micrologic 2.2</div>
+      <div class="card-title">${t('mccbResult')} \u2014 Micrologic 2.2</div>
       <div class="result-box">
         <div class="result-title">${mccbState.frame} ${mccbState.trip}</div>
         <div class="result-row"><span class="label">In</span><span class="value">${mccbState.inVal} A</span></div>
@@ -9083,75 +9176,8 @@ function renderMCCB() {
 
     <div class="card fade-in">
       <div class="card-title">${tx('LSIG Beskyttelseskurve', 'LSIG Protection Curve')}</div>
-      <div class="info-row">${tx('Juster trip-unit parametre og se den resulterende beskyttelseskonvolut. L = langsom (overbelastning), S = kort-tid, I = momentan, G = jordfejl.', 'Adjust trip-unit parameters and view the resulting protection envelope. L = long-time (overload), S = short-time, I = instantaneous, G = ground fault.')}</div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Trip-unit', 'Trip unit')}</div>
-        <div class="select-grid">
-          ${Object.keys(LSIG_TRIP_UNITS).map(tu =>
-            `<button class="sel-btn ${mccbState.tripUnit === tu ? 'selected' : ''}" onclick="mccbState.tripUnit='${tu}';renderModule('mccb')">${tu}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Lang-tid forsinkelse tr L [s] (ved 6×Ir)', 'Long-time delay tr L [s] (at 6×Ir)')}</div>
-        <div class="select-grid">
-          ${LSIG_LONG_TIME_DELAYS.map(d =>
-            `<button class="sel-btn ${mccbState.trL === d ? 'selected' : ''}" onclick="mccbState.trL=${d};renderModule('mccb')">${d} s</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Kort-tid forsinkelse tr S [s]', 'Short-time delay tr S [s]')}</div>
-        <div class="select-grid">
-          ${LSIG_SHORT_TIME_DELAYS.map(d =>
-            `<button class="sel-btn ${mccbState.trS === d ? 'selected' : ''}" onclick="mccbState.trS=${d};renderModule('mccb')">${d} s</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].segments.indexOf('I') >= 0 ? `
-      <div class="select-group">
-        <div class="select-label">${tx('Momentan Ii [×In]', 'Instantaneous Ii [×In]')}</div>
-        <div class="select-grid">
-          ${[8, 10, 12, 15, 20].map(m =>
-            `<button class="sel-btn ${mccbState.iiMult === m ? 'selected' : ''}" onclick="mccbState.iiMult=${m};renderModule('mccb')">${m}\u00d7</button>`
-          ).join('')}
-        </div>
-      </div>
-      ` : ''}
-
-      ${LSIG_TRIP_UNITS[mccbState.tripUnit] && LSIG_TRIP_UNITS[mccbState.tripUnit].gFault ? `
-      <div class="select-group">
-        <div class="select-label">${tx('Jordfejl Ig [×In]', 'Ground fault Ig [×In]')}</div>
-        <div class="select-grid">
-          ${LSIG_GROUND_MULT.map(m =>
-            `<button class="sel-btn ${mccbState.igMult === m ? 'selected' : ''}" onclick="mccbState.igMult=${m};renderModule('mccb')">${m}\u00d7</button>`
-          ).join('')}
-        </div>
-      </div>
-      <div class="select-group">
-        <div class="select-label">${tx('Jordfejl forsinkelse tg [s]', 'Ground fault delay tg [s]')}</div>
-        <div class="select-grid">
-          ${LSIG_GROUND_DELAY.map(d =>
-            `<button class="sel-btn ${mccbState.tg === d ? 'selected' : ''}" onclick="mccbState.tg=${d};renderModule('mccb')">${d} s</button>`
-          ).join('')}
-        </div>
-      </div>
-      ` : ''}
-
-      <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${tx('Beskyttelseskonvolut', 'Protection envelope')} — ${mccbState.tripUnit}</div>
-        ${lsigRenderCurve({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
-      </div>
-
-      <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${tx('Indstillinger', 'Settings')}</div>
-        ${lsigRenderSettingsTable({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
-        <div class="info-row" style="margin-top:6px">${tx('IEC 60947-2 Annex F; DS/HD 60364-4-43. Kurven repræsenterer den VALGTE indstilling — koordinér mod nedstrøms- og opstrømsenheder via TCC-modulet.', 'IEC 60947-2 Annex F; DS/HD 60364-4-43. The curve represents the SELECTED setting — coordinate against downstream and upstream devices via the TCC module.')}</div>
-      </div>
+      <div class="info-row">${tx('Juster trip-unit parametre og se den resulterende beskyttelseskonvolut.', 'Adjust trip-unit parameters and view the resulting protection envelope.')}</div>
+      ${uxPanel(tx('LSIG parametre og kurve', 'LSIG Parameters & Curve'), lsigBody, {id: 'uxp_mccb_lsig', icon: '\uD83D\uDCC8', open: mccbEngPlus})}
     </div>
   `;
 }
@@ -18566,11 +18592,26 @@ function busbarCalcFull(systemType, ratedCurrent, brand, ambientTemp, installMet
 function renderBusbar() {
   var calc = busbarCalcFull(busbarState.systemType, busbarState.ratedCurrent, busbarState.brand, busbarState.ambientTemp, busbarState.installMethod, busbarState.ipRating, busbarState.tapOffCount, busbarState.tapOffRating, busbarState.sections, busbarState.upstreamIk);
 
+  // Defaults for non-default detection (panels auto-open when changed)
+  var bbDefaults = {ambientTemp:35, installMethod:'horizontal_flat', ipRating:54, tapOffCount:6, tapOffRating:63, sections:5, upstreamIk:25};
+  var envNonDefault = (busbarState.ambientTemp !== bbDefaults.ambientTemp || busbarState.installMethod !== bbDefaults.installMethod || busbarState.ipRating !== bbDefaults.ipRating);
+  var loadNonDefault = (busbarState.tapOffCount !== bbDefaults.tapOffCount || busbarState.tapOffRating !== bbDefaults.tapOffRating || busbarState.sections !== bbDefaults.sections);
+  var supplyNonDefault = (busbarState.upstreamIk !== bbDefaults.upstreamIk);
+  var engPlus = uxModeLevel() >= 2;
+
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Skinnesystem (busbar)', 'Busbar Trunking System') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 61439-6 + DS/HD 60364', 'Calculation per IEC 61439-6 + DS/HD 60364') + '</div>';
 
-  // System Type
+  // Executive Summary
+  html += uxSummary([
+    {label: tx('Effektiv kapacitet', 'Effective Capacity'), value: calc.effectiveCapacity + ' A', status: calc.thermal.ok ? 'pass' : 'fail'},
+    {label: tx('Belastningsgrad', 'Load Ratio'), value: calc.thermal.loadRatio + '%', status: calc.thermal.ok ? 'pass' : (calc.thermal.loadRatio > 80 ? 'warn' : 'fail')},
+    {label: tx('Sp\u00E6ndingsfald', 'Voltage Drop'), value: calc.vdrop.vdropPercent + '%', status: calc.vdrop.ok ? 'pass' : 'fail'},
+    {label: tx('Kortslutning', 'Short-Circuit'), value: calc.sc.icw + '/' + calc.sc.upstreamIk + ' kA', status: calc.sc.ok ? 'pass' : 'fail'}
+  ]);
+
+  // Essential params: System Type (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
   Object.keys(BUSBAR_SYSTEM_TYPES).forEach(function(key) {
     var s = BUSBAR_SYSTEM_TYPES[key];
@@ -18578,14 +18619,14 @@ function renderBusbar() {
   });
   html += '</div></div>';
 
-  // Rated Current
+  // Essential params: Rated Current (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Maerkestr\u00F8m [A]', 'Rated Current [A]') + '</div><div class="select-grid">';
   [25, 40, 63, 100, 160, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3000, 4000, 5000].forEach(function(a) {
     html += '<button class="sel-btn' + (busbarState.ratedCurrent === a ? ' selected' : '') + '" onclick="busbarState.ratedCurrent=' + a + ';renderModule(\'busbar\')">' + a + '</button>';
   });
   html += '</div></div>';
 
-  // Brand
+  // Essential params: Brand (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Fabrikat', 'Brand') + '</div><div class="select-grid">';
   Object.keys(BUSBAR_BRANDS).forEach(function(key) {
     var b = BUSBAR_BRANDS[key];
@@ -18593,54 +18634,52 @@ function renderBusbar() {
   });
   html += '</div></div>';
 
-  // Ambient Temperature
-  html += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur [\u00B0C]', 'Ambient Temperature [\u00B0C]') + '</div><div class="select-grid">';
+  // Collapsible: Installation & Environment
+  var envBody = '';
+  envBody += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur [\u00B0C]', 'Ambient Temperature [\u00B0C]') + '</div><div class="select-grid">';
   [25, 30, 35, 40, 45, 50].forEach(function(t) {
-    html += '<button class="sel-btn' + (busbarState.ambientTemp === t ? ' selected' : '') + '" onclick="busbarState.ambientTemp=' + t + ';renderModule(\'busbar\')">' + t + '\u00B0C</button>';
+    envBody += '<button class="sel-btn' + (busbarState.ambientTemp === t ? ' selected' : '') + '" onclick="busbarState.ambientTemp=' + t + ';renderModule(\'busbar\')">' + t + '\u00B0C</button>';
   });
-  html += '</div></div>';
-
-  // Installation Method
-  html += '<div class="select-group"><div class="select-label">' + tx('Monteringsmetode', 'Installation Method') + '</div><div class="select-grid">';
+  envBody += '</div></div>';
+  envBody += '<div class="select-group"><div class="select-label">' + tx('Monteringsmetode', 'Installation Method') + '</div><div class="select-grid">';
   [{k:'horizontal_flat', da:'Vandret flad', en:'Horizontal flat'}, {k:'horizontal_edge', da:'Vandret p\u00E5 kant', en:'Horizontal edge-on'}, {k:'vertical', da:'Lodret', en:'Vertical'}].forEach(function(m) {
-    html += '<button class="sel-btn' + (busbarState.installMethod === m.k ? ' selected' : '') + '" onclick="busbarState.installMethod=\'' + m.k + '\';renderModule(\'busbar\')">' + tx(m.da, m.en) + '</button>';
+    envBody += '<button class="sel-btn' + (busbarState.installMethod === m.k ? ' selected' : '') + '" onclick="busbarState.installMethod=\'' + m.k + '\';renderModule(\'busbar\')">' + tx(m.da, m.en) + '</button>';
   });
-  html += '</div></div>';
-
-  // IP Rating
-  html += '<div class="select-group"><div class="select-label">' + tx('IP-kapslingsklasse', 'IP Rating') + '</div><div class="select-grid">';
+  envBody += '</div></div>';
+  envBody += '<div class="select-group"><div class="select-label">' + tx('IP-kapslingsklasse', 'IP Rating') + '</div><div class="select-grid">';
   [{v:31, da:'IP31 (indend\u00F8rs)', en:'IP31 (indoor)'}, {v:54, da:'IP54 (beskyttet)', en:'IP54 (protected)'}, {v:55, da:'IP55 (udend\u00F8rs/fugt)', en:'IP55 (outdoor/humid)'}].forEach(function(ip) {
-    html += '<button class="sel-btn' + (busbarState.ipRating === ip.v ? ' selected' : '') + '" onclick="busbarState.ipRating=' + ip.v + ';renderModule(\'busbar\')">' + tx(ip.da, ip.en) + '</button>';
+    envBody += '<button class="sel-btn' + (busbarState.ipRating === ip.v ? ' selected' : '') + '" onclick="busbarState.ipRating=' + ip.v + ';renderModule(\'busbar\')">' + tx(ip.da, ip.en) + '</button>';
   });
-  html += '</div></div>';
+  envBody += '</div></div>';
+  html += uxPanel(tx('Installation og milj\u00F8', 'Installation & Environment'), envBody, {id: 'uxp_busbar_env', icon: '\uD83C\uDF21\uFE0F', open: engPlus || envNonDefault});
 
-  // Tap-off Count
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal aftag', 'Number of Tap-offs') + '</div><div class="select-grid">';
+  // Collapsible: Load Configuration
+  var loadBody = '';
+  loadBody += '<div class="select-group"><div class="select-label">' + tx('Antal aftag', 'Number of Tap-offs') + '</div><div class="select-grid">';
   [1,2,3,4,5,6,7,8,9,10,12,14,16,18,20].forEach(function(n) {
-    html += '<button class="sel-btn' + (busbarState.tapOffCount === n ? ' selected' : '') + '" onclick="busbarState.tapOffCount=' + n + ';renderModule(\'busbar\')">' + n + '</button>';
+    loadBody += '<button class="sel-btn' + (busbarState.tapOffCount === n ? ' selected' : '') + '" onclick="busbarState.tapOffCount=' + n + ';renderModule(\'busbar\')">' + n + '</button>';
   });
-  html += '</div></div>';
-
-  // Tap-off Rating
-  html += '<div class="select-group"><div class="select-label">' + tx('Aftag-m\u00E6rkestr\u00F8m [A]', 'Tap-off Rating [A]') + '</div><div class="select-grid">';
+  loadBody += '</div></div>';
+  loadBody += '<div class="select-group"><div class="select-label">' + tx('Aftag-m\u00E6rkestr\u00F8m [A]', 'Tap-off Rating [A]') + '</div><div class="select-grid">';
   [16, 32, 63, 100, 160].forEach(function(a) {
-    html += '<button class="sel-btn' + (busbarState.tapOffRating === a ? ' selected' : '') + '" onclick="busbarState.tapOffRating=' + a + ';renderModule(\'busbar\')">' + a + '</button>';
+    loadBody += '<button class="sel-btn' + (busbarState.tapOffRating === a ? ' selected' : '') + '" onclick="busbarState.tapOffRating=' + a + ';renderModule(\'busbar\')">' + a + '</button>';
   });
-  html += '</div></div>';
-
-  // Sections (length)
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal sektioner (3m/sektion)', 'Number of Sections (3m/section)') + '</div><div class="select-grid">';
+  loadBody += '</div></div>';
+  loadBody += '<div class="select-group"><div class="select-label">' + tx('Antal sektioner (3m/sektion)', 'Number of Sections (3m/section)') + '</div><div class="select-grid">';
   for (var s = 1; s <= 10; s++) {
-    html += '<button class="sel-btn' + (busbarState.sections === s ? ' selected' : '') + '" onclick="busbarState.sections=' + s + ';renderModule(\'busbar\')">' + s + ' (' + (s*3) + 'm)</button>';
+    loadBody += '<button class="sel-btn' + (busbarState.sections === s ? ' selected' : '') + '" onclick="busbarState.sections=' + s + ';renderModule(\'busbar\')">' + s + ' (' + (s*3) + 'm)</button>';
   }
-  html += '</div></div>';
+  loadBody += '</div></div>';
+  html += uxPanel(tx('Belastningskonfiguration', 'Load Configuration'), loadBody, {id: 'uxp_busbar_load', icon: '\uD83D\uDD0C', open: engPlus || loadNonDefault});
 
-  // Upstream Ik
-  html += '<div class="select-group"><div class="select-label">' + tx('Upstream Ik [kA]', 'Upstream Ik [kA]') + '</div><div class="select-grid">';
+  // Collapsible: Upstream Supply (engineer+ level)
+  var supplyBody = '';
+  supplyBody += '<div class="select-group"><div class="select-label">' + tx('Upstream Ik [kA]', 'Upstream Ik [kA]') + '</div><div class="select-grid">';
   [10, 15, 20, 25, 30, 35, 40, 50, 65, 80].forEach(function(ik) {
-    html += '<button class="sel-btn' + (busbarState.upstreamIk === ik ? ' selected' : '') + '" onclick="busbarState.upstreamIk=' + ik + ';renderModule(\'busbar\')">' + ik + '</button>';
+    supplyBody += '<button class="sel-btn' + (busbarState.upstreamIk === ik ? ' selected' : '') + '" onclick="busbarState.upstreamIk=' + ik + ';renderModule(\'busbar\')">' + ik + '</button>';
   });
-  html += '</div></div>';
+  supplyBody += '</div></div>';
+  html += uxPanel(tx('Opstr\u00F8ms forsyning', 'Upstream Supply'), supplyBody, {id: 'uxp_busbar_supply', icon: '\u26A1', level: 'engineer', open: engPlus || supplyNonDefault});
 
   // Results - Derating
   html += '<div class="result-box">';
