@@ -20284,7 +20284,7 @@ function renderBusbar() {
 
   // Collapsible: Upstream Supply (engineer+ level)
   var supplyBody = '';
-  supplyBody += '<div class="select-group"><div class="select-label">' + tx('Upstream Ik [kA]', 'Upstream Ik [kA]') + '</div><div class="select-grid">';
+  supplyBody += '<div class="select-group"><div class="select-label">' + tx('Upstream I\u2096 [kA]', 'Upstream I\u2096 [kA]') + '</div><div class="select-grid">';
   [10, 15, 20, 25, 30, 35, 40, 50, 65, 80].forEach(function(ik) {
     supplyBody += '<button class="sel-btn' + (busbarState.upstreamIk === ik ? ' selected' : '') + '" onclick="busbarState.upstreamIk=' + ik + ';renderModule(\'busbar\')">' + ik + '</button>';
   });
@@ -30370,7 +30370,7 @@ function renderFaultLoop() {
     html += '</div></div>';
 
     // Voltage
-    html += '<div class="select-group"><div class="select-label">' + tx('Spænding U0 [V]', 'Voltage U0 [V]') + '</div><div class="select-grid">';
+    html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00e6nding U\u2080 [V]', 'Voltage U\u2080 [V]') + '</div><div class="select-grid">';
     FAULT_VOLTAGE_PRESETS.forEach(function(v) {
       html += '<button class="sel-btn' + (faultState.voltage === v ? ' selected' : '') + '" onclick="faultState.voltage=' + v + ';renderModule(\'fault\')">' + v + '</button>';
     });
