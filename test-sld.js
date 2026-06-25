@@ -13630,6 +13630,136 @@ test('autoexam: registered in module label registries (da/en) and nav', function
 });
 
 
+console.log('\n=== RCD / HPFI Tripping-Time Curve Engine Tests ===\n');
+
+test('rcd: RCD_TRIP_LIMITS general matches IEC 61008-1 Table 1 (300/150/40 ms)', function () {
+  var g = RCD_TRIP_LIMITS.general.points;
+  assert.strictEqual(g[0].m, 1); assert.strictEqual(g[0].max, 0.300);
+  assert.strictEqual(g[1].m, 2); assert.strictEqual(g[1].max, 0.150);
+  assert.strictEqual(g[2].m, 5); assert.strictEqual(g[2].max, 0.040);
+  assert.strictEqual(RCD_TRIP_LIMITS.general.noTrip, 0.5);
+});
+
+test('rcd: RCD_TRIP_LIMITS selective (type S) band 130-500 / 60-200 / 50-150 ms', function () {
+  var s = RCD_TRIP_LIMITS.selective.points;
+  assert.strictEqual(s[0].min, 0.130); assert.strictEqual(s[0].max, 0.500);
+  assert.strictEqual(s[1].min, 0.060); assert.strictEqual(s[1].max, 0.200);
+  assert.strictEqual(s[2].min, 0.050); assert.strictEqual(s[2].max, 0.150);
+});
+
+test('rcd: rcdTripMaxAt exact at standard test points (general)', function () {
+  assert.strictEqual(rcdTripMaxAt(1, false), 0.300);
+  assert.strictEqual(rcdTripMaxAt(2, false), 0.150);
+  assert.strictEqual(rcdTripMaxAt(5, false), 0.040);
+  // clamps below 1x and above 10x
+  assert.strictEqual(rcdTripMaxAt(0.6, false), 0.300);
+  assert.strictEqual(rcdTripMaxAt(20, false), 0.040);
+});
+
+test('rcd: rcdTripMaxAt is monotonically non-increasing with current', function () {
+  var prev = Infinity;
+  for (var m = 1; m <= 10; m += 0.5) {
+    var t = rcdTripMaxAt(m, false);
+    assert.ok(t <= prev + 1e-9, 'non-increasing at m=' + m + ' (' + t + ' > ' + prev + ')');
+    prev = t;
+  }
+});
+
+test('rcd: interpolated max time lies strictly between bracketing test points', function () {
+  var t = rcdTripMaxAt(3, false); // between 2x(150ms) and 5x(40ms)
+  assert.ok(t < 0.150 && t > 0.040, '40ms < t(3x)=' + t + ' < 150ms');
+});
+
+test('rcd: selective break times are slower (>=) than general at every test point', function () {
+  [1, 2, 5].forEach(function (m) {
+    assert.ok(rcdTripMaxAt(m, true) >= rcdTripMaxAt(m, false), 'selective>=general at ' + m + 'x');
+  });
+});
+
+test('rcd: rcdTripMinAt is 0 for general and positive for selective', function () {
+  assert.strictEqual(rcdTripMinAt(1, false), 0);
+  assert.strictEqual(rcdTripMinAt(1, true), 0.130);
+  assert.strictEqual(rcdTripMinAt(2, true), 0.060);
+});
+
+test('rcd: selective min < max at every test point (valid operating band)', function () {
+  [1, 2, 5, 10].forEach(function (m) {
+    assert.ok(rcdTripMinAt(m, true) < rcdTripMaxAt(m, true), 'min<max at ' + m + 'x');
+  });
+});
+
+test('rcd: rcdRenderTripCurve renders valid SVG with no leaks (general + selective, da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [false, true].forEach(function (sel) {
+      [30, 100, 300, 500].forEach(function (idn) {
+        var svg = rcdRenderTripCurve(idn, sel);
+        assert.ok(typeof svg === 'string' && svg.indexOf('<svg') === 0, 'is an svg (' + lg + '/' + idn + '/' + sel + ')');
+        assert.ok(svg.indexOf('</svg>') > 0, 'svg closed');
+        assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + idn + '/' + sel + ')');
+        assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + idn + '/' + sel + ')');
+        assert.ok(svg.indexOf(idn + ' mA') > 0, 'annotates rated I_dn');
+      });
+    });
+  });
+  lang = prev;
+});
+
+test('rcd: trip curve guards bad input (defaults to 30 mA)', function () {
+  var svg = rcdRenderTripCurve(null, false);
+  assert.ok(svg.indexOf('30 mA') > 0 && svg.indexOf('NaN') < 0, 'defaults safely');
+});
+
+test('rcd: RCD_TYPE_CAP — AC not allowed in DK, A/F/B allowed', function () {
+  assert.strictEqual(RCD_TYPE_CAP['Type AC'].allowDK, false);
+  assert.strictEqual(RCD_TYPE_CAP['Type A'].allowDK, true);
+  assert.strictEqual(RCD_TYPE_CAP['Type F'].allowDK, true);
+  assert.strictEqual(RCD_TYPE_CAP['Type B'].allowDK, true);
+});
+
+test('rcd: rcdRenderTypeMatrix lists all four types and flags AC, no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = rcdRenderTypeMatrix('Type B');
+    ['Type AC', 'Type A', 'Type F', 'Type B'].forEach(function (k) {
+      assert.ok(h.indexOf(k) >= 0, k + ' present (' + lg + ')');
+    });
+    assert.ok(h.indexOf('IEC 62423') >= 0, 'cites IEC 62423');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('rcd: type matrix highlights the selected type', function () {
+  var h = rcdRenderTypeMatrix('Type A');
+  assert.ok(h.indexOf('var(--primary-glow)') >= 0, 'selected row highlighted');
+});
+
+test('rcd: renderStandards embeds the curve + matrix when type & sensitivity chosen (da/en)', function () {
+  var prevLang = lang, ps = rcdSelected, pn = rcdSensitivity, pd = rcdDelay;
+  rcdSelected = 'Type B'; rcdSensitivity = 30; rcdDelay = 'selective';
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('<svg') >= 0, 'curve embedded (' + lg + ')');
+    assert.ok(out.indexOf('IEC 61008-1') >= 0, 'cites IEC 61008-1 (' + lg + ')');
+    assert.ok(out.indexOf('IEC 62423') >= 0, 'cites IEC 62423 (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined leak (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN leak (' + lg + ')');
+  });
+  lang = prevLang; rcdSelected = ps; rcdSensitivity = pn; rcdDelay = pd;
+});
+
+test('rcd: curve+matrix hidden until an RCD type is selected', function () {
+  var prevLang = lang, ps = rcdSelected; lang = 'da'; rcdSelected = null;
+  var out = renderStandards();
+  assert.ok(out.indexOf('Afbrydetidskurve') < 0, 'no curve before a type is picked');
+  lang = prevLang; rcdSelected = ps;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
