@@ -6165,6 +6165,50 @@ function stdChips(clauses) {
 }
 
 // ===========================================================================
+// INTERACTIVE ENGINEERING TREE — expandable decision tree (click-only, offline)
+// ===========================================================================
+// Every node is a native <details> element: click to expand and see that
+// step's calculation, standards reference and verification. Fulfils the
+// directive: "interactive engineering tree where users can expand any node
+// and view all calculations, decisions, standards references ... Every node
+// explains itself."
+function engTreeNode(node, depth) {
+  var icon = node.status === 'ok' ? '\u2705' : node.status === 'fail' ? '\u26D4' : node.status === 'warn' ? '\u26A0\uFE0F' : '\u25B8';
+  var indent = (depth || 0) * 12;
+  var h = '<details class="eng-tree-node" style="margin:3px 0 3px ' + indent + 'px;border-left:2px solid var(--border-light);padding-left:8px"' + (node.open ? ' open' : '') + '>';
+  h += '<summary style="cursor:pointer;font-size:0.85rem;font-weight:600;padding:3px 0">' + icon + ' ' + (node.label || '') + (node.value != null && node.value !== '' ? ' <span style="font-family:monospace;color:var(--primary);font-weight:700">' + node.value + '</span>' : '') + '</summary>';
+  if (node.detailHtml) h += '<div style="margin:4px 0 6px 0;font-size:0.82rem;line-height:1.5">' + node.detailHtml + '</div>';
+  (node.children || []).forEach(function (c) { h += engTreeNode(c, (depth || 0) + 1); });
+  h += '</details>';
+  return h;
+}
+function engTree(root) {
+  return '<div class="eng-tree">' + engTreeNode(root, 0) + '</div>';
+}
+
+// Build the engineering decision tree from analyzer results, grouped into the
+// authentic Danish exam structure: Forsyning / Installation / Verifikation.
+function analyzerBuildEngTree(results) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var groups = { forsyning: [], installation: [], verifikation: [] };
+  (results || []).forEach(function (r) {
+    var L = (r.label || '').toLowerCase();
+    var g = 'installation';
+    // Check verifikation FIRST — "verifikation" itself contains "ik", which would
+    // otherwise false-match the short-circuit pattern below.
+    if (/zs|fejl|jord|earth|rcd|hpfi|verifik|frakobl|disconnect|loop/.test(L)) g = 'verifikation';
+    else if (/\bik|kortslut|bryde|selektiv|forsyning|trafo|transformer|short.?circuit|breaking/.test(L)) g = 'forsyning';
+    groups[g].push({ label: r.label, value: r.value, status: r.status, detailHtml: r.html || '' });
+  });
+  var children = [];
+  function grp(key, da_, en_) { if (groups[key].length) children.push({ label: (da ? da_ : en_), open: true, status: groups[key].some(function (n) { return n.status === 'fail'; }) ? 'fail' : 'ok', children: groups[key] }); }
+  grp('forsyning', 'Forsyning \u2014 net, transformer, kortslutning', 'Supply \u2014 grid, transformer, short-circuit');
+  grp('installation', 'Installation \u2014 laster, kabler, beskyttelse', 'Installation \u2014 loads, cables, protection');
+  grp('verifikation', 'Verifikation \u2014 fejlbeskyttelse, frakobling', 'Verification \u2014 fault protection, disconnection');
+  return { label: (da ? 'Projekt \u2014 ingeni\u00f8rm\u00e6ssigt beslutningstr\u00e6' : 'Project \u2014 engineering decision tree'), open: true, children: children };
+}
+
+// ===========================================================================
 // ENGINEERING PRESENTATION FRAMEWORK (Viggo Bisch Methodology)
 // ===========================================================================
 // Replicates the exact engineering transparency demonstrated in the Danish
@@ -34025,6 +34069,17 @@ function renderAnalyzerResults() {
 
   // === CAPSTONE: Complete Exam Solution (click-only) ===
   html += examSolutionCard();
+
+  // === INTERACTIVE ENGINEERING DECISION TREE ===
+  // Reports REASONING, not just results: every branch expands to its calculation,
+  // standards reference and verification. Organised in the Danish exam structure.
+  if (analyzerState.results.length > 0) {
+    html += '<div class="card fade-in">';
+    html += '<div class="card-title">\uD83C\uDF33 ' + tx('Ingeni\u00f8rm\u00e6ssigt beslutningstr\u00e6', 'Engineering decision tree') + '</div>';
+    html += '<div class="info-row">' + tx('Klik en gren for at se beregning, standardhenvisning og verifikation for hvert trin \u2014 ingen skjulte tal.', 'Click a branch to see the calculation, standards reference and verification for each step \u2014 no hidden numbers.') + '</div>';
+    html += engTree(analyzerBuildEngTree(analyzerState.results));
+    html += '</div>';
+  }
 
   // Individual results
   var asked = analyzerState.results.filter(function(r) { return r.asked; });

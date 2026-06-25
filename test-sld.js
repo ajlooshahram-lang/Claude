@@ -15063,6 +15063,31 @@ test('eng: STD_REGISTRY covers the core life-safety clauses', function () {
   });
 });
 
+test('eng: engTree renders expandable <details> nodes and classifies into exam structure', function () {
+  var prev = lang; lang = 'da';
+  var results = [
+    { label: 'Ik3,max', value: '13.8 kA', status: 'ok', html: '' },
+    { label: 'Belastningsstr\u00f8m IB', value: '49 A', status: 'ok', html: '' },
+    { label: 'Kabel 16', value: '16 mm\u00b2', status: 'ok', html: '' },
+    { label: 'Zs verifikation', value: '1.2', status: 'fail', html: '' }
+  ];
+  var tree = analyzerBuildEngTree(results);
+  // 3 groups present
+  var labels = tree.children.map(function (c) { return c.label.split('\u2014')[0].trim(); });
+  assert.ok(labels.indexOf('Forsyning') >= 0 && labels.indexOf('Installation') >= 0 && labels.indexOf('Verifikation') >= 0, 'all 3 exam sections');
+  // Correct classification (the "verifikation contains ik" trap must not misfile Zs)
+  var verif = tree.children.filter(function (c) { return c.label.indexOf('Verifikation') === 0; })[0];
+  assert.ok(verif.children.some(function (n) { return n.label.indexOf('Zs') >= 0; }), 'Zs filed under Verifikation, not Forsyning');
+  var fors = tree.children.filter(function (c) { return c.label.indexOf('Forsyning') === 0; })[0];
+  assert.ok(fors.children.some(function (n) { return n.label.indexOf('Ik') >= 0; }), 'Ik filed under Forsyning');
+  // Renders as click-only <details>
+  var htmlOut = engTree(tree);
+  assert.ok(htmlOut.indexOf('<details') >= 0 && htmlOut.indexOf('eng-tree') >= 0, 'expandable details tree');
+  assert.ok(htmlOut.indexOf('\u26d4') >= 0, 'fail status icon propagates up the branch');
+  assert.ok(htmlOut.indexOf('undefined') < 0 && htmlOut.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
