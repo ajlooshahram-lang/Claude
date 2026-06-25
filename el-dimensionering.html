@@ -15855,9 +15855,9 @@ function sldRenderNodePanel(tree, nodeId) {
   if (node.type !== 'transformer') {
     html += '<div class="result-box"><div class="result-title">' + tx('Beregningsresultater', 'Calculation Results') + '</div>';
     html += '<div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">' + ib.toFixed(1) + ' A</span></div>';
-    html += '<div class="result-row"><span class="label">Zs (' + tx('kumulativ', 'cumulative') + ')</span><span class="value">' + (zs * 1000).toFixed(1) + ' m\u2126</span></div>';
+    html += '<div class="result-row"><span class="label">Z<sub>s</sub> (' + tx('kumulativ', 'cumulative') + ')</span><span class="value">' + (zs * 1000).toFixed(1) + ' m\u2126</span></div>';
     html += '<div class="result-row"><span class="label">\u0394U (' + tx('kumulativ', 'cumulative') + ')</span><span class="value">' + vdrop.toFixed(2) + ' %</span></div>';
-    html += '<div class="result-row"><span class="label">Ik,max / Ik,min</span><span class="value">' + (ikmax / 1000).toFixed(1) + ' / ' + (ikmin / 1000).toFixed(1) + ' kA</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>k,max</sub> / I<sub>k,min</sub></span><span class="value">' + (ikmax / 1000).toFixed(1) + ' / ' + (ikmin / 1000).toFixed(1) + ' kA</span></div>';
     html += '</div>';
   }
 
@@ -16870,7 +16870,7 @@ function sldRenderFaultResults(result) {
   html += '<div class="result-row"><span class="label">' + tx('Enhed udløst', 'Device tripped') + '</span><span class="value">' + tripDeviceName + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Udløsningstid', 'Trip time') + '</span><span class="value">' + (result.tripTime === Infinity ? tx('Ingen udløsning', 'No trip') : (result.tripTime * 1000).toFixed(0) + ' ms') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Krævet tid', 'Required time') + '</span><span class="value">' + (result.requiredTime * 1000).toFixed(0) + ' ms (' + result.clause + ')</span></div>';
-  html += '<div class="result-row"><span class="label">Zs ' + tx('ved fejlsted', 'at fault point') + '</span><span class="value">' + (result.zsAtFault * 1000).toFixed(1) + ' m\u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Z<sub>s</sub> ' + tx('ved fejlsted', 'at fault point') + '</span><span class="value">' + (result.zsAtFault * 1000).toFixed(1) + ' m\u03A9</span></div>';
   html += '</div>';
 
   // Selectivity issues
@@ -22313,12 +22313,12 @@ function renderZs() {
   // Calculation results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Impedansberegning', 'Impedance Calculation') + ' - DS/HD 60364-6 cl.6.2.3.5</div>';
-  html += '<div class="result-row"><span class="label">Ze (' + tx('kilde', 'source') + ')</span><span class="value">' + zsState.ze.toFixed(2) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Z<sub>e</sub> (' + tx('kilde', 'source') + ')</span><span class="value">' + zsState.ze.toFixed(2) + ' \u03A9</span></div>';
   html += '<div class="result-row"><span class="label">R1+R2 (' + zsState.cableSize + 'mm\u00B2)</span><span class="value">' + r1r2.toFixed(2) + ' m\u03A9/m</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Temperaturkorrektion', 'Temperature Correction') + '</span><span class="value">\u00D71.2 (' + tx('drift ved maks. temp.', 'operating at max temp.') + ')</span></div>';
-  html += '<div class="result-row"><span class="label">Zs ' + tx('beregnet', 'calculated') + '</span><span class="value"' + (!pass ? ' style="color:var(--danger)"' : '') + '>' + zsCalc.toFixed(3) + ' \u03A9</span></div>';
-  html += '<div class="result-row"><span class="label">Zs max (' + zsState.device + ')</span><span class="value">' + zsMax.toFixed(2) + ' \u03A9</span></div>';
-  html += '<div class="result-row"><span class="label">Zs max \u00D7 0.8 (' + tx('sikkerhedsmargin', 'safety margin') + ')</span><span class="value">' + (zsMax * 0.8).toFixed(3) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Z<sub>s</sub> ' + tx('beregnet', 'calculated') + '</span><span class="value"' + (!pass ? ' style="color:var(--danger)"' : '') + '>' + zsCalc.toFixed(3) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Z<sub>s,max</sub> (' + zsState.device + ')</span><span class="value">' + zsMax.toFixed(2) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Z<sub>s,max</sub> \u00D7 0.8 (' + tx('sikkerhedsmargin', 'safety margin') + ')</span><span class="value">' + (zsMax * 0.8).toFixed(3) + ' \u03A9</span></div>';
   html += '</div>';
 
   // Fault current
@@ -30421,12 +30421,12 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     var dev = FAULT_DEVICE_TYPES[faultState.deviceType];
 
     html += '<div class="result-box"><div class="result-title">' + tx('TN-system: Zs \u00B7 Ia \u2264 U0', 'TN system: Zs \u00B7 Ia \u2264 U0') + '</div>';
-    html += '<div class="result-row"><span class="label">Ia (' + tx('frakoblingsstrøm', 'disconnection current') + ')</span><span class="value">' + Ia.toFixed(1) + ' A';
+    html += '<div class="result-row"><span class="label">I<sub>a</sub> (' + tx('frakoblingsstrøm', 'disconnection current') + ')</span><span class="value">' + Ia.toFixed(1) + ' A';
     if (dev && dev.factor > 0) html += ' = ' + dev.factor + ' \u00D7 ' + faultState.deviceIn;
     html += '</span></div>';
-    html += '<div class="result-row"><span class="label">Zs \u00B7 Ia</span><span class="value">' + tn.ZsIa.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">Z<sub>s</sub> \u00B7 I<sub>a</sub></span><span class="value">' + tn.ZsIa.toFixed(1) + ' V</span></div>';
     html += '<div class="result-row"><span class="label">U<sub>0</sub></span><span class="value">' + tn.U0 + ' V</span></div>';
-    html += '<div class="result-row"><span class="label">Zs<sub>max</sub> = U0/Ia</span><span class="value">' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">Z<sub>s,max</sub> = U0/Ia</span><span class="value">' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Zs<sub>max</sub> = ' + faultState.voltage + ' / ' + Ia.toFixed(1) + ' = ' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (tn.ok ? '\u2705 ' + tn.ZsIa.toFixed(1) + ' \u2264 ' + tn.U0 : '\u274C ' + tn.ZsIa.toFixed(1) + ' > ' + tn.U0) + '</span></div>';
     html += '</div>';
@@ -30486,8 +30486,8 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     var U_it = faultState.voltage;
     var it2 = faultCalcIT2(Ia2, faultState.zsValue, U_it, false);
     html += '<div class="result-box"><div class="result-title">' + tx('IT dobbeltfejl: 2 \u00B7 Ia \u00B7 Zs \u2264 U', 'IT double fault: 2 \u00B7 Ia \u00B7 Zs \u2264 U') + '</div>';
-    html += '<div class="result-row"><span class="label">Ia</span><span class="value">' + Ia2.toFixed(1) + ' A</span></div>';
-    html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + faultState.zsValue + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>a</sub></span><span class="value">' + Ia2.toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">Z<sub>s</sub></span><span class="value">' + faultState.zsValue + ' \u03A9</span></div>';
     html += '<div class="result-row"><span class="label">2 \u00B7 Ia \u00B7 Zs</span><span class="value">' + it2.product.toFixed(1) + ' V</span></div>';
     html += '<div class="result-row"><span class="label">U (' + tx('uden N', 'without N') + ')</span><span class="value">' + U_it + ' V</span></div>';
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">2 \u00D7 ' + Ia2.toFixed(1) + ' \u00D7 ' + faultState.zsValue + ' = ' + it2.product.toFixed(1) + ' V \u2264 ' + U_it + ' V?</span></div>';
@@ -31616,9 +31616,9 @@ function renderMagnetInductance() {
   html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
-  html += '<div class="result-row"><span class="label">XL (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
+  html += '<div class="result-row"><span class="label">X<sub>L</sub> (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
   html += calcDetail({ name: tx('Selvinduktans', 'Self-inductance'), formula: 'L = N2*u0*ur*A/l', variables: [{ name: 'N', symbol: 'N', value: magnetState.inductN }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.inductArea, unit: 'm2' }, { name: 'l', symbol: 'l', value: magnetState.inductLength, unit: 'm' }], substitution: magnetState.inductN + '2*4pi*1e-7*' + muR + '*' + magnetState.inductArea + '/' + magnetState.inductLength, result: { value: L, unit: 'H' }, reference: 'Opgavesamling Kap. 5' });
-  html += calcDetail({ name: 'XL (link)', formula: 'XL = 2*pi*f*L', variables: [{ name: 'f', symbol: 'f', value: 50, unit: 'Hz' }, { name: 'L', symbol: 'L', value: L, unit: 'H' }], substitution: '2*pi*50*' + L.toExponential(3), result: { value: XL, unit: '\u03A9' }, reference: 'Kap. 4' });
+  html += calcDetail({ name: 'X<sub>L</sub> ' + tx('(reaktans)', '(reactance)'), formula: 'X_L = 2\u00b7\u03c0\u00b7f\u00b7L', variables: [{ name: 'f', symbol: 'f', value: 50, unit: 'Hz' }, { name: 'L', symbol: 'L', value: L, unit: 'H' }], substitution: '2\u00b7\u03c0\u00b750\u00b7' + L.toExponential(3), result: { value: XL, unit: '\u03A9' }, reference: 'Kap. 4' });
   html += '</div>';
   return html;
 }
