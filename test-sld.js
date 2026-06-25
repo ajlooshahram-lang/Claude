@@ -14075,10 +14075,22 @@ test('curves: Vektorer tab renders click-only pickers + both diagrams in da and 
     lang = lg; autoexamState.tab = 'vektorer'; autoexamState.vecP = 50; autoexamState.vecCos = 0.8;
     var out = renderAutoExam();
     assert.ok(out.indexOf("axVecSet('vecP'") >= 0 && out.indexOf("axVecSet('vecCos'") >= 0, 'click-only pickers in ' + lg);
-    assert.ok((out.match(/<svg/g) || []).length >= 2, 'both diagrams in ' + lg);
+    assert.ok((out.match(/<svg/g) || []).length >= 3, 'power triangle + phasor + motor curves in ' + lg);
     assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks in ' + lg);
   });
   lang = prev;
+});
+test('curves/motor-start: starting profiles have correct peak ratios and render 4 overlaid curves', function () {
+  var peak = function (m) { return axMotorStartProfile(m, 10).reduce(function (a, p) { return Math.max(a, p.mult); }, 0); };
+  assert.strictEqual(peak('dol'), 7, 'DOL ~7x In');
+  assert.strictEqual(peak('sd'), 4.5, 'star-delta transition ~4.5x');
+  assert.strictEqual(peak('soft'), 3.5, 'soft starter ~3.5x');
+  assert.strictEqual(peak('vfd'), 1.3, 'VFD ~1.3x');
+  assert.ok(peak('dol') > peak('sd') && peak('sd') > peak('soft') && peak('soft') > peak('vfd'), 'DOL > SD > soft > VFD');
+  // current scales with In
+  assert.strictEqual(axMotorStartProfile('dol', 20).reduce(function (a, p) { return Math.max(a, p.I); }, 0), 140, 'DOL peak = 7 x 20 = 140 A');
+  var svg = axRenderMotorStartCurves(67);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('NaN') < 0 && (svg.match(/<path/g) || []).length === 4, 'valid SVG with 4 method curves');
 });
 
 // ----- CT + relay primary pickup task (forsyning) -----
