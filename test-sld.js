@@ -13967,6 +13967,38 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 8: auto-generated single-line diagram (bilag) in exams -----
+test('autoexam/sld-bilag: installation diagram is fault-free and coordination-correct (IB<=In<=Iz, Icu>=Ik)', function () {
+  var n = 0, bad = 0;
+  ['parcelhus', 'fabrik', 'hospital', 'ev_anlaeg', 'landbrug', 'renovering', 'kontor', 'skole', 'solbatteri', 'etagebolig'].forEach(function (b) {
+    ['case', 'fuld'].forEach(function (md) {
+      n++; var p = axGenerate(n * 9 + 1, b, 'ekspert', md);
+      var inst = p.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+      if (!inst) return;
+      var m = axInstallationToSLD(inst.data);
+      assert.strictEqual(m.faultId, 'none', 'reference diagram carries no fault');
+      if (m.feeders.some(function (f) { return f.faulty; })) bad++;
+      if (m.main.Icu < inst.data.trafo.IkkA - 1e-9) bad++;
+      m.feeders.forEach(function (f) { if (!(f.In >= f.IB - 0.01) || !(f.Iz >= f.In - 0.01)) bad++; });
+      assert.ok(m.feeders.length <= 6, 'diagram caps feeders for readability');
+    });
+  });
+  assert.ok(n >= 16 && bad === 0, n + ' diagrams, ' + bad + ' coordination errors');
+});
+test('autoexam/sld-bilag: the diagram renders as valid SVG and is embedded in exam + print views', function () {
+  var prev = lang; lang = 'da';
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var inst = p.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+  var svg = axRenderSLD(axInstallationToSLD(inst.data), false);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0 && svg.indexOf('NaN') < 0, 'valid SVG');
+  assert.ok(svg.indexOf('\u26A0') < 0, 'reference diagram shows no fault marker');
+  var db = axDataBlockInstallation(inst.data);
+  assert.ok(db.indexOf('Enstregsdiagram') >= 0 && db.indexOf('<svg') >= 0, 'embedded in on-screen exam');
+  var ex = axBuildExamHtml(p);
+  assert.ok(ex.indexOf('<svg') >= 0 && ex.indexOf('undefined') < 0 && ex.indexOf('NaN') < 0, 'embedded in printable exam');
+  lang = prev;
+});
+
 // ----- Batch 7: printable exam paper + worked-solution (facit) export -----
 test('autoexam/print: exam paper is self-contained HTML with options, weighting and load table', function () {
   var prev = lang; lang = 'da';

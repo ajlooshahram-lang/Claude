@@ -12235,6 +12235,21 @@ function axSolveDiagramTask(task) {
 }
 
 // Inline SVG single-line diagram. highlightFault=true marks the faulty element.
+// Build a correct (fault-free) single-line-diagram model from a generated
+// installation's data, so each exam can carry an authentic enstregsdiagram bilag.
+function axInstallationToSLD(d) {
+  var mainIn = axDeviceRating(d.IBtotal);
+  var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var Icu = stdIcu.filter(function (v) { return v >= d.trafo.IkkA - 1e-9; })[0] || 100;
+  var feeders = d.loads.slice(0, 6).map(function (l, i) {
+    var inF = axDeviceRating(l.IB);
+    var sel = axSelectCable(inF, 'Cu', d.stik.insulation, 1, 1, 1); var csa = sel ? sel.csa : 16;
+    var iz = sel ? sel.baseIz : (axIzTable('Cu', d.stik.insulation)[csa] || 0);
+    var needRcd = (l.type === 'ev' || l.type === 'socket' || d.earthing === 'TT');
+    return { id: 'q' + (i + 1), name: { da: l.da, en: l.en }, IB: l.IB, In: inF, curve: 'C', csa: csa, material: 'Cu', Iz: iz, rcd: needRcd, rcdMa: 30, faulty: false };
+  });
+  return { earthing: d.earthing, building: { da: '', en: '' }, trafo: { SN: d.trafo.SN, ek: d.trafo.ek, IkkA: d.trafo.IkkA, In: d.trafo.In }, main: { In: mainIn, Icu: Icu, hasSwitch: true, faulty: false }, feeders: feeders, faultId: 'none' };
+}
+
 function axRenderSLD(m, highlightFault) {
   var W = 380; var rowH = 64; var top = 96; var busX = 46; var H = top + m.feeders.length * rowH + 30;
   function box(x, y, w, hh, txt, bad) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + hh + '" rx="4" fill="' + (bad ? '#d6454522' : '#8881') + '" stroke="' + (bad ? '#d64545' : 'currentColor') + '" stroke-width="' + (bad ? 2 : 1) + '"/>' + (txt ? '<text x="' + (x + w / 2) + '" y="' + (y + hh / 2 + 3) + '" font-size="9" text-anchor="middle" fill="currentColor">' + txt + '</text>' : ''); }
@@ -12853,6 +12868,8 @@ function axDataBlockInstallation(d) {
   d.loads.forEach(function (l) { h += '<tr style="border-bottom:1px solid var(--border-light)"><td style="padding:4px 6px">' + axL({ da: l.da, en: l.en }) + '</td><td style="padding:4px 6px">' + axFmt(l.P) + '</td><td style="padding:4px 6px">' + axFmt(l.cos) + '</td><td style="padding:4px 6px">' + axFmt(l.eta) + '</td><td style="padding:4px 6px">' + (l.ph === 3 ? '3~' : '1~') + '</td><td style="padding:4px 6px">' + axFmt(l.sf) + '</td><td style="padding:4px 6px">' + axFmt(l.IB, 1) + '</td></tr>'; });
   h += '<tr style="font-weight:700;background:var(--primary-glow)"><td style="padding:4px 6px" colspan="6">' + tx('Dimensionsgivende IB (med samtidighed)', 'Dimensioning IB (with diversity)') + '</td><td style="padding:4px 6px">' + axFmt(d.IBtotal, 1) + '</td></tr>';
   h += '</table></div>';
+  // Bilag: auto-generated enstregsdiagram of the installation
+  h += '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Bilag: Enstregsdiagram', 'Appendix: Single-line diagram') + '</div><div style="overflow-x:auto;padding:4px">' + axRenderSLD(axInstallationToSLD(d), false) + '</div></div>';
   return h;
 }
 
@@ -13110,6 +13127,7 @@ function axPrintDataBlock(op) {
     h += '<table><tr><th>' + tx('Brugsgenstand', 'Load') + '</th><th>P [kW]</th><th>cos\u03c6</th><th>\u03b7</th><th>' + tx('Faser', 'Phases') + '</th><th>Sf</th><th>IB [A]</th></tr>';
     d.loads.forEach(function (l) { h += '<tr><td>' + axEsc(axL({ da: l.da, en: l.en })) + '</td><td>' + axEsc(axFmt(l.P)) + '</td><td>' + axEsc(axFmt(l.cos)) + '</td><td>' + axEsc(axFmt(l.eta)) + '</td><td>' + (l.ph === 3 ? '3~' : '1~') + '</td><td>' + axEsc(axFmt(l.sf)) + '</td><td>' + axEsc(axFmt(l.IB, 1)) + '</td></tr>'; });
     h += '<tr><td colspan="6"><strong>' + tx('Dimensionsgivende IB', 'Dimensioning IB') + '</strong></td><td><strong>' + axEsc(axFmt(d.IBtotal, 1)) + '</strong></td></tr></table>';
+    h += '<h3>' + tx('Bilag: Enstregsdiagram', 'Appendix: Single-line diagram') + '</h3><div style="color:#111">' + axRenderSLD(axInstallationToSLD(d), false) + '</div>';
     return h;
   }
   if (op.type === 'forsyning') {
