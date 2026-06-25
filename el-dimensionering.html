@@ -6056,6 +6056,108 @@ function vdropSetLength(v) { vdropProfileState.length = Number(v) || 50; renderM
 function vdropSetIn(v) { vdropProfileState.In = Number(v) || 25; renderModule('standards'); }
 
 // ===========================================================================
+// CLICKABLE STANDARDS REGISTRY — every clause is auditable & self-explaining
+// ===========================================================================
+// Maps a standard clause -> what it says, WHY it applies, and which engineering
+// decision depends on it. Rendered as native <details> chips (100% click-only,
+// fully offline, no JS state). Fulfils the directive: "clickable standards
+// references ... users must understand why it applies and which decision
+// depends on it." DS/HD 60364 = Danish implementation of IEC 60364.
+const STD_REGISTRY = {
+  'DS/HD 60364-4-41': {
+    title_da: 'Beskyttelse mod elektrisk st\u00f8d', title_en: 'Protection against electric shock',
+    why_da: 'Kr\u00e6ver automatisk frakobling: Zs\u00b7Ia \u2264 U0, s\u00e5 en fejl ryddes inden for 0,4 s (endegrupper) / 5 s (fordeling).',
+    why_en: 'Requires automatic disconnection: Zs\u00b7Ia \u2264 U0 so a fault clears within 0.4 s (final) / 5 s (distribution).',
+    affects_da: 'Valg af beskyttelse, sl\u00f8jfeimpedans Zs, RCD-krav, lederst\u00f8rrelse.',
+    affects_en: 'Protective device choice, loop impedance Zs, RCD requirement, conductor size.'
+  },
+  'DS/HD 60364-4-43': {
+    title_da: 'Beskyttelse mod overstr\u00f8m', title_en: 'Protection against overcurrent',
+    why_da: 'Koordinering IB \u2264 In \u2264 Iz og I\u00b2t \u2264 k\u00b2S\u00b2 (kortslutning). Sikrer at lederen aldrig overophedes.',
+    why_en: 'Coordination IB \u2264 In \u2264 Iz and I\u00b2t \u2264 k\u00b2S\u00b2 (short-circuit). Ensures the conductor never overheats.',
+    affects_da: 'M\u00e6rkestr\u00f8m In, brydeevne Icu, mindste tv\u00e6rsnit.',
+    affects_en: 'Rated current In, breaking capacity Icu, minimum cross-section.'
+  },
+  'DS/HD 60364-5-52': {
+    title_da: 'Valg og installation af kabler', title_en: 'Selection and erection of wiring',
+    why_da: 'Giver str\u00f8mv\u00e6rdier (Iz) og korrektionsfaktorer for temperatur/gruppering samt sp\u00e6ndingsfaldsgr\u00e6nser (3%/5%).',
+    why_en: 'Provides ampacities (Iz) and correction factors for temperature/grouping plus voltage-drop limits (3%/5%).',
+    affects_da: 'Kabeltv\u00e6rsnit, Iz-korrektion, sp\u00e6ndingsfald.',
+    affects_en: 'Cable cross-section, Iz correction, voltage drop.'
+  },
+  'DS/HD 60364-5-54': {
+    title_da: 'Jordingsanl\u00e6g og beskyttelsesledere', title_en: 'Earthing & protective conductors',
+    why_da: 'Mindste PE-tv\u00e6rsnit (tabel 54.7) og adiabatisk kontrol S \u2265 \u221a(I\u00b2t)/k.',
+    why_en: 'Minimum PE cross-section (table 54.7) and adiabatic check S \u2265 \u221a(I\u00b2t)/k.',
+    affects_da: 'PE-lederst\u00f8rrelse, ekvipotentialforbindelser.',
+    affects_en: 'PE conductor size, equipotential bonding.'
+  },
+  'DS/HD 60364-6': {
+    title_da: 'Verifikation', title_en: 'Verification',
+    why_da: 'Felt-accepttest: m\u00e5lt Zs \u2264 0,8\u00b7Zs,max (varm leder), isolationsmodstand, RCD-udl\u00f8setid.',
+    why_en: 'Field acceptance: measured Zs \u2264 0.8\u00b7Zs,max (hot conductor), insulation resistance, RCD trip time.',
+    affects_da: 'Accepttest, idriftss\u00e6ttelse, inspektionsrapport.',
+    affects_en: 'Acceptance testing, commissioning, inspection report.'
+  },
+  'IEC 60898-1': {
+    title_da: 'Automatsikringer (MCB)', title_en: 'Circuit breakers (MCB)',
+    why_da: 'Definerer kurve B/C/D magnetiske udl\u00f8setærskler (5/10/20\u00d7In) og brydeevne.',
+    why_en: 'Defines curve B/C/D magnetic trip thresholds (5/10/20\u00d7In) and breaking capacity.',
+    affects_da: 'MCB-kurvevalg, Ia til Zs, brydeevne Icn.',
+    affects_en: 'MCB curve choice, Ia for Zs, breaking capacity Icn.'
+  },
+  'IEC 60269-2': {
+    title_da: 'Smeltesikringer (gG)', title_en: 'Fuses (gG)',
+    why_da: 'Tid/str\u00f8m-karakteristik; 5 s-str\u00f8mmen bestemmer Ia til fejlsl\u00f8jfeverifikation.',
+    why_en: 'Time-current characteristic; the 5 s current sets Ia for fault-loop verification.',
+    affects_da: 'Sikringsvalg, Ia til Zs, I\u00b2t-gennemslip.',
+    affects_en: 'Fuse choice, Ia for Zs, I\u00b2t let-through.'
+  },
+  'IEC 61008-1': {
+    title_da: 'Fejlstr\u00f8msafbrydere (RCD/HPFI)', title_en: 'Residual current devices (RCD)',
+    why_da: 'Maks. udl\u00f8setider (300/150/40 ms ved 1/2/5\u00d7I\u0394n) og type AC/A/F/B anvendelse.',
+    why_en: 'Max trip times (300/150/40 ms at 1/2/5\u00d7I\u0394n) and type AC/A/F/B application.',
+    affects_da: 'RCD-type, f\u00f8lsomhed I\u0394n, selektivitet (type S).',
+    affects_en: 'RCD type, sensitivity I\u0394n, selectivity (type S).'
+  },
+  'IEC 60909-0': {
+    title_da: 'Kortslutningsstr\u00f8mme', title_en: 'Short-circuit currents',
+    why_da: 'Ik3max = c\u00b7Un/(\u221a3\u00b7Z) med c=1,05 (DK 400V); bestemmer kravet Icu \u2265 Ik,max.',
+    why_en: 'Ik3max = c\u00b7Un/(\u221a3\u00b7Z) with c=1.05 (DK 400V); sets the requirement Icu \u2265 Ik,max.',
+    affects_da: 'Brydeevne, magnetisk udl\u00f8sning, selektivitet.',
+    affects_en: 'Breaking capacity, magnetic trip, selectivity.'
+  },
+  'IEC 60947-4-1': {
+    title_da: 'Motorstartere / termorel\u00e6', title_en: 'Motor starters / overload relays',
+    why_da: 'Udl\u00f8seklasser (5/10/20/30) angiver maks. udl\u00f8setid ved 7,2\u00d7Ie fra kold tilstand.',
+    why_en: 'Trip classes (5/10/20/30) give max trip time at 7.2\u00d7Ie from cold.',
+    affects_da: 'Motorbeskyttelse, termisk koordination, startmetode.',
+    affects_en: 'Motor protection, thermal coordination, starting method.'
+  }
+};
+
+// Render a clickable standards chip: a native <details> element showing the
+// clause and, on click, why it applies + which decision depends on it.
+function stdChip(clause) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var reg = STD_REGISTRY[clause];
+  if (!reg) return '<code style="background:var(--border-light);padding:1px 6px;border-radius:4px;font-size:0.82em">' + clause + '</code>';
+  var h = '<details class="std-chip" style="display:inline-block;vertical-align:middle;margin:2px 4px 2px 0">';
+  h += '<summary style="cursor:pointer;display:inline-block;background:var(--primary-glow);color:var(--primary);border:1px solid var(--primary);border-radius:12px;padding:1px 10px;font-size:0.78rem;font-weight:600;list-style:none">\uD83D\uDCD6 ' + clause + '</summary>';
+  h += '<div style="margin-top:5px;padding:8px 11px;background:var(--bg-card,#fff);border:1px solid var(--border);border-radius:8px;font-size:0.8rem;line-height:1.5;max-width:420px">';
+  h += '<div style="font-weight:700;margin-bottom:3px">' + (da ? reg.title_da : reg.title_en) + '</div>';
+  h += '<div style="margin-bottom:3px"><span style="color:var(--text-muted);font-weight:600">' + (da ? 'Hvorfor: ' : 'Why: ') + '</span>' + (da ? reg.why_da : reg.why_en) + '</div>';
+  h += '<div><span style="color:var(--text-muted);font-weight:600">' + (da ? 'P\u00e5virker: ' : 'Affects: ') + '</span>' + (da ? reg.affects_da : reg.affects_en) + '</div>';
+  h += '</div></details>';
+  return h;
+}
+
+// Render several clause chips inline.
+function stdChips(clauses) {
+  return (clauses || []).map(stdChip).join('');
+}
+
+// ===========================================================================
 // ENGINEERING PRESENTATION FRAMEWORK (Viggo Bisch Methodology)
 // ===========================================================================
 // Replicates the exact engineering transparency demonstrated in the Danish
@@ -6080,11 +6182,14 @@ function engPresentation(title, steps, opts) {
   var typeLabels = {
     standard: { da: 'Regelhenvisning', en: 'Standard reference', icon: '\uD83D\uDCD6' },
     assumption: { da: 'Antagelser / Givne data', en: 'Assumptions / Given data', icon: '\uD83D\uDCCB' },
+    variables: { da: 'Variable & enheder', en: 'Variables & units', icon: '\uD83D\uDD24' },
     formula: { da: 'Formel', en: 'Formula', icon: '\uD83D\uDD23' },
     substitution: { da: 'Inds\u00e6tning', en: 'Substitution', icon: '\u270F\uFE0F' },
     intermediate: { da: 'Mellemregning', en: 'Intermediate calculation', icon: '\u2699\uFE0F' },
     result: { da: 'Resultat', en: 'Result', icon: '\u2705' },
     verification: { da: 'Verifikation', en: 'Verification', icon: '\uD83D\uDD0D' },
+    alternatives: { da: 'Alternativer overvejet', en: 'Alternatives considered', icon: '\u2696\uFE0F' },
+    economic: { da: '\u00d8konomi & fremtidssikring', en: 'Economics & future-proofing', icon: '\uD83D\uDCB0' },
     conclusion: { da: 'Konklusion', en: 'Conclusion', icon: '\uD83C\uDFAF' }
   };
   var statusIcons = { pass: '\u2705', fail: '\u26D4', warn: '\u26A0\uFE0F' };
@@ -6096,45 +6201,87 @@ function engPresentation(title, steps, opts) {
     var stepBg = step.type === 'conclusion' ? (step.status === 'pass' ? 'background:var(--success-bg);border-left:3px solid var(--success)' : (step.status === 'fail' ? 'background:var(--danger-bg);border-left:3px solid var(--danger)' : '')) : '';
     body += '<div style="margin:6px 0;padding:6px 10px;border-radius:6px;' + stepBg + '">';
     body += '<div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px">' + tl.icon + ' ' + (da ? tl.da : tl.en) + '</div>';
-    body += '<div style="font-size:0.82rem;line-height:1.5">' + step.content + '</div>';
+    // Special renderers for the richer step types
+    if (step.type === 'standard' && step.clauses) {
+      body += '<div style="font-size:0.82rem;line-height:1.7">' + stdChips(step.clauses) + (step.content ? '<div style="margin-top:3px">' + step.content + '</div>' : '') + '</div>';
+    } else if (step.type === 'variables' && step.vars) {
+      body += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse">';
+      body += '<tr style="color:var(--text-muted);font-weight:600"><td style="padding:2px 6px">' + (da ? 'Symbol' : 'Symbol') + '</td><td style="padding:2px 6px">' + (da ? 'Betydning' : 'Meaning') + '</td><td style="padding:2px 6px">' + (da ? 'V\u00e6rdi' : 'Value') + '</td><td style="padding:2px 6px">' + (da ? 'Enhed' : 'Unit') + '</td></tr>';
+      step.vars.forEach(function (v) {
+        body += '<tr style="border-top:1px solid var(--border-light)"><td style="padding:2px 6px;font-family:monospace">' + (v.sym || '') + '</td><td style="padding:2px 6px">' + (da ? (v.da || v.en || '') : (v.en || v.da || '')) + '</td><td style="padding:2px 6px;font-family:monospace">' + (v.val != null ? v.val : '') + '</td><td style="padding:2px 6px">' + (v.unit || '') + '</td></tr>';
+      });
+      body += '</table>';
+    } else if (step.type === 'alternatives' && step.alts) {
+      body += '<div style="font-size:0.81rem;line-height:1.5">';
+      step.alts.forEach(function (a) {
+        var mark = a.chosen ? '\u2705 ' : '\u274C ';
+        var col = a.chosen ? 'var(--success)' : 'var(--text-muted)';
+        body += '<div style="margin:3px 0;padding:4px 8px;border-left:3px solid ' + col + '"><strong>' + mark + (a.option || '') + '</strong>' + (a.reason ? ' \u2014 ' + (da ? (a.reason_da || a.reason) : (a.reason_en || a.reason)) : '') + '</div>';
+      });
+      body += '</div>';
+    } else {
+      body += '<div style="font-size:0.82rem;line-height:1.5">' + (step.content || '') + '</div>';
+    }
     body += '</div>';
   }
 
   // Wrap in a collapsible panel with "Vis begrundelse / Show reasoning" header
-  var panelTitle = (opts.showIcon || '\uD83D\uDCDD') + ' ' + (title || (da ? 'Vis begrundelse' : 'Show reasoning'));
+  var panelTitle = (opts.showIcon || '\uD83D\uDCDD') + ' ' + (title || (da ? 'Vis ingeni\u00f8rm\u00e6ssig begrundelse' : 'Show engineering reasoning'));
   return uxPanel(panelTitle, body, { id: opts.id || ('eng_' + Math.random().toString(36).slice(2, 8)), open: opts.open || false, level: opts.level || null });
 }
 
 // Shortcut: builds a standard cable-dimensioning reasoning presentation.
 function engCableReasoning(data) {
   // data: {ib, installMethod, kInstall, kTemp, kGroup, kTotal, baseIz, correctedIz,
-  //         cableType, mm2, tableRef, tempC, groupCount, verdict}
+  //         cableType, mm2, tableRef, tempC, groupCount, verdict, altSmaller, altSmallerIz}
   var da = (typeof lang !== 'undefined' && lang === 'da');
   var steps = [
-    { type: 'standard', content: 'DS/HD 60364-5-52 ' + (da ? 'Anneks B (str\u00f8mv\u00e6rdier og korrektionsfaktorer)' : 'Annex B (current-carrying capacities and correction factors)') },
-    { type: 'assumption', content: (da ? 'Fremf\u00f8ringsmetode: ' : 'Installation method: ') + '<strong>' + (data.installMethod || 'C') + '</strong>' + (data.tableRef ? ' (' + data.tableRef + ')' : '') + '<br>' + (da ? 'Temperatur: ' : 'Temperature: ') + (data.tempC || 30) + ' \u00b0C<br>' + (da ? 'Gruppering: ' : 'Grouping: ') + (data.groupCount || 1) + (da ? ' kredsløb' : ' circuits') },
-    { type: 'formula', content: 'I<sub>Z,korr</sub> = I<sub>Z,tabel</sub> \u00d7 k<sub>1</sub> \u00d7 k<sub>2</sub> \u00d7 k<sub>3</sub>' },
+    { type: 'standard', clauses: ['DS/HD 60364-5-52', 'DS/HD 60364-4-43'], content: (da ? 'Str\u00f8mv\u00e6rdier (Iz) + korrektionsfaktorer; koordinering IB \u2264 In \u2264 Iz.' : 'Ampacities (Iz) + correction factors; coordination IB \u2264 In \u2264 Iz.') },
+    { type: 'assumption', content: (da ? 'Fremf\u00f8ringsmetode: ' : 'Installation method: ') + '<strong>' + (data.installMethod || 'C') + '</strong>' + (data.tableRef ? ' (' + data.tableRef + ')' : '') + '<br>' + (da ? 'Temperatur: ' : 'Temperature: ') + (data.tempC || 30) + ' \u00b0C, ' + (da ? 'gruppering: ' : 'grouping: ') + (data.groupCount || 1) },
+    { type: 'variables', vars: [
+      { sym: 'I\u1D2E', da: 'Belastningsstr\u00f8m', en: 'Design current', val: data.ib ? data.ib.toFixed(1) : '?', unit: 'A' },
+      { sym: 'Iz,tab', da: 'Tabel-str\u00f8mv\u00e6rdi', en: 'Tabulated ampacity', val: data.baseIz || '?', unit: 'A' },
+      { sym: 'k\u2081', da: 'Fremf\u00f8ringsfaktor', en: 'Install factor', val: data.kInstall || 1.0, unit: '' },
+      { sym: 'k\u2082', da: 'Temperaturfaktor', en: 'Temp factor', val: data.kTemp || 1.0, unit: '' },
+      { sym: 'k\u2083', da: 'Grupperingsfaktor', en: 'Grouping factor', val: data.kGroup || 1.0, unit: '' }
+    ] },
+    { type: 'formula', content: 'I<sub>Z,korr</sub> = I<sub>Z,tabel</sub> \u00d7 k\u2081 \u00d7 k\u2082 \u00d7 k\u2083' },
     { type: 'substitution', content: 'I<sub>Z,korr</sub> = ' + (data.baseIz || '?') + ' \u00d7 ' + (data.kInstall || 1.0) + ' \u00d7 ' + (data.kTemp || 1.0) + ' \u00d7 ' + (data.kGroup || 1.0) },
     { type: 'result', content: '<strong>I<sub>Z,korr</sub> = ' + (data.correctedIz ? data.correctedIz.toFixed(1) : '?') + ' A</strong> (' + (data.cableType || '') + ' ' + (data.mm2 || '') + ' mm\u00b2)' },
     { type: 'verification', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub>: <strong>' + (data.ib ? data.ib.toFixed(1) : '?') + ' A \u2264 I<sub>n</sub> \u2264 ' + (data.correctedIz ? data.correctedIz.toFixed(1) : '?') + ' A</strong>' },
-    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Kablet er korrekt dimensioneret.' : 'Cable is correctly sized.') : (da ? 'Kablet er IKKE tilstr\u00e6kkeligt!' : 'Cable is NOT adequate!'), status: data.verdict || 'pass' }
+    { type: 'alternatives', alts: [
+      (data.altSmaller ? { option: data.altSmaller + ' mm\u00b2', chosen: false, reason_da: 'Iz,korr (' + (data.altSmallerIz ? data.altSmallerIz.toFixed(0) : '?') + ' A) < I\u1D2E \u2014 ville overophede.', reason_en: 'Iz,corr (' + (data.altSmallerIz ? data.altSmallerIz.toFixed(0) : '?') + ' A) < design current \u2014 would overheat.' } : null),
+      { option: (data.mm2 || '?') + ' mm\u00b2', chosen: true, reason_da: 'Mindste tv\u00e6rsnit der opfylder Iz,korr \u2265 I\u1D2E.', reason_en: 'Smallest cross-section meeting Iz,corr \u2265 design current.' }
+    ].filter(Boolean) },
+    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Kablet er korrekt dimensioneret \u2014 mindste konforme l\u00f8sning.' : 'Cable is correctly sized \u2014 smallest compliant solution.') : (da ? 'Kablet er IKKE tilstr\u00e6kkeligt!' : 'Cable is NOT adequate!'), status: data.verdict || 'pass' }
   ];
-  return engPresentation(da ? 'Kabeldimensionering' : 'Cable sizing', steps, { id: 'eng_cable_' + (data.mm2 || '0') });
+  return engPresentation(da ? 'Kabeldimensionering \u2014 hvorfor dette tv\u00e6rsnit?' : 'Cable sizing \u2014 why this cross-section?', steps, { id: 'eng_cable_' + (data.mm2 || '0') });
 }
 
 // Shortcut: builds a standard breaker-selection reasoning presentation.
 function engBreakerReasoning(data) {
-  // data: {ib, deviceIn, deviceIcu, ikMax, curve, deviceLabel, izCorrected, verdict}
+  // data: {ib, deviceIn, deviceIcu, ikMax, curve, deviceLabel, izCorrected, verdict, altLower, altHigher}
   var da = (typeof lang !== 'undefined' && lang === 'da');
   var steps = [
-    { type: 'standard', content: 'DS/HD 60364-4-43 ' + (da ? '(overstr\u00f8msbeskyttelse) + IEC 60898-1' : '(overcurrent protection) + IEC 60898-1') },
-    { type: 'assumption', content: 'I<sub>B</sub> = ' + (data.ib ? data.ib.toFixed(1) : '?') + ' A<br>I<sub>k,max</sub> = ' + (data.ikMax ? (data.ikMax / 1000).toFixed(1) + ' kA' : '?') },
-    { type: 'formula', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub><br>I<sub>cu</sub> \u2265 I<sub>k,max</sub>' },
+    { type: 'standard', clauses: ['DS/HD 60364-4-43', 'IEC 60898-1', 'IEC 60909-0'], content: (da ? 'Overstr\u00f8msbeskyttelse + brydeevne.' : 'Overcurrent protection + breaking capacity.') },
+    { type: 'variables', vars: [
+      { sym: 'I\u1D2E', da: 'Belastningsstr\u00f8m', en: 'Design current', val: data.ib ? data.ib.toFixed(1) : '?', unit: 'A' },
+      { sym: 'I\u2099', da: 'M\u00e6rkestr\u00f8m', en: 'Rated current', val: data.deviceIn || '?', unit: 'A' },
+      { sym: 'Iz', da: 'Kabel-str\u00f8mv\u00e6rdi', en: 'Cable ampacity', val: data.izCorrected ? data.izCorrected.toFixed(0) : '?', unit: 'A' },
+      { sym: 'Icu', da: 'Brydeevne', en: 'Breaking capacity', val: data.deviceIcu || '?', unit: 'kA' },
+      { sym: 'Ik,max', da: 'Prospektiv kortslutning', en: 'Prospective short-circuit', val: data.ikMax ? (data.ikMax / 1000).toFixed(1) : '?', unit: 'kA' }
+    ] },
+    { type: 'formula', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>Z</sub>  &  I<sub>cu</sub> \u2265 I<sub>k,max</sub>' },
     { type: 'verification', content: (data.ib ? data.ib.toFixed(1) : '?') + ' A \u2264 <strong>' + (data.deviceIn || '?') + ' A</strong> \u2264 ' + (data.izCorrected ? data.izCorrected.toFixed(1) : '?') + ' A<br>I<sub>cu</sub> = ' + (data.deviceIcu || '?') + ' kA \u2265 ' + (data.ikMax ? (data.ikMax / 1000).toFixed(1) : '?') + ' kA' },
     { type: 'result', content: (da ? 'Valg: ' : 'Selection: ') + '<strong>' + (data.deviceLabel || '?') + '</strong> ' + (data.curve || '') + (data.deviceIn || '') + ' A' },
-    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Beskyttelsen opfylder kravene.' : 'Protection meets requirements.') : (da ? 'Beskyttelsen er UTILSTR\u00c6KKELIG!' : 'Protection is INADEQUATE!'), status: data.verdict || 'pass' }
+    { type: 'alternatives', alts: [
+      (data.altLower ? { option: (data.curve || '') + data.altLower + ' A', chosen: false, reason_da: 'I\u2099 < I\u1D2E \u2014 ville udl\u00f8se under normal drift.', reason_en: 'In < design current \u2014 would trip in normal operation.' } : null),
+      { option: (data.curve || '') + (data.deviceIn || '?') + ' A', chosen: true, reason_da: 'Mindste In \u2265 I\u1D2E med Icu \u2265 Ik,max \u2014 konform.', reason_en: 'Smallest In \u2265 design current with Icu \u2265 Ik,max \u2014 compliant.' },
+      (data.altHigher ? { option: (data.curve || '') + data.altHigher + ' A', chosen: false, reason_da: 'St\u00f8rre end n\u00f8dvendigt \u2014 d\u00e5rligere kabelbeskyttelse, h\u00f8jere pris.', reason_en: 'Larger than necessary \u2014 worse cable protection, higher cost.' } : null)
+    ].filter(Boolean) },
+    { type: 'conclusion', content: data.verdict === 'pass' ? (da ? 'Beskyttelsen opfylder kravene \u2014 mindste konforme l\u00f8sning.' : 'Protection meets requirements \u2014 smallest compliant solution.') : (da ? 'Beskyttelsen er UTILSTR\u00c6KKELIG!' : 'Protection is INADEQUATE!'), status: data.verdict || 'pass' }
   ];
-  return engPresentation(da ? 'Beskyttelsesvalg' : 'Protection selection', steps, { id: 'eng_breaker_' + (data.deviceIn || '0') });
+  return engPresentation(da ? 'Beskyttelsesvalg \u2014 hvorfor denne afbryder?' : 'Protection selection \u2014 why this breaker?', steps, { id: 'eng_breaker_' + (data.deviceIn || '0') });
 }
 
 // Shortcut: builds a voltage-drop reasoning presentation.

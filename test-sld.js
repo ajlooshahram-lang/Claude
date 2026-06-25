@@ -15029,6 +15029,40 @@ test('standards: IZ_COPPER ampacity table is conservatively rounded down from DS
   });
 });
 
+test('eng: stdChip renders clickable <details> with why + affects, graceful for unknown clause', function () {
+  var prev = lang; lang = 'da';
+  var chip = stdChip('DS/HD 60364-4-41');
+  assert.ok(chip.indexOf('<details') >= 0, 'is a details element (click-only)');
+  assert.ok(chip.indexOf('Hvorfor') >= 0 && chip.indexOf('P\u00e5virker') >= 0, 'shows why + affects');
+  assert.ok(stdChip('UNKNOWN-CLAUSE').indexOf('UNKNOWN-CLAUSE') >= 0, 'unknown clause still rendered');
+  lang = prev;
+});
+
+test('eng: engCableReasoning includes clickable standards, variables table, and rejected alternatives', function () {
+  var prev = lang; lang = 'da';
+  var c = engCableReasoning({ ib: 49.1, baseIz: 76, kInstall: 1, kTemp: 1.04, kGroup: 1, correctedIz: 79, cableType: 'NOIKLX', mm2: 16, installMethod: 'C', tempC: 25, groupCount: 1, verdict: 'pass', altSmaller: 10, altSmallerIz: 56 });
+  assert.ok(c.indexOf('<details') >= 0, 'clickable standards chip');
+  assert.ok(c.indexOf('Alternativer') >= 0, 'alternatives-considered section');
+  assert.ok(c.indexOf('10 mm') >= 0, 'rejected smaller cross-section shown');
+  assert.ok(c.indexOf('undefined') < 0 && c.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('eng: engBreakerReasoning includes alternatives (lower rejected) + standards chips', function () {
+  var prev = lang; lang = 'en';
+  var b = engBreakerReasoning({ ib: 49.1, deviceIn: 50, deviceIcu: 13.8, ikMax: 13800, curve: 'C', deviceLabel: 'Acti9', izCorrected: 79, verdict: 'pass', altLower: 40, altHigher: 63 });
+  assert.ok(b.indexOf('<details') >= 0, 'standards chips');
+  assert.ok(b.indexOf('alternatives') >= 0 || b.indexOf('Alternatives') >= 0, 'alternatives section');
+  assert.ok(b.indexOf('undefined') < 0 && b.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('eng: STD_REGISTRY covers the core life-safety clauses', function () {
+  ['DS/HD 60364-4-41', 'DS/HD 60364-4-43', 'DS/HD 60364-5-52', 'IEC 60898-1', 'IEC 60269-2', 'IEC 61008-1', 'IEC 60909-0', 'IEC 60947-4-1'].forEach(function (clause) {
+    assert.ok(STD_REGISTRY[clause] && STD_REGISTRY[clause].why_da && STD_REGISTRY[clause].affects_en, clause + ' has why + affects in both languages');
+  });
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
