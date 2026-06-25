@@ -17095,6 +17095,28 @@ function renderEV() {
     reference: 'DS/HD 60364-7-722; cl.722.525'
   });
 
+  // Energy Savings — EV vs. fossil fuel
+  var evAnnualKm = 15000; // avg Danish annual driving
+  var evKwhPer100km = 18; // kWh/100km for typical EV
+  var evAnnualKwh = evAnnualKm * evKwhPer100km / 100;
+  var fossilLPer100km = 7; // litres/100km petrol
+  var fossilAnnualL = evAnnualKm * fossilLPer100km / 100;
+  var fossilCostPerL = 13; // DKK/litre
+  var evCostPerKwh = 2.5; // DKK/kWh (home charging)
+  var evAnnualCost = evAnnualKwh * evCostPerKwh;
+  var fossilAnnualCost = fossilAnnualL * fossilCostPerL;
+  var evSavingDKK = fossilAnnualCost - evAnnualCost;
+  var evCO2saving = fossilAnnualL * 2.3 - evAnnualKwh * 0.085; // kg CO2
+
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — EV vs. fossilt brændstof', 'Energy Savings — EV vs. fossil fuel') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Årlig kørsel', 'Annual driving') + '</span><span class="value">' + evAnnualKm + ' km</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('EV elforbrug', 'EV electricity use') + '</span><span class="value" style="color:var(--success);font-weight:700">' + evAnnualKwh + ' kWh/\u00e5r (' + evAnnualCost.toFixed(0) + ' DKK)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Benzin/diesel', 'Petrol/diesel') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + fossilAnnualL + ' L/\u00e5r (' + fossilAnnualCost.toFixed(0) + ' DKK)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + evSavingDKK.toFixed(0) + ' DKK/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (evCO2saving / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '</div>';
+
   // Verdict
   var safe = vdropOk && !grid.overloaded && rcdTypeB;
   html += renderVerdict(safe, safe ? tx('Installation opfylder DS/HD 60364-7-722', 'Installation complies with DS/HD 60364-7-722') : tx('Krav IKKE opfyldt - se advarsler', 'Requirements NOT met - see warnings'));
@@ -18508,6 +18530,25 @@ function renderVFD() {
     reference: 'IEC 61800-1 cl.5.2; IEC 61800-3'
   });
 
+  // Energy Savings — VFD vs. direct-on-line
+  var vfdMotorKW = vfdState.motorKW || 15;
+  var vfdAnnualHours = 4000; // typical industrial motor hours
+  var dolConsumption = vfdMotorKW * vfdAnnualHours; // kWh without VFD (full speed)
+  var vfdSavingPct = 0.35; // 35% typical saving for pump/fan applications
+  var vfdConsumption = dolConsumption * (1 - vfdSavingPct);
+  var vfdSavingKWh = dolConsumption - vfdConsumption;
+  var vfdSavingDKK = vfdSavingKWh * 2.5;
+  var vfdInvestment = vfdMotorKW * 1500; // DKK
+
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — VFD vs. direkte drift', 'Energy Savings — VFD vs. direct-on-line') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motor uden VFD (DOL)', 'Motor without VFD (DOL)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + dolConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motor med VFD (\u221235%)', 'Motor with VFD (\u221235%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + vfdConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + vfdSavingKWh.toFixed(0) + ' kWh (' + (vfdSavingDKK / 1000).toFixed(0) + 'k DKK/\u00e5r)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (vfdSavingKWh * 0.085 / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling', 'Payback') + '</span><span class="value">\u2248 ' + Math.round(vfdInvestment / (vfdSavingDKK)) + ' \u00e5r (IEC 61800-9-2)</span></div>';
+  html += '</div>';
+
   html += renderVerdict(allOk, allOk ? tx('VFD-installation opfylder IEC 61800 + DS/HD 60364', 'VFD installation complies with IEC 61800 + DS/HD 60364') : tx('Motorkabel for lang - reducer l\u00E6ngde eller brug sk\u00E6rmet kabel', 'Motor cable too long - reduce length or use shielded cable'));
 
   html += '</div>';
@@ -18745,6 +18786,25 @@ function renderLighting() {
     result: { value: calc.count, unit: tx('armaturer', 'luminaires'), status: allOk ? 'ok' : 'fail' },
     reference: 'DS/EN 12464-1; DS/EN 15193 (LENI)'
   });
+
+  // Energy Savings — LED vs. conventional lighting
+  var ledWPerM2 = calc.powerDensity || 8;
+  var conventionalWPerM2 = ledWPerM2 * 2.5; // T8 fluorescent is ~2.5x LED
+  var roomArea = lightingState.roomW * lightingState.roomL;
+  var annualHoursLighting = (lightingState.task === 'office' || lightingState.task === 'classroom') ? 2500 : 4000;
+  var ledAnnualKWh = ledWPerM2 * roomArea * annualHoursLighting / 1000;
+  var convAnnualKWh = conventionalWPerM2 * roomArea * annualHoursLighting / 1000;
+  var lightSavingKWh = convAnnualKWh - ledAnnualKWh;
+  var lightSavingDKK = lightSavingKWh * 2.5;
+
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse \u2014 LED vs. konventionel', 'Energy Savings \u2014 LED vs. conventional') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('LED-belysning', 'LED lighting') + '</span><span class="value" style="color:var(--success);font-weight:700">' + ledAnnualKWh.toFixed(0) + ' kWh/\u00e5r (' + ledWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Konventionel (T8/T5)', 'Conventional (T8/T5)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + convAnnualKWh.toFixed(0) + ' kWh/\u00e5r (' + conventionalWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + lightSavingKWh.toFixed(0) + ' kWh (' + (lightSavingDKK / 1000).toFixed(1) + 'k DKK/\u00e5r)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (lightSavingKWh * 0.085 / 1000).toFixed(2) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value" style="font-size:0.75rem;color:var(--text-muted)">DS/EN 15193-1 (LENI); BR18 \u00a7377-378</span></div>';
+  html += '</div>';
 
   html += renderVerdict(allOk, allOk ? tx('Belysningsdesign opfylder DS/EN 12464-1 + DS/EN 15193', 'Lighting design complies with DS/EN 12464-1 + DS/EN 15193') : tx('Tilpas layout - uniformitet eller energi overskrider graense', 'Adjust layout - uniformity or energy exceeds limit'));
 
