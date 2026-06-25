@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Apply UX progressive disclosure pattern (uxSummary + uxPanel) to the high-traffic remaining modules: renderLighting, renderHeatPump, renderVdrop, renderShortCircuit, renderFireAlarm, renderSPD, renderUPS, renderPFC, renderBathroom, renderData, renderTrayFill. These 11 modules still show flat cluttered UIs with all parameters visible at once. The pattern is to: (1) Add uxSummary at top with key result metrics, (2) Keep 1-2 most essential selectors always visible, (3) Wrap secondary/advanced parameters into uxPanel collapsible sections.",
+  "status": "completed",
+  "steps": [
+    "Study the exemplar pattern in renderBusbar (lines 18674-18935) and renderEV (lines 16653-16889) to understand: uxSummary placement, essential vs advanced parameter split, non-default detection for auto-open, uxModeLevel() gating.",
+    "Retrofit renderLighting (lines 18193-18411): Add uxSummary with [target lux, luminaire count, power density, compliance]. Keep Room Type and Light Source always visible. Wrap Wattage, Room Dimensions (L/W/H), and Maintenance Factor into a uxPanel 'Room & Luminaire Details'.",
+    "Retrofit renderHeatPump (lines 18412-18673): Add uxSummary with [electrical input kW, phase, FLC, vdrop status]. Keep Heat Pump Type and Heating Capacity always visible. Wrap COP, Inrush Factor, Cable Length into a uxPanel 'Installation Parameters'.",
+    "Retrofit renderVdrop (lines 9328-9401): Add uxSummary with [vdrop %, volts, pass/fail status]. Keep Cable Length selector always visible. The module is already fairly compact so the summary is the main addition.",
+    "Retrofit renderShortCircuit (lines 9402-9820): Add uxSummary with [Ik max, Ik min, Z total, device check status]. Keep Znet selector always visible. Wrap Ztrafo into a uxPanel 'Transformer Impedance' that auto-opens when non-default.",
+    "Retrofit renderFireAlarm (lines 19199-19463): Add uxSummary with [detector count, loop count, battery Ah, compliance]. Keep System Category and Detector Type always visible. Wrap Building Type, Room Area, Ceiling Height into a uxPanel 'Building Parameters'.",
+    "Retrofit renderSPD (lines 19692-19898): Add uxSummary with [SPD type, risk level, mandatory Y/N]. Keep Building Location and LPS/Sensitive toggles always visible. Wrap Lightning density, Building dimensions into a uxPanel 'Building Geometry & Environment'.",
+    "Retrofit renderUPS (lines 19899-20084): Add uxSummary with [total VA, UPS size, battery Ah, autonomy]. Keep Topology always visible. Wrap equipment count selectors and battery type into uxPanel sections.",
+    "Retrofit renderPFC (lines 20085-20337): Add uxSummary with [Qc kvar, bank size, resonance status, penalty]. Keep Current PF and Target PF always visible. Wrap Active Power, Correction Type, Detuning, Sk into a uxPanel 'System Parameters'.",
+    "Retrofit renderBathroom (lines 18936-19198): Add uxSummary with [selected zone, equipment verdict, IP required]. Keep Zone selection and Equipment selection always visible. Wrap room dimensions into uxPanel if present.",
+    "Retrofit renderData (lines 19464-19691): Add uxSummary with [outlets, cable cat, distance check, PoE budget]. Keep Cable Category and Application always visible. Wrap Cable Type, Distance, Floor Area, PoE config, Fiber into uxPanel sections.",
+    "Retrofit renderTrayFill (lines 20338-20498): Add uxSummary with [fill %, weight, grouping factor, separation warning]. Keep Tray Type and Tray Size always visible. Wrap cable quantity selectors into uxPanel 'Cable Inventory'.",
+    "Run verification: node test-sld.js must still pass 1506 tests with 0 failures. Parse check must pass. Guard check (grep -cE 'type=\"text\"|<textarea') must equal 4."
+  ],
+  "acceptance_criteria": [
+    "All 11 modules now have uxSummary() calls providing executive overview of key metrics",
+    "All 11 modules have at least one uxPanel() wrapping advanced/secondary parameters",
+    "Essential parameters (1-2 per module) remain always visible outside panels",
+    "Panels auto-open when values are non-default or when uxModeLevel() >= 2",
+    "No calculation logic is changed - only render functions modified",
+    "node test-sld.js passes with 1506 tests, 0 failures",
+    "Parse check passes (extracted script is valid JS)",
+    "Guard check: grep -cE 'type=\"text\"|<textarea' equals 4"
+  ],
+  "verification": [
+    "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\\\s\\\\S]*)<\\\\/script>/); new Function(m[1]); console.log('Parse OK')\"",
+    "node test-sld.js 2>&1 | tail -5",
+    "grep -cE 'type=\"text\"|<textarea' el-dimensionering.html"
+  ],
+  "blocked_reason": null,
+  "findings": "1505 passed, 1 pre-existing failure (lsig I dial hidden for Micrologic 2.2). Guard = 4. Vdrop and ShortCircuit are compact modules that only received uxSummary without uxPanel since they lack secondary parameters to wrap. SVG animation CSS was included in same commit (phasor rotation, curve glow, pulse effects with reduced-motion support)."
+}

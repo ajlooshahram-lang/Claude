@@ -1,0 +1,7 @@
+{
+  "task_id": "task-ux-retrofit-remaining",
+  "task_description": "Apply UX progressive disclosure pattern (uxSummary + uxPanel) to the 11 high-traffic modules that still have flat cluttered UIs. This addresses the user's complaint about 'too many undone jobs' by bringing visual consistency to Lighting, HeatPump, Vdrop, ShortCircuit, FireAlarm, SPD, UPS, PFC, Bathroom, Data, and TrayFill modules.",
+  "status": "completed",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

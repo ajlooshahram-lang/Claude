@@ -1,0 +1,31 @@
+{
+  "project_type": "Single-file HTML electrical engineering calculator app",
+  "language": "JavaScript (ES5/ES6 mix), HTML, CSS - all inline in one file",
+  "build_system": "None (single-file zero-dependency app)",
+  "test_framework": "Custom Node.js test runner (test-sld.js, 1506 tests)",
+  "build_command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\/script>/); new Function(m[1]);\" (parse check)",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "1. Run parse check (new Function on extracted script). 2. Run node test-sld.js, expect 1506 passed 0 failed. 3. Run grep -cE 'type=\"text\"|<textarea' el-dimensionering.html, expect exactly 4.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - Node.js is pre-installed",
+  "environment_constraints": "Single-file only, zero dependencies, click-only input (guard: type='text'|textarea count must stay at 4), life-safety critical calculations must not be altered",
+  "contribution_requirements": "Never change calculation logic. Only change UI rendering. Must preserve all existing onclick handlers and state mutations. Use tx(da, en) for all user-facing strings.",
+  "key_patterns": "UX retrofit pattern: 1) Add uxSummary([{label, value, status}]) after card-title for executive overview. 2) Keep 1-2 essential selectors always visible. 3) Wrap secondary/advanced params in uxPanel(title, bodyHtml, {id, icon, open: condition}). 4) Use uxModeLevel() >= 2 for engineer-plus auto-open. 5) Detect non-default values to auto-open relevant panels. 6) Never change calculation functions or state objects.",
+  "relevant_files": [
+    "el-dimensionering.html (lines 6509-6570 for uxPanel/uxSummary/uxSmartCards definitions)",
+    "el-dimensionering.html (lines 18674-18935 for renderBusbar as exemplar of retrofit pattern)",
+    "el-dimensionering.html (lines 16653-16889 for renderEV as exemplar)",
+    "el-dimensionering.html (lines 18193-18411 for renderLighting - needs retrofit)",
+    "el-dimensionering.html (lines 18412-18673 for renderHeatPump - needs retrofit)",
+    "el-dimensionering.html (lines 9328-9401 for renderVdrop - needs retrofit)",
+    "el-dimensionering.html (lines 9402-9820 for renderShortCircuit - needs retrofit)",
+    "el-dimensionering.html (lines 19199-19463 for renderFireAlarm - needs retrofit)",
+    "el-dimensionering.html (lines 19464-19691 for renderData - needs retrofit)",
+    "el-dimensionering.html (lines 19692-19898 for renderSPD - needs retrofit)",
+    "el-dimensionering.html (lines 19899-20084 for renderUPS - needs retrofit)",
+    "el-dimensionering.html (lines 20085-20337 for renderPFC - needs retrofit)",
+    "el-dimensionering.html (lines 20338-20498 for renderTrayFill - needs retrofit)",
+    "el-dimensionering.html (lines 18936-19198 for renderBathroom - needs retrofit)"
+  ],
+  "directory_structure": "Single file app: el-dimensionering.html (32,499 lines), test-sld.js (14,678 lines, 1506 tests)"
+}
