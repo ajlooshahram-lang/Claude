@@ -6270,7 +6270,7 @@ test('SmartGrid: smartgridGetGridReqs >11kW requires freq response', function() 
 
 test('SmartGrid: smartgridGetGridReqs >16kW requires voltage ride-through', function() {
   var result = smartgridGetGridReqs('commercial', 25);
-  var hasVRT = result.some(function(r){return r.req.indexOf('ride-through') >= 0 || r.req.indexOf('gennemkoersel') >= 0;});
+  var hasVRT = result.some(function(r){return r.req.indexOf('ride-through') >= 0 || r.req.indexOf('gennemk\u00f8rsel') >= 0 || r.req.indexOf('gennemkoersel') >= 0;});
   assert(hasVRT);
 });
 
