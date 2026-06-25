@@ -14036,6 +14036,51 @@ test('autoexam/MASTER: full matrix sweep \u2014 every generated exam satisfies t
   assert.strictEqual(problems.length, 0, problems.length + ' contract violations:\n  ' + problems.slice(0, 20).join('\n  '));
 });
 
+// =====================================================================
+// ===== Curve engine: K/Z MCB curves + phasor / power-triangle ========
+// =====================================================================
+test('curves: MCB_CURVES now includes K and Z bands and sldDeviceCurve plots them', function () {
+  assert.ok(MCB_CURVES.K && MCB_CURVES.K.isdMin === 8 && MCB_CURVES.K.isdMax === 14, 'K curve 8-14x In');
+  assert.ok(MCB_CURVES.Z && MCB_CURVES.Z.isdMin === 2 && MCB_CURVES.Z.isdMax === 3, 'Z curve 2-3x In');
+  ['B', 'C', 'D', 'K', 'Z'].forEach(function (cv) {
+    var pts = sldDeviceCurve({ curve: cv }, 16);
+    assert.ok(pts.length > 0, 'curve ' + cv + ' produces TCC points');
+    pts.forEach(function (p) { assert.ok(p.i > 0 && p.tMin > 0 && p.tMax >= p.tMin, 'valid point on ' + cv); });
+  });
+});
+test('curves/power-triangle: axPowerTri computes P/Q/S/phi correctly', function () {
+  var t1 = axPowerTri(80, 0.8);
+  assert.strictEqual(t1.P, 80); assert.ok(Math.abs(t1.Q - 60) < 0.2, 'Q=60'); assert.ok(Math.abs(t1.S - 100) < 0.2, 'S=100');
+  assert.ok(Math.abs(t1.phiDeg - 36.9) < 0.2, 'phi=36.9');
+  var t2 = axPowerTri(100, 1.0);
+  assert.strictEqual(t2.Q, 0, 'unity PF => no reactive'); assert.ok(Math.abs(t2.S - 100) < 0.01, 'S=P at unity');
+  // S^2 = P^2 + Q^2 invariant
+  var t3 = axPowerTri(37, 0.86);
+  assert.ok(Math.abs(t3.S - Math.sqrt(t3.P * t3.P + t3.Q * t3.Q)) < 0.2, 'S = sqrt(P^2 + Q^2) within rounding');
+});
+test('curves/svg: power triangle and 3-phase phasor render valid SVG with no NaN across cosphi', function () {
+  var bad = 0, n = 0;
+  [0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.98, 1.0].forEach(function (c) {
+    [5, 50, 400].forEach(function (P) {
+      n++; var pt = axRenderPowerTriangle(P, c), ph = axRenderPhasor3ph(c, true);
+      if (pt.indexOf('<svg') !== 0 || pt.indexOf('</svg>') < 0 || pt.indexOf('NaN') >= 0) bad++;
+      if (ph.indexOf('<svg') !== 0 || ph.indexOf('NaN') >= 0 || ph.indexOf('L1') < 0) bad++;
+    });
+  });
+  assert.ok(n >= 24 && bad === 0, n + ' renders, ' + bad + ' bad');
+});
+test('curves: Vektorer tab renders click-only pickers + both diagrams in da and en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; autoexamState.tab = 'vektorer'; autoexamState.vecP = 50; autoexamState.vecCos = 0.8;
+    var out = renderAutoExam();
+    assert.ok(out.indexOf("axVecSet('vecP'") >= 0 && out.indexOf("axVecSet('vecCos'") >= 0, 'click-only pickers in ' + lg);
+    assert.ok((out.match(/<svg/g) || []).length >= 2, 'both diagrams in ' + lg);
+    assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks in ' + lg);
+  });
+  lang = prev;
+});
+
 // ----- CT + relay primary pickup task (forsyning) -----
 test('autoexam/ct-relay: relay primary pickup = factor x ki, present in every forsyning opgave', function () {
   var ct = null;

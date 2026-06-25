@@ -2782,8 +2782,11 @@ const MCB_TYPES = {
 };
 
 const MCB_CURVES = {
+  // IEC 60898-1 / IEC 60947-2 instantaneous (magnetic) trip bands, as multiples of In.
+  'Z': { isdMin: 2, isdMax: 3 },    // electronics / long cables (IEC 60898 Z)
   'B': { isdMin: 3.2, isdMax: 4.8 },
   'C': { isdMin: 7, isdMax: 10 },
+  'K': { isdMin: 8, isdMax: 14 },   // motor / transformer circuits (IEC 60947-2 K)
   'D': { isdMin: 10, isdMax: 20 }
 };
 
@@ -12410,6 +12413,72 @@ function axInstallationToSLD(d) {
   return { earthing: d.earthing, building: { da: '', en: '' }, trafo: { SN: d.trafo.SN, ek: d.trafo.ek, IkkA: d.trafo.IkkA, In: d.trafo.In }, main: { In: mainIn, Icu: Icu, hasSwitch: true, faulty: false }, feeders: feeders, faultId: 'none' };
 }
 
+// --- Power triangle + phasor diagram engine (vektorer/fasorer) ----------------
+// Pure: active/reactive/apparent power + angle from P and cos\u03c6.
+function axPowerTri(P_kW, cosPhi) {
+  var c = Math.max(0.01, Math.min(1, cosPhi));
+  var phi = Math.acos(c); var S = P_kW / c; var Q = P_kW * Math.tan(phi);
+  return { P: Math.round(P_kW * 10) / 10, Q: Math.round(Q * 10) / 10, S: Math.round(S * 10) / 10, cosPhi: Math.round(c * 1000) / 1000, phiDeg: Math.round(phi * 180 / Math.PI * 10) / 10 };
+}
+// Inline SVG power triangle (P horizontal, Q vertical, S hypotenuse, \u03c6 at origin).
+function axRenderPowerTriangle(P_kW, cosPhi) {
+  var t = axPowerTri(P_kW, cosPhi); var W = 360, H = 230; var ox = 50, oy = H - 40;
+  var maxV = Math.max(t.S, 1); var scale = 230 / maxV;
+  var px = t.P * scale, qy = t.Q * scale;
+  var ex = ox + px, ey = oy - qy; var cl = 'currentColor';
+  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;font-family:\'Segoe UI\',system-ui,sans-serif;color:var(--text,#ccc)">';
+  s += '<rect x="0" y="0" width="' + W + '" height="16" fill="#8881" rx="4"/><text x="6" y="12" font-size="9" fill="' + cl + '">' + tx('Effekttrekant', 'Power triangle') + '</text>';
+  // P (active) - blue
+  s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + Math.round(ex) + '" y2="' + oy + '" stroke="#3b82f6" stroke-width="2.5"/>';
+  s += '<text x="' + Math.round((ox + ex) / 2) + '" y="' + (oy + 14) + '" font-size="9" fill="#3b82f6" text-anchor="middle">P = ' + axFmt(t.P) + ' kW</text>';
+  // Q (reactive) - amber, vertical
+  s += '<line x1="' + Math.round(ex) + '" y1="' + oy + '" x2="' + Math.round(ex) + '" y2="' + Math.round(ey) + '" stroke="#d99a00" stroke-width="2.5"/>';
+  s += '<text x="' + (Math.round(ex) + 4) + '" y="' + Math.round((oy + ey) / 2) + '" font-size="9" fill="#d99a00">Q = ' + axFmt(t.Q) + ' kvar</text>';
+  // S (apparent) - green hypotenuse
+  s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + Math.round(ex) + '" y2="' + Math.round(ey) + '" stroke="#22a06b" stroke-width="2.5"/>';
+  s += '<text x="' + Math.round((ox + ex) / 2 - 10) + '" y="' + Math.round((oy + ey) / 2 - 6) + '" font-size="9" fill="#22a06b">S = ' + axFmt(t.S) + ' kVA</text>';
+  // angle arc
+  var r = 30; s += '<path d="M ' + (ox + r) + ' ' + oy + ' A ' + r + ' ' + r + ' 0 0 0 ' + Math.round(ox + r * Math.cos(t.phiDeg * Math.PI / 180)) + ' ' + Math.round(oy - r * Math.sin(t.phiDeg * Math.PI / 180)) + '" fill="none" stroke="' + cl + '"/>';
+  s += '<text x="' + (ox + r + 4) + '" y="' + (oy - 8) + '" font-size="9" fill="' + cl + '">\u03c6=' + axFmt(t.phiDeg) + '\u00b0</text>';
+  s += '<text x="' + ox + '" y="' + (H - 6) + '" font-size="8.5" fill="' + cl + '">cos\u03c6 = ' + axFmt(t.cosPhi, 2) + '  \u00b7  S = P + jQ = ' + axFmt(t.P) + ' + j' + axFmt(t.Q) + ' kVA</text>';
+  s += '</svg>';
+  return s;
+}
+// Inline SVG three-phase phasor diagram: balanced voltages 120\u00b0 apart, currents lagging by \u03c6.
+function axRenderPhasor3ph(cosPhi, showCurrent) {
+  var c = Math.max(0.01, Math.min(1, cosPhi)); var phi = Math.acos(c) * 180 / Math.PI;
+  var W = 300, H = 280, cx = W / 2, cy = H / 2 + 6, R = 95; var cl = 'currentColor';
+  var Vcol = ['#3b82f6', '#d64545', '#22a06b']; var names = ['L1', 'L2', 'L3'];
+  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;font-family:\'Segoe UI\',system-ui,sans-serif;color:var(--text,#ccc)">';
+  s += '<rect x="0" y="0" width="' + W + '" height="16" fill="#8881" rx="4"/><text x="6" y="12" font-size="9" fill="' + cl + '">' + tx('Fasordiagram (3-faset)', 'Phasor diagram (3-phase)') + '</text>';
+  // reference circle + axes
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="#8884" stroke-dasharray="3 3"/>';
+  s += '<line x1="' + (cx - R - 8) + '" y1="' + cy + '" x2="' + (cx + R + 8) + '" y2="' + cy + '" stroke="#8884"/><line x1="' + cx + '" y1="' + (cy - R - 8) + '" x2="' + cx + '" y2="' + (cy + R + 8) + '" stroke="#8884"/>';
+  for (var i = 0; i < 3; i++) {
+    var aV = (90 - i * 120) * Math.PI / 180; // V phasors 120 apart, L1 at +90
+    var vx = cx + R * Math.cos(aV), vy = cy - R * Math.sin(aV);
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + Math.round(vx) + '" y2="' + Math.round(vy) + '" stroke="' + Vcol[i] + '" stroke-width="2.5"/>';
+    s += '<polygon points="' + axArrowHead(cx, cy, vx, vy, Vcol[i]) + '" fill="' + Vcol[i] + '"/>';
+    s += '<text x="' + Math.round(cx + (R + 12) * Math.cos(aV)) + '" y="' + Math.round(cy - (R + 12) * Math.sin(aV) + 3) + '" font-size="9" fill="' + Vcol[i] + '" text-anchor="middle">U' + names[i] + '</text>';
+    if (showCurrent) {
+      var aI = (90 - i * 120 - phi) * Math.PI / 180; var Ir = R * 0.7; // currents lag by \u03c6
+      var ix = cx + Ir * Math.cos(aI), iy = cy - Ir * Math.sin(aI);
+      s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + Math.round(ix) + '" y2="' + Math.round(iy) + '" stroke="' + Vcol[i] + '" stroke-width="1.4" stroke-dasharray="4 2"/>';
+      s += '<text x="' + Math.round(cx + (Ir + 10) * Math.cos(aI)) + '" y="' + Math.round(cy - (Ir + 10) * Math.sin(aI) + 3) + '" font-size="8" fill="' + Vcol[i] + '" text-anchor="middle">I' + names[i] + '</text>';
+    }
+  }
+  s += '<text x="6" y="' + (H - 6) + '" font-size="8.5" fill="' + cl + '">' + (showCurrent ? (tx('Str\u00f8m sakker ', 'Current lags ') + axFmt(Math.round(phi * 10) / 10) + '\u00b0 (cos\u03c6 = ' + axFmt(c, 2) + ', induktiv)') : tx('Symmetrisk: 120\u00b0 mellem faserne', 'Balanced: 120\u00b0 between phases')) + '</text>';
+  s += '</svg>';
+  return s;
+}
+function axArrowHead(x0, y0, x1, y1, col) {
+  var ang = Math.atan2(y1 - y0, x1 - x0); var L = 8, w = 0.4;
+  var p1 = (x1) + ',' + (y1);
+  var p2 = (x1 - L * Math.cos(ang - w)) + ',' + (y1 - L * Math.sin(ang - w));
+  var p3 = (x1 - L * Math.cos(ang + w)) + ',' + (y1 - L * Math.sin(ang + w));
+  return p1 + ' ' + p2 + ' ' + p3;
+}
+
 // Render a 10 kV ring-network single-line diagram (HV forsyning bilag).
 function axRenderHVRing(d) {
   var W = 440, H = 260; var cx = W / 2, cy = 135, R = 85;
@@ -12988,7 +13057,7 @@ function examRenderAnswerKey(){
 // ============================================================================
 // ===== AUTORISATIONSPR\u00d8VE-GENERATOR \u2014 UI (renderAutoExam) ====================
 // ============================================================================
-var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, dgProject: null, dgAnswers: {}, dgResult: null, dgReveal: false, ingestNotice: null, ingesting: false, timerOn: false, timerLeft: 0, timerSec: 0 };
+var autoexamState = { tab: 'opgave', building: 'parcelhus', tier: 'elektriker', mode: 'case', seed: 0, project: null, answers: {}, result: null, revealFacit: false, hints: {}, cxProject: null, cxAnswers: {}, cxResult: null, cxReveal: false, dgProject: null, dgAnswers: {}, dgResult: null, dgReveal: false, ingestNotice: null, ingesting: false, vecP: 50, vecCos: 0.80, timerOn: false, timerLeft: 0, timerSec: 0 };
 var autoexamTimer = null;
 function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == null ? '' : String(o)); }
 function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
@@ -13330,6 +13399,26 @@ function axRenderDashboard() {
   return h;
 }
 function axClearLog() { try { localStorage.removeItem('autoexamLog'); } catch (e) {} renderModule('autoexam'); }
+function axVecSet(field, v) { autoexamState[field] = v; renderModule('autoexam'); }
+function axRenderVektorer() {
+  var P = autoexamState.vecP, cos = autoexamState.vecCos; var t = axPowerTri(P, cos);
+  var h = '<div class="info-row">' + tx('Interaktiv effekttrekant og 3-faset fasordiagram. V\u00e6lg aktiv effekt P og effektfaktor cos\u03c6 (klik-only) og se P, Q, S, vinklen \u03c6 og fasorernes retning. Grundlaget for fasekompensering og kompleks effekt S = P + jQ.', 'Interactive power triangle and 3-phase phasor diagram. Pick active power P and power factor cos\u03c6 (click-only) and see P, Q, S, the angle \u03c6 and the phasor directions. The basis for power-factor correction and complex power S = P + jQ.') + '</div>';
+  h += '<div class="select-group"><div class="select-label">P (kW)</div><div class="select-grid">';
+  [5, 10, 22, 37, 50, 75, 100, 160, 250, 400].forEach(function (v) { h += '<button class="sel-btn' + (P === v ? ' selected' : '') + '" onclick="axVecSet(\'vecP\',' + v + ')">' + v + '</button>'; });
+  h += '</div></div>';
+  h += '<div class="select-group"><div class="select-label">cos\u03c6</div><div class="select-grid">';
+  [0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.98, 1.0].forEach(function (v) { h += '<button class="sel-btn' + (cos === v ? ' selected' : '') + '" onclick="axVecSet(\'vecCos\',' + v + ')">' + axFmt(v, 2) + '</button>'; });
+  h += '</div></div>';
+  h += '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Resultater', 'Results') + '</div><div style="padding:4px 2px;line-height:1.7">';
+  h += '<div>P = ' + axFmt(t.P) + ' kW \u00b7 Q = ' + axFmt(t.Q) + ' kvar \u00b7 S = ' + axFmt(t.S) + ' kVA</div>';
+  h += '<div>cos\u03c6 = ' + axFmt(t.cosPhi, 2) + ' \u00b7 \u03c6 = ' + axFmt(t.phiDeg) + '\u00b0 \u00b7 ' + tx('Kompleks effekt', 'Complex power') + ': S = ' + axFmt(t.P) + ' + j' + axFmt(t.Q) + ' kVA</div>';
+  h += '<div>' + tx('Linjestr\u00f8m ved 400 V (3-faset)', 'Line current at 400 V (3-phase)') + ': I = S/(\u221a3\u00b7U) = ' + axFmt(Math.round(t.S * 1000 / (Math.sqrt(3) * 400) * 10) / 10, 1) + ' A</div>';
+  h += '</div></div>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:280px;border:1px solid var(--border-light);border-radius:8px;padding:4px">' + axRenderPowerTriangle(P, cos) + '</div>';
+  h += '<div style="flex:1;min-width:260px;border:1px solid var(--border-light);border-radius:8px;padding:4px">' + axRenderPhasor3ph(cos, true) + '</div></div>';
+  h += '<div class="info-row" style="margin-top:6px">' + tx('H\u00f8jere cos\u03c6 \u21d2 mindre Q, mindre S og lavere linjestr\u00f8m \u21d2 mindre tab og sp\u00e6ndingsfald. Det er form\u00e5let med fasekompensering.', 'Higher cos\u03c6 \u21d2 less Q, less S and lower line current \u21d2 less loss and voltage drop. That is the purpose of power-factor correction.') + '</div>';
+  return h;
+}
 
 function axRenderDiagram() {
   var p = axDgEnsure();
@@ -13594,6 +13683,7 @@ function renderAutoExam() {
   h += '<button class="sel-btn' + (autoexamState.tab === 'besvar' ? ' selected' : '') + '" onclick="axUITab(\'besvar\')">\u270D\uFE0F ' + tx('Min besvarelse', 'My answer') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'censor' ? ' selected' : '') + '" onclick="axUITab(\'censor\')">\uD83C\uDF93 ' + tx('Censor & facit', 'Censor & solution') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'kompleks' ? ' selected' : '') + '" onclick="axUITab(\'kompleks\')">\uD83E\uDDEE ' + tx('Kompleks (Viggo)', 'Complex (Viggo)') + '</button>';
+  h += '<button class="sel-btn' + (autoexamState.tab === 'vektorer' ? ' selected' : '') + '" onclick="axUITab(\'vektorer\')">\u26A1 ' + tx('Vektorer', 'Vectors') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'diagram' ? ' selected' : '') + '" onclick="axUITab(\'diagram\')">\uD83D\uDCD0 ' + tx('Diagram', 'Diagram') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'laering' ? ' selected' : '') + '" onclick="axUITab(\'laering\')">\uD83D\uDCE5 ' + tx('L\u00e6ring', 'Learning') + '</button>';
   h += '<button class="sel-btn' + (autoexamState.tab === 'standarder' ? ' selected' : '') + '" onclick="axUITab(\'standarder\')">\uD83D\uDCDA ' + tx('Standarder', 'Standards') + '</button>';
@@ -13603,6 +13693,7 @@ function renderAutoExam() {
   if (autoexamState.tab === 'opgave') { body = axRenderHeader(p); p.opgaver.forEach(function (op) { body += axOpgaveOverview(op, p); }); }
   else if (autoexamState.tab === 'besvar') body = axRenderAnswerTab(p);
   else if (autoexamState.tab === 'kompleks') body = axRenderKompleks();
+  else if (autoexamState.tab === 'vektorer') body = axRenderVektorer();
   else if (autoexamState.tab === 'diagram') body = axRenderDiagram();
   else if (autoexamState.tab === 'laering') body = axRenderLaering();
   else if (autoexamState.tab === 'standarder') body = axRenderStdRef();
