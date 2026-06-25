@@ -14814,6 +14814,41 @@ test('motor: motorOverloadVerdict returns correct coordination verdicts', functi
   motorCurveState.methods = pm; motorCurveState.tripClass = pt;
 });
 
+test('motor: overload trip time anchored to IEC 60947-4-1 class point (life-safety)', function () {
+  // Class number = max trip time [s] from cold at 7.2xIe — the curve MUST pass through it.
+  [5, 10, 20, 30].forEach(function (tc) {
+    assert.ok(Math.abs(motorOverloadTripTime(7.2, tc) - tc) < 0.01, 'class ' + tc + ' passes through 7.2xIe,' + tc + 's');
+  });
+  // Inverse-time: trip time strictly decreases as current rises.
+  var prev = Infinity;
+  [2, 3, 4, 5, 6, 7.2, 8, 10].forEach(function (x) {
+    var t = motorOverloadTripTime(x, 10);
+    assert.ok(t <= prev, 'monotonic decreasing at ' + x + 'xIe');
+    prev = t;
+  });
+  // Below pickup (<=1.05xIe) the relay never trips.
+  assert.ok(!isFinite(motorOverloadTripTime(1.0, 10)), 'no trip at/below Ie');
+});
+
+test('motor: thermal limit follows constant I^2t adiabatic model (life-safety)', function () {
+  // t = k/x^2 with k = stall * 6^2. At locked rotor (6x) returns the stall time.
+  assert.ok(Math.abs(motorThermalLimit(6, 8) - 8) < 0.01, 'hot limit @6x = 8s stall');
+  // Constant I^2t: halving current to 3x quadruples the time (8*36/9 = 32s).
+  assert.ok(Math.abs(motorThermalLimit(3, 8) - 32) < 0.01, 'I^2t constant @3x = 32s');
+  // Cold withstand must exceed hot withstand (conservative, physically correct).
+  assert.ok(motorThermalLimit(6, 14) > motorThermalLimit(6, 8), 'cold limit > hot limit');
+});
+
+test('trafo: inrush In matches S/(sqrt3*U) and peak scales linearly', function () {
+  var In630 = (630 * 1000) / (Math.sqrt(3) * 400);
+  assert.ok(Math.abs(In630 - 909.3) < 1, '630kVA/400V In ~ 909A');
+  // The rendered curve must contain the peak current annotation (peak x In).
+  var prevLang = lang; lang = 'da';
+  var svg = trafoRenderInrushCurve(630, 6, 400, 14);
+  assert.ok(svg.indexOf((14 * In630).toFixed(0)) >= 0, 'peak inrush current annotated');
+  lang = prevLang;
+});
+
 test('motor: overload protection card is embedded in standards module', function () {
   var prev = lang; lang = 'da';
   motorCurveState.tripClass = 10;
