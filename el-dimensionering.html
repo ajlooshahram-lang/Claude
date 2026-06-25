@@ -644,6 +644,57 @@ body.motion-off .appearance-panel.open {
 }
 body.motion-off .fade-in { will-change: auto; }
 
+/* ===== SVG DIAGRAM ANIMATIONS (phasors, impedance, TCC curves) ===== */
+.svg-animated .svg-phasor-vec {
+  animation: svgRotate 4s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.svg-animated .svg-impedance-vec {
+  animation: svgPulse 2.4s ease-in-out infinite;
+}
+.svg-animated .svg-curve-path {
+  animation: svgGlow 2.8s ease-in-out infinite;
+}
+.svg-animated .svg-cursor-line {
+  animation: svgCursorSweep 3.5s ease-in-out infinite alternate;
+}
+@keyframes svgRotate {
+  0%   { opacity: 0.85; }
+  25%  { opacity: 1; }
+  50%  { opacity: 0.85; }
+  75%  { opacity: 1; }
+  100% { opacity: 0.85; }
+}
+@keyframes svgPulse {
+  0%, 100% { stroke-width: 2.5; opacity: 0.8; }
+  50%      { stroke-width: 3.5; opacity: 1; }
+}
+@keyframes svgGlow {
+  0%, 100% { stroke-opacity: 0.7; filter: none; }
+  50%      { stroke-opacity: 1; filter: drop-shadow(0 0 3px currentColor); }
+}
+@keyframes svgCursorSweep {
+  0%   { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* Reduced motion: freeze SVG diagram animations */
+@media (prefers-reduced-motion: reduce) {
+  .svg-animated .svg-phasor-vec,
+  .svg-animated .svg-impedance-vec,
+  .svg-animated .svg-curve-path,
+  .svg-animated .svg-cursor-line {
+    animation: none !important;
+  }
+}
+body.motion-off .svg-animated .svg-phasor-vec,
+body.motion-off .svg-animated .svg-impedance-vec,
+body.motion-off .svg-animated .svg-curve-path,
+body.motion-off .svg-animated .svg-cursor-line {
+  animation: none !important;
+}
+
 /* Info tooltip */
 .info-row {
   display: flex;
@@ -4736,7 +4787,7 @@ function rcdRenderTripCurve(idnMA, selective) {
   function yPos(t) { return marginT + (1 - (Math.log10(t) - lyMin) / (lyMax - lyMin)) * plotH; }
   const da = (typeof lang !== 'undefined' && lang === 'da');
 
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // gridlines + x labels (multiples of I_dn)
   const xticks = [0.5, 1, 2, 5, 10];
   for (let i = 0; i < xticks.length; i++) {
@@ -4783,7 +4834,7 @@ function rcdRenderTripCurve(idnMA, selective) {
     svg += '<path d="' + fillPath + '" fill="rgba(34,197,94,0.10)" stroke="none"/>';
   }
   // max break-time envelope (the acceptance limit)
-  svg += '<path d="' + maxPath + '" fill="none" stroke="#dc2626" stroke-width="2.5"/>';
+  svg += '<path class="svg-curve-path" d="' + maxPath + '" fill="none" stroke="#dc2626" stroke-width="2.5"/>';
 
   // markers + time annotations at the standard test points
   const marks = [{ m: 1, t: rcdTripMaxAt(1, selective) }, { m: 2, t: rcdTripMaxAt(2, selective) }, { m: 5, t: rcdTripMaxAt(5, selective) }];
@@ -4892,7 +4943,7 @@ function mcbRenderCurves(curveTypes, In) {
   function clampMult(i) { return Math.max(xMin, Math.min(xMax, i / In)); }
 
   var colors = { 'B': '#2563eb', 'C': '#059669', 'D': '#dc2626', 'K': '#7c3aed', 'Z': '#d97706' };
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // grid x (multiples)
   var xt = [1, 2, 3, 5, 10, 20, 30];
   for (var a = 0; a < xt.length; a++) {
@@ -4933,8 +4984,8 @@ function mcbRenderCurves(curveTypes, In) {
     }
     band += 'Z';
     svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.12" stroke="none"/>';
-    svg += '<path d="' + edgePath(env.maxEdge) + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
-    svg += '<path d="' + edgePath(env.minEdge) + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    svg += '<path class="svg-curve-path" d="' + edgePath(env.maxEdge) + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<path class="svg-curve-path" d="' + edgePath(env.minEdge) + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
     // legend
     svg += '<rect x="' + (w - 150) + '" y="' + (mT + 6 + c * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '"/>';
     svg += '<text x="' + (w - 135) + '" y="' + (mT + 16 + c * 16) + '" font-size="10.5" fill="' + col + '">' + (da ? 'Kurve ' : 'Curve ') + ct + ' (' + env.info.iecMin + '\u2013' + env.info.iecMax + '\u00d7)</text>';
@@ -5083,7 +5134,7 @@ function fuseRenderCurve(size, classes) {
   function cl(m) { return Math.max(xMin, Math.min(xMax, m)); }
   var colors = { 'gG': '#2563eb', 'aM': '#dc2626', 'gR': '#059669', 'aR': '#d97706' };
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   var xt = [1, 2, 5, 10, 20, 50, 100];
   for (var a = 0; a < xt.length; a++) {
     var gx = xPos(xt[a]);
@@ -5115,8 +5166,8 @@ function fuseRenderCurve(size, classes) {
       band += 'Z';
       svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.10" stroke="none"/>';
     }
-    svg += '<path d="' + path(totalPts) + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
-    svg += '<path d="' + path(prePts) + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    svg += '<path class="svg-curve-path" d="' + path(totalPts) + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<path class="svg-curve-path" d="' + path(prePts) + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
     svg += '<rect x="' + (w - 165) + '" y="' + (mT + 6 + c * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '"/>';
     svg += '<text x="' + (w - 150) + '" y="' + (mT + 16 + c * 16) + '" font-size="10.5" fill="' + col + '">' + info.label + (info.anchored ? '' : ' \u2022') + '</text>';
   }
@@ -5283,7 +5334,7 @@ function lsigRenderCurve(settings) {
   function xPos(curr) { return mL + (Math.log10(Math.max(xLo, Math.min(xHi, curr))) - lxMin) / (lxMax - lxMin) * plotW; }
   function yPos(t) { return mT + (1 - (Math.log10(Math.max(tMin, Math.min(tMax, t))) - lyMin) / (lyMax - lyMin)) * plotH; }
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // grid x
   var xTicks = [];
   for (var exp = Math.floor(Math.log10(xLo)); exp <= Math.ceil(Math.log10(xHi)); exp++) {
@@ -5323,8 +5374,8 @@ function lsigRenderCurve(settings) {
     for (var r = pts.length - 1; r >= 0; r--) band += 'L' + xPos(pts[r].i).toFixed(1) + ',' + yPos(pts[r].tMin).toFixed(1);
     band += 'Z';
     svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.12" stroke="none"/>';
-    svg += '<path d="' + maxPath + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
-    svg += '<path d="' + minPath + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    svg += '<path class="svg-curve-path" d="' + maxPath + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<path class="svg-curve-path" d="' + minPath + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
     // legend
     svg += '<rect x="' + (w - 160) + '" y="' + (mT + 6 + legIdx * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '"/>';
     svg += '<text x="' + (w - 145) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="10" fill="' + col + '">' + segLabels[seg] + '</text>';
@@ -5437,7 +5488,7 @@ function phasorRenderVoltage(state) {
   function vx(mag, ang) { return cx + mag * scale * Math.cos(pDeg2Rad(ang)); }
   function vy(mag, ang) { return cy - mag * scale * Math.sin(pDeg2Rad(ang)); }
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // axes
   svg += '<line x1="20" y1="' + cy + '" x2="' + (w - 20) + '" y2="' + cy + '" stroke="#e5e7eb" stroke-width="0.5"/>';
   svg += '<line x1="' + cx + '" y1="20" x2="' + cx + '" y2="' + (h - 20) + '" stroke="#e5e7eb" stroke-width="0.5"/>';
@@ -5452,7 +5503,7 @@ function phasorRenderVoltage(state) {
   for (var i = 0; i < 3; i++) {
     var p = phasors[i];
     var ex = vx(p.mag, p.ang), ey = vy(p.mag, p.ang);
-    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + vColors[i] + '" stroke-width="2.5" marker-end="url(#arrV' + i + ')"/>';
+    svg += '<line class="svg-phasor-vec" x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + vColors[i] + '" stroke-width="2.5" marker-end="url(#arrV' + i + ')"/>';
     svg += '<text x="' + (ex + 4).toFixed(1) + '" y="' + (ey - 4).toFixed(1) + '" font-size="10" fill="' + vColors[i] + '">' + vLabels[i] + '</text>';
   }
   // arrowheads
@@ -5471,7 +5522,7 @@ function phasorRenderVoltage(state) {
     var ix = cx + im * iScale * Math.cos(pDeg2Rad(ia));
     var iy = cy - im * iScale * Math.sin(pDeg2Rad(ia));
     svg += '<marker id="arrI' + k + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="' + iColors[k] + '"/></marker>';
-    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ix.toFixed(1) + '" y2="' + iy.toFixed(1) + '" stroke="' + iColors[k] + '" stroke-width="1.8" stroke-dasharray="6,3" marker-end="url(#arrI' + k + ')"/>';
+    svg += '<line class="svg-phasor-vec" x1="' + cx + '" y1="' + cy + '" x2="' + ix.toFixed(1) + '" y2="' + iy.toFixed(1) + '" stroke="' + iColors[k] + '" stroke-width="1.8" stroke-dasharray="6,3" marker-end="url(#arrI' + k + ')"/>';
     svg += '<text x="' + (ix + 4).toFixed(1) + '" y="' + (iy + 10).toFixed(1) + '" font-size="9" fill="' + iColors[k] + '">' + iLabels[k] + ' (' + im + 'A, -' + iPhis[k] + '\u00b0)</text>';
   }
   svg += '</defs>';
@@ -5499,17 +5550,17 @@ function phasorRenderPowerTriangle(state) {
   var px = ox + pw.P * scale, py = oy;
   var sx = px, sy = oy - pw.Q * scale;
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // triangle
   svg += '<polygon points="' + ox + ',' + oy + ' ' + px.toFixed(1) + ',' + py + ' ' + sx.toFixed(1) + ',' + sy.toFixed(1) + '" fill="rgba(37,99,235,0.08)" stroke="#2563eb" stroke-width="2"/>';
   // P (horizontal)
-  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + px.toFixed(1) + '" y2="' + py + '" stroke="#059669" stroke-width="2.5"/>';
+  svg += '<line class="svg-phasor-vec" x1="' + ox + '" y1="' + oy + '" x2="' + px.toFixed(1) + '" y2="' + py + '" stroke="#059669" stroke-width="2.5"/>';
   svg += '<text x="' + ((ox + px) / 2).toFixed(1) + '" y="' + (oy + 18) + '" text-anchor="middle" font-size="11" fill="#059669">P = ' + (pw.P / 1000).toFixed(2) + ' kW</text>';
   // Q (vertical)
-  svg += '<line x1="' + px.toFixed(1) + '" y1="' + py + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#dc2626" stroke-width="2.5"/>';
+  svg += '<line class="svg-phasor-vec" x1="' + px.toFixed(1) + '" y1="' + py + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#dc2626" stroke-width="2.5"/>';
   svg += '<text x="' + (px + 8).toFixed(1) + '" y="' + ((py + sy) / 2).toFixed(1) + '" font-size="11" fill="#dc2626">Q = ' + (pw.Q / 1000).toFixed(2) + ' kvar</text>';
   // S (hypotenuse)
-  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
+  svg += '<line class="svg-phasor-vec" x1="' + ox + '" y1="' + oy + '" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
   svg += '<text x="' + ((ox + sx) / 2 - 10).toFixed(1) + '" y="' + ((oy + sy) / 2 - 6).toFixed(1) + '" font-size="11" fill="#2563eb">S = ' + (pw.S / 1000).toFixed(2) + ' kVA</text>';
   // phi arc
   var arcR2 = 30;
@@ -5531,20 +5582,20 @@ function phasorRenderImpedance(state) {
   var w = 360, h = 300, cx = w / 2, cy = h / 2;
   var scale = Math.min(w, h) / (z.Z * 3 || 1);
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   svg += '<line x1="20" y1="' + cy + '" x2="' + (w - 20) + '" y2="' + cy + '" stroke="#e5e7eb" stroke-width="0.5"/>';
   svg += '<line x1="' + cx + '" y1="20" x2="' + cx + '" y2="' + (h - 20) + '" stroke="#e5e7eb" stroke-width="0.5"/>';
   svg += '<text x="' + (w - 14) + '" y="' + (cy - 4) + '" font-size="9" fill="#94a3b8">R [\u03a9]</text>';
   svg += '<text x="' + (cx + 4) + '" y="18" font-size="9" fill="#94a3b8">X [\u03a9]</text>';
   // Z vector
   var zx = cx + z.R * scale, zy = cy - z.X * scale;
-  svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
+  svg += '<line class="svg-impedance-vec" x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#2563eb" stroke-width="2.5"/>';
   svg += '<text x="' + ((cx + zx) / 2 + 6).toFixed(1) + '" y="' + ((cy + zy) / 2 - 6).toFixed(1) + '" font-size="10" fill="#2563eb">Z = ' + z.Z.toFixed(3) + ' \u03a9</text>';
   // R (horizontal component)
-  svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + cy + '" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3"/>';
+  svg += '<line class="svg-impedance-vec" x1="' + cx + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + cy + '" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3"/>';
   svg += '<text x="' + ((cx + zx) / 2).toFixed(1) + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="9" fill="#059669">R = ' + z.R.toFixed(3) + ' \u03a9</text>';
   // X (vertical component)
-  svg += '<line x1="' + zx.toFixed(1) + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3"/>';
+  svg += '<line class="svg-impedance-vec" x1="' + zx.toFixed(1) + '" y1="' + cy + '" x2="' + zx.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3"/>';
   svg += '<text x="' + (zx + 6).toFixed(1) + '" y="' + ((cy + zy) / 2).toFixed(1) + '" font-size="9" fill="#dc2626">X = ' + z.X.toFixed(3) + ' \u03a9</text>';
   // annotations
   svg += '<text x="10" y="16" font-size="10" fill="#475467">' + (da ? 'Impedansvektor' : 'Impedance vector') + '</text>';
@@ -5640,7 +5691,7 @@ function motorRenderStartCurves(state) {
   function yPos(iMult) { return mT + (1 - iMult / iMax) * plotH; }
 
   var colors = { 'DOL': '#dc2626', 'SD': '#7c3aed', 'Soft': '#059669', 'VFD': '#2563eb' };
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // grid x (time)
   for (var t = 0; t <= tMax; t += 2) {
     var gx = xPos(t);
@@ -5670,7 +5721,7 @@ function motorRenderStartCurves(state) {
       var pt = info.profile(tNorm);
       d += (j === 0 ? 'M' : 'L') + xPos(tSec).toFixed(1) + ',' + yPos(pt.iMult).toFixed(1);
     }
-    svg += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
+    svg += '<path class="svg-curve-path" d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
     svg += '<rect x="' + (w - 150) + '" y="' + (mT + 6 + legIdx * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.6" stroke="' + col + '"/>';
     svg += '<text x="' + (w - 135) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="10" fill="' + col + '">' + info.label + ' (' + info.iStartMult + '\u00d7)</text>';
     legIdx++;
@@ -5741,7 +5792,7 @@ function vdropRenderProfile(state) {
   function xPos(d) { return mL + (d / maxL) * plotW; }
   function yPos(pct) { return mT + (pct / yMax) * plotH; }
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
   // compliance limits
   var limit3 = yPos(3), limit5 = yPos(5);
   if (3 <= yMax) { svg += '<line x1="' + mL + '" y1="' + limit3.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + limit3.toFixed(1) + '" stroke="#d97706" stroke-width="1" stroke-dasharray="5,3"/>'; svg += '<text x="' + (w - mR - 2) + '" y="' + (limit3 - 4).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#d97706">3% (' + (da ? 'belysning' : 'lighting') + ')</text>'; }
@@ -5755,7 +5806,7 @@ function vdropRenderProfile(state) {
     var pct = (drop / s.voltage) * 100;
     d += (i === 0 ? 'M' : 'L') + xPos(dist).toFixed(1) + ',' + yPos(pct).toFixed(1);
   }
-  svg += '<path d="' + d + '" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+  svg += '<path class="svg-curve-path" d="' + d + '" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
   // endpoint annotation
   svg += '<circle cx="' + xPos(maxL).toFixed(1) + '" cy="' + yPos(dropPct).toFixed(1) + '" r="4" fill="' + (dropPct > 5 ? '#dc2626' : (dropPct > 3 ? '#d97706' : '#059669')) + '"/>';
   svg += '<text x="' + (xPos(maxL) - 6).toFixed(1) + '" y="' + (yPos(dropPct) - 8).toFixed(1) + '" text-anchor="end" font-size="10" fill="' + (dropPct > 5 ? '#dc2626' : (dropPct > 3 ? '#d97706' : '#059669')) + '">' + dropPct.toFixed(2) + ' %</text>';
@@ -9412,6 +9463,13 @@ function renderVdrop() {
       <div class="card-title">${t('vdropTitle')}</div>
       <div class="info-row">${tx('V\u00E6lg kabel under "Kabler" f\u00F8rst, derefter l\u00E6ngde her', 'Select cable under "Cables" first, then length here')}</div>
 
+      ${selectedCable ? uxSummary([
+        {label: tx('Sp\u00E6ndingsfald', 'Voltage Drop'), value: vdropPercent.toFixed(2) + '%', status: isOk ? 'pass' : 'fail'},
+        {label: tx('Volt', 'Volts'), value: vdrop.toFixed(2) + ' V', status: ''},
+        {label: tx('Belysning \u22643%', 'Lighting \u22643%'), value: isLighting ? 'OK' : '> 3%', status: isLighting ? 'pass' : 'warn'},
+        {label: tx('L\u00E6ngde', 'Length'), value: vdropState.length + ' m', status: ''}
+      ]) : ''}
+
       ${!selectedCable ? `
         <div class="result-box warning">
           <div class="result-title">${tx('Advarsel', 'Warning')}</div>
@@ -9511,6 +9569,13 @@ function renderShortCircuit() {
     <div class="card fade-in">
       <div class="card-title">${t('scTitle')}</div>
       <div class="info-row">${tx('V\u00E6lg netimpedans og trafoimpedans. Kabelimpedans beregnes fra kabelmodulet.', 'Select network impedance and transformer impedance. Cable impedance is calculated from the cable module.')}</div>
+
+      ${uxSummary([
+        {label: 'Ik max (3\u03C6)', value: (ikMax3ph/1000).toFixed(2) + ' kA', status: deviceIcu > 0 ? (check1 ? 'pass' : 'fail') : ''},
+        {label: 'Ik min (2\u03C6)', value: ikMin2ph.toFixed(0) + ' A', status: deviceIsd > 0 ? (check2 ? 'pass' : 'fail') : ''},
+        {label: 'Z total', value: zTotal.toFixed(2) + ' m\u03A9', status: ''},
+        {label: tx('Frakobling', 'Disconnection'), value: discOk ? '\u22640.4s' : '> 0.4s', status: discOk ? 'pass' : 'fail'}
+      ])}
 
       <div class="select-group">
         <div class="select-label">${t('scZnet')}</div>
@@ -17357,6 +17422,27 @@ function renderNoed() {
     html += '<div class="result-row"><span class="label">' + tx('Dokumentation', 'Documentation') + '</span><span class="value">' + tx('Logbog paakraevet per DS/EN 50172 cl.6', 'Logbook required per DS/EN 50172 cl.6') + '</span></div>';
     html += '</div>';
 
+    // calcDetail - luminaire count calculation
+    html += calcDetail({
+      name: tx('Armaturberegning', 'Luminaire Count Calculation'),
+      formula: 'N = ceil(L/S) x ceil(W/S)',
+      variables: [
+        { name: tx('Rumlengde', 'Room length'), symbol: 'L', value: noedState.roomLength, unit: 'm', source: tx('Valgt', 'Selected') },
+        { name: tx('Rumbredde', 'Room width'), symbol: 'W', value: noedState.roomWidth, unit: 'm', source: tx('Valgt', 'Selected') },
+        { name: tx('Montagehoejde', 'Mounting height'), symbol: 'H', value: noedState.roomHeight, unit: 'm', source: tx('Valgt', 'Selected') },
+        { name: tx('Afstand', 'Spacing'), symbol: 'S', value: calc.spacing, unit: 'm', source: tx('Beregnet iht. DS/EN 1838', 'Calculated per DS/EN 1838') },
+        { name: tx('Lux-krav', 'Lux requirement'), symbol: 'E', value: calc.luxRequired, unit: 'lux', source: calc.luxClause }
+      ],
+      substitution: 'ceil(' + noedState.roomLength + '/' + calc.spacing + ') x ceil(' + noedState.roomWidth + '/' + calc.spacing + ')',
+      steps: [
+        { desc: tx('Raekker (laengde)', 'Rows (length)'), expr: 'ceil(' + noedState.roomLength + ' / ' + calc.spacing + ')', result: Math.ceil(noedState.roomLength / calc.spacing) },
+        { desc: tx('Kolonner (bredde)', 'Columns (width)'), expr: 'ceil(' + noedState.roomWidth + ' / ' + calc.spacing + ')', result: Math.ceil(noedState.roomWidth / calc.spacing) },
+        { desc: tx('Antal armaturer', 'Luminaire count'), expr: Math.ceil(noedState.roomLength / calc.spacing) + ' x ' + Math.ceil(noedState.roomWidth / calc.spacing), result: calc.luminaireCount }
+      ],
+      result: { value: calc.luminaireCount, unit: tx('armaturer', 'luminaires'), status: calc.luminaireCount > 0 ? 'ok' : 'fail' },
+      reference: 'DS/EN 1838 + DS/EN 50172 cl.4'
+    });
+
     // Verdict
     var safe = calc.required && calc.luminaireCount > 0;
     html += renderVerdict(safe, safe ? tx('Design opfylder DS/EN 1838 + DS/EN 50172', 'Design complies with DS/EN 1838 + DS/EN 50172') : tx('Utilstraekkeligt design', 'Insufficient design'));
@@ -18358,7 +18444,15 @@ function renderLighting() {
   html += '<div class="card-title">' + tx('Belysningsdesign', 'Lighting Design') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. DS/EN 12464-1 + DS/HD 60364-5-52', 'Calculation per DS/EN 12464-1 + DS/HD 60364-5-52') + '</div>';
 
-  // Room Type
+  // Executive summary
+  html += uxSummary([
+    {label: tx('M\u00E5l-lux', 'Target Lux'), value: calc.targetLux + ' lux', status: ''},
+    {label: tx('Armaturer', 'Luminaires'), value: calc.count + ' stk', status: ''},
+    {label: tx('Effektdensitet', 'Power Density'), value: calc.powerDensity + ' W/m\u00B2', status: calc.leniOk ? 'pass' : 'fail'},
+    {label: tx('Uniformitet', 'Uniformity'), value: calc.spacingRatio, status: calc.uniformityOk ? 'pass' : 'fail'}
+  ]);
+
+  // Room Type (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Rumtype (DS/EN 12464-1 Tabel 5.x)', 'Room Type (DS/EN 12464-1 Table 5.x)') + '</div><div class="select-grid">';
   Object.keys(LIGHTING_ROOM_TYPES).forEach(function(key) {
     var r = LIGHTING_ROOM_TYPES[key];
@@ -18366,7 +18460,7 @@ function renderLighting() {
   });
   html += '</div></div>';
 
-  // Light Source
+  // Light Source (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Lyskildeype', 'Light Source Type') + '</div><div class="select-grid">';
   Object.keys(LIGHTING_SOURCES).forEach(function(key) {
     var s = LIGHTING_SOURCES[key];
@@ -18374,41 +18468,46 @@ function renderLighting() {
   });
   html += '</div></div>';
 
+  // Room & Luminaire Details panel
+  var lightPanelBody = '';
   // Luminaire Wattage
-  html += '<div class="select-group"><div class="select-label">' + tx('Armatureffekt [W]', 'Luminaire Wattage [W]') + '</div><div class="select-grid">';
+  lightPanelBody += '<div class="select-group"><div class="select-label">' + tx('Armatureffekt [W]', 'Luminaire Wattage [W]') + '</div><div class="select-grid">';
   [18, 25, 36, 40, 50, 60, 80, 100, 150, 200].forEach(function(w) {
-    html += '<button class="sel-btn' + (lightingState.wattage === w ? ' selected' : '') + '" onclick="lightingState.wattage=' + w + ';renderModule(\'lighting\')">' + w + 'W</button>';
+    lightPanelBody += '<button class="sel-btn' + (lightingState.wattage === w ? ' selected' : '') + '" onclick="lightingState.wattage=' + w + ';renderModule(\'lighting\')">' + w + 'W</button>';
   });
-  html += '</div></div>';
+  lightPanelBody += '</div></div>';
 
   // Room Length
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumlangde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
+  lightPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumlangde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
   for (var l = 2; l <= 30; l += 2) {
-    html += '<button class="sel-btn' + (lightingState.length === l ? ' selected' : '') + '" onclick="lightingState.length=' + l + ';renderModule(\'lighting\')">' + l + '</button>';
+    lightPanelBody += '<button class="sel-btn' + (lightingState.length === l ? ' selected' : '') + '" onclick="lightingState.length=' + l + ';renderModule(\'lighting\')">' + l + '</button>';
   }
-  html += '</div></div>';
+  lightPanelBody += '</div></div>';
 
   // Room Width
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
+  lightPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
   for (var w = 2; w <= 20; w += 2) {
-    html += '<button class="sel-btn' + (lightingState.width === w ? ' selected' : '') + '" onclick="lightingState.width=' + w + ';renderModule(\'lighting\')">' + w + '</button>';
+    lightPanelBody += '<button class="sel-btn' + (lightingState.width === w ? ' selected' : '') + '" onclick="lightingState.width=' + w + ';renderModule(\'lighting\')">' + w + '</button>';
   }
-  html += '</div></div>';
+  lightPanelBody += '</div></div>';
 
   // Room Height
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumhoejde [m]', 'Room Height [m]') + '</div><div class="select-grid">';
+  lightPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumhoejde [m]', 'Room Height [m]') + '</div><div class="select-grid">';
   for (var h = 2.4; h <= 6.0; h += 0.3) {
     var hRound = Math.round(h * 10) / 10;
-    html += '<button class="sel-btn' + (lightingState.height === hRound ? ' selected' : '') + '" onclick="lightingState.height=' + hRound + ';renderModule(\'lighting\')">' + hRound + '</button>';
+    lightPanelBody += '<button class="sel-btn' + (lightingState.height === hRound ? ' selected' : '') + '" onclick="lightingState.height=' + hRound + ';renderModule(\'lighting\')">' + hRound + '</button>';
   }
-  html += '</div></div>';
+  lightPanelBody += '</div></div>';
 
   // Maintenance Factor
-  html += '<div class="select-group"><div class="select-label">' + tx('Vedligeholdelsesfaktor (MF)', 'Maintenance Factor (MF)') + '</div><div class="select-grid">';
+  lightPanelBody += '<div class="select-group"><div class="select-label">' + tx('Vedligeholdelsesfaktor (MF)', 'Maintenance Factor (MF)') + '</div><div class="select-grid">';
   [{v:0.8, da:'0.8 (Rent)', en:'0.8 (Clean environment)'}, {v:0.7, da:'0.7 (Normal)', en:'0.7 (Normal)'}, {v:0.6, da:'0.6 (Snavset/industri)', en:'0.6 (Dirty/Industrial)'}].forEach(function(item) {
-    html += '<button class="sel-btn' + (lightingState.maintenanceFactor === item.v ? ' selected' : '') + '" onclick="lightingState.maintenanceFactor=' + item.v + ';renderModule(\'lighting\')">' + tx(item.da, item.en) + '</button>';
+    lightPanelBody += '<button class="sel-btn' + (lightingState.maintenanceFactor === item.v ? ' selected' : '') + '" onclick="lightingState.maintenanceFactor=' + item.v + ';renderModule(\'lighting\')">' + tx(item.da, item.en) + '</button>';
   });
-  html += '</div></div>';
+  lightPanelBody += '</div></div>';
+
+  var lightNonDefault = (lightingState.wattage !== 40) || (lightingState.length !== 6) || (lightingState.width !== 4) || (lightingState.maintenanceFactor !== 0.8);
+  html += uxPanel(tx('Rum- og armaturdetaljer', 'Room & Luminaire Details'), lightPanelBody, {id: 'uxp_light_details', icon: '\uD83D\uDCA1', open: uxModeLevel() >= 2 || lightNonDefault});
 
   // Results
   html += '<div class="result-box">';
@@ -18596,7 +18695,15 @@ function renderHeatPump() {
   html += '<div class="card-title">' + tx('Varmepumpe-installation', 'Heat Pump Installation') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. DS/HD 60364 + Installationsbekendtgoerelsen', 'Calculation per DS/HD 60364 + Installationsbekendtgoerelsen') + '</div>';
 
-  // Heat Pump Type
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Elektrisk input', 'Electrical Input'), value: calc.electricalKW + ' kW', status: ''},
+    {label: tx('Faser', 'Phase'), value: calc.phase + '\u03C6', status: ''},
+    {label: 'FLC', value: calc.flc + ' A', status: ''},
+    {label: tx('Sp\u00E6ndingsfald', 'V-drop'), value: calc.vdrop.percent + '%', status: calc.vdrop.ok ? 'pass' : 'fail'}
+  ]);
+
+  // Heat Pump Type (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Varmepumpetype', 'Heat Pump Type') + '</div><div class="select-grid">';
   Object.keys(HEATPUMP_TYPES).forEach(function(key) {
     var t = HEATPUMP_TYPES[key];
@@ -18604,33 +18711,38 @@ function renderHeatPump() {
   });
   html += '</div></div>';
 
-  // Heating Capacity
+  // Heating Capacity (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Varmeeffekt [kW]', 'Heating Capacity [kW]') + '</div><div class="select-grid">';
   [4, 6, 8, 10, 12, 14, 16, 18, 20, 25].forEach(function(kw) {
     html += '<button class="sel-btn' + (heatpumpState.heatingKW === kw ? ' selected' : '') + '" onclick="heatpumpState.heatingKW=' + kw + ';renderModule(\'heatpump\')">' + kw + '</button>';
   });
   html += '</div></div>';
 
+  // Installation Parameters panel
+  var hpPanelBody = '';
   // COP
-  html += '<div class="select-group"><div class="select-label">' + tx('COP (ydelseskoefficient)', 'COP (Coefficient of Performance)') + '</div><div class="select-grid">';
+  hpPanelBody += '<div class="select-group"><div class="select-label">' + tx('COP (ydelseskoefficient)', 'COP (Coefficient of Performance)') + '</div><div class="select-grid">';
   [2.5, 3.0, 3.5, 4.0, 4.5].forEach(function(c) {
-    html += '<button class="sel-btn' + (heatpumpState.cop === c ? ' selected' : '') + '" onclick="heatpumpState.cop=' + c + ';renderModule(\'heatpump\')">' + c + '</button>';
+    hpPanelBody += '<button class="sel-btn' + (heatpumpState.cop === c ? ' selected' : '') + '" onclick="heatpumpState.cop=' + c + ';renderModule(\'heatpump\')">' + c + '</button>';
   });
-  html += '</div></div>';
+  hpPanelBody += '</div></div>';
 
   // Inrush Factor (LRA)
-  html += '<div class="select-group"><div class="select-label">' + tx('Startstroemsfaktor (LRA)', 'Starting Current Factor (LRA)') + '</div><div class="select-grid">';
+  hpPanelBody += '<div class="select-group"><div class="select-label">' + tx('Startstroemsfaktor (LRA)', 'Starting Current Factor (LRA)') + '</div><div class="select-grid">';
   [3, 4, 5, 6].forEach(function(f) {
-    html += '<button class="sel-btn' + (heatpumpState.inrushFactor === f ? ' selected' : '') + '" onclick="heatpumpState.inrushFactor=' + f + ';renderModule(\'heatpump\')">' + f + 'x</button>';
+    hpPanelBody += '<button class="sel-btn' + (heatpumpState.inrushFactor === f ? ' selected' : '') + '" onclick="heatpumpState.inrushFactor=' + f + ';renderModule(\'heatpump\')">' + f + 'x</button>';
   });
-  html += '</div></div>';
+  hpPanelBody += '</div></div>';
 
   // Cable Length
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabellaengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  hpPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kabellaengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
   [5, 10, 15, 20, 25, 30, 40, 50].forEach(function(len) {
-    html += '<button class="sel-btn' + (heatpumpState.cableLength === len ? ' selected' : '') + '" onclick="heatpumpState.cableLength=' + len + ';renderModule(\'heatpump\')">' + len + '</button>';
+    hpPanelBody += '<button class="sel-btn' + (heatpumpState.cableLength === len ? ' selected' : '') + '" onclick="heatpumpState.cableLength=' + len + ';renderModule(\'heatpump\')">' + len + '</button>';
   });
-  html += '</div></div>';
+  hpPanelBody += '</div></div>';
+
+  var hpNonDefault = (heatpumpState.cop !== 3.5) || (heatpumpState.inrushFactor !== 4) || (heatpumpState.cableLength !== 15);
+  html += uxPanel(tx('Installationsparametre', 'Installation Parameters'), hpPanelBody, {id: 'uxp_hp_details', icon: '\uD83D\uDD27', open: uxModeLevel() >= 2 || hpNonDefault});
 
   // Results - Electrical
   html += '<div class="result-box">';
@@ -19165,6 +19277,14 @@ function renderBathroom() {
   html += '<div class="card-title">' + tx('Badevaerelses-zoner (DS/HD 60364-7-701)', 'Bathroom Zones (DS/HD 60364-7-701)') + '</div>';
   html += '<div class="info-row">' + tx('Zoneklassifikation og udstyrskrav iht. DS/HD 60364-7-701', 'Zone classification and equipment requirements per DS/HD 60364-7-701') + '</div>';
 
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Valgt zone', 'Selected Zone'), value: 'Zone ' + bathroomState.selectedZone, status: ''},
+    {label: tx('IP krav', 'IP Required'), value: 'IP' + bathroomGetZoneIP(bathroomState.selectedZone), status: ''},
+    {label: tx('Udstyr', 'Equipment'), value: check.allowed ? tx('TILLADT', 'ALLOWED') : tx('FORBUDT', 'FORBIDDEN'), status: check.allowed ? 'pass' : 'fail'},
+    {label: tx('Resultat', 'Result'), value: check.allowed ? '\u2705' : '\u274C', status: check.allowed ? 'pass' : 'fail'}
+  ]);
+
   // Zone SVG diagram
   html += '<div class="result-box"><div class="result-title">' + tx('Zonediagram', 'Zone Diagram') + '</div>';
   html += '<svg viewBox="0 0 400 250" style="width:100%;max-width:400px;height:auto;display:block;margin:0 auto">';
@@ -19198,35 +19318,39 @@ function renderBathroom() {
   });
   html += '</div></div>';
 
+  // Room Dimensions panel
+  var bathPanelBody = '';
   // Room Width
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
+  bathPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
   [1.5, 2.0, 2.5, 3.0, 3.5, 4.0].forEach(function(w) {
-    html += '<button class="sel-btn' + (bathroomState.roomWidth === w ? ' selected' : '') + '" onclick="bathroomState.roomWidth=' + w + ';renderModule(\'bathroom\')">' + w + '</button>';
+    bathPanelBody += '<button class="sel-btn' + (bathroomState.roomWidth === w ? ' selected' : '') + '" onclick="bathroomState.roomWidth=' + w + ';renderModule(\'bathroom\')">' + w + '</button>';
   });
-  html += '</div></div>';
+  bathPanelBody += '</div></div>';
 
   // Room Length
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumlængde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
+  bathPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumlængde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
   [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].forEach(function(l) {
-    html += '<button class="sel-btn' + (bathroomState.roomLength === l ? ' selected' : '') + '" onclick="bathroomState.roomLength=' + l + ';renderModule(\'bathroom\')">' + l + '</button>';
+    bathPanelBody += '<button class="sel-btn' + (bathroomState.roomLength === l ? ' selected' : '') + '" onclick="bathroomState.roomLength=' + l + ';renderModule(\'bathroom\')">' + l + '</button>';
   });
-  html += '</div></div>';
+  bathPanelBody += '</div></div>';
 
   // Ceiling Height
-  html += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
+  bathPanelBody += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
   [2.3, 2.4, 2.5, 2.7, 3.0].forEach(function(h) {
-    html += '<button class="sel-btn' + (bathroomState.ceilingHeight === h ? ' selected' : '') + '" onclick="bathroomState.ceilingHeight=' + h + ';renderModule(\'bathroom\')">' + h + '</button>';
+    bathPanelBody += '<button class="sel-btn' + (bathroomState.ceilingHeight === h ? ' selected' : '') + '" onclick="bathroomState.ceilingHeight=' + h + ';renderModule(\'bathroom\')">' + h + '</button>';
   });
-  html += '</div></div>';
+  bathPanelBody += '</div></div>';
 
-  // Zone Selector
+  html += uxPanel(tx('Rumdimensioner', 'Room Dimensions'), bathPanelBody, {id: 'uxp_bath_room', icon: '\uD83D\uDCCF', open: uxModeLevel() >= 2});
+
+  // Zone Selector (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Vaelg zone', 'Select Zone') + '</div><div class="select-grid">';
   [0, 1, 2, 3].forEach(function(z) {
     html += '<button class="sel-btn' + (bathroomState.selectedZone === z ? ' selected' : '') + '" onclick="bathroomState.selectedZone=' + z + ';renderModule(\'bathroom\')">' + tx(BATHROOM_ZONES[z].da, BATHROOM_ZONES[z].en) + '</button>';
   });
   html += '</div></div>';
 
-  // Equipment Selector
+  // Equipment Selector (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Vaelg udstyr', 'Select Equipment') + '</div><div class="select-grid">';
   Object.keys(BATHROOM_EQUIPMENT).forEach(function(key) {
     var eq = BATHROOM_EQUIPMENT[key];
@@ -19443,22 +19567,22 @@ function renderFireAlarm() {
   html += '<div class="card-title">' + tx('Brandalarm (DS/EN 54 + DBI vejl. 36)', 'Fire Alarm System (DS/EN 54 + DBI Guidelines)') + '</div>';
   html += '<div class="info-row">' + tx('Brandalarmsystem iht. DS/EN 54 og DBI retningslinje 232', 'Fire alarm system per DS/EN 54 and DBI guideline 232') + '</div>';
 
-  // System Category
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Detektorer', 'Detectors'), value: calc.count + ' stk', status: ''},
+    {label: tx('Sloejfer', 'Loops'), value: loop.loops + '', status: ''},
+    {label: tx('Batteri', 'Battery'), value: battery.batteryAh + ' Ah', status: ''},
+    {label: tx('Loftkontrol', 'Height Check'), value: calc.heightOk ? 'OK' : tx('FOR H\u00D8JT', 'TOO HIGH'), status: calc.heightOk ? 'pass' : 'fail'}
+  ]);
+
+  // System Category (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Systemkategori (DBI retningslinje 232)', 'System Category (DBI guideline 232)') + '</div><div class="select-grid">';
   [1,2,3,4].forEach(function(c) {
     html += '<button class="sel-btn' + (firealarmState.category === c ? ' selected' : '') + '" onclick="firealarmState.category=' + c + ';renderModule(\'firealarm\')">' + tx(FIREALARM_CATEGORIES[c].da, FIREALARM_CATEGORIES[c].en) + '</button>';
   });
   html += '</div></div>';
 
-  // Building Type
-  html += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
-  Object.keys(FIREALARM_BUILDING_TYPES).forEach(function(key) {
-    var bt = FIREALARM_BUILDING_TYPES[key];
-    html += '<button class="sel-btn' + (firealarmState.buildingType === key ? ' selected' : '') + '" onclick="firealarmState.buildingType=\'' + key + '\';renderModule(\'firealarm\')">' + tx(bt.da, bt.en) + '</button>';
-  });
-  html += '</div></div>';
-
-  // Detector Type
+  // Detector Type (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Detektortype', 'Detector Type') + '</div><div class="select-grid">';
   Object.keys(FIREALARM_DETECTORS).forEach(function(key) {
     var dt = FIREALARM_DETECTORS[key];
@@ -19466,19 +19590,32 @@ function renderFireAlarm() {
   });
   html += '</div></div>';
 
-  // Room Area
-  html += '<div class="select-group"><div class="select-label">' + tx('Rumareal [m2]', 'Room Area [m2]') + '</div><div class="select-grid">';
-  [10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].forEach(function(a) {
-    html += '<button class="sel-btn' + (firealarmState.roomArea === a ? ' selected' : '') + '" onclick="firealarmState.roomArea=' + a + ';renderModule(\'firealarm\')">' + a + '</button>';
+  // Building Parameters panel
+  var faPanelBody = '';
+  // Building Type
+  faPanelBody += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
+  Object.keys(FIREALARM_BUILDING_TYPES).forEach(function(key) {
+    var bt = FIREALARM_BUILDING_TYPES[key];
+    faPanelBody += '<button class="sel-btn' + (firealarmState.buildingType === key ? ' selected' : '') + '" onclick="firealarmState.buildingType=\'' + key + '\';renderModule(\'firealarm\')">' + tx(bt.da, bt.en) + '</button>';
   });
-  html += '</div></div>';
+  faPanelBody += '</div></div>';
+
+  // Room Area
+  faPanelBody += '<div class="select-group"><div class="select-label">' + tx('Rumareal [m2]', 'Room Area [m2]') + '</div><div class="select-grid">';
+  [10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].forEach(function(a) {
+    faPanelBody += '<button class="sel-btn' + (firealarmState.roomArea === a ? ' selected' : '') + '" onclick="firealarmState.roomArea=' + a + ';renderModule(\'firealarm\')">' + a + '</button>';
+  });
+  faPanelBody += '</div></div>';
 
   // Ceiling Height
-  html += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
+  faPanelBody += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
   [2.4, 2.7, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 8.0, 10.0, 12.0].forEach(function(h) {
-    html += '<button class="sel-btn' + (firealarmState.ceilingHeight === h ? ' selected' : '') + '" onclick="firealarmState.ceilingHeight=' + h + ';renderModule(\'firealarm\')">' + h + '</button>';
+    faPanelBody += '<button class="sel-btn' + (firealarmState.ceilingHeight === h ? ' selected' : '') + '" onclick="firealarmState.ceilingHeight=' + h + ';renderModule(\'firealarm\')">' + h + '</button>';
   });
-  html += '</div></div>';
+  faPanelBody += '</div></div>';
+
+  var faNonDefault = (firealarmState.buildingType !== 'hospital') || (firealarmState.roomArea !== 100) || (firealarmState.ceilingHeight !== 3.0);
+  html += uxPanel(tx('Bygningsparametre', 'Building Parameters'), faPanelBody, {id: 'uxp_fa_building', icon: '\uD83C\uDFE2', open: uxModeLevel() >= 2 || faNonDefault});
 
   // Results - Detector Count
   html += '<div class="result-box">';
@@ -19729,7 +19866,15 @@ function renderData() {
   html += '<div class="card-title">' + tx('Datainstallation (ISO 11801 + DS/EN 50173)', 'Structured Cabling (ISO 11801 + DS/EN 50173)') + '</div>';
   html += '<div class="info-row">' + tx('Kabelinfrastruktur iht. ISO 11801 og DS/EN 50173', 'Cable infrastructure per ISO 11801 and DS/EN 50173') + '</div>';
 
-  // Cable Category
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Udtag', 'Outlets'), value: outlets.outlets + ' stk', status: ''},
+    {label: tx('Kategori', 'Category'), value: dataState.cableCategory.toUpperCase(), status: ''},
+    {label: tx('Afstand', 'Distance'), value: dataState.distance + 'm/' + distCheck.permanentLink + 'm', status: distCheck.ok ? 'pass' : 'fail'},
+    {label: 'PoE', value: poe.totalW + ' W', status: ''}
+  ]);
+
+  // Cable Category (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Kabelkategori', 'Cable Category') + '</div><div class="select-grid">';
   Object.keys(DATA_CABLE_CATEGORIES).forEach(function(key) {
     var c = DATA_CABLE_CATEGORIES[key];
@@ -19737,7 +19882,7 @@ function renderData() {
   });
   html += '</div></div>';
 
-  // Application
+  // Application (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Anvendelse', 'Application') + '</div><div class="select-grid">';
   Object.keys(DATA_APPLICATIONS).forEach(function(key) {
     var a = DATA_APPLICATIONS[key];
@@ -19745,51 +19890,56 @@ function renderData() {
   });
   html += '</div></div>';
 
+  // Cable & Distance panel
+  var dataPanelBody = '';
   // Cable Type
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltype', 'Cable Type') + '</div><div class="select-grid">';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kabeltype', 'Cable Type') + '</div><div class="select-grid">';
   Object.keys(DATA_CABLE_TYPES).forEach(function(key) {
     var ct = DATA_CABLE_TYPES[key];
-    html += '<button class="sel-btn' + (dataState.cableType === key ? ' selected' : '') + '" onclick="dataState.cableType=\'' + key + '\';renderModule(\'data\')">' + tx(ct.da, ct.en) + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.cableType === key ? ' selected' : '') + '" onclick="dataState.cableType=\'' + key + '\';renderModule(\'data\')">' + tx(ct.da, ct.en) + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
 
   // Distance
-  html += '<div class="select-group"><div class="select-label">' + tx('Afstand [m]', 'Distance [m]') + '</div><div class="select-grid">';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('Afstand [m]', 'Distance [m]') + '</div><div class="select-grid">';
   [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200, 300].forEach(function(d) {
-    html += '<button class="sel-btn' + (dataState.distance === d ? ' selected' : '') + '" onclick="dataState.distance=' + d + ';renderModule(\'data\')">' + d + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.distance === d ? ' selected' : '') + '" onclick="dataState.distance=' + d + ';renderModule(\'data\')">' + d + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
 
   // Floor Area
-  html += '<div class="select-group"><div class="select-label">' + tx('Gulvareal [m2]', 'Floor Area [m2]') + '</div><div class="select-grid">';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('Gulvareal [m2]', 'Floor Area [m2]') + '</div><div class="select-grid">';
   [50, 100, 150, 200, 300, 500, 750, 1000].forEach(function(a) {
-    html += '<button class="sel-btn' + (dataState.floorArea === a ? ' selected' : '') + '" onclick="dataState.floorArea=' + a + ';renderModule(\'data\')">' + a + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.floorArea === a ? ' selected' : '') + '" onclick="dataState.floorArea=' + a + ';renderModule(\'data\')">' + a + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
 
   // PoE Type
-  html += '<div class="select-group"><div class="select-label">' + tx('PoE-type', 'PoE Type') + '</div><div class="select-grid">';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('PoE-type', 'PoE Type') + '</div><div class="select-grid">';
   Object.keys(DATA_POE_TYPES).forEach(function(key) {
     var p = DATA_POE_TYPES[key];
-    html += '<button class="sel-btn' + (dataState.poeType === key ? ' selected' : '') + '" onclick="dataState.poeType=\'' + key + '\';renderModule(\'data\')">' + tx(p.da, p.en) + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.poeType === key ? ' selected' : '') + '" onclick="dataState.poeType=\'' + key + '\';renderModule(\'data\')">' + tx(p.da, p.en) + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
 
   // PoE Port Count
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal PoE-porte', 'PoE Port Count') + '</div><div class="select-grid">';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('Antal PoE-porte', 'PoE Port Count') + '</div><div class="select-grid">';
   [4, 8, 12, 16, 24, 48].forEach(function(n) {
-    html += '<button class="sel-btn' + (dataState.poePortCount === n ? ' selected' : '') + '" onclick="dataState.poePortCount=' + n + ';renderModule(\'data\')">' + n + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.poePortCount === n ? ' selected' : '') + '" onclick="dataState.poePortCount=' + n + ';renderModule(\'data\')">' + n + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
 
   // Fiber option
-  html += '<div class="select-group"><div class="select-label">' + tx('Fiber (valgfrit)', 'Fiber (optional)') + '</div><div class="select-grid">';
-  html += '<button class="sel-btn' + (dataState.fiberType === null ? ' selected' : '') + '" onclick="dataState.fiberType=null;renderModule(\'data\')">' + tx('Ingen fiber', 'No fiber') + '</button>';
+  dataPanelBody += '<div class="select-group"><div class="select-label">' + tx('Fiber (valgfrit)', 'Fiber (optional)') + '</div><div class="select-grid">';
+  dataPanelBody += '<button class="sel-btn' + (dataState.fiberType === null ? ' selected' : '') + '" onclick="dataState.fiberType=null;renderModule(\'data\')">' + tx('Ingen fiber', 'No fiber') + '</button>';
   Object.keys(DATA_FIBER_TYPES).forEach(function(key) {
     var f = DATA_FIBER_TYPES[key];
-    html += '<button class="sel-btn' + (dataState.fiberType === key ? ' selected' : '') + '" onclick="dataState.fiberType=\'' + key + '\';renderModule(\'data\')">' + tx(f.da, f.en) + '</button>';
+    dataPanelBody += '<button class="sel-btn' + (dataState.fiberType === key ? ' selected' : '') + '" onclick="dataState.fiberType=\'' + key + '\';renderModule(\'data\')">' + tx(f.da, f.en) + '</button>';
   });
-  html += '</div></div>';
+  dataPanelBody += '</div></div>';
+
+  var dataNonDefault = (dataState.cableType !== 'uutp') || (dataState.distance !== 50) || (dataState.fiberType !== null) || (dataState.poePortCount !== 24);
+  html += uxPanel(tx('Kabel, afstand og PoE', 'Cable, Distance & PoE'), dataPanelBody, {id: 'uxp_data_details', icon: '\uD83D\uDD0C', open: uxModeLevel() >= 2 || dataNonDefault});
 
   // Results - Distance Check
   html += '<div class="result-box">';
@@ -19977,7 +20127,15 @@ function renderSPD() {
   html += '<div class="card-title">' + tx('Overspaendingsbeskyttelse (DS/HD 60364-5-534 + IEC 62305)', 'Surge Protection Design (DS/HD 60364-5-534 + IEC 62305)') + '</div>';
   html += '<div class="info-row">' + tx('Risikovurdering og SPD-valg iht. DS/HD 60364-4-443', 'Risk assessment and SPD selection per DS/HD 60364-4-443') + '</div>';
 
-  // Building Location
+  // Executive summary
+  html += uxSummary([
+    {label: 'SPD', value: mainType, status: ''},
+    {label: tx('Risiko', 'Risk'), value: risk.level, status: risk.mandatory ? 'warn' : 'pass'},
+    {label: tx('P\u00E5kr\u00E6vet', 'Required'), value: risk.mandatory ? tx('Ja', 'Yes') : tx('Anbefalet', 'Rec.'), status: risk.mandatory ? 'warn' : 'pass'},
+    {label: 'Nd', value: strikeResult.nd.toFixed(4), status: ''}
+  ]);
+
+  // Building Location (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Bygningsplacering', 'Building Location') + '</div><div class="select-grid">';
   Object.keys(SPD_LOCATIONS).forEach(function(key) {
     var l = SPD_LOCATIONS[key];
@@ -19985,45 +20143,50 @@ function renderSPD() {
   });
   html += '</div></div>';
 
-  // Lightning flash density
-  html += '<div class="select-group"><div class="select-label">' + tx('Lynnedslagstaethed Ng [pr. km2/aar]', 'Lightning Flash Density Ng [flashes/km2/year]') + '</div><div class="select-grid">';
-  [0.5, 1.0, 1.5, 2.0, 2.5, 3.0].forEach(function(n) {
-    html += '<button class="sel-btn' + (spdState.ng === n ? ' selected' : '') + '" onclick="spdState.ng=' + n + ';renderModule(\'spd\')">' + n + '</button>';
-  });
-  html += '</div></div>';
-
-  // Building dimensions - length
-  html += '<div class="select-group"><div class="select-label">' + tx('Bygningslaengde [m]', 'Building Length [m]') + '</div><div class="select-grid">';
-  [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].forEach(function(v) {
-    html += '<button class="sel-btn' + (spdState.length === v ? ' selected' : '') + '" onclick="spdState.length=' + v + ';renderModule(\'spd\')">' + v + '</button>';
-  });
-  html += '</div></div>';
-
-  // Building dimensions - width
-  html += '<div class="select-group"><div class="select-label">' + tx('Bygningsbredde [m]', 'Building Width [m]') + '</div><div class="select-grid">';
-  [10, 15, 20, 25, 30, 35, 40, 45, 50].forEach(function(v) {
-    html += '<button class="sel-btn' + (spdState.width === v ? ' selected' : '') + '" onclick="spdState.width=' + v + ';renderModule(\'spd\')">' + v + '</button>';
-  });
-  html += '</div></div>';
-
-  // Building dimensions - height
-  html += '<div class="select-group"><div class="select-label">' + tx('Bygningshoejde [m]', 'Building Height [m]') + '</div><div class="select-grid">';
-  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30].forEach(function(v) {
-    html += '<button class="sel-btn' + (spdState.height === v ? ' selected' : '') + '" onclick="spdState.height=' + v + ';renderModule(\'spd\')">' + v + '</button>';
-  });
-  html += '</div></div>';
-
-  // LPS toggle
+  // LPS toggle (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Ekstern lynbeskyttelse (LPS) eller luftlinje', 'External Lightning Protection (LPS) or Overhead Supply') + '</div><div class="select-grid">';
   html += '<button class="sel-btn' + (!spdState.hasLPS ? ' selected' : '') + '" onclick="spdState.hasLPS=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
   html += '<button class="sel-btn' + (spdState.hasLPS ? ' selected' : '') + '" onclick="spdState.hasLPS=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
   html += '</div></div>';
 
-  // Sensitive equipment toggle
+  // Sensitive equipment toggle (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Foelsomt udstyr (IT, medicinsk, data)', 'Sensitive Equipment (IT, medical, data)') + '</div><div class="select-grid">';
   html += '<button class="sel-btn' + (!spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
   html += '<button class="sel-btn' + (spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
   html += '</div></div>';
+
+  // Building Geometry & Environment panel
+  var spdPanelBody = '';
+  // Lightning flash density
+  spdPanelBody += '<div class="select-group"><div class="select-label">' + tx('Lynnedslagstaethed Ng [pr. km2/aar]', 'Lightning Flash Density Ng [flashes/km2/year]') + '</div><div class="select-grid">';
+  [0.5, 1.0, 1.5, 2.0, 2.5, 3.0].forEach(function(n) {
+    spdPanelBody += '<button class="sel-btn' + (spdState.ng === n ? ' selected' : '') + '" onclick="spdState.ng=' + n + ';renderModule(\'spd\')">' + n + '</button>';
+  });
+  spdPanelBody += '</div></div>';
+
+  // Building dimensions - length
+  spdPanelBody += '<div class="select-group"><div class="select-label">' + tx('Bygningslaengde [m]', 'Building Length [m]') + '</div><div class="select-grid">';
+  [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].forEach(function(v) {
+    spdPanelBody += '<button class="sel-btn' + (spdState.length === v ? ' selected' : '') + '" onclick="spdState.length=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  spdPanelBody += '</div></div>';
+
+  // Building dimensions - width
+  spdPanelBody += '<div class="select-group"><div class="select-label">' + tx('Bygningsbredde [m]', 'Building Width [m]') + '</div><div class="select-grid">';
+  [10, 15, 20, 25, 30, 35, 40, 45, 50].forEach(function(v) {
+    spdPanelBody += '<button class="sel-btn' + (spdState.width === v ? ' selected' : '') + '" onclick="spdState.width=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  spdPanelBody += '</div></div>';
+
+  // Building dimensions - height
+  spdPanelBody += '<div class="select-group"><div class="select-label">' + tx('Bygningshoejde [m]', 'Building Height [m]') + '</div><div class="select-grid">';
+  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30].forEach(function(v) {
+    spdPanelBody += '<button class="sel-btn' + (spdState.height === v ? ' selected' : '') + '" onclick="spdState.height=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  spdPanelBody += '</div></div>';
+
+  var spdNonDefault = (spdState.ng !== 1.0) || (spdState.length !== 30) || (spdState.width !== 20) || (spdState.height !== 6);
+  html += uxPanel(tx('Bygningsgeometri og miljo', 'Building Geometry & Environment'), spdPanelBody, {id: 'uxp_spd_geom', icon: '\uD83C\uDF29\uFE0F', open: uxModeLevel() >= 2 || spdNonDefault});
 
   // Results
   html += '<div class="result-box">';
@@ -20200,7 +20363,16 @@ function renderUPS() {
   html += '<div class="card-title">' + tx('UPS-dimensionering (IEC 62040 + DS/HD 60364-5-56)', 'UPS Sizing (IEC 62040 + DS/HD 60364-5-56)') + '</div>';
   html += '<div class="info-row">' + tx('Dimensionering af UPS og batteri iht. IEC 62040', 'UPS and battery sizing per IEC 62040') + '</div>';
 
-  // Topology
+  // Executive summary
+  var upsLoadPct = load.totalVA > 0 ? Math.ceil((load.totalVA / upsSize) * 100) : 0;
+  html += uxSummary([
+    {label: tx('Total belastning', 'Total Load'), value: load.totalVA + ' VA', status: ''},
+    {label: 'UPS', value: (upsSize >= 1000 ? (upsSize / 1000) + ' kVA' : upsSize + ' VA'), status: upsLoadPct <= 80 ? 'pass' : 'fail'},
+    {label: tx('Batteri', 'Battery'), value: battery.ah + ' Ah', status: ''},
+    {label: tx('Autonomi', 'Autonomy'), value: upsState.autonomy + ' min', status: ''}
+  ]);
+
+  // Topology (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('UPS-topologi', 'UPS Topology') + '</div><div class="select-grid">';
   Object.keys(UPS_TOPOLOGIES).forEach(function(key) {
     var top = UPS_TOPOLOGIES[key];
@@ -20208,30 +20380,39 @@ function renderUPS() {
   });
   html += '</div></div>';
 
-  // Equipment - each type with quantity buttons
+  // Equipment panel
+  var upsPanelBody = '';
   Object.keys(UPS_EQUIPMENT).forEach(function(key) {
     var eq = UPS_EQUIPMENT[key];
-    html += '<div class="select-group"><div class="select-label">' + tx(eq.da, eq.en) + ' (' + eq.w + 'W)</div><div class="select-grid">';
+    upsPanelBody += '<div class="select-group"><div class="select-label">' + tx(eq.da, eq.en) + ' (' + eq.w + 'W)</div><div class="select-grid">';
     [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].forEach(function(n) {
-      html += '<button class="sel-btn' + (upsState.equipment[key] === n ? ' selected' : '') + '" onclick="upsState.equipment.' + key + '=' + n + ';renderModule(\'ups\')">' + n + '</button>';
+      upsPanelBody += '<button class="sel-btn' + (upsState.equipment[key] === n ? ' selected' : '') + '" onclick="upsState.equipment.' + key + '=' + n + ';renderModule(\'ups\')">' + n + '</button>';
     });
-    html += '</div></div>';
+    upsPanelBody += '</div></div>';
   });
 
+  var upsHasEquipment = Object.keys(upsState.equipment).some(function(k) { return upsState.equipment[k] > 0; });
+  html += uxPanel(tx('Udstyrsliste', 'Equipment List'), upsPanelBody, {id: 'uxp_ups_equip', icon: '\uD83D\uDDA5\uFE0F', open: uxModeLevel() >= 2 || upsHasEquipment});
+
+  // Battery & Autonomy panel
+  var upsBatBody = '';
   // Autonomy
-  html += '<div class="select-group"><div class="select-label">' + tx('Autonomitid [min]', 'Autonomy Time [min]') + '</div><div class="select-grid">';
+  upsBatBody += '<div class="select-group"><div class="select-label">' + tx('Autonomitid [min]', 'Autonomy Time [min]') + '</div><div class="select-grid">';
   [5, 10, 15, 20, 30, 45, 60].forEach(function(m) {
-    html += '<button class="sel-btn' + (upsState.autonomy === m ? ' selected' : '') + '" onclick="upsState.autonomy=' + m + ';renderModule(\'ups\')">' + m + '</button>';
+    upsBatBody += '<button class="sel-btn' + (upsState.autonomy === m ? ' selected' : '') + '" onclick="upsState.autonomy=' + m + ';renderModule(\'ups\')">' + m + '</button>';
   });
-  html += '</div></div>';
+  upsBatBody += '</div></div>';
 
   // Battery Type
-  html += '<div class="select-group"><div class="select-label">' + tx('Batteritype', 'Battery Type') + '</div><div class="select-grid">';
+  upsBatBody += '<div class="select-group"><div class="select-label">' + tx('Batteritype', 'Battery Type') + '</div><div class="select-grid">';
   Object.keys(UPS_BATTERY_TYPES).forEach(function(key) {
     var bt = UPS_BATTERY_TYPES[key];
-    html += '<button class="sel-btn' + (upsState.batteryType === key ? ' selected' : '') + '" onclick="upsState.batteryType=\'' + key + '\';renderModule(\'ups\')">' + tx(bt.da, bt.en) + '</button>';
+    upsBatBody += '<button class="sel-btn' + (upsState.batteryType === key ? ' selected' : '') + '" onclick="upsState.batteryType=\'' + key + '\';renderModule(\'ups\')">' + tx(bt.da, bt.en) + '</button>';
   });
-  html += '</div></div>';
+  upsBatBody += '</div></div>';
+
+  var upsAutoNonDefault = (upsState.autonomy !== 15) || (upsState.batteryType !== 'agm');
+  html += uxPanel(tx('Batteri og autonomi', 'Battery & Autonomy'), upsBatBody, {id: 'uxp_ups_batt', icon: '\uD83D\uDD0B', open: uxModeLevel() >= 2 || upsAutoNonDefault});
 
   // Results - Load Calculation
   html += '<div class="result-box">';
@@ -20405,47 +20586,60 @@ function renderPFC() {
   html += '<div class="card-title">' + tx('Effektfaktorkorrektion (IEC 61921 + DS/HD 60364-5-52)', 'Power Factor Correction (IEC 61921 + DS/HD 60364-5-52)') + '</div>';
   html += '<div class="info-row">' + tx('Beregning af kondensatorbatteri og resonanskontrol', 'Capacitor bank calculation and resonance check') + '</div>';
 
-  // Current PF
+  // Executive summary
+  html += uxSummary([
+    {label: 'Qc', value: calc.kvar + ' kvar', status: ''},
+    {label: tx('Bank', 'Bank'), value: standardSize + ' kvar', status: ''},
+    {label: tx('Resonans', 'Resonance'), value: resonance.fr + ' Hz', status: resonance.risk ? 'fail' : 'pass'},
+    {label: tx('Straf', 'Penalty'), value: penalty.penalty > 0 ? penalty.penalty + ' DKK' : 'OK', status: penalty.penalty > 0 ? 'warn' : 'pass'}
+  ]);
+
+  // Current PF (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Aktuel effektfaktor (cos \u03C6)', 'Current Power Factor (cos \u03C6)') + '</div><div class="select-grid">';
   [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95].forEach(function(pf) {
     html += '<button class="sel-btn' + (pfcState.currentPF === pf ? ' selected' : '') + '" onclick="pfcState.currentPF=' + pf + ';renderModule(\'pfc\')">' + pf.toFixed(2) + '</button>';
   });
   html += '</div></div>';
 
-  // Target PF
+  // Target PF (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Maal effektfaktor', 'Target Power Factor') + '</div><div class="select-grid">';
   [0.90, 0.92, 0.95, 0.96, 0.98, 1.00].forEach(function(pf) {
     html += '<button class="sel-btn' + (pfcState.targetPF === pf ? ' selected' : '') + '" onclick="pfcState.targetPF=' + pf + ';renderModule(\'pfc\')">' + pf.toFixed(2) + '</button>';
   });
   html += '</div></div>';
 
+  // System Parameters panel
+  var pfcPanelBody = '';
   // Active Power
-  html += '<div class="select-group"><div class="select-label">' + tx('Aktiv effekt [kW]', 'Active Power [kW]') + '</div><div class="select-grid">';
+  pfcPanelBody += '<div class="select-group"><div class="select-label">' + tx('Aktiv effekt [kW]', 'Active Power [kW]') + '</div><div class="select-grid">';
   [10, 20, 30, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000].forEach(function(p) {
-    html += '<button class="sel-btn' + (pfcState.activePower === p ? ' selected' : '') + '" onclick="pfcState.activePower=' + p + ';renderModule(\'pfc\')">' + p + '</button>';
+    pfcPanelBody += '<button class="sel-btn' + (pfcState.activePower === p ? ' selected' : '') + '" onclick="pfcState.activePower=' + p + ';renderModule(\'pfc\')">' + p + '</button>';
   });
-  html += '</div></div>';
+  pfcPanelBody += '</div></div>';
 
   // Correction Type
-  html += '<div class="select-group"><div class="select-label">' + tx('Korrektionstype', 'Correction Type') + '</div><div class="select-grid">';
+  pfcPanelBody += '<div class="select-group"><div class="select-label">' + tx('Korrektionstype', 'Correction Type') + '</div><div class="select-grid">';
   [{k:'fixed', da:'Fast (konstant belastning)', en:'Fixed (constant loads)'}, {k:'auto', da:'Automatisk/trinvis (varierende)', en:'Automatic/Stepped (varying)'}, {k:'detuned', da:'Afstemt m. reaktor (harmoniske)', en:'Detuned with reactor (harmonics)'}].forEach(function(ct) {
-    html += '<button class="sel-btn' + (pfcState.correctionType === ct.k ? ' selected' : '') + '" onclick="pfcState.correctionType=\'' + ct.k + '\';renderModule(\'pfc\')">' + tx(ct.da, ct.en) + '</button>';
+    pfcPanelBody += '<button class="sel-btn' + (pfcState.correctionType === ct.k ? ' selected' : '') + '" onclick="pfcState.correctionType=\'' + ct.k + '\';renderModule(\'pfc\')">' + tx(ct.da, ct.en) + '</button>';
   });
-  html += '</div></div>';
+  pfcPanelBody += '</div></div>';
 
   // Detuning Factor
-  html += '<div class="select-group"><div class="select-label">' + tx('Aftemningsfaktor', 'Detuning Factor') + '</div><div class="select-grid">';
+  pfcPanelBody += '<div class="select-group"><div class="select-label">' + tx('Aftemningsfaktor', 'Detuning Factor') + '</div><div class="select-grid">';
   [{v:0, da:'Ingen (0%)', en:'None (0%)'}, {v:7, da:'7% (189 Hz, THD<15%)', en:'7% (189 Hz, THD<15%)'}, {v:14, da:'14% (134 Hz, THD 15-30%)', en:'14% (134 Hz, THD 15-30%)'}].forEach(function(d) {
-    html += '<button class="sel-btn' + (pfcState.detuning === d.v ? ' selected' : '') + '" onclick="pfcState.detuning=' + d.v + ';renderModule(\'pfc\')">' + tx(d.da, d.en) + '</button>';
+    pfcPanelBody += '<button class="sel-btn' + (pfcState.detuning === d.v ? ' selected' : '') + '" onclick="pfcState.detuning=' + d.v + ';renderModule(\'pfc\')">' + tx(d.da, d.en) + '</button>';
   });
-  html += '</div></div>';
+  pfcPanelBody += '</div></div>';
 
   // Short-circuit power
-  html += '<div class="select-group"><div class="select-label">' + tx('Kortslutningseffekt Sk [MVA]', 'Short-circuit Power Sk [MVA]') + '</div><div class="select-grid">';
+  pfcPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kortslutningseffekt Sk [MVA]', 'Short-circuit Power Sk [MVA]') + '</div><div class="select-grid">';
   [5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200].forEach(function(s) {
-    html += '<button class="sel-btn' + (pfcState.skMVA === s ? ' selected' : '') + '" onclick="pfcState.skMVA=' + s + ';renderModule(\'pfc\')">' + s + '</button>';
+    pfcPanelBody += '<button class="sel-btn' + (pfcState.skMVA === s ? ' selected' : '') + '" onclick="pfcState.skMVA=' + s + ';renderModule(\'pfc\')">' + s + '</button>';
   });
-  html += '</div></div>';
+  pfcPanelBody += '</div></div>';
+
+  var pfcNonDefault = (pfcState.activePower !== 100) || (pfcState.correctionType !== 'auto') || (pfcState.detuning !== 0) || (pfcState.skMVA !== 20);
+  html += uxPanel(tx('Systemparametre', 'System Parameters'), pfcPanelBody, {id: 'uxp_pfc_sys', icon: '\u26A1', open: uxModeLevel() >= 2 || pfcNonDefault});
 
   // Results - kvar calculation
   html += '<div class="result-box">';
@@ -20679,7 +20873,15 @@ function renderTrayFill() {
   html += '<div class="card-title">' + tx('Kabelbakke Fyldningsberegning (DS/EN 50174-2 + DS/HD 60364-5-52)', 'Cable Tray Fill Calculator (DS/EN 50174-2 + DS/HD 60364-5-52)') + '</div>';
   html += '<div class="info-row">' + tx('Beregn fyldningsgrad, grupperingsfaktor og vaegt iht. standarder', 'Calculate fill rate, grouping factor and weight per standards') + '</div>';
 
-  // Tray Type selector
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Fyldning', 'Fill'), value: fillRate.toFixed(1) + '%/' + maxFill + '%', status: fillRate <= maxFill ? 'pass' : 'fail'},
+    {label: tx('V\u00E6gt', 'Weight'), value: weight.toFixed(1) + ' kg/m', status: ''},
+    {label: tx('Derating', 'Derating'), value: groupFactor.toFixed(2), status: groupFactor < 0.6 ? 'warn' : 'pass'},
+    {label: tx('Adskillelse', 'Separation'), value: needsSeparation ? '\u26A0\uFE0F' : 'OK', status: needsSeparation ? 'warn' : 'pass'}
+  ]);
+
+  // Tray Type selector (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Bakketype', 'Tray Type') + '</div><div class="select-grid">';
   Object.keys(TRAY_TYPES).forEach(function(key) {
     var t = TRAY_TYPES[key];
@@ -20687,26 +20889,30 @@ function renderTrayFill() {
   });
   html += '</div></div>';
 
-  // Tray Size selector
+  // Tray Size selector (always visible)
   html += '<div class="select-group"><div class="select-label">' + tx('Bakkestaerrelse (B x H mm)', 'Tray Size (W x H mm)') + '</div><div class="select-grid">';
   TRAY_SIZES.forEach(function(s, i) {
     html += '<button class="sel-btn' + (trayFillState.traySize === i ? ' selected' : '') + '" onclick="trayFillState.traySize=' + i + ';renderModule(\'trayfill\')">' + s.w + '\u00D7' + s.h + '</button>';
   });
   html += '</div></div>';
 
-  // Cable entry
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabler (klik +/- for at tilfoeje/fjerne)', 'Cables (click +/- to add/remove)') + '</div>';
+  // Cable Inventory panel
+  var trayPanelBody = '';
+  trayPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kabler (klik +/- for at tilfoeje/fjerne)', 'Cables (click +/- to add/remove)') + '</div>';
   Object.keys(TRAY_CABLES).forEach(function(key) {
     var c = TRAY_CABLES[key];
     var qty = trayFillState.cables[key] || 0;
-    html += '<div style="display:inline-flex;align-items:center;margin:4px 8px 4px 0;background:var(--bg-card,#1e293b);border-radius:8px;padding:4px 8px">';
-    html += '<span style="margin-right:6px;font-size:0.85em">' + key + ' (\u2300' + c.diam + 'mm)</span>';
-    html += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.max(0,(trayFillState.cables[\'' + key + '\']||0)-1);renderModule(\'trayfill\')">-</button>';
-    html += '<span style="margin:0 6px;min-width:20px;text-align:center">' + qty + '</span>';
-    html += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.min(20,(trayFillState.cables[\'' + key + '\']||0)+1);renderModule(\'trayfill\')">+</button>';
-    html += '</div>';
+    trayPanelBody += '<div style="display:inline-flex;align-items:center;margin:4px 8px 4px 0;background:var(--bg-card,#1e293b);border-radius:8px;padding:4px 8px">';
+    trayPanelBody += '<span style="margin-right:6px;font-size:0.85em">' + key + ' (\u2300' + c.diam + 'mm)</span>';
+    trayPanelBody += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.max(0,(trayFillState.cables[\'' + key + '\']||0)-1);renderModule(\'trayfill\')">-</button>';
+    trayPanelBody += '<span style="margin:0 6px;min-width:20px;text-align:center">' + qty + '</span>';
+    trayPanelBody += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.min(20,(trayFillState.cables[\'' + key + '\']||0)+1);renderModule(\'trayfill\')">+</button>';
+    trayPanelBody += '</div>';
   });
-  html += '</div>';
+  trayPanelBody += '</div>';
+
+  var trayHasCables = Object.keys(trayFillState.cables).some(function(k) { return (trayFillState.cables[k] || 0) > 0; });
+  html += uxPanel(tx('Kabelinventar', 'Cable Inventory'), trayPanelBody, {id: 'uxp_tray_cables', icon: '\uD83D\uDCE6', open: uxModeLevel() >= 2 || trayHasCables});
 
   // Results
   html += '<div class="result-box">';
@@ -22193,11 +22399,31 @@ function renderEarthsys() {
   html += '<div class="result-row"><span class="label">' + tx('Periodisk gentest', 'Periodic retest') + '</span><span class="value">' + tx('Hvert 5. år (boliger), hvert 3. år (erhverv)', 'Every 5 years (domestic), every 3 years (commercial)') + '</span></div>';
   html += '</div>';
 
+  // calcDetail - earth electrode resistance
+  html += calcDetail({
+    name: tx('Jordelektrodemodstand', 'Earth Electrode Resistance'),
+    formula: 'Re = rho / (2*pi*L) * ln(4L/d)',
+    variables: [
+      { name: tx('Jordresistivitet', 'Soil resistivity'), symbol: '\u03C1', value: earthsysState.soilResistivity, unit: '\u03A9\u00B7m', source: tx('Valgt', 'Selected') },
+      { name: tx('Elektrodelengde', 'Electrode length'), symbol: 'L', value: electrode.length, unit: 'm', source: tx('Valgt', 'Selected') },
+      { name: tx('Diameter', 'Diameter'), symbol: 'd', value: electrode.diameter, unit: 'm', source: tx('Valgt', 'Selected') },
+      { name: tx('Antal stang', 'Number of rods'), symbol: 'n', value: earthsysState.numRods, unit: '', source: tx('Valgt', 'Selected') }
+    ],
+    substitution: earthsysState.soilResistivity + ' / (2\u00B7\u03C0\u00B7' + electrode.length + ') \u00D7 ln(4\u00D7' + electrode.length + '/' + electrode.diameter + ')',
+    steps: [
+      { desc: tx('Enkelt stang Re', 'Single rod Re'), expr: earthsysState.soilResistivity + ' / (2\u03C0\u00D7' + electrode.length + ') \u00D7 ln(' + (4 * electrode.length / electrode.diameter).toFixed(1) + ')', result: singleRe.toFixed(2) + ' \u03A9' },
+      { desc: tx('Parallel reduktionsfaktor', 'Parallel reduction factor'), expr: earthsysState.numRods + ' stang', result: (totalRe / singleRe).toFixed(2) },
+      { desc: tx('Total modstand', 'Total resistance'), expr: singleRe.toFixed(2) + ' \u00D7 ' + (totalRe / singleRe).toFixed(2), result: totalRe.toFixed(2) + ' \u03A9' }
+    ],
+    result: { value: totalRe, unit: '\u03A9', status: targetMet ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-5-54 cl.542 + Tabel 54.2'
+  });
+
   // Verdict
   var safe = targetMet;
   var verdictText = safe ?
-    tx('OK: Jordmodstand ' + totalRe.toFixed(2) + ' Ω ≤ 10 Ω. PE ' + peSize + ' mm² iht. DS/HD 60364-5-54 Tabel 54.2.', 'OK: Earth resistance ' + totalRe.toFixed(2) + ' Ohm <= 10 Ohm. PE ' + peSize + ' mm2 per DS/HD 60364-5-54 Table 54.2.') :
-    tx('FEJL: Jordmodstand ' + totalRe.toFixed(2) + ' Ω > 10 Ω. Tilføj flere parallelstænger eller brug længere elektroder.', 'FAIL: Earth resistance ' + totalRe.toFixed(2) + ' Ohm > 10 Ohm. Add more parallel rods or use longer electrodes.');
+    tx('OK: Jordmodstand ' + totalRe.toFixed(2) + ' \u03A9 \u2264 10 \u03A9. PE ' + peSize + ' mm\u00B2 iht. DS/HD 60364-5-54 Tabel 54.2.', 'OK: Earth resistance ' + totalRe.toFixed(2) + ' Ohm <= 10 Ohm. PE ' + peSize + ' mm2 per DS/HD 60364-5-54 Table 54.2.') :
+    tx('FEJL: Jordmodstand ' + totalRe.toFixed(2) + ' \u03A9 > 10 \u03A9. Tilf\u00F8j flere parallelst\u00E6nger eller brug l\u00E6ngere elektroder.', 'FAIL: Earth resistance ' + totalRe.toFixed(2) + ' Ohm > 10 Ohm. Add more parallel rods or use longer electrodes.');
   html += renderVerdict(safe, verdictText);
   html += '</div>';
   return html;
