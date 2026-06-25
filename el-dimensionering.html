@@ -8469,7 +8469,7 @@ const PHYS_CONST = {
 // Collapsed by default. Presentation only.
 function symbolLegend(rows) {
   if (!rows || !rows.length) return '';
-  var h = '<details class="calc-detail" style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  var h = '<details class="calc-detail" open style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
   h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
   h += '<span style="flex:1">' + tx('Symbolforklaring', 'Symbol legend') + '</span>';
   h += '<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">' + tx('vis', 'show') + ' \u25BC</span>';
@@ -8510,7 +8510,7 @@ function symbolLegend(rows) {
 
 function calcDetail(calc) {
   if (!calc) return '';
-  var h = '<details class="calc-detail" style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  var h = '<details class="calc-detail" open style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
   // Summary line
   h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
   h += '<span style="flex:1">' + (calc.name || '') + '</span>';
@@ -8869,11 +8869,23 @@ function applyLoadPreset(key) {
 function renderFuse() {
   const holder = FUSE_HOLDERS[fuseState.holder];
   const sizes = holder.sizes;
+  const fuseEngPlus = uxModeLevel() >= 2;
+  const fuseClassNonDefault = fuseCurveSel.length > 1 || fuseCurveSel[0] !== 'gG';
+
+  // Executive summary (when size is selected)
+  const fuseSummaryHtml = fuseState.size ? uxSummary([
+    {label: tx('Holder', 'Holder'), value: fuseState.holder, status: ''},
+    {label: tx('Størrelse', 'Size'), value: fuseState.size + ' A', status: ''},
+    {label: 'Ik max', value: holder.ikMax + ' kA', status: 'pass'},
+    {label: tx('5s strøm', '5s current'), value: (FUSE_5S[fuseState.size] || '\u2014') + ' A', status: ''}
+  ]) : '';
 
   return `
     <div class="card fade-in">
       <div class="card-title">${t('fuseTitle')}</div>
       <div class="info-row">${t('infoClick')}</div>
+
+      ${fuseSummaryHtml}
 
       <div class="select-group">
         <div class="select-label">${t('fuseHolder')}</div>
@@ -8902,40 +8914,40 @@ function renderFuse() {
         <div class="result-row"><span class="label">${t('fuseHolder')}</span><span class="value">${fuseState.holder}</span></div>
         <div class="result-row"><span class="label">${t('fuseSize')}</span><span class="value">${fuseState.size} A</span></div>
         <div class="result-row"><span class="label">${t('fuseIkmax')}</span><span class="value">${holder.ikMax} kA</span></div>
-        <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '—'} A</span></div>
+        <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '\u2014'} A</span></div>
         <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
         <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
       </div>
     </div>
 
-    <div class="card fade-in">
-      <div class="card-title">${tx('Tid/strøm-karakteristik (IEC 60269)', 'Time-current characteristic (IEC 60269)')}</div>
-      <div class="info-row">${tx('Sammenlign sikringsklasser. gG er forankret i verificerede 5 s-strømme; aM/gR/aR vises som illustrative, normaliserede klassekurver (markeret •). Brug altid fabrikantkurver til endeligt design.', 'Compare fuse classes. gG is anchored to verified 5 s currents; aM/gR/aR are shown as illustrative, normalised class curves (marked •). Always use manufacturer curves for final design.')}</div>
+    ${uxPanel(tx('Sikringsklasser og kurver', 'Fuse Classes & Curves'), `
+    <div class="card-title">${tx('Tid/str\u00F8m-karakteristik (IEC 60269)', 'Time-current characteristic (IEC 60269)')}</div>
+    <div class="info-row">${tx('Sammenlign sikringsklasser. gG er forankret i verificerede 5 s-str\u00F8mme; aM/gR/aR vises som illustrative, normaliserede klassekurver (markeret \u2022). Brug altid fabrikantkurver til endeligt design.', 'Compare fuse classes. gG is anchored to verified 5 s currents; aM/gR/aR are shown as illustrative, normalised class curves (marked \u2022). Always use manufacturer curves for final design.')}</div>
 
-      <div class="select-group">
-        <div class="select-label">${tx('Vælg sikringsklasser (flere mulige)', 'Select fuse classes (multiple)')}</div>
-        <div class="select-grid">
-          ${Object.keys(FUSE_CLASSES).map(cls =>
-            `<button class="sel-btn ${fuseCurveSel.indexOf(cls) >= 0 ? 'selected' : ''}" onclick="fuseToggleClass('${cls}')">${FUSE_CLASSES[cls].label}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${tx('Tid/strøm-kurve', 'Time-current curve')} — ${fuseState.size} A</div>
-        ${fuseRenderCurve(fuseState.size, fuseCurveSel)}
-      </div>
-
-      <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${tx('I²t energi-gennemslip', 'I²t energy let-through')}</div>
-        ${fuseRenderLetThrough(fuseState.size, fuseCurveSel)}
-      </div>
-
-      <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${tx('Sikringsklasser (IEC 60269)', 'Fuse classes (IEC 60269)')}</div>
-        ${fuseRenderClassTable(fuseCurveSel)}
+    <div class="select-group">
+      <div class="select-label">${tx('V\u00E6lg sikringsklasser (flere mulige)', 'Select fuse classes (multiple)')}</div>
+      <div class="select-grid">
+        ${Object.keys(FUSE_CLASSES).map(cls =>
+          `<button class="sel-btn ${fuseCurveSel.indexOf(cls) >= 0 ? 'selected' : ''}" onclick="fuseToggleClass('${cls}')">${FUSE_CLASSES[cls].label}</button>`
+        ).join('')}
       </div>
     </div>
+
+    <div class="result-box" style="margin-top:12px">
+      <div class="result-title">${tx('Tid/str\u00F8m-kurve', 'Time-current curve')} \u2014 ${fuseState.size} A</div>
+      ${fuseRenderCurve(fuseState.size, fuseCurveSel)}
+    </div>
+
+    <div class="result-box" style="margin-top:12px">
+      <div class="result-title">${tx('I\u00B2t energi-gennemslip', 'I\u00B2t energy let-through')}</div>
+      ${fuseRenderLetThrough(fuseState.size, fuseCurveSel)}
+    </div>
+
+    <div class="result-box" style="margin-top:12px">
+      <div class="result-title">${tx('Sikringsklasser (IEC 60269)', 'Fuse classes (IEC 60269)')}</div>
+      ${fuseRenderClassTable(fuseCurveSel)}
+    </div>
+    `, {id: 'uxp_fuse_classes', icon: '\uD83D\uDCC8', open: fuseEngPlus || fuseClassNonDefault})}
     ` : ''}
   `;
 }
@@ -16649,10 +16661,20 @@ function renderEV() {
   var grid = evCheckGridCapacity(evState.mainFuse, designCurrent);
   var vdropOk = vdrop <= 3.0;
   var rcdTypeB = rcd && rcd.rcdType === 'B';
+  var evEngPlus = uxModeLevel() >= 2;
+  var evNonDefault = (evState.numChargers !== 1) || (evState.cableLength !== 15) || (evState.mainFuse !== 50);
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Elbil-lader dimensionering', 'EV Charging Dimensioning') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. DS/HD 60364-7-722', 'Calculation per DS/HD 60364-7-722') + '</div>';
+
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Designstroem', 'Design Current'), value: designCurrent + ' A', status: ''},
+    {label: tx('Kabel', 'Cable'), value: cable ? cable.mm2 + 'mm\u00B2' : '-', status: cable ? 'pass' : ''},
+    {label: tx('Spændingsfald', 'Voltage Drop'), value: vdrop.toFixed(1) + '%', status: vdropOk ? 'pass' : 'fail'},
+    {label: 'RCD', value: rcd ? 'Type ' + rcd.rcdType : '-', status: rcdTypeB ? 'pass' : 'warn'}
+  ]);
 
   // Charger Mode
   html += '<div class="select-group"><div class="select-label">' + tx('Ladertilstand', 'Charger Mode') + '</div><div class="select-grid">';
@@ -16679,26 +16701,30 @@ function renderEV() {
   });
   html += '</div></div>';
 
+  // Installation Details panel (chargers, cable length, main fuse)
+  var evPanelBody = '';
   // Number of chargers
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal ladere', 'Number of Chargers') + '</div><div class="select-grid">';
+  evPanelBody += '<div class="select-group"><div class="select-label">' + tx('Antal ladere', 'Number of Chargers') + '</div><div class="select-grid">';
   for (var nc = 1; nc <= 10; nc++) {
-    html += '<button class="sel-btn' + (evState.numChargers === nc ? ' selected' : '') + '" onclick="evState.numChargers=' + nc + ';renderModule(\'ev\')">' + nc + '</button>';
+    evPanelBody += '<button class="sel-btn' + (evState.numChargers === nc ? ' selected' : '') + '" onclick="evState.numChargers=' + nc + ';renderModule(\'ev\')">' + nc + '</button>';
   }
-  html += '</div></div>';
+  evPanelBody += '</div></div>';
 
   // Cable length
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  evPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
   [5, 10, 15, 20, 25, 30, 40, 50].forEach(function(len) {
-    html += '<button class="sel-btn' + (evState.cableLength === len ? ' selected' : '') + '" onclick="evState.cableLength=' + len + ';renderModule(\'ev\')">' + len + ' m</button>';
+    evPanelBody += '<button class="sel-btn' + (evState.cableLength === len ? ' selected' : '') + '" onclick="evState.cableLength=' + len + ';renderModule(\'ev\')">' + len + ' m</button>';
   });
-  html += '</div></div>';
+  evPanelBody += '</div></div>';
 
   // Main Fuse
-  html += '<div class="select-group"><div class="select-label">' + tx('Hovedsikring [A]', 'Main Fuse [A]') + '</div><div class="select-grid">';
+  evPanelBody += '<div class="select-group"><div class="select-label">' + tx('Hovedsikring [A]', 'Main Fuse [A]') + '</div><div class="select-grid">';
   [25, 35, 50, 63].forEach(function(fuse) {
-    html += '<button class="sel-btn' + (evState.mainFuse === fuse ? ' selected' : '') + '" onclick="evState.mainFuse=' + fuse + ';renderModule(\'ev\')">' + fuse + ' A</button>';
+    evPanelBody += '<button class="sel-btn' + (evState.mainFuse === fuse ? ' selected' : '') + '" onclick="evState.mainFuse=' + fuse + ';renderModule(\'ev\')">' + fuse + ' A</button>';
   });
-  html += '</div></div>';
+  evPanelBody += '</div></div>';
+
+  html += uxPanel(tx('Installation detaljer', 'Installation Details'), evPanelBody, {id: 'uxp_ev_details', icon: '\uD83D\uDD27', open: evEngPlus || evNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -16873,10 +16899,20 @@ function renderSolar() {
   var mcb = solarSelectMCB(acResult.current);
   var rcd = solarSelectRCD();
   var hasBattery = solarState.systemType === 'gridbat' || solarState.systemType === 'hybrid';
+  var solarEngPlus = uxModeLevel() >= 2;
+  var solarNonDefault = (solarState.panelWp !== 440) || (solarState.selfConsumption !== 50) || hasBattery;
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Solcelle & Batteri dimensionering', 'Solar PV & Battery Dimensioning') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. DS/EN 62446 + DS/HD 60364-7-712', 'Calculation per DS/EN 62446 + DS/HD 60364-7-712') + '</div>';
+
+  // Executive summary
+  html += uxSummary([
+    {label: tx('Total kWp', 'Total kWp'), value: kWp.toFixed(1) + ' kWp', status: ''},
+    {label: tx('Inverter', 'Inverter'), value: inverter.recommended + ' kW', status: ''},
+    {label: 'Voc', value: stringCheck.vocCold + ' V', status: stringCheck.ok ? 'pass' : 'fail'},
+    {label: tx('Tilbagebetaling', 'Payback'), value: '~' + payback.paybackYears + ' ' + tx('aar', 'yr'), status: ''}
+  ]);
 
   // System type
   html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
@@ -16893,28 +16929,32 @@ function renderSolar() {
   });
   html += '</div></div>';
 
+  // System Configuration panel (wattage, battery, self-consumption)
+  var solarPanelBody = '';
   // Panel wattage
-  html += '<div class="select-group"><div class="select-label">' + tx('Panel effekt [Wp]', 'Panel Wattage [Wp]') + '</div><div class="select-grid">';
+  solarPanelBody += '<div class="select-group"><div class="select-label">' + tx('Panel effekt [Wp]', 'Panel Wattage [Wp]') + '</div><div class="select-grid">';
   [400, 420, 440, 460, 500].forEach(function(wp) {
-    html += '<button class="sel-btn' + (solarState.panelWp === wp ? ' selected' : '') + '" onclick="solarState.panelWp=' + wp + ';renderModule(\'solar\')">' + wp + ' Wp</button>';
+    solarPanelBody += '<button class="sel-btn' + (solarState.panelWp === wp ? ' selected' : '') + '" onclick="solarState.panelWp=' + wp + ';renderModule(\'solar\')">' + wp + ' Wp</button>';
   });
-  html += '</div></div>';
+  solarPanelBody += '</div></div>';
 
   // Battery (if applicable)
   if (hasBattery) {
-    html += '<div class="select-group"><div class="select-label">' + tx('Batterikapacitet [kWh]', 'Battery Capacity [kWh]') + '</div><div class="select-grid">';
+    solarPanelBody += '<div class="select-group"><div class="select-label">' + tx('Batterikapacitet [kWh]', 'Battery Capacity [kWh]') + '</div><div class="select-grid">';
     [5, 10, 13.5, 15, 20].forEach(function(kwh) {
-      html += '<button class="sel-btn' + (solarState.batteryKWh === kwh ? ' selected' : '') + '" onclick="solarState.batteryKWh=' + kwh + ';renderModule(\'solar\')">' + kwh + ' kWh</button>';
+      solarPanelBody += '<button class="sel-btn' + (solarState.batteryKWh === kwh ? ' selected' : '') + '" onclick="solarState.batteryKWh=' + kwh + ';renderModule(\'solar\')">' + kwh + ' kWh</button>';
     });
-    html += '</div></div>';
+    solarPanelBody += '</div></div>';
   }
 
   // Self-consumption ratio
-  html += '<div class="select-group"><div class="select-label">' + tx('Egetforbrug', 'Self-consumption') + '</div><div class="select-grid">';
+  solarPanelBody += '<div class="select-group"><div class="select-label">' + tx('Egetforbrug', 'Self-consumption') + '</div><div class="select-grid">';
   [30, 50, 70, 90].forEach(function(pct) {
-    html += '<button class="sel-btn' + (solarState.selfConsumption === pct ? ' selected' : '') + '" onclick="solarState.selfConsumption=' + pct + ';renderModule(\'solar\')">' + pct + '%</button>';
+    solarPanelBody += '<button class="sel-btn' + (solarState.selfConsumption === pct ? ' selected' : '') + '" onclick="solarState.selfConsumption=' + pct + ';renderModule(\'solar\')">' + pct + '%</button>';
   });
-  html += '</div></div>';
+  solarPanelBody += '</div></div>';
+
+  html += uxPanel(tx('Systemkonfiguration', 'System Configuration'), solarPanelBody, {id: 'uxp_solar_config', icon: '\u2699\uFE0F', open: solarEngPlus || solarNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -17394,23 +17434,25 @@ function renderMotor() {
   var derating = MOTOR_DUTY_DERATING[motorState.duty];
   var vdipOk = vdip <= 3.0;
   var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
+  var motorEngPlus = uxModeLevel() >= 2;
+  var motorNonDefault = (motorState.poles !== 4) || (motorState.duty !== 'S1') || (motorState.cableLength !== 30);
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Motorstart-analyse', 'Motor Start Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 60947 + DS/HD 60364-5-52', 'Calculation per IEC 60947 + DS/HD 60364-5-52') + '</div>';
 
+  // Executive summary
+  html += uxSummary([
+    {label: 'FLC', value: flc + ' A', status: ''},
+    {label: tx('Startstr.', 'Start I'), value: iStart + ' A', status: ''},
+    {label: tx('Sp.dyk', 'V-dip'), value: vdip.toFixed(1) + '%', status: vdipOk ? 'pass' : 'fail'},
+    {label: 'MPCB', value: mpcb ? mpcb.rangeMin + '-' + mpcb.rangeMax + 'A' : '-', status: mpcb ? 'pass' : ''}
+  ]);
+
   // Motor Power
   html += '<div class="select-group"><div class="select-label">' + tx('Motoreffekt [kW]', 'Motor Power [kW]') + '</div><div class="select-grid">';
   [0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110].forEach(function(kw) {
     html += '<button class="sel-btn' + (motorState.kW === kw ? ' selected' : '') + '" onclick="motorState.kW=' + kw + ';renderModule(\'motor\')">' + kw + '</button>';
-  });
-  html += '</div></div>';
-
-  // Motor Poles
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal poler', 'Motor Poles') + '</div><div class="select-grid">';
-  [2, 4, 6, 8].forEach(function(p) {
-    var rpm = Math.round(3000 / (p / 2));
-    html += '<button class="sel-btn' + (motorState.poles === p ? ' selected' : '') + '" onclick="motorState.poles=' + p + ';renderModule(\'motor\')">' + p + 'P (' + rpm + ' rpm)</button>';
   });
   html += '</div></div>';
 
@@ -17427,29 +17469,41 @@ function renderMotor() {
   });
   html += '</div></div>';
 
+  // Motor Parameters panel (poles, duty, cable length)
+  var motorPanelBody = '';
+  // Motor Poles
+  motorPanelBody += '<div class="select-group"><div class="select-label">' + tx('Antal poler', 'Motor Poles') + '</div><div class="select-grid">';
+  [2, 4, 6, 8].forEach(function(p) {
+    var rpm = Math.round(3000 / (p / 2));
+    motorPanelBody += '<button class="sel-btn' + (motorState.poles === p ? ' selected' : '') + '" onclick="motorState.poles=' + p + ';renderModule(\'motor\')">' + p + 'P (' + rpm + ' rpm)</button>';
+  });
+  motorPanelBody += '</div></div>';
+
   // Duty Cycle
-  html += '<div class="select-group"><div class="select-label">' + tx('Driftsart (IEC 60034-1)', 'Duty Cycle (IEC 60034-1)') + '</div><div class="select-grid">';
+  motorPanelBody += '<div class="select-group"><div class="select-label">' + tx('Driftsart (IEC 60034-1)', 'Duty Cycle (IEC 60034-1)') + '</div><div class="select-grid">';
   [{ key: 'S1', da: 'S1 Kontinuerlig', en: 'S1 Continuous' },
    { key: 'S2', da: 'S2 Kortvarig', en: 'S2 Short-time' },
    { key: 'S3', da: 'S3 Intermitterende', en: 'S3 Intermittent' }].forEach(function(d) {
-    html += '<button class="sel-btn' + (motorState.duty === d.key ? ' selected' : '') + '" onclick="motorState.duty=\'' + d.key + '\';renderModule(\'motor\')">' + tx(d.da, d.en) + '</button>';
+    motorPanelBody += '<button class="sel-btn' + (motorState.duty === d.key ? ' selected' : '') + '" onclick="motorState.duty=\'' + d.key + '\';renderModule(\'motor\')">' + tx(d.da, d.en) + '</button>';
   });
-  html += '</div></div>';
+  motorPanelBody += '</div></div>';
 
   // Cable Length
-  html += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  motorPanelBody += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
   [10, 15, 20, 25, 30, 40, 50, 75, 100].forEach(function(len) {
-    html += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
+    motorPanelBody += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
   });
-  html += '</div></div>';
+  motorPanelBody += '</div></div>';
+
+  html += uxPanel(tx('Motor parametre', 'Motor Parameters'), motorPanelBody, {id: 'uxp_motor_params', icon: '\u2699\uFE0F', open: motorEngPlus || motorNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
   // Motor Data
   html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststrøm (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + flc + ' A (IEC 60947)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Startstrøm', 'Starting Current') + '</span><span class="value">' + iStart + ' A (' + mult.typical + 'x FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststr\u00F8m (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + flc + ' A (IEC 60947)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Startstr\u00F8m', 'Starting Current') + '</span><span class="value">' + iStart + ' A (' + mult.typical + 'x FLC)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Starttid', 'Starting Time') + '</span><span class="value">' + startTime.typical + ' s</span></div>';
   html += '<div class="result-row"><span class="label">I\u00B2t (' + tx('termisk belastning', 'thermal stress') + ')</span><span class="value">' + i2t + ' A\u00B2s</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Driftsart reduktion', 'Duty derating') + '</span><span class="value">' + derating + ' (IEC 60034-1)</span></div>';
@@ -17457,8 +17511,8 @@ function renderMotor() {
 
   // Voltage Dip
   html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">' + tx('Spændingsdyk ved start', 'Voltage Dip') + '</span><span class="value">' + vdip.toFixed(2) + '% ' + (vdipOk ? '\u2705' : '\u274C') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Grænse (DS/HD 60364-5-52 cl.525)', 'Limit (DS/HD 60364-5-52 cl.525)') + '</span><span class="value">max 3%</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sp\u00E6ndingsdyk ved start', 'Voltage Dip') + '</span><span class="value">' + vdip.toFixed(2) + '% ' + (vdipOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Gr\u00E6nse (DS/HD 60364-5-52 cl.525)', 'Limit (DS/HD 60364-5-52 cl.525)') + '</span><span class="value">max 3%</span></div>';
   html += '</div>';
 
   // Protection Coordination
@@ -17471,7 +17525,7 @@ function renderMotor() {
     html += '<div class="result-row"><span class="label">' + tx('Kontaktor', 'Contactor') + '</span><span class="value">' + contactor.brand + ' ' + contactor.model + ' (AC-3: ' + contactor.ac3_A + 'A / ' + contactor.ac3_kW + 'kW)</span></div>';
   }
   if (overload) {
-    html += '<div class="result-row"><span class="label">' + tx('Overbelastningsrelæ', 'Overload Relay') + '</span><span class="value">' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '-' + overload.rangeMax + 'A)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Overbelastningsrel\u00E6', 'Overload Relay') + '</span><span class="value">' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '-' + overload.rangeMax + 'A)</span></div>';
   }
   html += '</div>';
 
@@ -17485,7 +17539,7 @@ function renderMotor() {
   html += '</div>';
 
   // Verdict
-  html += renderVerdict(vdipOk, vdipOk ? tx('Spændingsdyk OK - starter opfylder DS/HD 60364-5-52 cl.525', 'Voltage dip OK - starter complies with DS/HD 60364-5-52 cl.525') : tx('Spændingsdyk for højt - brug blødere startmetode eller kortere kabel', 'Voltage dip exceeded - use softer starting method or shorter cable'));
+  html += renderVerdict(vdipOk, vdipOk ? tx('Sp\u00E6ndingsdyk OK - starter opfylder DS/HD 60364-5-52 cl.525', 'Voltage dip OK - starter complies with DS/HD 60364-5-52 cl.525') : tx('Sp\u00E6ndingsdyk for h\u00F8jt - brug bl\u00F8dere startmetode eller kortere kabel', 'Voltage dip exceeded - use softer starting method or shorter cable'));
 
   html += '</div>';
   return html;
@@ -17649,10 +17703,20 @@ function renderHarmonic() {
   var deratingResult = harmonicCalcCableDerating(harmonicState.loadType, harmonicState.numLoads);
   var spec = HARMONIC_SPECTRA[harmonicState.loadType];
   var thdOk = !thdResult.exceeded;
+  var harmEngPlus = uxModeLevel() >= 2;
+  var harmNonDefault = (harmonicState.numLoads !== 1) || (harmonicState.loadKW !== 11);
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Harmonisk analyse', 'Harmonic Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. EN 61000-3-2/12 + DS/HD 60364-5-52', 'Calculation per EN 61000-3-2/12 + DS/HD 60364-5-52') + '</div>';
+
+  // Executive summary
+  html += uxSummary([
+    {label: 'THD', value: thdResult.thd.toFixed(1) + '%', status: thdOk ? 'pass' : 'fail'},
+    {label: 'K-' + tx('faktor', 'Factor'), value: kResult.kFactor.toFixed(1), status: kResult.kFactor > 4 ? 'warn' : ''},
+    {label: tx('Neutral', 'Neutral'), value: (neutralResult.factor * 100) + '%', status: neutralResult.oversized ? 'warn' : 'pass'},
+    {label: tx('Filter', 'Filter'), value: filterResult.needed ? tx('Paakr.', 'Req.') : 'OK', status: filterResult.needed ? 'warn' : 'pass'}
+  ]);
 
   // Load Type
   html += '<div class="select-group"><div class="select-label">' + tx('Lasttype', 'Load Type') + '</div><div class="select-grid">';
@@ -17663,27 +17727,31 @@ function renderHarmonic() {
   });
   html += '</div></div>';
 
+  // Load Details panel (number of loads, load power)
+  var harmPanelBody = '';
   // Number of loads
-  html += '<div class="select-group"><div class="select-label">' + tx('Antal identiske laster', 'Number of Identical Loads') + '</div><div class="select-grid">';
+  harmPanelBody += '<div class="select-group"><div class="select-label">' + tx('Antal identiske laster', 'Number of Identical Loads') + '</div><div class="select-grid">';
   [1, 2, 3, 4, 5, 6, 8, 10, 15, 20].forEach(function(n) {
-    html += '<button class="sel-btn' + (harmonicState.numLoads === n ? ' selected' : '') + '" onclick="harmonicState.numLoads=' + n + ';renderModule(\'harmonic\')">' + n + '</button>';
+    harmPanelBody += '<button class="sel-btn' + (harmonicState.numLoads === n ? ' selected' : '') + '" onclick="harmonicState.numLoads=' + n + ';renderModule(\'harmonic\')">' + n + '</button>';
   });
-  html += '</div></div>';
+  harmPanelBody += '</div></div>';
 
   // Load power
-  html += '<div class="select-group"><div class="select-label">' + tx('Effekt per last [kW]', 'Power per Load [kW]') + '</div><div class="select-grid">';
+  harmPanelBody += '<div class="select-group"><div class="select-label">' + tx('Effekt per last [kW]', 'Power per Load [kW]') + '</div><div class="select-grid">';
   [1.5, 3, 5.5, 7.5, 11, 15, 22, 30, 45, 55].forEach(function(kw) {
-    html += '<button class="sel-btn' + (harmonicState.loadKW === kw ? ' selected' : '') + '" onclick="harmonicState.loadKW=' + kw + ';renderModule(\'harmonic\')">' + kw + '</button>';
+    harmPanelBody += '<button class="sel-btn' + (harmonicState.loadKW === kw ? ' selected' : '') + '" onclick="harmonicState.loadKW=' + kw + ';renderModule(\'harmonic\')">' + kw + '</button>';
   });
-  html += '</div></div>';
+  harmPanelBody += '</div></div>';
+
+  html += uxPanel(tx('Lastdetaljer', 'Load Details'), harmPanelBody, {id: 'uxp_harmonic_loads', icon: '\u26A1', open: harmEngPlus || harmNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
   // THD
   html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">THD (' + tx('total harmonisk forvrængning', 'Total Harmonic Distortion') + ')</span><span class="value">' + thdResult.thd.toFixed(2) + '% ' + (thdOk ? '\u2705' : '\u274C') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Grænse (EN 50160)', 'Limit (EN 50160)') + '</span><span class="value">max 8.0%</span></div>';
+  html += '<div class="result-row"><span class="label">THD (' + tx('total harmonisk forvr\u00E6ngning', 'Total Harmonic Distortion') + ')</span><span class="value">' + thdResult.thd.toFixed(2) + '% ' + (thdOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Gr\u00E6nse (EN 50160)', 'Limit (EN 50160)') + '</span><span class="value">max 8.0%</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Diversitetsfaktor', 'Diversity Factor') + '</span><span class="value">' + thdResult.diversity + '</span></div>';
   html += '</div>';
 
@@ -17707,7 +17775,7 @@ function renderHarmonic() {
   // K-factor
   html += '<div class="result-box">';
   html += '<div class="result-row"><span class="label">K-' + tx('faktor (transformerbelastning)', 'Factor (transformer loading)') + '</span><span class="value">' + kResult.kFactor.toFixed(2) + ' (' + kResult.clause + ')</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Transformer derating', 'Transformer Derating') + '</span><span class="value">' + (kResult.derating * 100).toFixed(0) + '% ' + tx('af mærkeeffekt', 'of rated power') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Transformer derating', 'Transformer Derating') + '</span><span class="value">' + (kResult.derating * 100).toFixed(0) + '% ' + tx('af m\u00E6rkeeffekt', 'of rated power') + '</span></div>';
   html += '</div>';
 
   // Neutral sizing
@@ -17731,12 +17799,12 @@ function renderHarmonic() {
       html += '<div class="result-row"><span class="label">' + tx('Aktivt filter anbefales', 'Active Filter Recommended') + '</span><span class="value">THD > 8% (' + filterResult.clause + ')</span></div>';
     }
   } else {
-    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + tx('Intet filter nødvendigt', 'No filter required') + ' \u2705</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + tx('Intet filter n\u00F8dvendigt', 'No filter required') + ' \u2705</span></div>';
   }
   html += '</div>';
 
   // Verdict
-  html += renderVerdict(thdOk, thdOk ? tx('THD inden for grænse - opfylder EN 50160 cl.4.2.5', 'THD within limits - complies with EN 50160 cl.4.2.5') : tx('THD overskrider 8% - aktivt filter påkrævet per EN 50160', 'THD exceeds 8% - active filter required per EN 50160'));
+  html += renderVerdict(thdOk, thdOk ? tx('THD inden for gr\u00E6nse - opfylder EN 50160 cl.4.2.5', 'THD within limits - complies with EN 50160 cl.4.2.5') : tx('THD overskrider 8% - aktivt filter p\u00E5kr\u00E6vet per EN 50160', 'THD exceeds 8% - active filter required per EN 50160'));
 
   html += '</div>';
   return html;
@@ -17898,10 +17966,20 @@ function renderVFD() {
   var inputMCB = vfdSelectInputMCB(inputCable.inputCurrent);
   var app = VFD_APPLICATIONS[vfdState.application];
   var emc = VFD_EMC_CATEGORIES[vfdState.emcCategory];
+  var vfdEngPlus = uxModeLevel() >= 2;
+  var vfdNonDefault = (vfdState.emcCategory !== 'C2') || (vfdState.cableLength !== 25);
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Frekvensomformer dimensionering', 'VFD Sizing') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 61800 + DS/HD 60364-5-52', 'Calculation per IEC 61800 + DS/HD 60364-5-52') + '</div>';
+
+  // Executive summary
+  html += uxSummary([
+    {label: tx('VFD min.', 'VFD min.'), value: sizing.vfdCurrent + ' A', status: ''},
+    {label: 'Motor FLC', value: sizing.motorFLC + ' A', status: ''},
+    {label: tx('Kabel', 'Cable'), value: vfdState.cableLength + 'm/' + outputCable.maxLength + 'm', status: outputCable.lengthOk ? 'pass' : 'fail'},
+    {label: 'EMC', value: vfdState.emcCategory, status: ''}
+  ]);
 
   // Application Type
   html += '<div class="select-group"><div class="select-label">' + tx('Applikationstype', 'Application Type') + '</div><div class="select-grid">';
@@ -17919,20 +17997,24 @@ function renderVFD() {
   });
   html += '</div></div>';
 
+  // EMC & Cabling panel
+  var vfdPanelBody = '';
   // EMC Category
-  html += '<div class="select-group"><div class="select-label">' + tx('EMC-kategori (IEC 61800-3)', 'EMC Category (IEC 61800-3)') + '</div><div class="select-grid">';
+  vfdPanelBody += '<div class="select-group"><div class="select-label">' + tx('EMC-kategori (IEC 61800-3)', 'EMC Category (IEC 61800-3)') + '</div><div class="select-grid">';
   Object.keys(VFD_EMC_CATEGORIES).forEach(function(cat) {
     var c = VFD_EMC_CATEGORIES[cat];
-    html += '<button class="sel-btn' + (vfdState.emcCategory === cat ? ' selected' : '') + '" onclick="vfdState.emcCategory=\'' + cat + '\';renderModule(\'vfd\')">' + tx(c.label_da, c.label_en) + '</button>';
+    vfdPanelBody += '<button class="sel-btn' + (vfdState.emcCategory === cat ? ' selected' : '') + '" onclick="vfdState.emcCategory=\'' + cat + '\';renderModule(\'vfd\')">' + tx(c.label_da, c.label_en) + '</button>';
   });
-  html += '</div></div>';
+  vfdPanelBody += '</div></div>';
 
   // Cable Length (VFD to motor)
-  html += '<div class="select-group"><div class="select-label">' + tx('Motorkabel længde [m]', 'Motor Cable Length [m]') + '</div><div class="select-grid">';
+  vfdPanelBody += '<div class="select-group"><div class="select-label">' + tx('Motorkabel l\u00E6ngde [m]', 'Motor Cable Length [m]') + '</div><div class="select-grid">';
   [5, 10, 15, 20, 25, 30, 40, 50, 75, 100].forEach(function(len) {
-    html += '<button class="sel-btn' + (vfdState.cableLength === len ? ' selected' : '') + '" onclick="vfdState.cableLength=' + len + ';renderModule(\'vfd\')">' + len + ' m</button>';
+    vfdPanelBody += '<button class="sel-btn' + (vfdState.cableLength === len ? ' selected' : '') + '" onclick="vfdState.cableLength=' + len + ';renderModule(\'vfd\')">' + len + ' m</button>';
   });
-  html += '</div></div>';
+  vfdPanelBody += '</div></div>';
+
+  html += uxPanel(tx('EMC og kabling', 'EMC & Cabling'), vfdPanelBody, {id: 'uxp_vfd_emc', icon: '\uD83D\uDD0C', open: vfdEngPlus || vfdNonDefault});
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -17941,7 +18023,7 @@ function renderVFD() {
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('VFD dimensionering', 'VFD Sizing') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Motor FLC', 'Motor FLC') + '</span><span class="value">' + sizing.motorFLC + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('VFD min. strøm', 'VFD Min. Current') + '</span><span class="value">' + sizing.vfdCurrent + ' A (' + sizing.sizingFactor + 'x FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('VFD min. str\u00F8m', 'VFD Min. Current') + '</span><span class="value">' + sizing.vfdCurrent + ' A (' + sizing.sizingFactor + 'x FLC)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Momenttype', 'Torque Type') + '</span><span class="value">' + tx(app.torqueType === 'variable' ? 'Variabelt moment' : 'Konstant moment', app.torqueType === 'variable' ? 'Variable torque' : 'Constant torque') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + sizing.clause + '</span></div>';
   html += '</div>';
@@ -17949,7 +18031,7 @@ function renderVFD() {
   // Input Cable
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Indgangskabel (net til VFD)', 'Input Cable (mains to VFD)') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Indgangsstrøm', 'Input Current') + '</span><span class="value">' + inputCable.inputCurrent + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Indgangsstr\u00F8m', 'Input Current') + '</span><span class="value">' + inputCable.inputCurrent + ' A</span></div>';
   if (inputCable.cable) {
     html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + inputCable.cable.brand + ' ' + inputCable.cable.model + ' ' + inputCable.cable.mm2 + 'mm\u00B2 (Iz=' + inputCable.cable.iz + 'A)</span></div>';
   }
@@ -17964,8 +18046,8 @@ function renderVFD() {
   if (outputCable.cable) {
     html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + outputCable.cable.brand + ' ' + outputCable.cable.model + ' ' + outputCable.cable.mm2 + 'mm\u00B2</span></div>';
   }
-  html += '<div class="result-row"><span class="label">' + tx('Maks. kabellængde', 'Max Cable Length') + '</span><span class="value">' + outputCable.maxLength + ' m ' + (outputCable.lengthOk ? '\u2705' : '\u274C') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Skærmet kabel', 'Shielded Cable') + '</span><span class="value">' + (outputCable.shieldRequired ? tx('PÅKRÆVET (EMC)', 'REQUIRED (EMC)') : tx('Anbefalet', 'Recommended')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. kabell\u00E6ngde', 'Max Cable Length') + '</span><span class="value">' + outputCable.maxLength + ' m ' + (outputCable.lengthOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sk\u00E6rmet kabel', 'Shielded Cable') + '</span><span class="value">' + (outputCable.shieldRequired ? tx('P\u00C5KR\u00C6VET (EMC)', 'REQUIRED (EMC)') : tx('Anbefalet', 'Recommended')) + '</span></div>';
   if (outputCable.dvdtFilterNeeded) {
     html += '<div class="result-row"><span class="label">dV/dt ' + tx('filter', 'Filter') + '</span><span class="value">' + tx('Anbefalet (kabel > 30m)', 'Recommended (cable > 30m)') + '</span></div>';
   }
@@ -17992,13 +18074,13 @@ function renderVFD() {
 
   // CRITICAL WARNING: No RCD on VFD output
   html += '<div class="result-box" style="border-left:4px solid #ef4444;background:#fef2f2">';
-  html += '<div class="result-row"><span class="label" style="color:#ef4444;font-weight:bold">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value" style="color:#ef4444">' + tx('ALDRIG installér RCD mellem VFD og motor!', 'NEVER install RCD between VFD and motor!') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Årsag', 'Reason') + '</span><span class="value">' + tx('Højfrekvens lækstrøm udløser RCD (IEC 61800-5-1)', 'High-frequency leakage current trips RCD (IEC 61800-5-1)') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#ef4444;font-weight:bold">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value" style="color:#ef4444">' + tx('ALDRIG install\u00E9r RCD mellem VFD og motor!', 'NEVER install RCD between VFD and motor!') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('\u00C5rsag', 'Reason') + '</span><span class="value">' + tx('H\u00F8jfrekvens l\u00E6kstr\u00F8m udl\u00F8ser RCD (IEC 61800-5-1)', 'High-frequency leakage current trips RCD (IEC 61800-5-1)') + '</span></div>';
   html += '</div>';
 
   // Verdict
   var allOk = outputCable.lengthOk;
-  html += renderVerdict(allOk, allOk ? tx('VFD-installation opfylder IEC 61800 + DS/HD 60364', 'VFD installation complies with IEC 61800 + DS/HD 60364') : tx('Motorkabel for lang - reducer længde eller brug skærmet kabel', 'Motor cable too long - reduce length or use shielded cable'));
+  html += renderVerdict(allOk, allOk ? tx('VFD-installation opfylder IEC 61800 + DS/HD 60364', 'VFD installation complies with IEC 61800 + DS/HD 60364') : tx('Motorkabel for lang - reducer l\u00E6ngde eller brug sk\u00E6rmet kabel', 'Motor cable too long - reduce length or use shielded cable'));
 
   html += '</div>';
   return html;
