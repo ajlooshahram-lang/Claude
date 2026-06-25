@@ -8918,6 +8918,23 @@ function renderFuse() {
         <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
         <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
       </div>
+      ${calcDetail({
+        name: tx('Sikringsdimensionering', 'Fuse Dimensioning'),
+        formula: 'IB \u2264 In, I\u2082t \u2264 k\u00b2S\u00b2, Icu \u2265 Ik,max',
+        variables: [
+          { name: tx('Mærkestrøm', 'Rated current'), symbol: 'In', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('5s strøm', '5s current'), symbol: 'I5s', value: FUSE_5S[fuseState.size] || 0, unit: 'A', source: 'IEC 60269 / ' + tx('fabrikantdata', 'manufacturer data') },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: holder.ikMax, unit: 'kA', source: fuseState.holder },
+          { name: tx('Holder', 'Holder'), symbol: fuseState.holder, value: holder.range, unit: '', source: tx('valgt system', 'selected system') }
+        ],
+        substitution: 'I\u00b2t = I5s\u00b2 \u00d7 5 = ' + (FUSE_5S[fuseState.size] || 0) + '\u00b2 \u00d7 5 = ' + ((FUSE_5S[fuseState.size] || 0) * (FUSE_5S[fuseState.size] || 0) * 5 / 1000000).toFixed(2) + ' \u00d7 10\u2076 A\u00b2s',
+        steps: [
+          { desc: tx('Total I\u00b2t (clearing)', 'Total I\u00b2t (clearing)'), expr: (FUSE_5S[fuseState.size] || 0) + '\u00b2 \u00d7 5', result: ((FUSE_5S[fuseState.size] || 0) * (FUSE_5S[fuseState.size] || 0) * 5).toFixed(0) + ' A\u00b2s' },
+          { desc: tx('Pre-arc I\u00b2t (~50%)', 'Pre-arc I\u00b2t (~50%)'), expr: '0.5 \u00d7 ' + ((FUSE_5S[fuseState.size] || 0) * (FUSE_5S[fuseState.size] || 0) * 5).toFixed(0), result: ((FUSE_5S[fuseState.size] || 0) * (FUSE_5S[fuseState.size] || 0) * 2.5).toFixed(0) + ' A\u00b2s' }
+        ],
+        result: { value: fuseState.size, unit: 'A', status: 'ok' },
+        reference: 'IEC 60269-2; DS/HD 60364-4-43 cl.433'
+      })}
     </div>
 
     ${uxPanel(tx('Sikringsklasser og kurver', 'Fuse Classes & Curves'), `
