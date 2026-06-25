@@ -4463,6 +4463,7 @@ let scState = { zNet: 1, zTrafo: 5 };
 let rcdSelected = null;
 let rcdSensitivity = null;
 let rcdApplication = null;
+let rcdDelay = 'general'; // 'general' (instantaneous) | 'selective' (type S)
 let earthSelected = null;
 
 // Helper functions for standards module
@@ -4475,6 +4476,223 @@ function getRcdRecommendation() {
     ev: { type: 'Type B / Type A + 6mA DC', sensitivity: '30 mA', note: tx('Type B påkrævet ved DC-fejlstrøm >6 mA', 'Type B required for DC fault current >6 mA') }
   };
   return recommendations[rcdApplication] || { type: '-', sensitivity: '-', note: '-' };
+}
+
+// ===========================================================================
+// RCD / HPFI TRIPPING-TIME CURVE ENGINE
+// ===========================================================================
+// IMPORTANT engineering distinction (do not conflate):
+//  (1) The TIME-CURRENT trip band is defined by the operating CLASS
+//      (general/instantaneous vs. type S/selective), per IEC 61008-1 Table 1.
+//      It is INDEPENDENT of the waveform type (AC/A/F/B).
+//  (2) The waveform TYPE (AC/A/F/B) defines WHICH residual-current waveforms
+//      the device can detect (IEC 60755 / IEC 62423). Two devices of different
+//      types but the same class share the same max break times.
+// Both are surfaced separately so the presentation stays standards-accurate.
+//
+// Maximum break times (general/instantaneous RCCB) and the selective (type S)
+// min non-actuating / max break-time band, IEC 61008-1 Tabel 1 (= the same
+// acceptance values used by the commissioning engine cvRcdTripLimits()).
+const RCD_TRIP_LIMITS = {
+  general: {
+    // multiple of I_dn  ->  maximum break time t [s]
+    points: [
+      { m: 1, max: 0.300 },
+      { m: 2, max: 0.150 },
+      { m: 5, max: 0.040 },
+      { m: 10, max: 0.040 } // >=5 I_dn / 500 A clamp stays at 40 ms
+    ],
+    noTrip: 0.5, // must NOT operate at <= 0.5 I_dn (IEC 61008-1 cl. 9.9.1)
+    clause: 'IEC 61008-1 Tabel 1 (momentan)',
+    name_da: 'Momentan (generel type)', name_en: 'Instantaneous (general type)'
+  },
+  selective: {
+    points: [
+      { m: 1, min: 0.130, max: 0.500 },
+      { m: 2, min: 0.060, max: 0.200 },
+      { m: 5, min: 0.050, max: 0.150 },
+      { m: 10, min: 0.040, max: 0.150 }
+    ],
+    noTrip: 0.5,
+    clause: 'IEC 61008-1 (type S) / IEC 60947-2 Annex B',
+    name_da: 'Selektiv (type S, tidsforsinket)', name_en: 'Selective (type S, time-delayed)'
+  }
+};
+
+// Waveform-detection capability per type (IEC 60755 / IEC 62423).
+const RCD_TYPE_CAP = {
+  'Type AC': {
+    detects_da: 'Kun sinusformet vekselstrøm (50 Hz)',
+    detects_en: 'Sinusoidal AC residual current only (50 Hz)',
+    dc_da: 'Ingen DC-evne', dc_en: 'No DC capability',
+    use_da: 'Ikke tilladt i nye danske installationer (kræver mindst type A)',
+    use_en: 'Not permitted in new Danish installations (type A minimum required)',
+    std: 'IEC 60755', allowDK: false
+  },
+  'Type A': {
+    detects_da: 'AC + pulserende DC-fejlstrøm',
+    detects_en: 'AC + pulsating DC residual current',
+    dc_da: 'Tåler op til 6 mA glat DC', dc_en: 'Tolerates up to 6 mA smooth DC',
+    use_da: 'Standardkrav for boliger og almindelige slutkredse',
+    use_en: 'Standard requirement for dwellings and ordinary final circuits',
+    std: 'IEC 61008-1 / IEC 61009-1', allowDK: true
+  },
+  'Type F': {
+    detects_da: 'Type A + blandede frekvenser (≤ 1 kHz)',
+    detects_en: 'Type A + composite/mixed frequencies (≤ 1 kHz)',
+    dc_da: 'Tåler op til 10 mA glat DC', dc_en: 'Tolerates up to 10 mA smooth DC',
+    use_da: '1-fasede frekvensomformere (vaskemaskiner, varmepumper m. 1-faset VFD)',
+    use_en: 'Single-phase frequency converters (washers, heat pumps with 1-phase VFD)',
+    std: 'IEC 62423', allowDK: true
+  },
+  'Type B': {
+    detects_da: 'Type F + glat DC-fejlstrøm + HF (≤ 1 kHz)',
+    detects_en: 'Type F + smooth DC residual current + HF (≤ 1 kHz)',
+    dc_da: 'Detekterer ren glat DC-fejlstrøm', dc_en: 'Detects pure smooth DC residual current',
+    use_da: '3-fasede frekvensomformere, DC-ladning af elbiler, solcelleanlæg',
+    use_en: '3-phase frequency converters, EV DC charging, PV installations',
+    std: 'IEC 62423', allowDK: true
+  }
+};
+
+// Returns the maximum break time [s] at a given multiple of I_dn for a class.
+// Linear interpolation in log-log between the defined test points; clamped to
+// the defined endpoints. Exact at the standard test points m = 1, 2, 5.
+function rcdTripMaxAt(multiple, selective) {
+  const cls = selective ? RCD_TRIP_LIMITS.selective : RCD_TRIP_LIMITS.general;
+  const p = cls.points;
+  if (multiple <= p[0].m) return p[0].max;
+  if (multiple >= p[p.length - 1].m) return p[p.length - 1].max;
+  for (let i = 0; i < p.length; i++) { if (multiple === p[i].m) return p[i].max; } // exact at test points
+  for (let i = 0; i < p.length - 1; i++) {
+    if (multiple >= p[i].m && multiple <= p[i + 1].m) {
+      const lx = Math.log10(multiple), lx0 = Math.log10(p[i].m), lx1 = Math.log10(p[i + 1].m);
+      const ly0 = Math.log10(p[i].max), ly1 = Math.log10(p[i + 1].max);
+      const f = (lx - lx0) / (lx1 - lx0);
+      return Math.pow(10, ly0 + f * (ly1 - ly0));
+    }
+  }
+  return p[p.length - 1].max;
+}
+
+// Minimum non-actuating time [s] at a multiple (selective only; general = 0).
+function rcdTripMinAt(multiple, selective) {
+  if (!selective) return 0;
+  const p = RCD_TRIP_LIMITS.selective.points;
+  if (multiple <= p[0].m) return p[0].min;
+  if (multiple >= p[p.length - 1].m) return p[p.length - 1].min;
+  for (let i = 0; i < p.length; i++) { if (multiple === p[i].m) return p[i].min; } // exact at test points
+  for (let i = 0; i < p.length - 1; i++) {
+    if (multiple >= p[i].m && multiple <= p[i + 1].m) {
+      const lx = Math.log10(multiple), lx0 = Math.log10(p[i].m), lx1 = Math.log10(p[i + 1].m);
+      const ly0 = Math.log10(p[i].min), ly1 = Math.log10(p[i + 1].min);
+      const f = (lx - lx0) / (lx1 - lx0);
+      return Math.pow(10, ly0 + f * (ly1 - ly0));
+    }
+  }
+  return p[p.length - 1].min;
+}
+
+// Inline-SVG tripping-time curve. idnMA = rated residual current I_dn [mA].
+// selective = true for type S. Returns an <svg> string (no external deps).
+function rcdRenderTripCurve(idnMA, selective) {
+  idnMA = (typeof idnMA === 'number' && idnMA > 0) ? idnMA : 30;
+  const cls = selective ? RCD_TRIP_LIMITS.selective : RCD_TRIP_LIMITS.general;
+  const w = 560, h = 360, marginL = 64, marginR = 18, marginT = 26, marginB = 46;
+  const plotW = w - marginL - marginR, plotH = h - marginT - marginB;
+  const mMin = 0.3, mMax = 10;            // x: multiple of I_dn
+  const tMin = 0.01, tMax = 1;            // y: time [s]
+  const lxMin = Math.log10(mMin), lxMax = Math.log10(mMax);
+  const lyMin = Math.log10(tMin), lyMax = Math.log10(tMax);
+  function xPos(m) { return marginL + (Math.log10(m) - lxMin) / (lxMax - lxMin) * plotW; }
+  function yPos(t) { return marginT + (1 - (Math.log10(t) - lyMin) / (lyMax - lyMin)) * plotH; }
+  const da = (typeof lang !== 'undefined' && lang === 'da');
+
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // gridlines + x labels (multiples of I_dn)
+  const xticks = [0.5, 1, 2, 5, 10];
+  for (let i = 0; i < xticks.length; i++) {
+    const gx = xPos(xticks[i]);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + marginT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - marginB) + '" stroke="#eef0f3" stroke-width="1"/>';
+    const mA = Math.round(xticks[i] * idnMA);
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - marginB + 16) + '" text-anchor="middle" font-size="10" fill="#475467">' + xticks[i] + '\u00d7</text>';
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - marginB + 28) + '" text-anchor="middle" font-size="9" fill="#98a2b3">' + mA + ' mA</text>';
+  }
+  // gridlines + y labels (time)
+  const yticks = [0.01, 0.04, 0.1, 0.15, 0.3, 0.5, 1];
+  for (let i = 0; i < yticks.length; i++) {
+    const gy = yPos(yticks[i]);
+    svg += '<line x1="' + marginL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - marginR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3" stroke-width="1"/>';
+    const lbl = yticks[i] >= 1 ? '1 s' : (Math.round(yticks[i] * 1000) + ' ms');
+    svg += '<text x="' + (marginL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#475467">' + lbl + '</text>';
+  }
+  // no-trip zone (x <= 0.5 I_dn): device must NOT operate
+  const ntX = xPos(cls.noTrip);
+  svg += '<rect x="' + marginL + '" y="' + marginT + '" width="' + (ntX - marginL).toFixed(1) + '" height="' + plotH + '" fill="rgba(148,163,184,0.16)"/>';
+  svg += '<text x="' + ((marginL + ntX) / 2).toFixed(1) + '" y="' + (marginT + 44) + '" text-anchor="middle" font-size="9" fill="#64748b" transform="rotate(-90 ' + ((marginL + ntX) / 2).toFixed(1) + ' ' + (marginT + 44) + ')">' + (da ? 'm\u00e5 IKKE udl\u00f8se' : 'must NOT trip') + '</text>';
+
+  // build max-time envelope (from m=1 to m=10)
+  const env = [];
+  const samples = [1, 1.5, 2, 3, 5, 7, 10];
+  for (let i = 0; i < samples.length; i++) env.push({ m: samples[i], t: rcdTripMaxAt(samples[i], selective) });
+  let maxPath = '';
+  for (let i = 0; i < env.length; i++) maxPath += (i === 0 ? 'M' : 'L') + xPos(env[i].m).toFixed(1) + ',' + yPos(env[i].t).toFixed(1);
+
+  if (selective) {
+    // min non-actuating line + shaded operating band
+    const minPts = [];
+    for (let i = 0; i < samples.length; i++) minPts.push({ m: samples[i], t: rcdTripMinAt(samples[i], selective) });
+    let bandPath = maxPath;
+    for (let i = minPts.length - 1; i >= 0; i--) bandPath += 'L' + xPos(minPts[i].m).toFixed(1) + ',' + yPos(minPts[i].t).toFixed(1);
+    bandPath += 'Z';
+    svg += '<path d="' + bandPath + '" fill="rgba(37,99,235,0.12)" stroke="none"/>';
+    let minPath = '';
+    for (let i = 0; i < minPts.length; i++) minPath += (i === 0 ? 'M' : 'L') + xPos(minPts[i].m).toFixed(1) + ',' + yPos(minPts[i].t).toFixed(1);
+    svg += '<path d="' + minPath + '" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="5,4"/>';
+  } else {
+    // compliant region (below the max line) lightly shaded green
+    let fillPath = maxPath + 'L' + xPos(10).toFixed(1) + ',' + yPos(tMin).toFixed(1) + 'L' + xPos(1).toFixed(1) + ',' + yPos(tMin).toFixed(1) + 'Z';
+    svg += '<path d="' + fillPath + '" fill="rgba(34,197,94,0.10)" stroke="none"/>';
+  }
+  // max break-time envelope (the acceptance limit)
+  svg += '<path d="' + maxPath + '" fill="none" stroke="#dc2626" stroke-width="2.5"/>';
+
+  // markers + time annotations at the standard test points
+  const marks = [{ m: 1, t: rcdTripMaxAt(1, selective) }, { m: 2, t: rcdTripMaxAt(2, selective) }, { m: 5, t: rcdTripMaxAt(5, selective) }];
+  for (let i = 0; i < marks.length; i++) {
+    const mx = xPos(marks[i].m), my = yPos(marks[i].t);
+    svg += '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="3.5" fill="#dc2626"/>';
+    svg += '<text x="' + (mx + 5).toFixed(1) + '" y="' + (my - 5).toFixed(1) + '" font-size="9.5" fill="#b42318">' + Math.round(marks[i].t * 1000) + ' ms</text>';
+  }
+  // axis titles
+  svg += '<text x="' + (marginL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Fejlstr\u00f8m (\u00d7 I\u0394n = ' + idnMA + ' mA)' : 'Residual current (\u00d7 I\u0394n = ' + idnMA + ' mA)') + '</text>';
+  svg += '<text x="14" y="' + (marginT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 14 ' + (marginT + plotH / 2) + ')">' + (da ? 'Afbrydetid t [s]' : 'Break time t [s]') + '</text>';
+  // title
+  svg += '<text x="' + marginL + '" y="' + (marginT - 10) + '" font-size="11" fill="#475467">' + (da ? cls.name_da : cls.name_en) + ' \u00b7 ' + cls.clause + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Capability matrix for all four waveform types (click-only, no inputs).
+function rcdRenderTypeMatrix(highlightType) {
+  const da = (typeof lang !== 'undefined' && lang === 'da');
+  let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin:6px 0">';
+  h += '<tr style="background:var(--border-light);font-weight:700"><td style="padding:5px 7px">' + (da ? 'Type' : 'Type') + '</td><td style="padding:5px 7px">' + (da ? 'Detekterer' : 'Detects') + '</td><td style="padding:5px 7px">DC</td><td style="padding:5px 7px">' + (da ? 'Typisk anvendelse' : 'Typical use') + '</td><td style="padding:5px 7px">' + (da ? 'Standard' : 'Standard') + '</td></tr>';
+  const order = ['Type AC', 'Type A', 'Type F', 'Type B'];
+  for (let i = 0; i < order.length; i++) {
+    const k = order[i], c = RCD_TYPE_CAP[k];
+    const hi = (highlightType === k);
+    const bg = hi ? 'background:var(--primary-glow);font-weight:700' : (c.allowDK ? '' : 'background:rgba(220,38,38,0.06)');
+    h += '<tr style="border-bottom:1px solid var(--border-light);' + bg + '">';
+    h += '<td style="padding:5px 7px;white-space:nowrap">' + k + (c.allowDK ? '' : ' \u26d4') + '</td>';
+    h += '<td style="padding:5px 7px">' + (da ? c.detects_da : c.detects_en) + '</td>';
+    h += '<td style="padding:5px 7px">' + (da ? c.dc_da : c.dc_en) + '</td>';
+    h += '<td style="padding:5px 7px">' + (da ? c.use_da : c.use_en) + '</td>';
+    h += '<td style="padding:5px 7px;white-space:nowrap">' + c.std + '</td>';
+    h += '</tr>';
+  }
+  h += '</table></div>';
+  return h;
 }
 
 function getEarthInfo(sys) {
@@ -8659,6 +8877,29 @@ function renderStandards() {
             `<button class="sel-btn ${rcdSensitivity === s ? 'selected' : ''}" onclick="rcdSensitivity=${s};renderModule('standards')">${s} mA</button>`
           ).join('')}
         </div>
+      </div>
+
+      <div class="select-group" style="margin-top:12px">
+        <div class="select-label">${tx('Udløsningsklasse', 'Operating class')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${rcdDelay === 'general' ? 'selected' : ''}" onclick="rcdDelay='general';renderModule('standards')">${tx('Momentan (generel)', 'Instantaneous (general)')}</button>
+          <button class="sel-btn ${rcdDelay === 'selective' ? 'selected' : ''}" onclick="rcdDelay='selective';renderModule('standards')">${tx('Selektiv (type S)', 'Selective (type S)')}</button>
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Afbrydetidskurve (IEC 61008-1 Tabel 1)', 'Tripping-time curve (IEC 61008-1 Table 1)')}</div>
+        <div class="info-row" style="margin-bottom:6px">${tx('Den røde linje er den MAKSIMALT tilladte afbrydetid. En reel HPFI afbryder hurtigere (under linjen). Tidskurven afhænger af udløsningsklassen — IKKE af typen AC/A/F/B.', 'The red line is the MAXIMUM permitted break time. A real RCD trips faster (below the line). The time curve depends on the operating class — NOT on the AC/A/F/B type.')}</div>
+        ${rcdRenderTripCurve(rcdSensitivity || RCD_TYPES[rcdSelected].sensitivity[0], rcdDelay === 'selective')}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:0.78rem">
+          ${(function(){ var sel = rcdDelay === 'selective'; var idn = rcdSensitivity || RCD_TYPES[rcdSelected].sensitivity[0]; var rows = [[1,'I\u0394n'],[2,'2\u00d7I\u0394n'],[5,'5\u00d7I\u0394n']]; return rows.map(function(r){ var mx = Math.round(rcdTripMaxAt(r[0], sel)*1000); var mn = sel ? (Math.round(rcdTripMinAt(r[0], sel)*1000)+'\u2013') : ''; return '<span style="padding:3px 8px;background:var(--border-light);border-radius:6px">'+r[1]+' ('+Math.round(r[0]*idn)+' mA): '+mn+mx+' ms '+tx('maks','max')+'</span>'; }).join(''); })()}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${tx('Strømform-detektion pr. type (IEC 62423 / 60755)', 'Waveform detection per type (IEC 62423 / 60755)')}</div>
+        <div class="info-row" style="margin-bottom:4px">${tx('Typen bestemmer HVILKE fejlstrømsformer HPFIen kan opfange — den ændrer ikke tidskurven ovenfor. ⛔ = ikke tilladt i nye danske installationer.', 'The type defines WHICH residual-current waveforms the RCD can detect — it does not change the time curve above. ⛔ = not permitted in new Danish installations.')}</div>
+        ${rcdRenderTypeMatrix(rcdSelected)}
       </div>
       ` : ''}
 
