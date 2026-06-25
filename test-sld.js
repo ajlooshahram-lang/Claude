@@ -13967,6 +13967,30 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Train-weakest focused drill -----
+test('autoexam/weakest: train-weakest generates a gradable exam emphasizing the weak competency', function () {
+  // log with a clearly weak competency (vdrop)
+  var logArr = [];
+  for (var i = 0; i < 3; i++) logArr.push({ ts: i + 1, building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 70, verdict: 'pass', catPct: { overload: 95, cable: 90, vdrop: 20, shortcircuit: 85, fault: 80 }, elapsed: 1500 });
+  try { localStorage.setItem('autoexamLog', JSON.stringify(logArr)); } catch (e) {}
+  assert.strictEqual(axAnalytics(axLogList()).weakest, 'vdrop', 'weakest detected as vdrop');
+  // dashboard exposes the button
+  var prev = lang; lang = 'da'; autoexamState.tab = 'analyse'; autoexamState.tier = 'kandidat';
+  assert.ok(renderAutoExam().indexOf('axTrainWeakest') >= 0, 'dashboard shows train-weakest button');
+  // generating from it yields a valid, gradable exam with the core chain first
+  autoexamState.building = 'kontor'; axTrainWeakest();
+  assert.strictEqual(autoexamState.tab, 'opgave', 'switches to the exam');
+  var inst = autoexamState.project.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+  assert.deepStrictEqual(inst.tasks.slice(0, 3).map(function (t) { return t.id; }), ['t_ib', 't_dev', 't_cab'], 'core chain first');
+  var ans = {}; autoexamState.project.opgaver.forEach(function (o) { o.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(autoexamState.project, ans).score, 100, 'still grades to 100');
+  // no-log case is safe (no bias, still generates)
+  try { localStorage.removeItem('autoexamLog'); } catch (e) {}
+  axTrainWeakest();
+  assert.ok(autoexamState.project && autoexamState.project.opgaver.length >= 1, 'no-log train still generates');
+  lang = prev;
+});
+
 // ----- Time tracking + lifetime stats banner -----
 test('autoexam/time: analytics computes time stats from log entries with elapsed field', function () {
   var log = [

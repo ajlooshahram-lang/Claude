@@ -12953,6 +12953,14 @@ function axDgPick(taskId, i) { autoexamState.dgAnswers[taskId] = i; renderModule
 function axDgGrade() { var p = axDgEnsure(); autoexamState.dgResult = axExamine(p, autoexamState.dgAnswers); autoexamState.dgReveal = true; axLogPush({ ts: Date.now(), building: 'diagram', tier: p.tierId, mode: 'diagram', score: autoexamState.dgResult.score, verdict: autoexamState.dgResult.verdict, catPct: autoexamState.dgResult.catPct, correctCount: autoexamState.dgResult.correctCount, totalCount: autoexamState.dgResult.totalCount }); renderModule('autoexam'); }
 // Adaptive: apply the recommended next tier + focus building, then generate.
 function axApplyAdaptive() { var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier; axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam'); }
+// Generate an exam concentrated on the user's weakest competency.
+function axTrainWeakest() {
+  var a = axAnalytics(axLogList());
+  var bias = null;
+  if (a.weakest) { bias = {}; ['overload', 'cable', 'vdrop', 'shortcircuit', 'fault'].forEach(function (c) { bias[c] = (c === a.weakest) ? 60 : 4; }); }
+  var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier;
+  axUIgenerate(false, bias); autoexamState.tab = 'opgave'; renderModule('autoexam');
+}
 // Continuous learning: ingest an uploaded exam file (offline) into the profile.
 function axIngestFile(input) {
   if (!input || !input.files || !input.files[0]) return;
@@ -13242,7 +13250,7 @@ function axRenderDashboard() {
   var buildItems = Object.keys(a.buildAvg).map(function (b) { var bb = axBuilding(b); return { label: (bb ? axL({ da: bb.da, en: bb.en }) : b) + ' (' + a.buildAvg[b].n + ')', value: a.buildAvg[b].avg }; });
   if (buildItems.length) h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Pr. bygningstype', 'By building type') + '</div><div style="padding:4px 2px">' + axSvgBars(buildItems) + '</div></div>';
   // coaching line
-  if (a.weakest) { var nm = AX_CAT_NAME[a.weakest] || { da: a.weakest, en: a.weakest }; h += '<div class="result-box warning" style="margin-top:8px"><div style="padding:6px 2px">\uD83C\uDFAF ' + tx('Fokus n\u00e6ste gang', 'Focus next time') + ': <strong>' + axL(nm) + '</strong> (' + a.catAvg[a.weakest] + '%). ' + axL(axCatSuggest(a.weakest)) + '</div></div>'; }
+  if (a.weakest) { var nm = AX_CAT_NAME[a.weakest] || { da: a.weakest, en: a.weakest }; h += '<div class="result-box warning" style="margin-top:8px"><div style="padding:6px 2px">\uD83C\uDFAF ' + tx('Fokus n\u00e6ste gang', 'Focus next time') + ': <strong>' + axL(nm) + '</strong> (' + a.catAvg[a.weakest] + '%). ' + axL(axCatSuggest(a.weakest)) + '<div style="margin-top:6px"><button class="sel-btn selected" onclick="axTrainWeakest()">\uD83C\uDFCB\uFE0F ' + tx('Tr\u00e6n min svageste kompetence', 'Train my weakest competency') + '</button></div></div></div>'; }
   // adaptive recommendation
   var rec = axAdaptiveNext(log, autoexamState.tier);
   h += '<div class="result-box" style="margin-top:8px"><div class="result-title">\uD83E\uDDED ' + tx('Adaptiv tr\u00e6ning', 'Adaptive training') + '</div><div style="padding:6px 2px">';
