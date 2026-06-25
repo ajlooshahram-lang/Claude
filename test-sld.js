@@ -13760,6 +13760,149 @@ test('rcd: curve+matrix hidden until an RCD type is selected', function () {
 });
 
 
+console.log('\n=== MCB Time-Current Curve Engine Tests (B/C/D/K/Z) ===\n');
+
+test('mcb: MCB_CURVES now supports all five types B/C/D/K/Z', function () {
+  ['B', 'C', 'D', 'K', 'Z'].forEach(function (c) {
+    assert.ok(MCB_CURVES[c] && MCB_CURVES[c].isdMin > 0 && MCB_CURVES[c].isdMax > MCB_CURVES[c].isdMin, c + ' present & valid');
+  });
+  assert.strictEqual(MCB_CURVES.Z.isdMin, 2); assert.strictEqual(MCB_CURVES.Z.isdMax, 3);
+  assert.strictEqual(MCB_CURVES.K.isdMin, 8); assert.strictEqual(MCB_CURVES.K.isdMax, 14);
+});
+
+test('mcb: magnetic bands are correctly ordered (Z < B < C, K within D-ish, D highest)', function () {
+  // standard IEC magnetic multiples
+  assert.strictEqual(MCB_TYPE_INFO.Z.iecMin, 2); assert.strictEqual(MCB_TYPE_INFO.Z.iecMax, 3);
+  assert.strictEqual(MCB_TYPE_INFO.B.iecMin, 3); assert.strictEqual(MCB_TYPE_INFO.B.iecMax, 5);
+  assert.strictEqual(MCB_TYPE_INFO.C.iecMin, 5); assert.strictEqual(MCB_TYPE_INFO.C.iecMax, 10);
+  assert.strictEqual(MCB_TYPE_INFO.D.iecMin, 10); assert.strictEqual(MCB_TYPE_INFO.D.iecMax, 20);
+  assert.strictEqual(MCB_TYPE_INFO.K.iecMin, 8); assert.strictEqual(MCB_TYPE_INFO.K.iecMax, 14);
+  // ordering of lower thresholds
+  assert.ok(MCB_TYPE_INFO.Z.iecMin < MCB_TYPE_INFO.B.iecMin);
+  assert.ok(MCB_TYPE_INFO.B.iecMin < MCB_TYPE_INFO.C.iecMin);
+  assert.ok(MCB_TYPE_INFO.C.iecMin < MCB_TYPE_INFO.K.iecMin);
+  assert.ok(MCB_TYPE_INFO.K.iecMin < MCB_TYPE_INFO.D.iecMin);
+});
+
+test('mcb: each type cites a real component standard', function () {
+  assert.strictEqual(MCB_TYPE_INFO.B.std, 'IEC 60898-1');
+  assert.strictEqual(MCB_TYPE_INFO.K.std, 'IEC 60947-2');
+});
+
+test('mcb: thermal model anchored to IEC 2.55 In -> 60 s test point, monotonic decreasing', function () {
+  assert.ok(Math.abs(mcbThermalT(2.55, 'max') - 60) < 0.5, 'max edge ~60 s at 2.55 In (got ' + mcbThermalT(2.55, 'max').toFixed(1) + ')');
+  assert.ok(mcbThermalT(2.55, 'min') < mcbThermalT(2.55, 'max'), 'hot edge faster than cold edge');
+  var prev = Infinity;
+  for (var m = 1.2; m <= 10; m += 0.4) {
+    var t = mcbThermalT(m, 'max');
+    assert.ok(t <= prev + 1e-9, 'monotonic at m=' + m);
+    prev = t;
+  }
+  assert.strictEqual(mcbThermalT(1.1, 'max'), 7200); // no-trip zone capped
+});
+
+test('mcb: mcbCurveEnvelope returns ordered edges with correct magnetic boundaries', function () {
+  var env = mcbCurveEnvelope('C', 16);
+  assert.ok(env && env.maxEdge.length && env.minEdge.length, 'edges present');
+  assert.strictEqual(env.iLo, 5 * 16); // C lower magnetic = 5x
+  assert.strictEqual(env.iHi, 10 * 16); // C upper magnetic = 10x
+  // max edge ends fast (instantaneous), starts slow (thermal)
+  assert.ok(env.maxEdge[0].t > env.maxEdge[env.maxEdge.length - 1].t, 'time decreases along max edge');
+  assert.strictEqual(mcbCurveEnvelope('C', 0), null); // guards bad In
+  assert.strictEqual(mcbCurveEnvelope('Q', 16), null); // guards unknown type
+});
+
+test('mcb: envelope min edge is always at or below max edge at shared currents', function () {
+  var env = mcbCurveEnvelope('D', 32);
+  // sample thermal region: min(hot) trip must be <= max(cold) trip
+  [1.5, 2, 2.55, 3, 5].forEach(function (m) {
+    assert.ok(mcbThermalT(m, 'min') <= mcbThermalT(m, 'max'), 'min<=max at ' + m);
+  });
+  assert.ok(env.iHi > env.iLo, 'D magnetic band non-degenerate');
+});
+
+test('mcb: D curve trips later than B curve in the magnetic region (higher Isd)', function () {
+  assert.ok(MCB_TYPE_INFO.D.iecMin > MCB_TYPE_INFO.B.iecMax, 'D magnetic pickup well above B');
+});
+
+test('mcb: mcbRenderCurves produces valid SVG, no leaks, all types, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [['B'], ['B', 'C', 'D', 'K', 'Z'], ['Z']].forEach(function (sel) {
+      [6, 16, 63].forEach(function (In) {
+        var svg = mcbRenderCurves(sel, In);
+        assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + In + ')');
+        assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + sel.join('') + '/' + In + ')');
+        assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + sel.join('') + '/' + In + ')');
+        sel.forEach(function (ct) { assert.ok(svg.indexOf('Curve ' + ct) > 0 || svg.indexOf('Kurve ' + ct) > 0, ct + ' in legend'); });
+      });
+    });
+  });
+  lang = prev;
+});
+
+test('mcb: renderer guards empty selection and bad In', function () {
+  assert.ok(mcbRenderCurves([], 0).indexOf('<svg') === 0, 'defaults safely');
+  assert.ok(mcbRenderCurves(null, null).indexOf('NaN') < 0, 'no NaN with null args');
+});
+
+test('mcb: mcbRenderTypeTable lists each selected type with absolute Isd range, no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = mcbRenderTypeTable(['C', 'D'], 32);
+    assert.ok(h.indexOf('160') > 0, 'C lower Isd 5x32=160 A shown');
+    assert.ok(h.indexOf('640') > 0, 'D upper Isd 20x32=640 A shown');
+    assert.ok(h.indexOf('IEC 60898-1') >= 0, 'cites standard');
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('mcb: toggle helper adds/removes types but never empties the selection', function () {
+  var prev = mcbCurveSel.slice();
+  mcbCurveSel = ['C'];
+  mcbToggleCurveType('D'); assert.ok(mcbCurveSel.indexOf('D') >= 0, 'D added');
+  mcbToggleCurveType('C'); assert.ok(mcbCurveSel.indexOf('C') < 0, 'C removed');
+  mcbToggleCurveType('D'); assert.ok(mcbCurveSel.length >= 1, 'never empties'); // last one stays
+  mcbCurveSel = prev;
+});
+
+test('mcb: sldDeviceCurve now plots K and Z MCBs (engine integration)', function () {
+  var kPts = sldDeviceCurve({ curve: 'K' }, 16, null);
+  var zPts = sldDeviceCurve({ curve: 'Z' }, 10, null);
+  assert.ok(kPts.length > 0, 'K curve plottable');
+  assert.ok(zPts.length > 0, 'Z curve plottable');
+});
+
+test('mcb: renderStandards embeds the MCB curve chart + table (da/en)', function () {
+  var prev = lang, ps = mcbCurveSel.slice(), pi = mcbCurveIn;
+  mcbCurveSel = ['B', 'C', 'D', 'K', 'Z']; mcbCurveIn = 16;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('IEC 60898-1') >= 0, 'cites IEC 60898-1 (' + lg + ')');
+    assert.ok(out.indexOf('IEC 60947-2') >= 0, 'cites IEC 60947-2 for K (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve chart embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined leak (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN leak (' + lg + ')');
+  });
+  lang = prev; mcbCurveSel = ps; mcbCurveIn = pi;
+});
+
+test('mcb: MCB module renders for K and Z without error (B/C/D/K/Z buttons)', function () {
+  var prev = mcbState.curve;
+  ['K', 'Z'].forEach(function (c) {
+    mcbState.curve = c; mcbState.rating = 16;
+    var out = renderMCB();
+    assert.ok(out.indexOf('undefined') < 0 && out.indexOf('<svg') !== -2, c + ' renders');
+    assert.ok(out.length > 100, c + ' produced output');
+  });
+  mcbState.curve = prev;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
