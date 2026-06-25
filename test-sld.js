@@ -15010,6 +15010,25 @@ test('autoexam: auto-curves embedded in worked solutions (device, cable, vdrop, 
 });
 
 
+test('standards: IZ_COPPER ampacity table is conservatively rounded down from DS/HD 60364-5-52', function () {
+  // Official DS/HD 60364-5-52 Table C.52.1 method C, Cu/PVC (reference values, 2-loaded).
+  // The app table MUST be <= these (conservative = under-rate Iz = choose larger cable = safer).
+  var official = {1.5:17.5, 2.5:24, 4:32, 6:41, 10:57, 16:76, 25:101, 35:125, 50:151, 70:192, 95:232, 120:269};
+  Object.keys(official).forEach(function (csa) {
+    var appVal = IZ_COPPER[Number(csa)];
+    if (appVal !== undefined) {
+      assert.ok(appVal <= official[csa], 'IZ_COPPER[' + csa + ']=' + appVal + ' <= official ' + official[csa] + ' (conservative)');
+      assert.ok(appVal >= official[csa] * 0.85, 'IZ_COPPER[' + csa + ']=' + appVal + ' >= 85% of ' + official[csa] + ' (not erroneously low)');
+    }
+  });
+  // XLPE must always exceed PVC for same cross-section (physically correct: higher temp rating)
+  Object.keys(IZ_COPPER).forEach(function (csa) {
+    if (IZ_COPPER_XLPE[csa]) {
+      assert.ok(IZ_COPPER_XLPE[csa] > IZ_COPPER[csa], 'XLPE(' + csa + ')=' + IZ_COPPER_XLPE[csa] + ' > PVC=' + IZ_COPPER[csa]);
+    }
+  });
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
