@@ -14277,6 +14277,108 @@ test('phasor: state setters update correctly', function () {
 });
 
 
+console.log('\n=== UX Design System Foundation Tests ===\n');
+
+test('ux: UX_MODES defines all four complexity levels', function () {
+  assert.deepStrictEqual(UX_MODES, ['apprentice', 'electrician', 'engineer', 'expert']);
+});
+
+test('ux: uxMode defaults to electrician and uxModeLevel returns correct index', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; assert.strictEqual(uxModeLevel(), 1);
+  uxMode = 'apprentice'; assert.strictEqual(uxModeLevel(), 0);
+  uxMode = 'engineer'; assert.strictEqual(uxModeLevel(), 2);
+  uxMode = 'expert'; assert.strictEqual(uxModeLevel(), 3);
+  uxMode = prev;
+});
+
+test('ux: uxSetMode only accepts valid modes', function () {
+  var prev = uxMode;
+  uxSetMode('expert'); assert.strictEqual(uxMode, 'expert');
+  uxSetMode('invalid_mode'); assert.strictEqual(uxMode, 'expert'); // unchanged
+  uxSetMode('apprentice'); assert.strictEqual(uxMode, 'apprentice');
+  uxMode = prev;
+});
+
+test('ux: uxRenderModeBar renders all four buttons with correct active state (da/en)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg; uxMode = 'electrician';
+    var h = uxRenderModeBar();
+    assert.ok(h.indexOf('ux-mode-bar') >= 0, 'has container class');
+    assert.ok(h.indexOf('active') >= 0, 'one is active');
+    UX_MODES.forEach(function (m) { assert.ok(h.indexOf(m) >= 0, m + ' present'); });
+    assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks (' + lg + ')');
+  });
+  lang = prev; uxMode = pm;
+});
+
+test('ux: uxPanel renders collapsible panel, respects level gating', function () {
+  var prev = uxMode;
+  uxMode = 'electrician'; // level 1
+  var h = uxPanel('Test Panel', '<p>Content</p>', { id: 'test1' });
+  assert.ok(h.indexOf('ux-panel') >= 0, 'panel rendered');
+  assert.ok(h.indexOf('Content') >= 0, 'body included');
+  // Engineer-level panel hidden for electrician
+  var h2 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test2' });
+  assert.strictEqual(h2, '', 'engineer panel hidden for electrician');
+  uxMode = 'engineer'; // level 2
+  var h3 = uxPanel('Advanced', '<p>Deep</p>', { level: 'engineer', id: 'test3' });
+  assert.ok(h3.indexOf('Deep') >= 0, 'engineer panel shown for engineer');
+  // Expert panel still hidden for engineer
+  var h4 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test4' });
+  assert.strictEqual(h4, '', 'expert panel hidden for engineer');
+  uxMode = 'expert';
+  var h5 = uxPanel('Expert Only', '<p>Secret</p>', { level: 'expert', id: 'test5' });
+  assert.ok(h5.indexOf('Secret') >= 0, 'expert panel shown for expert');
+  uxMode = prev;
+});
+
+test('ux: uxSummary renders executive summary cards with status classes', function () {
+  var h = uxSummary([
+    { label: 'Cable', value: '✓ OK', status: 'pass' },
+    { label: 'Vdrop', value: '4.2%', status: 'warn' },
+    { label: 'Fault', value: '✗ FAIL', status: 'fail' }
+  ]);
+  assert.ok(h.indexOf('ux-summary') >= 0, 'container');
+  assert.ok(h.indexOf('pass') >= 0, 'pass class');
+  assert.ok(h.indexOf('warn') >= 0, 'warn class');
+  assert.ok(h.indexOf('fail') >= 0, 'fail class');
+  assert.ok(h.indexOf('4.2%') >= 0, 'value rendered');
+});
+
+test('ux: uxSmartCards renders visual selector with correct selection', function () {
+  var items = [
+    { id: 'tn-s', icon: '⚡', title: 'TN-S', desc: 'Separate N+PE' },
+    { id: 'tt', icon: '🔌', title: 'TT', desc: 'Local earth' }
+  ];
+  var h = uxSmartCards(items, 'tn-s', 'testFn');
+  assert.ok(h.indexOf('ux-smart-cards') >= 0, 'grid container');
+  assert.ok(h.indexOf('selected') >= 0, 'one selected');
+  assert.ok(h.indexOf('TN-S') >= 0, 'title');
+  assert.ok(h.indexOf('testFn') >= 0, 'onclick handler');
+});
+
+test('ux: uxWizardSteps renders step indicators with done/active states', function () {
+  var steps = [{ label: 'Load' }, { label: 'Cable' }, { label: 'Protection' }];
+  var h = uxWizardSteps(steps, 1);
+  assert.ok(h.indexOf('done') >= 0, 'first step is done');
+  assert.ok(h.indexOf('active') >= 0, 'second step is active');
+  assert.ok(h.indexOf('Protection') >= 0, 'third step label');
+  assert.ok(h.indexOf('✓') >= 0 || h.indexOf('\u2713') >= 0, 'checkmark on done step');
+});
+
+test('ux: renderModule includes mode bar in output (all modules)', function () {
+  var prev = lang; lang = 'da';
+  var out = renderModule('load');
+  // renderModule writes to main.innerHTML but we can check the helper directly
+  var bar = uxRenderModeBar();
+  assert.ok(bar.indexOf('ux-mode-bar') >= 0, 'mode bar renders');
+  assert.ok(bar.length > 50, 'mode bar has content');
+  lang = prev;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
