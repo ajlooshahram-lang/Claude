@@ -14457,6 +14457,49 @@ test('ux-load: preset still works (applyLoadPreset sets state)', function () {
 });
 
 
+console.log('\n=== UX Cable Module Retrofit Tests ===\n');
+
+test('ux-cable: renderCable uses wizard steps indicator', function () {
+  var prev = lang; lang = 'da';
+  var out = renderCable();
+  assert.ok(out.indexOf('ux-wizard-step') >= 0, 'wizard steps present');
+  lang = prev;
+});
+
+test('ux-cable: correction factors in collapsible panel', function () {
+  var prev = lang; lang = 'en';
+  var out = renderCable();
+  assert.ok(out.indexOf('cable_corrections') >= 0, 'corrections panel has id');
+  assert.ok(out.indexOf('ux-panel') >= 0, 'collapsible panel present');
+  lang = prev;
+});
+
+test('ux-cable: executive summary appears when cross-section selected', function () {
+  var prev = lang, pcs = cableState.crossSection;
+  lang = 'da'; cableState.crossSection = '2.5';
+  var out = renderCable();
+  assert.ok(out.indexOf('ux-summary') >= 0, 'summary present with cross-section');
+  cableState.crossSection = null;
+  out = renderCable();
+  assert.ok(out.indexOf('ux-summary') < 0, 'no summary without cross-section');
+  lang = prev; cableState.crossSection = pcs;
+});
+
+test('ux-cable: no undefined/NaN in any mode (da/en x all modes)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    UX_MODES.forEach(function (m) {
+      uxMode = m;
+      var out = renderCable();
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + m + ')');
+      assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + m + ')');
+    });
+  });
+  lang = prev; uxMode = pm;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
