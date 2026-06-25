@@ -1243,7 +1243,7 @@ const T = {
     cableR: 'R [\u03A9/km]',
     cableX: 'X [\u03A9/km]',
     cableResult: 'Valgt kabel',
-    cableIz: 'Iz (strømb\u00E6reevne)',
+    cableIz: 'I<sub>z</sub> (strømb\u00E6reevne)',
     // Voltage drop
     vdropTitle: 'Spændingsfald',
     cableLength: 'Kabellængde [m]',
@@ -1395,7 +1395,7 @@ const T = {
     cableR: 'R [\u03A9/km]',
     cableX: 'X [\u03A9/km]',
     cableResult: 'Selected Cable',
-    cableIz: 'Iz (Current Capacity)',
+    cableIz: 'I<sub>z</sub> (Current Capacity)',
     vdropTitle: 'Voltage Drop',
     cableLength: 'Cable Length [m]',
     vdropResult: 'Calculated Voltage Drop',
@@ -1544,7 +1544,7 @@ const T = {
     cableR: 'R [Ω/km]',
     cableX: 'X [Ω/km]',
     cableResult: 'کابل انتخاب‌شده',
-    cableIz: 'Iz (ظرفیت جریان)',
+    cableIz: 'I<sub>z</sub> (ظرفیت جریان)',
     vdropTitle: 'افت ولتاژ',
     cableLength: 'طول کابل [m]',
     vdropResult: 'افت ولتاژ محاسبه‌شده',
@@ -9762,7 +9762,7 @@ function renderLoad() {
       <div class="result-box">
         <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
         <div class="result-row"><span class="label">Pb</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
-        <div class="result-row"><span class="label">IB</span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
       </div>
     `, { level: 'engineer', id: 'load_diversity' })}
   `;
@@ -10150,7 +10150,7 @@ function renderMCCB() {
       <div class="card-title">${t('mccbResult')} \u2014 Micrologic 2.2</div>
       <div class="result-box">
         <div class="result-title">${mccbState.frame} ${mccbState.trip}</div>
-        <div class="result-row"><span class="label">In</span><span class="value">${mccbState.inVal} A</span></div>
+        <div class="result-row"><span class="label">I<sub>n</sub></span><span class="value">${mccbState.inVal} A</span></div>
         <div class="result-row"><span class="label">${t('mccbIcu2')}</span><span class="value">${icu} kA</span></div>
         <div class="result-row"><span class="label">Io</span><span class="value">${io.toFixed(0)} A</span></div>
         <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
@@ -10307,7 +10307,7 @@ function renderCable() {
         <div class="result-row"><span class="label">${t('cableMaterial')}</span><span class="value">${cableState.material === 'copper' ? t('cableCopper') : t('cableAluminium')}</span></div>
         <div class="result-row"><span class="label">${t('cableR')}</span><span class="value">${selectedCable.r} \u03A9/km</span></div>
         <div class="result-row"><span class="label">${t('cableX')}</span><span class="value">${selectedCable.x} \u03A9/km</span></div>
-        <div class="result-row"><span class="label">Iz (${tx('basis', 'base')})</span><span class="value">${baseIz} A</span></div>
+        <div class="result-row"><span class="label">I<sub>z</sub> (${tx('basis', 'base')})</span><span class="value">${baseIz} A</span></div>
         <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
         <div class="result-row"><span class="label">${t('cableIz')} (${tx('korrigeret', 'corrected')})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
       </div>
@@ -10366,7 +10366,7 @@ function renderVdrop() {
       ` : `
         <div class="result-box" style="margin-bottom:16px;background:var(--primary-glow);border-color:var(--primary-light)">
           <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
-          <div class="result-row"><span class="label">IB</span><span class="value">${calcIB().toFixed(1)} A</span></div>
+          <div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">${calcIB().toFixed(1)} A</span></div>
         </div>
       `}
 
@@ -11362,7 +11362,7 @@ function renderTrafoInrush() {
   peakOptions.forEach(function(p) { html += '<button class="sel-btn' + (peak === p ? ' selected' : '') + '" onclick="trafoState.inrushPeak=' + p + ';renderModule(\'trafo\')">' + p + '\u00d7In</button>'; });
   html += '</div></div>';
   html += '<div class="result-box">';
-  html += '<div class="result-row"><span class="label">In (' + S + ' kVA, 400 V)</span><span class="value">' + In.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>n</sub> (' + S + ' kVA, 400 V)</span><span class="value">' + In.toFixed(1) + ' A</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Peak inrush', 'Peak inrush') + '</span><span class="value" style="font-weight:700;color:var(--danger)">' + peak + '\u00d7In = ' + (peak * In).toFixed(0) + ' A</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tidskonstant \u03c4', 'Time constant \u03c4') + '</span><span class="value">' + trafoInrushTau(S).toString().replace('.', ',') + ' s (' + tx('skaleret med str\u00f8relse', 'scaled with size') + ')</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('5\u03c4 (henfaldet)', '5\u03c4 (decayed)') + '</span><span class="value">' + (5 * trafoInrushTau(S)).toFixed(2).replace('.', ',') + ' s</span></div>';
@@ -15854,7 +15854,7 @@ function sldRenderNodePanel(tree, nodeId) {
 
   if (node.type !== 'transformer') {
     html += '<div class="result-box"><div class="result-title">' + tx('Beregningsresultater', 'Calculation Results') + '</div>';
-    html += '<div class="result-row"><span class="label">IB</span><span class="value">' + ib.toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">' + ib.toFixed(1) + ' A</span></div>';
     html += '<div class="result-row"><span class="label">Zs (' + tx('kumulativ', 'cumulative') + ')</span><span class="value">' + (zs * 1000).toFixed(1) + ' m\u2126</span></div>';
     html += '<div class="result-row"><span class="label">\u0394U (' + tx('kumulativ', 'cumulative') + ')</span><span class="value">' + vdrop.toFixed(2) + ' %</span></div>';
     html += '<div class="result-row"><span class="label">Ik,max / Ik,min</span><span class="value">' + (ikmax / 1000).toFixed(1) + ' / ' + (ikmin / 1000).toFixed(1) + ' kA</span></div>';
@@ -17978,7 +17978,7 @@ function renderEV() {
   html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
   if (cable) {
     html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>z</sub></span><span class="value">' + cable.iz + ' A</span></div>';
   }
   html += '<div class="result-row"><span class="label">' + tx('Spændingsfald', 'Voltage drop') + '</span><span class="value">' + vdrop.toFixed(2) + ' % ' + (vdropOk ? '\u2705' : '\u274C') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Grænse (Fællesregulativet)', 'Limit (Utility reg.)') + '</span><span class="value">max 3% (cl.722.525)</span></div>';
@@ -18872,7 +18872,7 @@ function renderMotor() {
   html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
   if (cable) {
     html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
-    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A (DS/HD 60364-5-52)</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>z</sub></span><span class="value">' + cable.iz + ' A (DS/HD 60364-5-52)</span></div>';
   }
   html += '</div>';
 
@@ -23914,7 +23914,7 @@ function renderConstruction() {
   html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Kabel', 'Cable') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Type', 'Type') + '</span><span class="value">' + cable.type + ' ' + cable.mm2 + ' mm\u00B2</span></div>';
-  html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>z</sub></span><span class="value">' + cable.iz + ' A</span></div>';
   html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + cable.clause + '</span></div>';
   html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
@@ -30425,7 +30425,7 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     if (dev && dev.factor > 0) html += ' = ' + dev.factor + ' \u00D7 ' + faultState.deviceIn;
     html += '</span></div>';
     html += '<div class="result-row"><span class="label">Zs \u00B7 Ia</span><span class="value">' + tn.ZsIa.toFixed(1) + ' V</span></div>';
-    html += '<div class="result-row"><span class="label">U0</span><span class="value">' + tn.U0 + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">U<sub>0</sub></span><span class="value">' + tn.U0 + ' V</span></div>';
     html += '<div class="result-row"><span class="label">Zs<sub>max</sub> = U0/Ia</span><span class="value">' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Zs<sub>max</sub> = ' + faultState.voltage + ' / ' + Ia.toFixed(1) + ' = ' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (tn.ok ? '\u2705 ' + tn.ZsIa.toFixed(1) + ' \u2264 ' + tn.U0 : '\u274C ' + tn.ZsIa.toFixed(1) + ' > ' + tn.U0) + '</span></div>';
@@ -31334,7 +31334,7 @@ function renderLysLumen() {
   html += '<div class="result-row"><span class="label">\u03A6_total</span><span class="value">' + Math.round(phiTotal) + ' lm</span></div>';
   html += '<div class="result-row"><span class="label" style="font-weight:700">' + tx('Antal armaturer', 'Number of luminaires') + '</span><span class="value" style="font-weight:700;font-size:1.1em">' + nLum + ' stk</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Samlet effekt', 'Total power') + '</span><span class="value">' + totalW + ' W</span></div>';
-  html += '<div class="result-row"><span class="label">IB (230V)</span><span class="value">' + Ib.toFixed(2) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>B</sub> (230V)</span><span class="value">' + Ib.toFixed(2) + ' A</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('MCB', 'MCB') + '</span><span class="value">' + (Ib <= 10 ? '10A' : Ib <= 16 ? '16A' : '20A') + ' B</span></div>';
   html += '</div>';
   html += calcDetail({ name: tx('Rumindeks', 'Room index'), formula: 'k = l\u00D7b / (hm\u00D7(l+b))', variables: [{ name: 'l', symbol: 'l', value: lysState.roomLength, unit: 'm' }, { name: 'b', symbol: 'b', value: lysState.roomWidth, unit: 'm' }, { name: 'hm', symbol: 'hm', value: lysState.mountHeight, unit: 'm' }], substitution: lysState.roomLength + '\u00D7' + lysState.roomWidth + ' / (' + lysState.mountHeight + '\u00D7(' + lysState.roomLength + '+' + lysState.roomWidth + '))', result: { value: k, unit: '' }, reference: 'DS/EN 12464-1, Opgavesamling Kap. 12' });
