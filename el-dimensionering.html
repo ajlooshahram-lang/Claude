@@ -646,37 +646,61 @@ body.motion-off .fade-in { will-change: auto; }
 
 /* ===== SVG DIAGRAM ANIMATIONS (phasors, impedance, TCC curves) ===== */
 .svg-animated .svg-phasor-vec {
-  animation: svgRotate 4s linear infinite;
+  animation: svgRotate 8s linear infinite;
   transform-origin: center;
   transform-box: fill-box;
 }
 .svg-animated .svg-impedance-vec {
-  animation: svgPulse 2.4s ease-in-out infinite;
+  animation: svgPulse 2s ease-in-out infinite;
 }
 .svg-animated .svg-curve-path {
-  animation: svgGlow 2.8s ease-in-out infinite;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: svgDrawCurve 2.5s ease-out forwards;
 }
 .svg-animated .svg-cursor-line {
-  animation: svgCursorSweep 3.5s ease-in-out infinite alternate;
+  animation: svgCursorSweep 3s ease-in-out infinite alternate;
+}
+.svg-animated path:not(.svg-curve-path):not(.svg-phasor-vec) {
+  stroke-dasharray: 800;
+  stroke-dashoffset: 800;
+  animation: svgDrawCurve 2s ease-out forwards;
+}
+.svg-animated line.svg-phasor-vec {
+  animation: svgRotate 8s linear infinite;
+  transform-origin: var(--cx, 50%) var(--cy, 50%);
+}
+.svg-animated rect {
+  animation: svgBarGrow 0.8s ease-out forwards;
+  transform-origin: bottom;
+}
+.svg-animated circle {
+  animation: svgDotPop 0.6s ease-out forwards;
 }
 @keyframes svgRotate {
-  0%   { opacity: 0.85; }
-  25%  { opacity: 1; }
-  50%  { opacity: 0.85; }
-  75%  { opacity: 1; }
-  100% { opacity: 0.85; }
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 @keyframes svgPulse {
-  0%, 100% { stroke-width: 2.5; opacity: 0.8; }
-  50%      { stroke-width: 3.5; opacity: 1; }
+  0%, 100% { stroke-width: 2; opacity: 0.7; transform: scale(1); }
+  50%      { stroke-width: 3.5; opacity: 1; transform: scale(1.03); }
 }
-@keyframes svgGlow {
-  0%, 100% { stroke-opacity: 0.7; filter: none; }
-  50%      { stroke-opacity: 1; filter: drop-shadow(0 0 3px currentColor); }
+@keyframes svgDrawCurve {
+  0%   { stroke-dashoffset: 1000; }
+  100% { stroke-dashoffset: 0; }
 }
 @keyframes svgCursorSweep {
-  0%   { opacity: 0.3; }
-  100% { opacity: 1; }
+  0%   { opacity: 0.2; transform: translateX(-2px); }
+  100% { opacity: 1; transform: translateX(2px); }
+}
+@keyframes svgBarGrow {
+  0%   { transform: scaleY(0); opacity: 0; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes svgDotPop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* Reduced motion: freeze SVG diagram animations */
@@ -7358,7 +7382,7 @@ function pdfRenderSLD(tree) {
   if (!tree) tree = pdfGetTree();
   var root = tree.nodes[tree.rootId];
   var w = 600, h = 300;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
   svg += '<rect x="10" y="10" width="120" height="40" fill="#f0f0f0" stroke="#333"/>';
   svg += '<text x="70" y="35" text-anchor="middle" font-size="10">' + sldNodeName(root) + '</text>';
   var mainBoardId = root.childIds[0];
@@ -7544,7 +7568,7 @@ function tccRenderCascadeChart(devices, cursorCurrent) {
   function xPos(I) { return marginL + (Math.log10(I) - logImin) / (logImax - logImin) * plotW; }
   function yPos(t) { return marginT + (1 - (Math.log10(t) - logTmin) / (logTmax - logTmin)) * plotH; }
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
   svg += '<rect width="' + w + '" height="' + h + '" fill="#fff"/>';
 
   // Grid
@@ -7815,7 +7839,7 @@ function panelVerifyBusbar(boardNode, tree) {
 
 function panelRenderDINRail(rail, railIdx) {
   var w = 600, h = 80;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
   svg += '<rect x="0" y="30" width="' + w + '" height="20" fill="#c0c0c0" rx="2"/>';
   var x = 10;
   for (var i = 0; i < rail.length; i++) {
@@ -13121,7 +13145,7 @@ function buildSLD(){
 
   // ---- Compose ----
   return `<div class="sld">`
-  + `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${tx('Enstregsdiagram','Single-line diagram')}" `
+  + `<svg class="svg-animated" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${tx('Enstregsdiagram','Single-line diagram')}" `
   + `style="background:var(--bg);border-radius:12px;border:1px solid var(--border)" xmlns="http://www.w3.org/2000/svg">`
   + `<defs>`
   + `<pattern id="sldGrid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M 26 0 L 0 0 0 26" fill="none" stroke="${SLD_C.line}" stroke-width="0.5" opacity="0.5"/></pattern>`
@@ -13202,7 +13226,7 @@ function build3D(){
       svg+=`<circle cx="${(cx+bw/2+bd*.4+nx-bw/2)/2}" cy="${cy2}" r="4" fill="${nt.color}" opacity="0.9"/>`;
     }
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:linear-gradient(180deg,#050c18,#020710 65%,#010408);border-radius:14px;border:1px solid var(--line,#2a3645);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${svg}<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="9" fill="#4a7090">3D ${tx('installationsskitse', 'installation scene')} \u00B7 ${nodes.length} ${tx('noder', 'nodes')} \u00B7 El-Dimensionering</text></svg>`;
+  return `<svg class="svg-animated" viewBox="0 0 ${W} ${H}" width="100%" style="background:linear-gradient(180deg,#050c18,#020710 65%,#010408);border-radius:14px;border:1px solid var(--line,#2a3645);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${svg}<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="9" fill="#4a7090">3D ${tx('installationsskitse', 'installation scene')} \u00B7 ${nodes.length} ${tx('noder', 'nodes')} \u00B7 El-Dimensionering</text></svg>`;
 }
 
 function renderDrawing(){
@@ -15203,7 +15227,7 @@ function sldRenderTCCChart(upstreamCurve, downstreamCurve, selectivityResult) {
     return mt + ph - ((logT - logYMin) / (logYMax - logYMin)) * ph;
   }
 
-  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:600px;height:auto;background:#fafbfc;border:1px solid var(--border,#ddd);border-radius:8px" xmlns="http://www.w3.org/2000/svg">';
+  var svg = '<svg class="svg-animated" viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:600px;height:auto;background:#fafbfc;border:1px solid var(--border,#ddd);border-radius:8px" xmlns="http://www.w3.org/2000/svg">';
 
   // Grid lines
   svg += '<g stroke="#e0e0e0" stroke-width="0.5">';
@@ -22030,7 +22054,7 @@ function discrimRenderChart(chartData) {
   function xPos(I) { return marginL + (Math.log10(I) - logImin) / (logImax - logImin) * plotW; }
   function yPos(e) { return marginT + (1 - (Math.log10(e) - logEmin) / (logEmax - logEmin)) * plotH; }
 
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:100%;background:#fff;border:1px solid #ddd;border-radius:8px">';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:100%;background:#fff;border:1px solid #ddd;border-radius:8px">';
 
   // Grid lines
   var gridCurrents = [100, 1000, 10000, 100000];
@@ -26401,7 +26425,7 @@ function reportRenderSLD(prov, project) {
   const finals = (project.finals || []);
   const w = 640, perCol = Math.max(1, finals.length);
   const h = 250;
-  let svg = '<svg class="report-sld" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="background:#ffffff;border:1px solid #999">';
+  let svg = '<svg class="svg-animated" class="report-sld" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="background:#ffffff;border:1px solid #999">';
   svg += '<rect x="20" y="14" width="160" height="36" fill="#f4f4f4" stroke="#333"/>';
   svg += '<text x="100" y="36" text-anchor="middle" font-size="11">' + tx('Transformer', 'Transformer') + '</text>';
   svg += '<line x1="100" y1="50" x2="100" y2="78" stroke="#333" stroke-width="2"/>';
