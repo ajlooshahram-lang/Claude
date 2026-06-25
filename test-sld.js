@@ -14849,6 +14849,17 @@ test('trafo: inrush In matches S/(sqrt3*U) and peak scales linearly', function (
   lang = prevLang;
 });
 
+test('trafo: inrush time constant scales with transformer rating (engineering accuracy)', function () {
+  // Physically: larger transformers have longer inrush decay (L_sat/R rises with size).
+  assert.ok(trafoInrushTau(50) < trafoInrushTau(630), 'small < medium');
+  assert.ok(trafoInrushTau(630) < trafoInrushTau(2000), 'medium < large');
+  // 630 kVA anchors at the classic 0.3 s typical value.
+  assert.ok(Math.abs(trafoInrushTau(630) - 0.30) < 0.001, '630 kVA tau = 0.30 s');
+  // Clamped to a physical 0.1-1.0 s band.
+  assert.ok(trafoInrushTau(10) >= 0.10, 'lower clamp 0.1 s');
+  assert.ok(trafoInrushTau(5000) <= 1.0, 'upper clamp 1.0 s');
+});
+
 test('motor: overload protection card is embedded in standards module', function () {
   var prev = lang; lang = 'da';
   motorCurveState.tripClass = 10;

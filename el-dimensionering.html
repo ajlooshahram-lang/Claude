@@ -10986,16 +10986,25 @@ function trafoRenderEffCurve(SN, P0, Pcu, cosPhi, currentLoadPct) {
 // Transformer inrush-current envelope (magnetizing inrush decay vs time).
 // On energization, inrush peaks at 10–15× In (worst case: residual flux = max,
 // closing angle = 0°) and decays with time-constant τ ≈ L_sat/R. Modelled as
-// I_peak * e^(-t/τ) with τ = 0.3 s (typical distribution trafo).
+// I_peak * e^(-t/τ). The inrush time constant grows with transformer rating
+// (L_sat/R rises with size), so τ scales with SN rather than being fixed.
 // Also shows the MCB D-curve 20×In instantaneous band and the B/C regions
 // to visualize nuisance-trip risk. DS/HD 60364 clause 4-43.3.
 // ---------------------------------------------------------------------------
+
+// Inrush decay time constant [s] as a function of transformer rating [kVA].
+// Small distribution units (≤100 kVA) ≈ 0.1 s; ~630 kVA ≈ 0.3 s; large
+// (≥2000 kVA) approaches ~0.8–1.0 s. Clamped to a physical 0.1–1.0 s band.
+function trafoInrushTau(SN) {
+  var tau = 0.10 + (SN / 2500) * 0.80;
+  return Math.max(0.10, Math.min(1.0, Math.round(tau * 100) / 100));
+}
 
 function trafoRenderInrushCurve(SN, ukPct, voltageV, peakMult) {
   var da = (typeof lang !== 'undefined' && lang === 'da');
   var In = (SN * 1000) / (Math.sqrt(3) * (voltageV || 400));
   var pk = peakMult || 14; // peak inrush multiple
-  var tau = 0.30; // decay time constant [s]
+  var tau = trafoInrushTau(SN); // size-dependent decay time constant [s]
   var w = 560, h = 340, mL = 52, mR = 16, mT = 28, mB = 44;
   var plotW = w - mL - mR, plotH = h - mT - mB;
   var tMax = 2.0; // seconds displayed
@@ -11103,8 +11112,8 @@ function renderTrafoInrush() {
   html += '<div class="result-box">';
   html += '<div class="result-row"><span class="label">In (' + S + ' kVA, 400 V)</span><span class="value">' + In.toFixed(1) + ' A</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Peak inrush', 'Peak inrush') + '</span><span class="value" style="font-weight:700;color:var(--danger)">' + peak + '\u00d7In = ' + (peak * In).toFixed(0) + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Tidskonstant \u03c4', 'Time constant \u03c4') + '</span><span class="value">0,30 s (typisk)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('5\u03c4 (henfaldet)', '5\u03c4 (decayed)') + '</span><span class="value">1,50 s</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tidskonstant \u03c4', 'Time constant \u03c4') + '</span><span class="value">' + trafoInrushTau(S).toString().replace('.', ',') + ' s (' + tx('skaleret med str\u00f8relse', 'scaled with size') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('5\u03c4 (henfaldet)', '5\u03c4 (decayed)') + '</span><span class="value">' + (5 * trafoInrushTau(S)).toFixed(2).replace('.', ',') + ' s</span></div>';
   // MCB coordination verdict
   var mcbOK = peak <= 20;
   var mcbType = peak <= 5 ? 'B' : (peak <= 10 ? 'C' : (peak <= 20 ? 'D' : 'K'));
@@ -11113,7 +11122,7 @@ function renderTrafoInrush() {
   html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Indkoblingskonvolut vs. MCB-zoner', 'Inrush envelope vs. MCB zones') + '</div>';
   html += trafoRenderInrushCurve(S, uk, 400, peak);
   html += '</div>';
-  html += calcDetail({ name: tx('Indkoblingsstr\u00f8m', 'Inrush current'), formula: 'I_peak = k \u00D7 In (exponential decay: I(t) = I_peak \u00D7 e^(-t/\u03C4))', variables: [{ name: 'In', symbol: 'In', value: In, unit: 'A' }, { name: 'k', symbol: 'k', value: peak }, { name: '\u03c4', symbol: '\u03c4', value: 0.3, unit: 's' }], substitution: peak + ' \u00d7 ' + In.toFixed(1) + ' = ' + (peak * In).toFixed(0) + ' A', result: { value: peak * In, unit: 'A (peak)' }, reference: 'DS/HD 60364-4-43.3; IEC 60076-3' });
+  html += calcDetail({ name: tx('Indkoblingsstr\u00f8m', 'Inrush current'), formula: 'I_peak = k \u00D7 In (exponential decay: I(t) = I_peak \u00D7 e^(-t/\u03C4))', variables: [{ name: 'In', symbol: 'In', value: In, unit: 'A' }, { name: 'k', symbol: 'k', value: peak }, { name: '\u03c4', symbol: '\u03c4', value: trafoInrushTau(S), unit: 's' }], substitution: peak + ' \u00d7 ' + In.toFixed(1) + ' = ' + (peak * In).toFixed(0) + ' A', result: { value: peak * In, unit: 'A (peak)' }, reference: 'DS/HD 60364-4-43.3; IEC 60076-3' });
   html += '</div>';
   return html;
 }
