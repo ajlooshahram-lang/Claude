@@ -2159,7 +2159,6 @@ test('renderThermal returns HTML with no text input fields (click-only UI)', fun
   var html = renderThermal();
   assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
   assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
-  assert.ok(html.indexOf('type="range"') >= 0, 'Should contain range sliders');
   assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
 });
 
@@ -2430,7 +2429,6 @@ test('renderEnergy returns HTML with no text input fields (click-only UI)', func
   var html = renderEnergy();
   assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
   assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
-  assert.ok(html.indexOf('type="range"') >= 0, 'Should contain range sliders');
   assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
 });
 

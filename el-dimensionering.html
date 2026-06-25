@@ -3469,7 +3469,7 @@ const PRODUCTS = {
     { id: 'CD-RED-50', brand: 'Wavin', model: 'Roer 50mm roed', cat: 'pipe', diameter: 50, color: 'red', use_da: 'Kabelrør 50mm stærkstrøm', use_en: 'Cable duct 50mm power', standard: 'DS 475' },
     { id: 'CD-RED-75', brand: 'Wavin', model: 'Roer 75mm roed', cat: 'pipe', diameter: 75, color: 'red', use_da: 'Kabelrør 75mm stærkstrøm', use_en: 'Cable duct 75mm power', standard: 'DS 475' },
     { id: 'CD-RED-110', brand: 'Wavin', model: 'Roer 110mm roed', cat: 'pipe', diameter: 110, color: 'red', use_da: 'Kabelrør 110mm stærkstrøm', use_en: 'Cable duct 110mm power', standard: 'DS 475' },
-    { id: 'CD-BLUE-50', brand: 'Wavin', model: 'Roer 50mm blaa', cat: 'pipe', diameter: 50, color: 'blue', use_da: 'Kabelrør 50mm telecom', use_en: 'Cable duct 50mm telecom', standard: 'DS 475' },
+    { id: 'CD-BLUE-50', brand: 'Wavin', model: 'R\u00f8r 50mm bl\u00e5', cat: 'pipe', diameter: 50, color: 'blue', use_da: 'Kabelr\u00f8r 50mm telecom', use_en: 'Cable duct 50mm telecom', standard: 'DS 475' },
     { id: 'CD-GREEN-50', brand: 'Wavin', model: 'Roer 50mm groen', cat: 'pipe', diameter: 50, color: 'green', use_da: 'Kabelrør 50mm fiber', use_en: 'Cable duct 50mm fiber', standard: 'DS 475' },
     { id: 'CD-TRAY-200', brand: 'Wibe', model: 'Kabelbakke 200mm', cat: 'tray', width: 200, color: 'grey', use_da: 'Kabelbakke 200mm perforeret', use_en: 'Cable tray 200mm perforated', standard: 'IEC 61537' },
     { id: 'CD-TRAY-400', brand: 'Wibe', model: 'Kabelbakke 400mm', cat: 'tray', width: 400, color: 'grey', use_da: 'Kabelbakke 400mm perforeret', use_en: 'Cable tray 400mm perforated', standard: 'IEC 61537' }
@@ -7306,12 +7306,16 @@ function renderThermal() {
       </div>
     </div>
     <div class="select-group">
-      <div class="select-label">${tx('Omgivelsestemperatur', 'Ambient Temperature')}: ${thermalState.ambientTemp}C</div>
-      <input type="range" min="10" max="60" step="5" value="${thermalState.ambientTemp}" onchange="thermalState.ambientTemp=+this.value;renderModule('thermal')">
+      <div class="select-label">${tx('Omgivelsestemperatur', 'Ambient Temperature')}: ${thermalState.ambientTemp}\u00b0C</div>
+      <div class="select-grid">
+        ${[10,15,20,25,30,35,40,45,50,55,60].map(t => `<button class="sel-btn ${thermalState.ambientTemp===t?'selected':''}" onclick="thermalState.ambientTemp=${t};renderModule('thermal')">${t}\u00b0C</button>`).join('')}
+      </div>
     </div>
     <div class="select-group">
       <div class="select-label">${tx('Antal kabler', 'Number of cables')}: ${thermalState.groupingCount}</div>
-      <input type="range" min="1" max="9" step="1" value="${thermalState.groupingCount}" onchange="thermalState.groupingCount=+this.value;renderModule('thermal')">
+      <div class="select-grid">
+        ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="sel-btn ${thermalState.groupingCount===n?'selected':''}" onclick="thermalState.groupingCount=${n};renderModule('thermal')">${n}</button>`).join('')}
+      </div>
     </div>
     <div class="select-group">
       <div class="select-label">${tx('Installationsmetode', 'Installation method')}</div>
@@ -7785,7 +7789,9 @@ function renderEnergy() {
     </div>
     <div class="select-group">
       <div class="select-label">${tx('Effekt','Power')}: ${energyState.powerKW} kW</div>
-      <input type="range" min="10" max="500" step="10" value="${energyState.powerKW}" onchange="energyState.powerKW=parseInt(this.value);renderModule('energy')">
+      <div class="select-grid">
+        ${[10,20,30,50,75,100,150,200,300,400,500].map(p => `<button class="sel-btn ${energyState.powerKW===p?'selected':''}" onclick="energyState.powerKW=${p};renderModule('energy')">${p} kW</button>`).join('')}
+      </div>
     </div>
     <div class="select-group">
       <div class="select-label">${tx('Belastningstyper','Load Types')}</div>
