@@ -14379,6 +14379,84 @@ test('ux: renderModule includes mode bar in output (all modules)', function () {
 });
 
 
+console.log('\n=== UX Load Module Retrofit Tests ===\n');
+
+test('ux-load: renderLoad uses uxSummary for executive summary (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderLoad();
+    assert.ok(out.indexOf('ux-summary') >= 0, 'executive summary present (' + lg + ')');
+    assert.ok(out.indexOf('ux-summary-item') >= 0, 'summary items present');
+  });
+  lang = prev;
+});
+
+test('ux-load: renderLoad uses uxSmartCards for presets', function () {
+  var prev = lang; lang = 'da';
+  var out = renderLoad();
+  assert.ok(out.indexOf('ux-smart-cards') >= 0, 'smart card grid present');
+  assert.ok(out.indexOf('ux-smart-card') >= 0, 'smart cards present');
+  assert.ok(out.indexOf('applyLoadPreset') >= 0, 'preset handler wired');
+  lang = prev;
+});
+
+test('ux-load: advanced params (cosφ/sf/ef) in a collapsible panel', function () {
+  var prev = lang; lang = 'da';
+  var out = renderLoad();
+  assert.ok(out.indexOf('ux-panel') >= 0, 'collapsible panel present');
+  assert.ok(out.indexOf('load_advanced') >= 0, 'panel has correct id');
+  lang = prev;
+});
+
+test('ux-load: diversity section hidden for apprentice/electrician, shown for engineer', function () {
+  var prev = lang, pm = uxMode;
+  lang = 'da';
+  uxMode = 'apprentice';
+  var out = renderLoad();
+  assert.ok(out.indexOf('load_diversity') < 0, 'diversity hidden for apprentice');
+  uxMode = 'engineer';
+  out = renderLoad();
+  assert.ok(out.indexOf('load_diversity') >= 0, 'diversity visible for engineer');
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: motor/contactor/relay recommendations hidden for apprentice, shown for engineer', function () {
+  var prev = lang, pm = uxMode;
+  lang = 'en'; loadState.power = 50; // enough to produce IB > 0
+  uxMode = 'apprentice';
+  var out = renderLoad();
+  assert.ok(out.indexOf('Recommended contactors') < 0, 'contactors hidden for apprentice');
+  uxMode = 'engineer';
+  out = renderLoad();
+  assert.ok(out.indexOf('Recommended contactors') >= 0, 'contactors shown for engineer');
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: output has no undefined/NaN in any mode (da/en × all modes)', function () {
+  var prev = lang, pm = uxMode;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    UX_MODES.forEach(function (m) {
+      uxMode = m;
+      var out = renderLoad();
+      assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + m + ')');
+      assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + m + ')');
+    });
+  });
+  lang = prev; uxMode = pm;
+});
+
+test('ux-load: preset still works (applyLoadPreset sets state)', function () {
+  var prev = { v: loadState.voltage, p: loadState.power, c: loadState.cosPhi };
+  applyLoadPreset('ev22');
+  assert.strictEqual(loadState.power, 22, 'EV22 sets 22 kW');
+  assert.strictEqual(loadState.voltage, '3x400', 'EV22 sets 3x400');
+  assert.strictEqual(loadState._preset, 'ev22', 'preset key stored');
+  loadState.voltage = prev.v; loadState.power = prev.p; loadState.cosPhi = prev.c;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
