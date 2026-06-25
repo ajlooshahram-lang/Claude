@@ -7066,6 +7066,24 @@ function renderCable3D() {
       <div class="result-row"><span class="label">${tx('Total','Total')} W/m</span><span class="value">${hd.totalWperM}</span></div>
       <div class="result-row"><span class="label">${tx('Per kabel','Per cable')} W/m</span><span class="value">${hd.perCable}</span></div>
     </div>
+    ${calcDetail({
+      name: tx('R\u00F8r-fyldningsgrad', 'Conduit fill rate'),
+      formula: tx('Fyldning% = \u03A3A_kabel / A_r\u00F8r \u00D7 100', 'Fill% = \u03A3A_cable / A_conduit \u00D7 100'),
+      variables: [
+        { name: tx('R\u00F8rdiameter', 'Conduit diameter'), symbol: 'd', value: cable3dState.conduitDia, unit: 'mm', source: tx('valgt', 'selected') },
+        { name: tx('R\u00F8rareal', 'Conduit area'), symbol: 'A_r\u00F8r', value: fr.containmentArea.toFixed(0), unit: 'mm\u00B2', source: '\u03C0\u00D7(d/2)\u00B2' },
+        { name: tx('Samlet kabelareal', 'Total cable area'), symbol: '\u03A3A', value: fr.totalCableArea.toFixed(0), unit: 'mm\u00B2', source: tx('sum af valgte', 'sum of selected') },
+        { name: tx('Antal kabler', 'Cable count'), symbol: 'n', value: cable3dState.selectedCables.length, unit: '', source: tx('valgt', 'selected') }
+      ],
+      substitution: fr.totalCableArea.toFixed(0) + ' / ' + fr.containmentArea.toFixed(0) + ' \u00D7 100',
+      steps: [
+        { desc: tx('R\u00F8rareal', 'Conduit area'), expr: '\u03C0 \u00D7 (' + cable3dState.conduitDia + '/2)\u00B2', result: fr.containmentArea.toFixed(0) + ' mm\u00B2' },
+        { desc: tx('Fyldningsgrad', 'Fill rate'), expr: fr.totalCableArea.toFixed(0) + ' / ' + fr.containmentArea.toFixed(0), result: (fr.fillRate * 100).toFixed(1) + '%' },
+        { desc: tx('Maks. tilladt', 'Max allowed'), expr: '\u2264 ' + (fr.maxFill * 100).toFixed(0) + '%', result: fr.exceeded ? (tx('OVERSKREDET', 'EXCEEDED') + ' \u274C') : 'OK \u2705' }
+      ],
+      result: { value: (fr.fillRate * 100).toFixed(1), unit: '%', status: fr.exceeded ? 'fail' : 'ok' },
+      reference: 'IEC 61386 Table 52.3; DS/HD 60364-5-52'
+    })}
   </div>`;
 }
 
