@@ -13967,6 +13967,34 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 9: continuous-learning closes the loop (topic-emphasis biasing) -----
+test('autoexam/bias: axGenerate stays deterministic with and without topic weights', function () {
+  assert.strictEqual(JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case')), JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case')));
+  var tw = { topicWeights: { shortcircuit: 50, overload: 5, cable: 5, vdrop: 5, fault: 5 } };
+  assert.strictEqual(JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case', tw)), JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case', tw)));
+});
+test('autoexam/bias: emphasizing a competency makes its tasks appear more often (core chain still first)', function () {
+  function share(cat, opts) {
+    var hit = 0, tot = 0;
+    for (var s = 1; s <= 120; s++) {
+      var p = axGenerate(s * 7 + 1, 'fabrik', 'ekspert', 'case', opts);
+      var inst = p.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+      inst.tasks.forEach(function (t) { tot++; if (t.cat === cat) hit++; });
+    }
+    return hit / tot;
+  }
+  var base = share('shortcircuit', null);
+  var biased = share('shortcircuit', { topicWeights: { shortcircuit: 60, overload: 3, cable: 3, vdrop: 3, fault: 3 } });
+  assert.ok(biased >= base, 'short-circuit emphasis must not decrease its share (' + Math.round(base * 100) + '% -> ' + Math.round(biased * 100) + '%)');
+  assert.ok(biased > base - 1e-9, 'bias is applied');
+  // core chain remains first and the exam still grades perfectly
+  var p = axGenerate(3, 'fabrik', 'ekspert', 'fuld', { topicWeights: { fault: 40, overload: 5, cable: 5, vdrop: 5, shortcircuit: 5 } });
+  var inst = p.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+  assert.deepStrictEqual(inst.tasks.slice(0, 3).map(function (t) { return t.id; }), ['t_ib', 't_dev', 't_cab'], 'core chain first under bias');
+  var ans = {}; p.opgaver.forEach(function (o) { o.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(p, ans).score, 100, 'biased exam still solvable to 100%');
+});
+
 // ----- Batch 8: auto-generated single-line diagram (bilag) in exams -----
 test('autoexam/sld-bilag: installation diagram is fault-free and coordination-correct (IB<=In<=Iz, Icu>=Ik)', function () {
   var n = 0, bad = 0;

@@ -11572,7 +11572,7 @@ function axGenInstallation(rng, b, tier) {
   };
 }
 
-function axTasksInstallation(d, tier, maxTasks, rng) {
+function axTasksInstallation(d, tier, maxTasks, rng, topicWeights) {
   var tasks = [];
   var kTemp = TEMP_FACTORS[d.ambient] || 1;
   var kGroup = GROUP_FACTORS[d.grouping] || 1;
@@ -11618,9 +11618,18 @@ function axTasksInstallation(d, tier, maxTasks, rng) {
     var nRa = axNumOpts(raMax, [Math.round(raMax / 3), Math.round(raMax * 2), Math.round(raMax / 10)]);
     tasks.push({ id: 't_ra', kind: 'earthing', prompt: { da: 'Bestem den maksimalt tilladte udbredelsesmodstand RA for jordelektroden i TT-systemet (HPFI I\u0394n = 30 mA, UL = 50 V).', en: 'Determine the maximum permissible earth-electrode resistance RA in the TT system (RCD I\u0394n = 30 mA, UL = 50 V).' }, given: { IDn: IDn, UL: UL }, answer: raMax, opts: nRa.opts, ci: nRa.ci, unit: '\u03a9', clause: 'DS/HD 60364-4-41 \u00a7411.5.3', cat: 'fault' });
   }
-  // Keep the core chain (IB -> In -> cable) first; deterministically vary the rest.
+  // Keep the core chain (IB -> In -> cable) first; vary the rest. When topic
+  // weights are supplied (from a learned profile), bias the order so emphasized
+  // competencies surface first (weighted shuffle); otherwise a plain shuffle.
   var core = tasks.slice(0, 3); var rest = tasks.slice(3);
-  if (rng) { for (var qi = rest.length - 1; qi > 0; qi--) { var rj = Math.floor(rng() * (qi + 1)); var tmp = rest[qi]; rest[qi] = rest[rj]; rest[rj] = tmp; } }
+  if (rng) {
+    if (topicWeights) {
+      rest = rest.map(function (t) { var w = topicWeights[t.cat]; if (!(w > 0)) w = 1; return { t: t, key: Math.pow(rng() || 1e-9, 1 / w) }; })
+        .sort(function (a, b) { return b.key - a.key; }).map(function (x) { return x.t; });
+    } else {
+      for (var qi = rest.length - 1; qi > 0; qi--) { var rj = Math.floor(rng() * (qi + 1)); var tmp = rest[qi]; rest[qi] = rest[rj]; rest[rj] = tmp; }
+    }
+  }
   var ordered = core.concat(rest);
   return ordered.slice(0, Math.max(2, Math.min(maxTasks, ordered.length)));
 }
@@ -11664,8 +11673,9 @@ function axGenSpoergsmaal(rng, tier, n) {
 }
 
 // axGenerate(seed, buildingId, tierId, modeId) -> full authentic exam project.
-function axGenerate(seed, buildingId, tierId, modeId) {
+function axGenerate(seed, buildingId, tierId, modeId, opts) {
   var rng = axRngMake(seed >>> 0);
+  var topicWeights = opts && opts.topicWeights ? opts.topicWeights : null;
   var b = axBuilding(buildingId), tier = axTier(tierId), mode = axMode(modeId);
   var parts = mode.parts.filter(function (p) { return p !== 'forsyning' || b.hasForsyning; });
   if (parts.length === 0) parts = ['installation'];
@@ -11682,7 +11692,7 @@ function axGenerate(seed, buildingId, tierId, modeId) {
       opgaver.push({ num: num, type: 'forsyning', weightPct: weights.forsyning, title: { da: 'Forsyningsanl\u00e6g', en: 'Supply installation' }, data: f.data, tasks: f.tasks.slice(0, tasksPerPart) });
     } else if (part === 'installation') {
       var d = axGenInstallation(rng, b, tier);
-      var it = axTasksInstallation(d, tier, tasksPerPart, rng);
+      var it = axTasksInstallation(d, tier, tasksPerPart, rng, topicWeights);
       opgaver.push({ num: num, type: 'installation', weightPct: weights.installation, title: { da: 'Bygningsinstallation', en: 'Building installation' }, data: d, tasks: it });
     } else {
       var st = axGenSpoergsmaal(rng, tier, tasksPerPart);
@@ -12742,9 +12752,9 @@ function axL(o) { return (o && typeof o === 'object') ? tx(o.da, o.en) : (o == n
 function axStoreGet() { try { return JSON.parse(localStorage.getItem('autoexamStore') || '{}'); } catch (e) { return {}; } }
 function axStoreSet(s) { try { localStorage.setItem('autoexamStore', JSON.stringify(s)); } catch (e) {} }
 function axFmtTime(s) { s = Math.max(0, s | 0); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60; return (h > 0 ? (h + ':') : '') + (m < 10 && h > 0 ? '0' : '') + m + ':' + (ss < 10 ? '0' : '') + ss; }
-function axUIgenerate(keepSeed) {
+function axUIgenerate(keepSeed, bias) {
   if (!keepSeed || !autoexamState.seed) autoexamState.seed = (Math.floor(Math.random() * 1e9)) || 1;
-  autoexamState.project = axGenerate(autoexamState.seed, autoexamState.building, autoexamState.tier, autoexamState.mode);
+  autoexamState.project = axGenerate(autoexamState.seed, autoexamState.building, autoexamState.tier, autoexamState.mode, bias ? { topicWeights: bias } : null);
   autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; autoexamState.hints = {};
   var md = axMode(autoexamState.mode); autoexamState.timerSec = md.sec; autoexamState.timerLeft = md.sec; autoexamState.timerOn = false;
   if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; }
@@ -12802,7 +12812,8 @@ function axGenFromProfile() {
   var rng = axRngMake((Math.floor(Math.random() * 1e9)) || 1);
   autoexamState.building = axBiasedBuilding(prof, rng);
   var rec = axAdaptiveNext(axLogList(), autoexamState.tier); autoexamState.tier = rec.tier;
-  axUIgenerate(false); autoexamState.tab = 'opgave'; renderModule('autoexam');
+  var bias = axProfileBias(prof); var tw = bias ? bias.topicEmphasis : null;
+  axUIgenerate(false, tw); autoexamState.tab = 'opgave'; renderModule('autoexam');
 }
 function axTimerStart() { autoexamState.timerOn = true; var end = Date.now() + autoexamState.timerLeft * 1000; if (autoexamTimer) clearInterval(autoexamTimer); autoexamTimer = setInterval(function () { autoexamState.timerLeft = Math.max(0, Math.round((end - Date.now()) / 1000)); var el = document.getElementById('axTimer'); if (el) el.textContent = axFmtTime(autoexamState.timerLeft); if (autoexamState.timerLeft <= 0) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; renderModule('autoexam'); } }, 1000); renderModule('autoexam'); }
 function axTimerPause() { autoexamState.timerOn = false; if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; } renderModule('autoexam'); }
