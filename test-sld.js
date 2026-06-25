@@ -14042,6 +14042,144 @@ test('fuse: curve card hidden until a fuse size is selected', function () {
 });
 
 
+console.log('\n=== MCCB/ACB LSIG Protection Envelope Tests ===\n');
+
+test('lsig: LSIG_TRIP_UNITS covers Micrologic 2.2/5.2/6.2 and generic ACB', function () {
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 2.2'], '2.2 present');
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 5.2'], '5.2 present');
+  assert.ok(LSIG_TRIP_UNITS['Micrologic 6.2'], '6.2 present');
+  assert.ok(LSIG_TRIP_UNITS['ACB LSIG'], 'ACB present');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 2.2'].segments, 'LS');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 5.2'].segments, 'LSI');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 6.2'].segments, 'LSIG');
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 6.2'].gFault, true);
+  assert.strictEqual(LSIG_TRIP_UNITS['Micrologic 2.2'].gFault, false);
+});
+
+test('lsig: envelope returns L+S for Micrologic 2.2 (no I, no G)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 2.2', trL: 16, trS: 0.1 });
+  assert.ok(env.L.length > 0, 'L segment present');
+  assert.ok(env.S.length > 0, 'S segment present');
+  assert.strictEqual(env.I.length, 0, 'no I segment');
+  assert.strictEqual(env.G.length, 0, 'no G segment');
+});
+
+test('lsig: envelope returns L+S+I for Micrologic 5.2', function () {
+  var env = lsigCurveEnvelope({ In: 250, ioMult: 0.8, isdMult: 3, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 8, trS: 0.2 });
+  assert.ok(env.L.length > 0 && env.S.length > 0 && env.I.length > 0, 'L+S+I');
+  assert.strictEqual(env.G.length, 0, 'no G');
+});
+
+test('lsig: envelope returns L+S+I+G for Micrologic 6.2 / ACB', function () {
+  ['Micrologic 6.2', 'ACB LSIG'].forEach(function (tu) {
+    var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 15, igMult: 0.3, tg: 0.2, tripUnit: tu, trL: 16, trS: 0.1 });
+    assert.ok(env.L.length > 0 && env.S.length > 0 && env.I.length > 0 && env.G.length > 0, tu + ' L+S+I+G');
+  });
+});
+
+test('lsig: computed pickups are correct', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.4, tg: 0, tripUnit: 'Micrologic 6.2', trL: 16, trS: 0.1 });
+  assert.strictEqual(env.settings.io, 320);   // 0.8 * 400
+  assert.strictEqual(env.settings.isd, 1600); // 5 * 320
+  assert.strictEqual(env.settings.ii, 4800);  // 12 * 400
+  assert.strictEqual(env.settings.ig, 160);   // 0.4 * 400
+});
+
+test('lsig: L segment ends before S pickup (long-time does not extend into short-time region)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12 });
+  var maxLcurr = 0;
+  env.L.forEach(function (p) { if (p.i > maxLcurr) maxLcurr = p.i; });
+  assert.ok(maxLcurr < env.settings.isd, 'L region below Isd (' + maxLcurr + ' < ' + env.settings.isd + ')');
+});
+
+test('lsig: S segment ends before I pickup for LSI/LSIG', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1 });
+  var maxScurr = 0;
+  env.S.forEach(function (p) { if (p.i > maxScurr) maxScurr = p.i; });
+  assert.ok(maxScurr < env.settings.ii, 'S region below Ii (' + maxScurr + ' < ' + env.settings.ii + ')');
+});
+
+test('lsig: L region times decrease with increasing current (inverse-time)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12 });
+  var prev = Infinity;
+  env.L.forEach(function (p) { assert.ok(p.tMax <= prev + 1e-9, 'L decreasing'); prev = p.tMax; });
+});
+
+test('lsig: I segment is fast (<= 20 ms max)', function () {
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1 });
+  env.I.forEach(function (p) { assert.ok(p.tMax <= 0.02, 'I <= 20 ms (got ' + p.tMax + ')'); });
+});
+
+test('lsig: changing trL changes L-segment times', function () {
+  var env1 = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 4, trS: 0.1, iiMult: 12 });
+  var env2 = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 5.2', trL: 32, trS: 0.1, iiMult: 12 });
+  assert.ok(env1.L[0].tMax < env2.L[0].tMax, 'shorter trL means faster L');
+});
+
+test('lsig: lsigRenderCurve produces valid SVG, no leaks, all trip units, da/en', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    Object.keys(LSIG_TRIP_UNITS).forEach(function (tu) {
+      var svg = lsigRenderCurve({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.3, tg: 0.1, tripUnit: tu, trL: 16, trS: 0.1 });
+      assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'svg (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + '/' + tu + ')');
+      assert.ok(svg.indexOf(tu) >= 0, 'trip unit named in title');
+    });
+  });
+  lang = prev;
+});
+
+test('lsig: settings table renders with correct pickup values, no leaks', function () {
+  var prev = lang; lang = 'en';
+  var h = lsigRenderSettingsTable({ In: 400, ioMult: 0.8, isdMult: 5, iiMult: 12, igMult: 0.3, tg: 0.1, tripUnit: 'Micrologic 6.2', trL: 16, trS: 0.1 });
+  assert.ok(h.indexOf('320 A') >= 0, 'Ir = 320 A (0.8*400)');
+  assert.ok(h.indexOf('1600 A') >= 0, 'Isd = 1600 A (5*320)');
+  assert.ok(h.indexOf('4800 A') >= 0, 'Ii = 4800 A (12*400)');
+  assert.ok(h.indexOf('120 A') >= 0, 'Ig = 120 A (0.3*400)');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('lsig: renderMCCB embeds the LSIG curve and all dials (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderMCCB();
+    assert.ok(out.indexOf('LSIG') >= 0, 'LSIG referenced (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'curve embedded (' + lg + ')');
+    assert.ok(out.indexOf('IEC 60947-2') >= 0, 'cites IEC 60947-2 (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('lsig: ground-fault dials hidden for Micrologic 2.2/5.2, shown for 6.2/ACB', function () {
+  var prev = lang; lang = 'da';
+  mccbState.tripUnit = 'Micrologic 2.2';
+  var out = renderMCCB();
+  assert.ok(out.indexOf('Jordfejl Ig') < 0, 'no G dial for 2.2');
+  mccbState.tripUnit = 'Micrologic 6.2';
+  out = renderMCCB();
+  assert.ok(out.indexOf('Jordfejl Ig') >= 0, 'G dial for 6.2');
+  mccbState.tripUnit = 'Micrologic 5.2'; // restore
+  lang = prev;
+});
+
+test('lsig: I dial hidden for Micrologic 2.2 (LS only), shown for 5.2+', function () {
+  var prev = lang; lang = 'en';
+  mccbState.tripUnit = 'Micrologic 2.2';
+  var out = renderMCCB();
+  assert.ok(out.indexOf('Instantaneous Ii') < 0, 'no I dial for 2.2');
+  mccbState.tripUnit = 'Micrologic 5.2';
+  out = renderMCCB();
+  assert.ok(out.indexOf('Instantaneous Ii') >= 0, 'I dial for 5.2');
+  lang = prev;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
