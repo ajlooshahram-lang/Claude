@@ -13645,6 +13645,36 @@ test('rcd: RCD_TRIP_LIMITS selective (type S) band 130-500 / 60-200 / 50-150 ms'
   assert.strictEqual(s[2].min, 0.050); assert.strictEqual(s[2].max, 0.150);
 });
 
+test('standards: adiabatic k-factors match IEC 60364-4-43 Table 43A (life-safety constants)', function () {
+  // The autoexam answer-key table and the Fault module MUST share the exact
+  // standardised k values. Any drift here silently corrupts every short-circuit
+  // (k^2*S^2 >= I^2*t) verdict, so pin them hard.
+  assert.strictEqual(AX_K['Cu/PVC'], 115, 'Cu/PVC k=115');
+  assert.strictEqual(AX_K['Cu/XLPE'], 143, 'Cu/XLPE k=143');
+  assert.strictEqual(AX_K['Al/PVC'], 76, 'Al/PVC k=76');
+  assert.strictEqual(AX_K['Al/XLPE'], 94, 'Al/XLPE k=94');
+  assert.strictEqual(FAULT_K_FACTORS.cuPVC.k, 115, 'fault Cu/PVC k=115');
+  assert.strictEqual(FAULT_K_FACTORS.cuXLPE.k, 143, 'fault Cu/XLPE k=143');
+  assert.strictEqual(FAULT_K_FACTORS.alPVC.k, 76, 'fault Al/PVC k=76');
+  assert.strictEqual(FAULT_K_FACTORS.alXLPE.k, 94, 'fault Al/XLPE k=94');
+  // The two tables must agree (single source of truth for the standard k).
+  assert.strictEqual(AX_K['Cu/PVC'], FAULT_K_FACTORS.cuPVC.k, 'autoexam and fault agree on Cu/PVC');
+  assert.strictEqual(AX_K['Cu/XLPE'], FAULT_K_FACTORS.cuXLPE.k, 'autoexam and fault agree on Cu/XLPE');
+  // Large-conductor reduced k must be conservative (lower => larger Smin => safer).
+  ['cuPVC', 'cuXLPE', 'alPVC', 'alXLPE'].forEach(function (key) {
+    assert.ok(FAULT_K_FACTORS[key].kLarge <= FAULT_K_FACTORS[key].k, key + ' kLarge <= k (conservative)');
+  });
+});
+
+test('standards: faultCalcMinCSA implements Smin = sqrt(I^2 t)/k = I*sqrt(t)/k', function () {
+  // 1000 A, 0.2 s, Cu/PVC k=115 -> 1000*sqrt(0.2)/115 = 3.887 mm^2
+  var smin = faultCalcMinCSA(1000, 0.2, 115);
+  assert.ok(Math.abs(smin - (1000 * Math.sqrt(0.2) / 115)) < 1e-6, 'matches adiabatic formula');
+  assert.ok(Math.abs(smin - 3.887) < 0.01, 'numeric check ~3.89 mm^2');
+  // Lower k must demand a larger cross-section (safety direction).
+  assert.ok(faultCalcMinCSA(1000, 0.2, 103) > smin, 'lower k => larger Smin');
+});
+
 test('rcd: rcdTripMaxAt exact at standard test points (general)', function () {
   assert.strictEqual(rcdTripMaxAt(1, false), 0.300);
   assert.strictEqual(rcdTripMaxAt(2, false), 0.150);
