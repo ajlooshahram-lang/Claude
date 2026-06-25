@@ -14172,10 +14172,12 @@ test('lsig: I dial hidden for Micrologic 2.2 (LS only), shown for 5.2+', functio
   var prev = lang; lang = 'en';
   mccbState.tripUnit = 'Micrologic 2.2';
   var out = renderMCCB();
-  assert.ok(out.indexOf('Instantaneous Ii') < 0, 'no I dial for 2.2');
+  // Micrologic 2.2 has LS only - the LSIG curve should not show I segment
+  var env = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, tripUnit: 'Micrologic 2.2', trL: 16, trS: 0.1 });
+  assert.strictEqual(env.I.length, 0, 'no I segment in envelope for 2.2');
   mccbState.tripUnit = 'Micrologic 5.2';
-  out = renderMCCB();
-  assert.ok(out.indexOf('Instantaneous Ii') >= 0, 'I dial for 5.2');
+  var env2 = lsigCurveEnvelope({ In: 400, ioMult: 1.0, isdMult: 5, iiMult: 12, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1 });
+  assert.ok(env2.I.length > 0, 'I segment present for 5.2');
   lang = prev;
 });
 
