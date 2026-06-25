@@ -18830,8 +18830,8 @@ function renderLighting() {
   // Energy Savings — LED vs. conventional lighting
   var ledWPerM2 = calc.powerDensity || 8;
   var conventionalWPerM2 = ledWPerM2 * 2.5; // T8 fluorescent is ~2.5x LED
-  var roomArea = lightingState.roomW * lightingState.roomL;
-  var annualHoursLighting = (lightingState.task === 'office' || lightingState.task === 'classroom') ? 2500 : 4000;
+  var roomArea = calc.area || (lightingState.length * lightingState.width);
+  var annualHoursLighting = (lightingState.roomType === 'office' || lightingState.roomType === 'classroom' || lightingState.roomType === 'school') ? 2500 : 4000;
   var ledAnnualKWh = ledWPerM2 * roomArea * annualHoursLighting / 1000;
   var convAnnualKWh = conventionalWPerM2 * roomArea * annualHoursLighting / 1000;
   var lightSavingKWh = convAnnualKWh - ledAnnualKWh;
@@ -19972,14 +19972,14 @@ function renderFireAlarm() {
     formula: 'n = A / A_detektor',
     variables: [
       { name: tx('Rumareal', 'Room area'), symbol: 'A', value: firealarmState.roomArea, unit: 'm\u00B2', source: tx('Valgt', 'Selected') },
-      { name: tx('Detektorareal', 'Detector coverage'), symbol: 'A_det', value: calc.coverageM2, unit: 'm\u00B2', source: 'DS/EN 54-1' },
+      { name: tx('Detektorareal', 'Detector coverage'), symbol: 'A_det', value: calc.coverage || tx('n/a', 'n/a'), unit: 'm\u00B2', source: 'DS/EN 54-1' },
       { name: tx('Antal detektorer', 'Detector count'), symbol: 'n', value: calc.count, unit: 'stk', source: tx('Beregnet', 'Calculated') },
       { name: tx('Lofth\u00F8jde', 'Ceiling height'), symbol: 'h', value: firealarmState.ceilingHeight, unit: 'm', source: tx('Valgt', 'Selected') },
       { name: tx('Maks h\u00F8jde', 'Max height'), symbol: 'h_max', value: calc.maxHeight, unit: 'm', source: tx('Detektortype', 'Detector type') }
     ],
-    substitution: firealarmState.roomArea + ' / ' + calc.coverageM2 + ' = ' + calc.count,
+    substitution: firealarmState.roomArea + ' / ' + (calc.coverage || 1) + ' = ' + calc.count,
     steps: [
-      { desc: tx('Antal detektorer', 'Detector count'), expr: firealarmState.roomArea + ' / ' + calc.coverageM2, result: calc.count + ' stk' },
+      { desc: tx('Antal detektorer', 'Detector count'), expr: firealarmState.roomArea + ' / ' + (calc.coverage || 1), result: calc.count + ' stk' },
       { desc: tx('H\u00F8jdekontrol', 'Height check'), expr: firealarmState.ceilingHeight + 'm vs max ' + calc.maxHeight + 'm', result: calc.heightOk ? 'OK \u2705' : tx('FOR H\u00D8JT', 'TOO HIGH') + ' \u274C' }
     ],
     result: { value: calc.count, unit: tx('detektorer', 'detectors'), status: compliant ? 'ok' : 'fail' },
@@ -20322,12 +20322,12 @@ function renderData() {
       { name: tx('Kategori', 'Category'), symbol: 'Cat', value: dataState.cableCategory.toUpperCase(), unit: '', source: tx('Valgt', 'Selected') },
       { name: tx('Afstand', 'Distance'), symbol: 'L', value: dataState.distance, unit: 'm', source: tx('Valgt', 'Selected') },
       { name: tx('Maks. afstand', 'Max distance'), symbol: 'L_max', value: distCheck.maxPermanent || 90, unit: 'm', source: 'ISO 11801' },
-      { name: tx('Antal udtag', 'Outlet count'), symbol: 'n', value: outlets.outlets, unit: 'stk', source: outlets.outletsPerM2 + '/m\u00B2' }
+      { name: tx('Antal udtag', 'Outlet count'), symbol: 'n', value: outlets.outlets, unit: 'stk', source: outlets.density + '/m\u00B2' }
     ],
     substitution: dataState.distance + 'm vs max ' + (distCheck.maxPermanent || 90) + 'm',
     steps: [
       { desc: tx('Afstandskontrol', 'Distance check'), expr: dataState.distance + ' \u2264 ' + (distCheck.maxPermanent || 90), result: distCheck.ok ? 'OK \u2705' : tx('FOR LANG', 'TOO LONG') + ' \u274C' },
-      { desc: tx('Udtag beregnet', 'Outlets calculated'), expr: dataState.floorArea + 'm\u00B2 \u00D7 ' + outlets.outletsPerM2, result: outlets.outlets + ' stk' }
+      { desc: tx('Udtag beregnet', 'Outlets calculated'), expr: dataState.floorArea + 'm\u00B2 \u00D7 ' + outlets.density, result: outlets.outlets + ' stk' }
     ],
     result: { value: dataState.distance, unit: 'm', status: distCheck.ok ? 'ok' : 'fail' },
     reference: 'ISO 11801; DS/EN 50173'
