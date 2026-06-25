@@ -13086,6 +13086,102 @@ function axRenderLaering() {
   return h;
 }
 
+// ---- Printable exam paper + worked-solution (facit) export -------------------
+function axEsc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : '&gt;'); }); }
+function axPrintCss() {
+  return '<style>body{font-family:Georgia,"Times New Roman",serif;color:#111;max-width:820px;margin:24px auto;padding:0 24px;line-height:1.5}h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;border-bottom:2px solid #333;padding-bottom:4px;margin-top:22px}h3{font-size:13px;margin:10px 0 4px}table{border-collapse:collapse;width:100%;font-size:12px;margin:8px 0}td,th{border:1px solid #999;padding:3px 6px;text-align:left}.muted{color:#555;font-size:12px}.box{border:1px solid #bbb;background:#f6f6f6;padding:8px 10px;border-radius:6px;margin:8px 0}ol,ul{margin:6px 0 6px 22px}.opg{page-break-inside:avoid}.pb{page-break-before:always}.ans{color:#0a7d32;font-weight:bold}.sol{border-left:3px solid #06c;padding-left:10px;margin:10px 0;font-size:13px}code{background:#eee;padding:1px 4px;border-radius:3px;font-family:"Cambria Math",Consolas,monospace}@media print{body{margin:0;max-width:none}a[href]:after{content:""}}</style>';
+}
+function axPrintBullets(arr) { return '<ul>' + arr.map(function (x) { return '<li>' + axEsc(axL(x)) + '</li>'; }).join('') + '</ul>'; }
+function axGenerelleBullets() {
+  return axPrintBullets([
+    { da: 'Besvarelsen udf\u00f8res i overensstemmelse med g\u00e6ldende DS/HD 60364-serie samt Bekendtg\u00f8relse om elektriske installationer (BEK 1082) og g\u00e6ldende F\u00e6llesregulativ.', en: 'The answer follows the current DS/HD 60364 series plus the Danish installation order (BEK 1082) and the current common regulation.' },
+    { da: 'Hvor der er flere dimensioneringsgrundlag, v\u00e6lges og angives grundlaget efter eget valg.', en: 'Where several dimensioning bases exist, choose and state the basis used.' },
+    { da: 'Opgaverne kan l\u00f8ses uafh\u00e6ngigt af hinanden.', en: 'The parts may be solved independently.' }
+  ]);
+}
+function axPrintDataBlock(op) {
+  if (op.type === 'installation') {
+    var d = op.data;
+    var h = '<div class="box"><strong>' + tx('Tekniske oplysninger', 'Technical information') + '</strong><br>';
+    h += tx('Systemjording', 'System earthing') + ': ' + d.earthing + '<br>';
+    h += tx('Transformer', 'Transformer') + ': SN = ' + axEsc(axFmt(d.trafo.SN)) + ' kVA, UN = 3\u00d710/0,4 kV, ' + d.trafo.vector + ', ek = ' + axEsc(axFmt(d.trafo.ek)) + ' %<br>';
+    h += tx('Omgivelsestemperatur', 'Ambient temperature') + ': ' + d.ambient + ' \u00b0C \u00b7 ' + tx('gruppering', 'grouping') + ': ' + d.grouping + '<br>';
+    h += tx('Stikledning', 'Service line') + ': ' + (d.stik.material === 'Al' ? 'Al' : 'Cu') + '/' + d.stik.insulation + ', L = ' + axEsc(axFmt(d.stik.length)) + ' m, cos\u03c6 = ' + axEsc(axFmt(d.stik.cos)) + '</div>';
+    h += '<table><tr><th>' + tx('Brugsgenstand', 'Load') + '</th><th>P [kW]</th><th>cos\u03c6</th><th>\u03b7</th><th>' + tx('Faser', 'Phases') + '</th><th>Sf</th><th>IB [A]</th></tr>';
+    d.loads.forEach(function (l) { h += '<tr><td>' + axEsc(axL({ da: l.da, en: l.en })) + '</td><td>' + axEsc(axFmt(l.P)) + '</td><td>' + axEsc(axFmt(l.cos)) + '</td><td>' + axEsc(axFmt(l.eta)) + '</td><td>' + (l.ph === 3 ? '3~' : '1~') + '</td><td>' + axEsc(axFmt(l.sf)) + '</td><td>' + axEsc(axFmt(l.IB, 1)) + '</td></tr>'; });
+    h += '<tr><td colspan="6"><strong>' + tx('Dimensionsgivende IB', 'Dimensioning IB') + '</strong></td><td><strong>' + axEsc(axFmt(d.IBtotal, 1)) + '</strong></td></tr></table>';
+    return h;
+  }
+  if (op.type === 'forsyning') {
+    var f = op.data;
+    return '<div class="box"><strong>' + tx('Forsyningsforhold', 'Supply conditions') + '</strong><br>' + tx('Transformer', 'Transformer') + ': SN = ' + axEsc(axFmt(f.SN)) + ' kVA, UN = 3\u00d710/0,4 kV, ' + f.vector + ', ek = ' + axEsc(axFmt(f.ek)) + ' %<br>' + tx('Fuldlaststr\u00f8m (LV)', 'Full-load current (LV)') + ': In \u2248 ' + axEsc(axFmt(f.In, 0)) + ' A \u00b7 ki = ' + f.ki + '/5 A</div>';
+  }
+  return '';
+}
+// Build a standalone, printable exam paper (self-contained HTML).
+function axBuildExamHtml(project) {
+  var m = project.meta;
+  var H = '<!doctype html><html lang="' + (lang === 'da' ? 'da' : 'en') + '"><head><meta charset="utf-8"><title>' + axEsc(axL(m.title)) + ' \u2013 ' + axEsc(axL(m.building)) + '</title>' + axPrintCss() + '</head><body>';
+  H += '<h1>' + m.icon + ' ' + axEsc(axL(m.title)) + ' \u2014 ' + axEsc(axL(m.building)) + '</h1>';
+  H += '<div class="muted">' + axEsc(axL(m.date)) + ', kl. ' + m.time + ' \u00b7 ' + m.approved + ' \u00b7 ' + m.pages + ' ' + tx('sider', 'pages') + ', ' + m.bilag + ' ' + tx('bilag', 'appendices') + '</div>';
+  H += '<div class="muted">' + tx('Niveau', 'Level') + ': ' + axEsc(axL(m.tier)) + ' \u00b7 ' + tx('Form', 'Format') + ': ' + axEsc(axL(m.mode)) + '</div>';
+  H += '<p><strong>' + tx('V\u00e6gtning', 'Weighting') + ':</strong> ' + project.opgaver.map(function (o) { return 'Opgave ' + o.num + ' = ' + o.weightPct + '%'; }).join(' \u00b7 ') + '</p>';
+  H += '<div class="box"><strong>' + tx('Generelle oplysninger', 'General information') + '</strong>' + axGenerelleBullets() + '</div>';
+  if (project.background) H += '<p><strong>' + tx('Projektbaggrund', 'Project background') + ':</strong> ' + axEsc(axL(project.background)) + '</p>';
+  if (project.customer && project.customer.da) H += '<p><strong>' + tx('Kundekrav', 'Customer requirements') + ':</strong> ' + axEsc(tx(project.customer.da[0], project.customer.en[0])) + '</p>';
+  project.opgaver.forEach(function (op, idx) {
+    H += '<div class="opg' + (idx > 0 ? ' pb' : '') + '"><h2>Opgave ' + op.num + ' \u2014 ' + axEsc(axL(op.title)) + ' (' + op.weightPct + '%)</h2>';
+    H += axPrintDataBlock(op);
+    H += '<h3>' + tx('Opgaven omfatter f\u00f8lgende', 'The task comprises the following') + ':</h3><ol>';
+    op.tasks.forEach(function (t) {
+      H += '<li>' + axEsc(axL(t.prompt)) + ' <span class="muted">[' + axEsc(t.clause) + ']</span>';
+      H += '<div class="muted">';
+      for (var i = 0; i < t.opts.length; i++) H += String.fromCharCode(97 + i) + ') ' + axEsc(axOptLabel(t, i)) + '&nbsp;&nbsp; ';
+      H += '</div></li>';
+    });
+    H += '</ol>';
+    H += '<h3>' + tx('Leverancer', 'Deliverables') + ':</h3>' + axPrintBullets(axDeliverables(op.type));
+    H += '<h3>' + tx('Dokumentationskrav', 'Documentation requirements') + ':</h3>' + axPrintBullets(axDocReq());
+    H += '<h3>' + tx('Bed\u00f8mmelseskriterier', 'Evaluation criteria') + ':</h3>' + axPrintBullets(axEvalCriteria(axTier(project.tierId).pass));
+    H += '</div>';
+  });
+  H += '</body></html>';
+  return H;
+}
+// Build a standalone, printable worked solution (facit).
+function axBuildSolutionHtml(project) {
+  var m = project.meta; var sol = axSolve(project);
+  var H = '<!doctype html><html lang="' + (lang === 'da' ? 'da' : 'en') + '"><head><meta charset="utf-8"><title>' + tx('Facit', 'Solution') + ' \u2013 ' + axEsc(axL(m.building)) + '</title>' + axPrintCss() + '</head><body>';
+  H += '<h1>\uD83D\uDCD8 ' + tx('L\u00f8sningsforslag (facit)', 'Worked solution (key)') + ' \u2014 ' + axEsc(axL(m.building)) + '</h1>';
+  H += '<div class="muted">' + axEsc(axL(m.date)) + ' \u00b7 ' + tx('Niveau', 'Level') + ': ' + axEsc(axL(m.tier)) + '</div>';
+  sol.forEach(function (op, idx) {
+    H += '<div class="' + (idx > 0 ? 'pb' : '') + '"><h2>Opgave ' + op.num + ' \u2014 ' + axEsc(axL(op.title)) + '</h2>';
+    op.tasks.forEach(function (s, k) {
+      var orig = project.opgaver[idx].tasks[k];
+      H += '<div class="sol"><strong>' + (k + 1) + '. ' + axEsc(axL(s.title)) + '</strong>';
+      H += '<div class="ans">' + tx('Korrekt svar', 'Correct answer') + ': ' + axEsc(axOptLabel(orig, orig.ci)) + '</div>';
+      if (s.assumptions && s.assumptions.length) H += '<div><em>' + tx('Antagelser', 'Assumptions') + ':</em> ' + s.assumptions.map(function (a) { return axEsc(axL(a)); }).join(' ') + '</div>';
+      if (s.formula) H += '<div><em>' + tx('Formel', 'Formula') + ':</em> <code>' + axEsc(s.formula.replace(/\n/g, '  |  ')) + '</code></div>';
+      H += '<div><em>' + tx('Standard', 'Standard') + ':</em> ' + axEsc(s.standard) + '</div>';
+      if (s.substitution) H += '<div><em>' + tx('Inds\u00e6tning', 'Substitution') + ':</em> <code>' + axEsc(s.substitution) + '</code></div>';
+      if (s.steps && s.steps.length) { H += '<div><em>' + tx('Mellemregninger', 'Steps') + ':</em><ol>'; s.steps.forEach(function (st) { H += '<li>' + axEsc(axL(st)) + ': <code>' + axEsc(st.expr || '') + '</code> = <strong>' + axEsc(st.result || '') + '</strong></li>'; }); H += '</ol></div>'; }
+      if (s.result) H += '<div><strong>' + tx('Resultat', 'Result') + ':</strong> ' + axEsc(axFmt(s.result.value)) + (s.result.unit ? (' ' + s.result.unit) : '') + ' \u2014 ' + axEsc(axL({ da: s.result.da, en: s.result.en })) + '</div>';
+      if (s.verification) H += '<div><em>' + tx('Verifikation', 'Verification') + ':</em> ' + axEsc(axL(s.verification)) + '</div>';
+      if (s.compliance && s.compliance.length) H += '<div><em>Compliance:</em> ' + s.compliance.map(function (c) { return axEsc(axL(c)); }).join('; ') + '</div>';
+      if (s.conclusion) H += '<div><em>' + tx('Konklusion', 'Conclusion') + ':</em> ' + axEsc(axL(s.conclusion)) + '</div>';
+      H += '</div>';
+    });
+    H += '</div>';
+  });
+  H += '</body></html>';
+  return H;
+}
+function axPrintHtml(html) {
+  try { var w = window.open('', '_blank'); if (!w) { alert(tx('Tillad pop op-vinduer for at printe.', 'Allow pop-ups to print.')); return; } w.document.write(html); w.document.close(); w.focus(); setTimeout(function () { try { w.print(); } catch (e) {} }, 350); } catch (e) {}
+}
+function axPrintExam() { axPrintHtml(axBuildExamHtml(axEnsure())); }
+function axPrintSolution() { axPrintHtml(axBuildSolutionHtml(axEnsure())); }
+
 function renderAutoExam() {
   var p = axEnsure();
   var st = axStoreGet(); var bestKey = p.buildingId + ':' + p.tierId + ':' + p.modeId; var best = st[bestKey];
@@ -13105,6 +13201,8 @@ function renderAutoExam() {
   // generate + timer
   h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">';
   h += '<button class="sel-btn selected" onclick="axNewTask()">\uD83C\uDFB2 ' + tx('Generér ny opgave', 'Generate new exam') + '</button>';
+  h += ' <button class="sel-btn" onclick="axPrintExam()">\uD83D\uDDA8\uFE0F ' + tx('Print opgave', 'Print exam') + '</button>';
+  h += ' <button class="sel-btn" onclick="axPrintSolution()">\uD83D\uDCD8 ' + tx('Print facit', 'Print solution') + '</button>';
   h += '<span style="color:var(--text-muted);font-size:0.85rem">' + tx('Opgave-id', 'Exam id') + ': #' + p.seed + '</span>';
   if (best != null) h += '<span style="color:var(--success);font-size:0.85rem">' + tx('Bedste', 'Best') + ': ' + best + '%</span>';
   h += '</div>';

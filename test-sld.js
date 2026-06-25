@@ -13967,6 +13967,46 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 7: printable exam paper + worked-solution (facit) export -----
+test('autoexam/print: exam paper is self-contained HTML with options, weighting and load table', function () {
+  var prev = lang; lang = 'da';
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var h = axBuildExamHtml(p);
+  assert.ok(h.indexOf('<!doctype html>') === 0 && h.indexOf('</html>') > 0, 'complete HTML document');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+  assert.ok(h.indexOf('a) ') >= 0, 'lists click options a) b) ...');
+  assert.ok(/gtning/.test(h), 'shows weighting');
+  assert.ok(h.indexOf('<table') >= 0, 'includes the load schedule table');
+  assert.ok((h.match(/<body>/g) || []).length === 1 && (h.match(/<\/body>/g) || []).length === 1, 'balanced body');
+  lang = prev;
+});
+test('autoexam/print: facit shows the correct answer + full worked solution per task', function () {
+  var prev = lang; lang = 'da';
+  var p = axGenerate(2024, 'fabrik', 'kandidat', 'fuld');
+  var h = axBuildSolutionHtml(p);
+  assert.ok(h.indexOf('<!doctype html>') === 0 && h.indexOf('</html>') > 0, 'complete HTML');
+  assert.ok(h.indexOf('Korrekt svar') >= 0, 'marks the correct answer');
+  assert.ok(h.indexOf('Verifik') >= 0 && h.indexOf('Resultat') >= 0, 'shows verification + result');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+  lang = prev;
+});
+test('autoexam/print: builders never throw or leak across buildings/durations (da+en)', function () {
+  var n = 0, bad = 0;
+  ['da', 'en'].forEach(function (lg) {
+    var prev = lang; lang = lg;
+    ['parcelhus', 'fabrik', 'hospital', 'ev_anlaeg', 'landbrug'].forEach(function (b) {
+      ['mini', 'case', 'fuld'].forEach(function (md) {
+        n++; var p = axGenerate(n * 7 + 1, b, 'kandidat', md);
+        var e, s; try { e = axBuildExamHtml(p); s = axBuildSolutionHtml(p); } catch (err) { bad++; return; }
+        if (e.indexOf('undefined') >= 0 || e.indexOf('NaN') >= 0 || s.indexOf('undefined') >= 0 || s.indexOf('NaN') >= 0) bad++;
+        if (e.indexOf('</html>') < 0 || s.indexOf('</html>') < 0) bad++;
+      });
+    });
+    lang = prev;
+  });
+  assert.ok(n >= 30 && bad === 0, n + ' builds, ' + bad + ' bad');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
