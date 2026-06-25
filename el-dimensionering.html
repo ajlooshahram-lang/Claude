@@ -15482,9 +15482,10 @@ function sldRenderFaultResults(result) {
 // --- Main SLD Render Function ---
 function renderSLD() {
   if (!sldTree) sldInit();
+  if (!sldTree || !sldTree.nodes) { sldTree = sldCreateTree(); }
   sldPropagateAll(sldTree);
 
-  const selNode = sldTree.nodes[sldSelectedId];
+  const selNode = sldSelectedId ? sldTree.nodes[sldSelectedId] : null;
   const canAddSubBoard = selNode && (selNode.type === 'main_board' || selNode.type === 'sub_board');
   const canAddCircuit = selNode && (selNode.type === 'main_board' || selNode.type === 'sub_board');
   const canRemove = selNode && sldSelectedId !== sldTree.rootId && !(selNode.type === 'main_board' && sldTree.nodes[sldTree.rootId].childIds.length <= 1);
