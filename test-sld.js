@@ -13967,6 +13967,27 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 11: 'Eksisterende installation' block for renovation exams -----
+test('autoexam/renovation: renovation exams carry an existing-installation descriptor; others do not', function () {
+  var ren = axGenerate(2024, 'renovering', 'avanceret', 'fuld');
+  var ri = ren.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+  assert.ok(ri.data.existing, 'renovation has an existing installation');
+  assert.strictEqual(ri.data.existing.system, 'TN-C', 'legacy system is TN-C');
+  assert.strictEqual(ri.data.existing.rcd, false, 'legacy has no RCD');
+  assert.ok([35, 50, 63].indexOf(ri.data.existing.mainFuse) >= 0, 'plausible legacy main fuse');
+  var fab = axGenerate(2024, 'fabrik', 'avanceret', 'fuld');
+  var fi = fab.opgaver.filter(function (o) { return o.type === 'installation'; })[0];
+  assert.ok(!fi.data.existing, 'non-renovation has no existing descriptor');
+  // rendered in both views (da), absent for non-renovation; still grades 100
+  var prev = lang; lang = 'da';
+  assert.ok(axDataBlockInstallation(ri.data).indexOf('Eksisterende') >= 0, 'shown on-screen');
+  assert.ok(axBuildExamHtml(ren).indexOf('Eksisterende') >= 0, 'shown in printable exam');
+  assert.ok(axBuildExamHtml(fab).indexOf('Eksisterende') < 0, 'absent for fabrik');
+  lang = prev;
+  var ans = {}; ren.opgaver.forEach(function (o) { o.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+  assert.strictEqual(axExamine(ren, ans).score, 100, 'renovation exam still grades to 100');
+});
+
 // ----- Batch 10: additional authentic Danish building types -----
 test('autoexam/buildings: waterworks, marina and cold-store types exist and generate valid, gradable exams', function () {
   ['vandvaerk', 'marina', 'koelehus'].forEach(function (id) {

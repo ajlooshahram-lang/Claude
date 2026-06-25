@@ -11603,9 +11603,18 @@ function axGenInstallation(rng, b, tier) {
   });
   var IBtotal = 0; loads.forEach(function (l) { IBtotal += l.IBdiv; });
   IBtotal = Math.round(IBtotal * 10) / 10;
+  // Renovation projects describe the legacy installation to work around.
+  var existing = null;
+  if (b.id === 'renovering') {
+    existing = {
+      system: 'TN-C', mainFuse: axRngPick(rng, [35, 50, 63]), cableMat: 'Al',
+      rcd: false, year: axRngPick(rng, [1975, 1982, 1988, 1994]),
+      note: { da: 'Eksisterende anl\u00e6g udf\u00f8rt som TN-C (PEN), uden HPFI. PEN opdeles i N og PE ved den nye tavle (TN-C-S). Brugbare dele genbruges hvor det er forsvarligt; tilstand dokumenteres f\u00f8r udvidelse.', en: 'Existing system built as TN-C (PEN), without RCD. PEN is split into N and PE at the new board (TN-C-S). Usable parts reused where safe; condition documented before extension.' }
+    };
+  }
   return {
     earthing: b.earthing, trafo: { SN: SN, ek: ek, Un1: 10, Un2: 400, In: trafo.In, Ik: trafo.Ik, IkkA: trafo.IkkA, vector: 'Dyn1', PCu: Math.round(SN * 10) },
-    ambient: ambient, grouping: grouping,
+    ambient: ambient, grouping: grouping, existing: existing,
     stik: { material: stikMat, insulation: stikIns, length: stikLen, cos: 0.9 },
     loads: loads, IBtotal: IBtotal
   };
@@ -12905,7 +12914,13 @@ function axRenderHeader(p) {
 }
 
 function axDataBlockInstallation(d) {
-  var h = '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Tekniske oplysninger', 'Technical information') + '</div><div style="padding:4px 2px;line-height:1.7">';
+  var h = '';
+  if (d.existing) {
+    h += '<div class="result-box warning" style="margin:8px 0"><div class="result-title">' + tx('Eksisterende installation', 'Existing installation') + '</div><div style="padding:4px 2px;line-height:1.6">';
+    h += '<div><strong>' + tx('System', 'System') + ':</strong> ' + d.existing.system + ' (' + tx('uden HPFI', 'no RCD') + ', ' + tx('ca.', 'approx.') + ' ' + d.existing.year + ') \u00b7 <strong>' + tx('Hovedsikring', 'Main fuse') + ':</strong> ' + d.existing.mainFuse + ' A \u00b7 <strong>' + tx('Ledermateriale', 'Conductor') + ':</strong> ' + d.existing.cableMat + '</div>';
+    h += '<div>' + axL(d.existing.note) + '</div></div></div>';
+  }
+  h += '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Tekniske oplysninger', 'Technical information') + '</div><div style="padding:4px 2px;line-height:1.7">';
   h += '<div><strong>' + tx('Systemjording', 'System earthing') + ':</strong> ' + d.earthing + '</div>';
   h += '<div><strong>' + tx('Transformer', 'Transformer') + ':</strong> SN = ' + axFmt(d.trafo.SN) + ' kVA, UN = 3\u00d710/0,4 kV, ' + d.trafo.vector + ', ek = ' + axFmt(d.trafo.ek) + ' %</div>';
   h += '<div><strong>' + tx('Omgivelsestemperatur', 'Ambient temperature') + ':</strong> ' + d.ambient + ' \u00b0C</div>';
@@ -13169,7 +13184,11 @@ function axGenerelleBullets() {
 function axPrintDataBlock(op) {
   if (op.type === 'installation') {
     var d = op.data;
-    var h = '<div class="box"><strong>' + tx('Tekniske oplysninger', 'Technical information') + '</strong><br>';
+    var h = '';
+    if (d.existing) {
+      h += '<div class="box"><strong>' + tx('Eksisterende installation', 'Existing installation') + '</strong><br>' + tx('System', 'System') + ': ' + d.existing.system + ' (' + tx('uden HPFI', 'no RCD') + ', ' + tx('ca.', 'approx.') + ' ' + d.existing.year + ') \u00b7 ' + tx('Hovedsikring', 'Main fuse') + ': ' + d.existing.mainFuse + ' A \u00b7 ' + tx('Ledermateriale', 'Conductor') + ': ' + d.existing.cableMat + '<br>' + axEsc(axL(d.existing.note)) + '</div>';
+    }
+    h += '<div class="box"><strong>' + tx('Tekniske oplysninger', 'Technical information') + '</strong><br>';
     h += tx('Systemjording', 'System earthing') + ': ' + d.earthing + '<br>';
     h += tx('Transformer', 'Transformer') + ': SN = ' + axEsc(axFmt(d.trafo.SN)) + ' kVA, UN = 3\u00d710/0,4 kV, ' + d.trafo.vector + ', ek = ' + axEsc(axFmt(d.trafo.ek)) + ' %<br>';
     h += tx('Omgivelsestemperatur', 'Ambient temperature') + ': ' + d.ambient + ' \u00b0C \u00b7 ' + tx('gruppering', 'grouping') + ': ' + d.grouping + '<br>';
