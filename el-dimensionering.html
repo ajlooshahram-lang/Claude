@@ -940,6 +940,14 @@ html[dir="rtl"] .appearance-panel { right: auto; left: 0; text-align: right; }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
   img { filter: none !important; }
+  /* Freeze ALL SVG animations to their fully-rendered end state so diagrams
+     print complete (no half-drawn curves, no mid-rotation phasors, no
+     collapsed bars). Draw-curve animations already use forwards, but infinite
+     ones (rotation/pulse/sweep) must be pinned for clean PDF output. */
+  .svg-animated, .svg-animated * { animation: none !important; }
+  .svg-animated .svg-curve-path,
+  .svg-animated path:not(.svg-phasor-vec) { stroke-dashoffset: 0 !important; stroke-dasharray: none !important; }
+  .svg-animated rect, .svg-animated circle, .svg-animated line { opacity: 1 !important; transform: none !important; }
 }
 .print-only { display: none; }
 
