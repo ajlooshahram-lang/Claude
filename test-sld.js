@@ -13967,6 +13967,36 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Printable progress/training report -----
+test('autoexam/report: training report is empty-safe and self-contained when no history', function () {
+  try { localStorage.removeItem('autoexamLog'); } catch (e) {}
+  var h = axBuildReportHtml();
+  assert.ok(h.indexOf('<!doctype html>') === 0 && h.indexOf('</html>') > 0, 'valid HTML doc');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+});
+test('autoexam/report: training report summarises competencies, buildings and recent attempts', function () {
+  var prev = lang; lang = 'da';
+  try {
+    localStorage.setItem('autoexamLog', JSON.stringify([
+      { ts: Date.now(), building: 'fabrik', tier: 'kandidat', mode: 'fuld', score: 85, verdict: 'pass', catPct: { overload: 100, cable: 60, vdrop: 40, shortcircuit: 90, fault: 80 }, elapsed: 3000 },
+      { ts: Date.now(), building: 'marina', tier: 'avanceret', mode: 'case', score: 65, verdict: 'fail', catPct: { overload: 80, cable: 50, vdrop: 30, fault: 70 }, elapsed: 1800 }
+    ]));
+  } catch (e) {}
+  var h = axBuildReportHtml();
+  assert.ok(h.indexOf('<!doctype html>') === 0 && h.indexOf('</html>') > 0, 'valid HTML');
+  assert.ok(h.indexOf('Resum') >= 0, 'has summary');
+  assert.ok(h.indexOf('Kompetencer') >= 0, 'has competency table');
+  assert.ok(h.indexOf('bygningstype') >= 0, 'has per-building table');
+  assert.ok(h.indexOf('Seneste') >= 0, 'has recent attempts');
+  assert.ok((h.match(/<body>/g) || []).length === 1 && (h.match(/<\/body>/g) || []).length === 1, 'balanced body');
+  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('NaN') < 0, 'no leaks');
+  // dashboard exposes the button
+  autoexamState.tab = 'analyse';
+  assert.ok(renderAutoExam().indexOf('axPrintReport') >= 0, 'dashboard shows print-report button');
+  try { localStorage.removeItem('autoexamLog'); } catch (e) {}
+  lang = prev;
+});
+
 // ----- Expanded regulatory question bank -----
 test('autoexam/reg-bank: question bank is expanded and every entry is well-formed', function () {
   assert.ok(AX_REG_BANK.length >= 18, 'bank expanded to >= 18 questions, got ' + AX_REG_BANK.length);

@@ -13267,7 +13267,7 @@ function axRenderDashboard() {
   h += '<div class="result-box" style="margin-top:8px"><div class="result-title">\uD83E\uDDED ' + tx('Adaptiv tr\u00e6ning', 'Adaptive training') + '</div><div style="padding:6px 2px">';
   h += axL(rec.reason) + ' ' + tx('Anbefalet niveau', 'Recommended level') + ': <strong>' + axL(axTier(rec.tier)) + '</strong>' + (rec.focusName ? (' \u00b7 ' + tx('fokus', 'focus') + ': ' + axL(rec.focusName)) : '') + '.';
   h += '<div style="margin-top:6px"><button class="sel-btn selected" onclick="axApplyAdaptive()">\uD83C\uDFAF ' + tx('Generér adaptiv pr\u00f8ve', 'Generate adaptive exam') + '</button></div></div></div>';
-  h += '<div style="margin-top:8px"><button class="sel-btn" onclick="axClearLog()">\uD83D\uDDD1\uFE0F ' + tx('Ryd historik', 'Clear history') + '</button></div>';
+  h += '<div style="margin-top:8px"><button class="sel-btn" onclick="axPrintReport()">\uD83D\uDDA8\uFE0F ' + tx('Print tr\u00e6ningsrapport', 'Print training report') + '</button> <button class="sel-btn" onclick="axClearLog()">\uD83D\uDDD1\uFE0F ' + tx('Ryd historik', 'Clear history') + '</button></div>';
   return h;
 }
 function axClearLog() { try { localStorage.removeItem('autoexamLog'); } catch (e) {} renderModule('autoexam'); }
@@ -13450,6 +13450,43 @@ function axPrintHtml(html) {
 }
 function axPrintExam() { axPrintHtml(axBuildExamHtml(axEnsure())); }
 function axPrintSolution() { axPrintHtml(axBuildSolutionHtml(axEnsure())); }
+// Build a standalone printable progress/competency report from the attempt log.
+function axBuildReportHtml() {
+  var log = axLogList(); var a = axAnalytics(log);
+  var H = '<!doctype html><html lang="' + (lang === 'da' ? 'da' : 'en') + '"><head><meta charset="utf-8"><title>' + tx('Tr\u00e6ningsrapport', 'Training report') + '</title>' + axPrintCss() + '</head><body>';
+  H += '<h1>\uD83D\uDCCA ' + tx('Tr\u00e6ningsrapport \u2014 Autorisationspr\u00f8ve', 'Training report \u2014 Authorization exam') + '</h1>';
+  H += '<div class="muted">' + tx('Genereret', 'Generated') + ': ' + new Date().toLocaleString(lang === 'da' ? 'da-DK' : 'en-GB') + '</div>';
+  if (!a.attempts) { H += '<p>' + tx('Ingen gennemf\u00f8rte pr\u00f8ver endnu.', 'No completed exams yet.') + '</p></body></html>'; return H; }
+  // Summary
+  H += '<h2>' + tx('Resum\u00e9', 'Summary') + '</h2><table>';
+  H += '<tr><td>' + tx('Gennemf\u00f8rte pr\u00f8ver', 'Exams completed') + '</td><td>' + a.attempts + '</td></tr>';
+  H += '<tr><td>' + tx('Best\u00e5elsesrate', 'Pass rate') + '</td><td>' + a.passRate + '% (' + a.passCount + '/' + a.attempts + ')</td></tr>';
+  H += '<tr><td>' + tx('Gennemsnitsscore', 'Average score') + '</td><td>' + a.avgScore + '%</td></tr>';
+  H += '<tr><td>' + tx('Bedste score', 'Best score') + '</td><td>' + a.bestScore + '%</td></tr>';
+  H += '<tr><td>' + tx('Aktuel stime (best\u00e5et)', 'Current streak (passed)') + '</td><td>' + a.streak + '</td></tr>';
+  if (a.totalElapsed > 0) { H += '<tr><td>' + tx('Samlet tr\u00e6ningstid', 'Total training time') + '</td><td>' + axFmtTime(a.totalElapsed) + '</td></tr>'; H += '<tr><td>' + tx('Gns. tid pr. pr\u00f8ve', 'Avg time per exam') + '</td><td>' + axFmtTime(a.avgElapsed) + '</td></tr>'; }
+  H += '</table>';
+  // Competency table
+  H += '<h2>' + tx('Kompetencer (gennemsnit)', 'Competencies (average)') + '</h2><table><tr><th>' + tx('Kompetence', 'Competency') + '</th><th>%</th><th>' + tx('Niveau', 'Level') + '</th></tr>';
+  Object.keys(a.catAvg).forEach(function (c) { var nm = AX_CAT_NAME[c] || { da: c, en: c }; var pct = a.catAvg[c]; var lvl = pct >= 80 ? tx('St\u00e6rk', 'Strong') : (pct >= 60 ? tx('Middel', 'Moderate') : tx('Svag', 'Weak')); H += '<tr><td>' + axEsc(axL(nm)) + '</td><td>' + pct + '%</td><td>' + lvl + '</td></tr>'; });
+  H += '</table>';
+  // Per-building table
+  H += '<h2>' + tx('Pr. bygningstype', 'By building type') + '</h2><table><tr><th>' + tx('Type', 'Type') + '</th><th>' + tx('Fors\u00f8g', 'Attempts') + '</th><th>' + tx('Gns.', 'Avg') + '</th><th>' + tx('Bedste', 'Best') + '</th></tr>';
+  Object.keys(a.buildAvg).forEach(function (b) { var bb = axBuilding(b); var nm = bb ? axL({ da: bb.da, en: bb.en }) : b; H += '<tr><td>' + axEsc(nm) + '</td><td>' + a.buildAvg[b].n + '</td><td>' + a.buildAvg[b].avg + '%</td><td>' + a.buildAvg[b].best + '%</td></tr>'; });
+  H += '</table>';
+  // Recent attempts (last 15)
+  H += '<h2>' + tx('Seneste pr\u00f8ver', 'Recent exams') + '</h2><table><tr><th>' + tx('Dato', 'Date') + '</th><th>' + tx('Type', 'Type') + '</th><th>' + tx('Niveau', 'Level') + '</th><th>Score</th><th>' + tx('Resultat', 'Result') + '</th><th>' + tx('Tid', 'Time') + '</th></tr>';
+  log.slice(-15).reverse().forEach(function (r) {
+    var bb = axBuilding(r.building); var nm = (r.building === 'kompleks') ? 'Kompleks' : (r.building === 'diagram' ? 'Diagram' : (bb ? axL({ da: bb.da, en: bb.en }) : r.building));
+    var tr = axTier(r.tier);
+    H += '<tr><td>' + new Date(r.ts).toLocaleDateString(lang === 'da' ? 'da-DK' : 'en-GB') + '</td><td>' + axEsc(nm) + '</td><td>' + axEsc(axL(tr)) + '</td><td>' + r.score + '%</td><td>' + (r.verdict === 'pass' ? tx('Best\u00e5et', 'Pass') : tx('Ikke best\u00e5et', 'Fail')) + '</td><td>' + (r.elapsed ? axFmtTime(r.elapsed) : '\u2013') + '</td></tr>';
+  });
+  H += '</table>';
+  if (a.weakest) { var wn = AX_CAT_NAME[a.weakest] || { da: a.weakest, en: a.weakest }; H += '<p><strong>' + tx('Anbefalet fokus', 'Recommended focus') + ':</strong> ' + axEsc(axL(wn)) + ' (' + a.catAvg[a.weakest] + '%) \u2014 ' + axEsc(axL(axCatSuggest(a.weakest))) + '</p>'; }
+  H += '</body></html>';
+  return H;
+}
+function axPrintReport() { axPrintHtml(axBuildReportHtml()); }
 
 function renderAutoExam() {
   var p = axEnsure();
