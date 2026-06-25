@@ -11519,6 +11519,45 @@ var AX_BUILDINGS = [
       { da: 'Ny varmepumpe', en: 'New heat pump', P: [4, 8], cos: 0.9, eta: 1, ph: 3, type: 'hp', sf: 1.0 },
       { da: 'Ny elbillader', en: 'New EV charger', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 }
     ]
+  },
+  {
+    id: 'vandvaerk', cat: 'industri', icon: '\uD83D\uDEB0', da: 'Vandv\u00e6rk / pumpestation', en: 'Waterworks / pump station', earthing: 'TT', hasForsyning: false,
+    bg: { da: ['Et alment vandv\u00e6rk opf\u00f8rer en ny pumpestation med r\u00e5- og rentvandspumper og SRO-anl\u00e6g.', 'En kommune etablerer en ny sp\u00e6ndingsforsyning til en pumpestation i det \u00e5bne land.'], en: ['A public waterworks builds a new pump station with raw- and clean-water pumps and a SCADA system.', 'A municipality establishes a new supply for a rural pump station.'] },
+    customer: { da: ['Kunden kr\u00e6ver h\u00f8j driftssikkerhed, n\u00f8ddrift og korrekt beskyttelse i v\u00e5dt/aggressivt milj\u00f8 (IP).', 'Bygherren \u00f8nsker bl\u00f8dstart af pumperne og overv\u00e5gning via SRO.'], en: ['The customer requires high reliability, backup operation and correct protection in a wet/aggressive (IP) environment.', 'The client wants soft-starting of the pumps and SCADA monitoring.'] },
+    expansion: { da: ['Stationen skal forberedes til en ekstra 30 kW pumpe.', 'Der \u00f8nskes plads til en n\u00f8dgenerator-tilslutning.'], en: ['The station must be prepared for an extra 30 kW pump.', 'Provision for a backup-generator connection is wanted.'] },
+    loads: [
+      { da: 'R\u00e5vandspumpe (motor)', en: 'Raw-water pump (motor)', P: [7.5, 22], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Rentvandspumpe (motor)', en: 'Clean-water pump (motor)', P: [11, 30], cos: 0.86, eta: 0.92, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Doserings-/omr\u00f8ranl\u00e6g (motor)', en: 'Dosing/mixing unit (motor)', P: [1.5, 5.5], cos: 0.82, eta: 0.85, ph: 3, type: 'motor', sf: 0.6 },
+      { da: 'SRO / styretavle (stik)', en: 'SCADA / control panel (sockets)', P: [1.5, 4], cos: 0.9, eta: 1, ph: 1, type: 'socket', sf: 0.7 },
+      { da: 'Belysning + ventilation', en: 'Lighting + ventilation', P: [2, 6], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 }
+    ]
+  },
+  {
+    id: 'marina', cat: 'erhverv', icon: '\u26F5', da: 'Marina / lystb\u00e5dehavn', en: 'Marina / harbour', earthing: 'TN-S', hasForsyning: false,
+    bg: { da: ['En lystb\u00e5dehavn etablerer landstr\u00f8m til b\u00e5depladser via stikstandere p\u00e5 broerne.', 'En havn moderniserer elinstallationen p\u00e5 broerne med nye standere og m\u00e5ling.'], en: ['A marina establishes shore power to berths via pedestals on the pontoons.', 'A harbour modernises the pontoon electrics with new pedestals and metering.'] },
+    customer: { da: ['Kunden kr\u00e6ver HPFI pr. stikkreds og robust beskyttelse i salt/fugtigt milj\u00f8 (mindst IP44).', 'Bygherren \u00f8nsker individuel m\u00e5ling pr. b\u00e5deplads.'], en: ['The customer requires an RCD per outlet and robust protection in a salty/wet (\u2265 IP44) environment.', 'The client wants individual metering per berth.'] },
+    expansion: { da: ['Anl\u00e6gget skal kunne udvides med 10 ekstra stikstandere.', 'Der \u00f8nskes forberedelse til elb\u00e5d-ladning.'], en: ['The facility must allow 10 extra pedestals.', 'Preparation for electric-boat charging is wanted.'] },
+    loads: [
+      { da: 'Stikstander-gruppe (broer)', en: 'Pedestal group (pontoons)', P: [7, 18], cos: 0.95, eta: 1, ph: 3, type: 'socket', sf: 0.4 },
+      { da: 'Servicebygning (stik/lys)', en: 'Service building (sockets/light)', P: [4, 10], cos: 0.95, eta: 1, ph: 3, type: 'socket', sf: 0.5 },
+      { da: 'Bro-/havnebelysning', en: 'Pontoon/harbour lighting', P: [2, 6], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 1.0 },
+      { da: 'B\u00e5d-/mastekran (motor)', en: 'Boat/mast crane (motor)', P: [5.5, 15], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.5 },
+      { da: 'Elb\u00e5d-ladning (AC)', en: 'Electric-boat charging (AC)', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 1.0 }
+    ]
+  },
+  {
+    id: 'koelehus', cat: 'industri', icon: '\u2744\uFE0F', da: 'K\u00f8le-/fryselager', en: 'Cold store', earthing: 'TN-S', hasForsyning: true,
+    bg: { da: ['En f\u00f8devarevirksomhed opf\u00f8rer et k\u00f8le-/fryselager med k\u00f8lekompressorer forsynet fra egen transformer.', 'Et distributionslager udvides med fryserum og ny k\u00f8lecentral.'], en: ['A food company builds a cold/freezer store with refrigeration compressors supplied from its own transformer.', 'A distribution warehouse adds freezer rooms and a new refrigeration plant.'] },
+    customer: { da: ['Kunden kr\u00e6ver h\u00f8j forsyningssikkerhed (temperaturkritisk), selektivitet og n\u00f8dstr\u00f8m til k\u00f8lecentralen.', 'Bygherren \u00f8nsker effektiv drift med fasekompensering og lav harmonisk forvr\u00e6ngning fra frekvensomformere.'], en: ['The customer requires high reliability (temperature-critical), selectivity and backup power for the refrigeration plant.', 'The client wants efficient operation with power-factor correction and low harmonic distortion from the VFDs.'] },
+    expansion: { da: ['K\u00f8lecentralen skal forberedes til en ekstra 75 kW kompressor.', 'Transformeren skal have reserve til et nyt fryserum.'], en: ['The refrigeration plant must be prepared for an extra 75 kW compressor.', 'The transformer must have spare capacity for a new freezer room.'] },
+    loads: [
+      { da: 'K\u00f8lekompressor (VFD-motor)', en: 'Refrigeration compressor (VFD motor)', P: [22, 75], cos: 0.88, eta: 0.94, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Fordamper-/kondensatorbl\u00e6sere (motor)', en: 'Evaporator/condenser fans (motor)', P: [5.5, 18.5], cos: 0.85, eta: 0.9, ph: 3, type: 'motor', sf: 0.8 },
+      { da: 'Lagerbelysning', en: 'Warehouse lighting', P: [6, 15], cos: 0.95, eta: 1, ph: 3, type: 'light', sf: 0.9 },
+      { da: 'Port-/d\u00f8rvarme + stik', en: 'Door heating + sockets', P: [4, 11], cos: 0.95, eta: 1, ph: 3, type: 'socket', sf: 0.5 },
+      { da: 'Truck-ladning (AC)', en: 'Forklift charging (AC)', P: [11, 22], cos: 1.0, eta: 1, ph: 3, type: 'ev', sf: 0.8 }
+    ]
   }
 ];
 function axBuilding(id) { for (var i = 0; i < AX_BUILDINGS.length; i++) if (AX_BUILDINGS[i].id === id) return AX_BUILDINGS[i]; return AX_BUILDINGS[0]; }

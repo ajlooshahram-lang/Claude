@@ -13967,6 +13967,23 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Batch 10: additional authentic Danish building types -----
+test('autoexam/buildings: waterworks, marina and cold-store types exist and generate valid, gradable exams', function () {
+  ['vandvaerk', 'marina', 'koelehus'].forEach(function (id) {
+    var b = axBuilding(id);
+    assert.strictEqual(b.id, id, id + ' registered');
+    assert.ok(b.loads && b.loads.length >= 4, id + ' has a realistic load pool');
+    assert.ok(['TT', 'TN-S', 'TN-C-S'].indexOf(b.earthing) >= 0, id + ' has a valid earthing system');
+    ['case', 'fuld'].forEach(function (md) {
+      var p = axGenerate(12345, id, 'ekspert', md);
+      assert.ok(p.opgaver.length >= 1 && p.opgaver.every(function (o) { return o.tasks.length >= 1; }), id + '/' + md + ' generates tasks');
+      var ans = {}; p.opgaver.forEach(function (o) { o.tasks.forEach(function (t) { ans[t.id] = t.ci; }); });
+      assert.strictEqual(axExamine(p, ans).score, 100, id + '/' + md + ' grades to 100 with the reference answers');
+    });
+  });
+  assert.ok(AX_BUILDINGS.length >= 13, 'building catalogue expanded to >= 13 types, got ' + AX_BUILDINGS.length);
+});
+
 // ----- Batch 9: continuous-learning closes the loop (topic-emphasis biasing) -----
 test('autoexam/bias: axGenerate stays deterministic with and without topic weights', function () {
   assert.strictEqual(JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case')), JSON.stringify(axGenerate(5, 'fabrik', 'ekspert', 'case')));
