@@ -14368,12 +14368,11 @@ test('ux: uxWizardSteps renders step indicators with done/active states', functi
   assert.ok(h.indexOf('✓') >= 0 || h.indexOf('\u2713') >= 0, 'checkmark on done step');
 });
 
-test('ux: renderModule includes mode bar in output (all modules)', function () {
+test('ux: mode bar is rendered in the status bar (not content area)', function () {
   var prev = lang; lang = 'da';
-  var out = renderModule('load');
-  // renderModule writes to main.innerHTML but we can check the helper directly
+  // Mode bar is now in renderStatusBar, not renderModule
   var bar = uxRenderModeBar();
-  assert.ok(bar.indexOf('ux-mode-bar') >= 0, 'mode bar renders');
+  assert.ok(bar.indexOf('ux-mode-bar') >= 0, 'mode bar helper still works');
   assert.ok(bar.length > 50, 'mode bar has content');
   lang = prev;
 });

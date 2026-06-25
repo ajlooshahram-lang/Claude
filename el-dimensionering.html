@@ -6586,7 +6586,7 @@ function renderStatusBar() {
   // Protection device
   if (mcbState.rating) {
     chips.push({ label: 'MCB', value: `${mcbState.type} ${mcbState.curve}${mcbState.rating}`, mod: 'mcb' });
-  } else if (mccbState.inVal) {
+  } else if (mccbState.inVal && ib > 63) {
     chips.push({ label: 'MCCB', value: `${mccbState.frame} ${mccbState.inVal}A`, mod: 'mccb' });
   }
 
@@ -6607,7 +6607,11 @@ function renderStatusBar() {
 
   bar.innerHTML = chips.map(c =>
     `<span class="status-chip has-value" onclick="switchModule('${c.mod}')"${c.color ? ` style="border-color:${c.color}"` : ''}><span class="chip-label">${c.label}:</span><span class="chip-value"${c.color ? ` style="color:${c.color}"` : ''}>${c.value}</span></span>`
-  ).join('');
+  ).join('') + '<span style="margin-left:auto;display:flex;gap:3px">' + UX_MODES.map(function(m) {
+    var info = UX_MODE_LABELS[m];
+    var da = (typeof lang !== 'undefined' && lang === 'da');
+    return '<button class="status-chip' + (uxMode === m ? ' has-value' : '') + '" onclick="uxSetMode(\'' + m + '\')" style="cursor:pointer;font-size:0.68rem;padding:3px 8px' + (uxMode === m ? ';background:var(--primary);color:#fff;border-color:var(--primary)' : '') + '">' + info.icon + ' ' + (da ? info.da : info.en) + '</button>';
+  }).join('') + '</span>';
 }
 
 
@@ -7993,7 +7997,7 @@ function renderModule(mod) {
       else main.classList.add('module-switch');
     }
   } catch (e) { /* non-DOM env */ }
-  main.innerHTML = uxRenderModeBar() + content;
+  main.innerHTML = content;
   if (_sameModule) {
     _restoreScrollState(_savedScroll);                       // synchronous restore (no visible flash)
     _restoreFocusKey(_savedFocus);                           // keep focus on the control just used
