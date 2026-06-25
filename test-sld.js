@@ -14500,6 +14500,64 @@ test('ux-cable: no undefined/NaN in any mode (da/en x all modes)', function () {
 });
 
 
+console.log('\n=== Analyzer De-duplication + Fallback Inference Tests ===\n');
+
+test('analyzer: analyzerSegment de-duplicates repeated Opgave headers', function () {
+  var text = 'Opgave 1\nBeregn IB for 37 kW motor.\nOpgave 2\nBeregn Zs.\nOpgave 1\nSvar: IB = 67 A.';
+  var segs = analyzerSegment(text);
+  // Should have 2 segments (Opgave 1 merged, Opgave 2), not 3
+  var ids = segs.map(function (s) { return s.id; });
+  assert.ok(ids.indexOf(1) >= 0, 'Opgave 1 present');
+  assert.ok(ids.indexOf(2) >= 0, 'Opgave 2 present');
+  var count1 = ids.filter(function (id) { return id === 1; }).length;
+  assert.strictEqual(count1, 1, 'Opgave 1 appears exactly once (de-duped)');
+  // Merged text should contain both parts
+  var seg1 = segs.find(function (s) { return s.id === 1; });
+  assert.ok(seg1.text.indexOf('37 kW') >= 0, 'first part merged');
+  assert.ok(seg1.text.indexOf('67 A') >= 0, 'second part merged');
+});
+
+test('analyzer: analyzerSegment handles Generelt (text before first Opgave)', function () {
+  var text = 'Generelt: forsyning TN-S 400V\nOpgave 1\nBeregn IB.';
+  var segs = analyzerSegment(text);
+  assert.ok(segs.length >= 2, 'at least 2 segments (Generelt + Opgave 1)');
+  var gen = segs.find(function (s) { return s.id === 0; });
+  assert.ok(gen, 'Generelt segment (id=0) exists');
+});
+
+test('analyzer: fallback inference detects questions from data when no explicit patterns match', function () {
+  // Text with electrical data but NO "beregn IB" or other explicit verbs
+  var text = 'Installation i kontorbygning. 37 kW belastning. 400 V forsyning. Kabel 50 m NOIKLX 5G16.';
+  var qs = analyzerDetectQuestions(text);
+  assert.ok(qs.length > 0, 'fallback inferred questions (got ' + qs.length + ')');
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('ib') >= 0, 'IB inferred from power + voltage');
+  assert.ok(types.indexOf('cable') >= 0 || types.indexOf('vdrop') >= 0, 'cable/vdrop inferred from cable data');
+});
+
+test('analyzer: fallback does NOT activate when explicit patterns already matched', function () {
+  var text = 'Beregn belastningsstrømmen IB for 37 kW motor. 400 V. Kabel 50 m.';
+  var qs = analyzerDetectQuestions(text);
+  // Should have explicit 'ib' match, not a bunch of fallback duplicates
+  var ibCount = qs.filter(function (q) { return q.type === 'ib'; }).length;
+  assert.strictEqual(ibCount, 1, 'only one IB question (no fallback duplicate)');
+});
+
+test('analyzer: fallback infers trafo from kVA/transformer keywords', function () {
+  var text = 'Transformer 630 kVA, uk = 4%, Dyn11.';
+  var qs = analyzerDetectQuestions(text);
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('trafo') >= 0 || types.indexOf('trafo_vec') >= 0, 'trafo inferred');
+});
+
+test('analyzer: fallback infers motor from motor keywords', function () {
+  var text = 'Asynkronmotor 4-polet, 1450 omdrejninger, 15 kW.';
+  var qs = analyzerDetectQuestions(text);
+  var types = qs.map(function (q) { return q.type; });
+  assert.ok(types.indexOf('motor_start') >= 0 || types.indexOf('motor_sync') >= 0, 'motor inferred');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

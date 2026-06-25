@@ -30118,12 +30118,24 @@ function analyzerSegment(text) {
   var segments = [];
   // Split by Opgave headers: "Opgave 1", "Opgave 2", etc.
   var parts = text.split(/(?=Opgave\s+\d+)/i);
+  var seenIds = {};
   for (var i = 0; i < parts.length; i++) {
     var part = parts[i].trim();
     if (!part) continue;
     var headerMatch = part.match(/^Opgave\s+(\d+)[^\n]*/i);
     var segId = headerMatch ? parseInt(headerMatch[1]) : 0;
     var title = headerMatch ? headerMatch[0] : 'Generelt';
+    // De-duplicate: if we've already seen this Opgave id, merge the text
+    // (handles cases where assignment + answer key are pasted together)
+    if (seenIds[segId] !== undefined) {
+      segments[seenIds[segId]].text += '\n' + part;
+      var subParts2 = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+      for (var k = 0; k < subParts2.length; k++) {
+        var s2 = subParts2[k].trim();
+        if (s2 && s2 !== title) segments[seenIds[segId]].subQuestions.push(s2);
+      }
+      continue;
+    }
     // Split sub-questions within each Opgave
     var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
     var subQuestions = [];
@@ -30131,6 +30143,7 @@ function analyzerSegment(text) {
       var sub = subParts[j].trim();
       if (sub && sub !== title) subQuestions.push(sub);
     }
+    seenIds[segId] = segments.length;
     segments.push({
       id: segId,
       title: title,
@@ -30485,6 +30498,31 @@ function analyzerDetectQuestions(text) {
     seenType[questions[d].type] = true;
     deduped.push(questions[d]);
   }
+
+  // === FALLBACK INFERENCE ===
+  // When NO explicit patterns matched but the text contains electrical data
+  // (power, voltage, cable length, etc.), infer the most likely questions
+  // based on what data is present. This prevents the empty "Ingen detekterede
+  // spørgsmål" state that confuses users.
+  if (deduped.length === 0 && text && text.length > 20) {
+    var hasP = /\d+[.,]?\d*\s*kW/i.test(text);
+    var hasV = /\d+\s*V\b|3\s*x\s*400|1\s*x\s*230/i.test(text);
+    var hasL = /\d+[.,]?\d*\s*m(?:\b|eter)/i.test(text);
+    var hasCable = /mm.?\s|tværsnit|kabel|leder/i.test(text);
+    var hasTrafo = /trafo|transformer|kVA/i.test(text);
+    var hasMotor = /motor|asynkron|synkron|omdrejning/i.test(text);
+    var hasZ = /impedans|\u03A9|ohm|Z\s*=/i.test(text);
+    var hasRCD = /HPFI|RCD|fejlstrøm/i.test(text);
+    if (hasP && hasV) deduped.push({ type: 'ib', label: tx('Beregn IB (afledt fra data)', 'Calculate IB (inferred from data)'), module: 'load' });
+    if (hasP && hasL && hasCable) deduped.push({ type: 'vdrop', label: tx('Beregn spændingsfald (afledt)', 'Calculate voltage drop (inferred)'), module: 'vdrop' });
+    if (hasCable && hasV) deduped.push({ type: 'cable', label: tx('Kabeldimensionering (afledt)', 'Cable sizing (inferred)'), module: 'cable' });
+    if (hasTrafo) deduped.push({ type: 'trafo', label: tx('Trafoberegning (afledt)', 'Transformer calculation (inferred)'), module: 'trafo' });
+    if (hasMotor) deduped.push({ type: 'motor_start', label: tx('Motorberegning (afledt)', 'Motor calculation (inferred)'), module: 'motor' });
+    if (hasZ) deduped.push({ type: 'impedans', label: tx('Impedansberegning (afledt)', 'Impedance calculation (inferred)'), module: 'impedans' });
+    if (hasRCD) deduped.push({ type: 'rcd', label: tx('RCD/HPFI-valg (afledt)', 'RCD selection (inferred)'), module: 'standards' });
+    if (hasP && !hasTrafo && !hasMotor && !hasZ) deduped.push({ type: 'device', label: tx('Beskyttelsesvalg (afledt)', 'Protection selection (inferred)'), module: 'mcb' });
+  }
+
   return deduped;
 }
 
