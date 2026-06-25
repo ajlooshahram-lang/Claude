@@ -2189,7 +2189,7 @@ console.log('\n=== 3D Cable Routing Tests ===\n');
 
 // Test 126: Cable3D module in translations
 test('Cable3D module appears in all three language translation objects', function() {
-  assert.strictEqual(T.da.modules.cable3d, '3D Kabelfoering');
+  assert.strictEqual(T.da.modules.cable3d, '3D Kabelføring');
   assert.strictEqual(T.en.modules.cable3d, '3D Cable Routing');
   assert.strictEqual(T.fa.modules.cable3d, '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0633\u0647\u200C\u0628\u0639\u062F\u06CC');
 });
@@ -11104,7 +11104,7 @@ test('Dcmaskine: all four machine types are selectable', function() {
 
 test('Dcmaskine: trilingual labels resolve (da/en/fa)', function() {
   var savedLang = lang;
-  lang = 'da'; assert(t('modules').dcmaskine.indexOf('Jaevnstr') >= 0, 'da label');
+  lang = 'da'; assert(t('modules').dcmaskine.indexOf('Jævnstr') >= 0, 'da label');
   lang = 'en'; assert(t('modules').dcmaskine === 'DC machines', 'en label');
   lang = 'fa'; assert(typeof t('modules').dcmaskine === 'string' && t('modules').dcmaskine.length > 0, 'fa label present');
   lang = savedLang;

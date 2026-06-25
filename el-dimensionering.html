@@ -1129,24 +1129,24 @@ const T = {
       brain: 'El-Hjerne',
       pdf: 'Dokumentation',
       thermal: 'Termisk Sim.',
-      cable3d: '3D Kabelfoering',
+      cable3d: '3D Kabelføring',
       energy: 'Energi Monitor',
       tcc: 'Kaskade-TCC',
       panel: 'Tavle',
       ev: 'Elbil-lader',
       solar: 'Solcelle & Batteri',
-      noed: 'Noedbelysning',
+      noed: 'Nødbelysning',
       motor: 'Motorstart',
       harmonic: 'Harmonisk',
       vfd: 'Frekvensomformer',
       lighting: 'Belysning',
       heatpump: 'Varmepumpe',
       busbar: 'Skinnesystem',
-      bathroom: 'Badevaerelse',
+      bathroom: 'Badeværelse',
       firealarm: 'Brandalarm',
       data: 'Datainstallation',
-      spd: 'Overspaending',
-      ups: 'UPS / Noedstroem',
+      spd: 'Overspænding',
+      ups: 'UPS / Nødstrøm',
       pfc: 'PF-korrektion',
       trayfill: 'Kabelbakke',
       zs: 'Fejlsløjfe Zs',
@@ -1157,7 +1157,7 @@ const T = {
       generator: 'Nødgenerator',
       discrim: 'Selektivitet',
       earthsys: 'Jordingssystem',
-      pool: 'Svoemmehal',
+      pool: 'Svømmehal',
       construction: 'Byggeplads',
       agri: 'Landbrug',
       arcflash: 'Lysbue-risiko',
@@ -1179,7 +1179,7 @@ const T = {
       magnet: 'Magnetkreds',
       kapacitor: 'Kapacitor & RC',
       varme: 'Rumvarme & U-v\u00e6rdi',
-      dcmaskine: 'Jaevnstr\u00f8msmaskiner',
+      dcmaskine: 'Jævnstrømsmaskiner',
       analyzer: '\uD83D\uDD0D Projektanalysator'
     },
     // Load module
@@ -10573,37 +10573,37 @@ function renderTrafoPowerSolve() {
       var guideLines = [];
       if (res.known.I !== undefined && res.known.U === undefined && res.known.S === undefined) {
         guideLines.push(tx(
-          'Du har valgt I = ' + res.known.I + ' A. Tilfoej spaending U for at udlede S, eller tilfoej S for at udlede U.',
+          'Du har valgt I = ' + res.known.I + ' A. Tilføj spænding U for at udlede S, eller tilføj S for at udlede U.',
           'You have selected I = ' + res.known.I + ' A. Add voltage U to derive S, or add S to derive U.'
         ));
       }
       if (res.known.U !== undefined && res.known.I === undefined && res.known.S === undefined && res.known.P === undefined) {
         guideLines.push(tx(
-          'Du har valgt U = ' + res.known.U + ' V. Tilfoej stroem I for at udlede S, eller tilfoej S/P for at udlede I.',
+          'Du har valgt U = ' + res.known.U + ' V. Tilføj strøm I for at udlede S, eller tilføj S/P for at udlede I.',
           'You have selected U = ' + res.known.U + ' V. Add current I to derive S, or add S/P to derive I.'
         ));
       }
       if (res.known.cosphi !== undefined && res.known.S === undefined && res.known.P === undefined && res.known.U === undefined && res.known.I === undefined) {
         guideLines.push(tx(
-          'Du har valgt cos\u03C6 = ' + res.known.cosphi + '. Tilfoej mindst to af: U, I, S eller P for at beregne effekttrekanten.',
+          'Du har valgt cos\u03C6 = ' + res.known.cosphi + '. Tilføj mindst to af: U, I, S eller P for at beregne effekttrekanten.',
           'You have selected cos\u03C6 = ' + res.known.cosphi + '. Add at least two of: U, I, S or P to compute the power triangle.'
         ));
       }
       if (res.known.P !== undefined && res.known.cosphi === undefined && res.known.S === undefined && res.known.Q === undefined) {
         guideLines.push(tx(
-          'Du har valgt P = ' + (res.known.P / 1000) + ' kW. Tilfoej cos\u03C6 for at udlede S og Q, eller tilfoej Q direkte.',
+          'Du har valgt P = ' + (res.known.P / 1000) + ' kW. Tilføj cos\u03C6 for at udlede S og Q, eller tilføj Q direkte.',
           'You have selected P = ' + (res.known.P / 1000) + ' kW. Add cos\u03C6 to derive S and Q, or add Q directly.'
         ));
       }
       if (res.known.Q !== undefined && res.known.cosphi === undefined && res.known.S === undefined && res.known.P === undefined) {
         guideLines.push(tx(
-          'Du har valgt Q = ' + (res.known.Q / 1000) + ' kvar. Tilfoej P eller cos\u03C6 for at udlede S.',
+          'Du har valgt Q = ' + (res.known.Q / 1000) + ' kvar. Tilføj P eller cos\u03C6 for at udlede S.',
           'You have selected Q = ' + (res.known.Q / 1000) + ' kvar. Add P or cos\u03C6 to derive S.'
         ));
       }
       if (guideLines.length === 0) {
         guideLines.push(tx(
-          'Tilfoej en stoerrelse mere for at laase resten op. Gyldige kombinationer: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).',
+          'Tilføj en størrelse mere for at låse resten op. Gyldige kombinationer: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).',
           'Add one more quantity to unlock the rest. Valid combinations: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).'
         ));
       }
@@ -10658,7 +10658,7 @@ function renderTrafoOCSC() {
   var I0pct = trafoState.ocI0pct;
   var I0_A = I0pct / 100 * sc.IN;
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Tomgangs- og kortslutningsprøve', 'Open-Circuit & Short-Circuit Test') + '</div>';
-  html += '<div class="info-row">' + tx('Værdier fra valgt trafo (' + S + ' kVA). Skift stoerrelse under Dimensionering.', 'Values from selected transformer (' + S + ' kVA). Change size under Sizing.') + '</div>';
+  html += '<div class="info-row">' + tx('Værdier fra valgt trafo (' + S + ' kVA). Skift størrelse under Dimensionering.', 'Values from selected transformer (' + S + ' kVA). Change size under Sizing.') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Magnetiseringsstrøm I0 [%]', 'Magnetizing current I0 [%]') + '</div><div class="select-grid">';
   [1, 1.5, 2, 2.5, 3, 3.5, 4, 5].forEach(function(v) { html += '<button class="sel-btn' + (trafoState.ocI0pct === v ? ' selected' : '') + '" onclick="trafoState.ocI0pct=' + v + ';renderModule(\'trafo\')">' + v + '%</button>'; });
   html += '</div></div>';
@@ -32013,7 +32013,7 @@ function analyzerDetectQuestions(text) {
     // === DC CIRCUITS (Bind 1) ===
     { re: /ohms\s+lov|ohm'?s\s+law/i, type: 'dc_ohm', label: 'Ohms lov', module: 'dc' },
     { re: /kirchhoff|kirch/i, type: 'dc_kirch', label: 'Kirchhoffs love', module: 'dc' },
-    { re: /thevenin|norton|superposition/i, type: 'dc_equiv', label: 'Erstatningskredsloeb', module: 'dc' },
+    { re: /thevenin|norton|superposition/i, type: 'dc_equiv', label: 'Erstatningskredsløb', module: 'dc' },
     { re: /sp.ndingsdeler|voltage\s+divider/i, type: 'dc_vdiv', label: 'Sp\u00e6ndingsdeler', module: 'dc' },
     { re: /serie.*parallel|parallel.*serie|modstand.*beregn/i, type: 'dc_rnet', label: 'Serie/parallel modstand', module: 'dc' },
     // === LIGHTING (Bind 4) ===
