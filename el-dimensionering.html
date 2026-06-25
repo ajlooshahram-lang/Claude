@@ -12625,8 +12625,8 @@ function renderAiElectrician() {
         <div class="select-label">${tx('Emne', 'Topic')}</div>
         <div class="select-grid">
           <button class="sel-btn ${aiTopic === 'all' ? 'selected' : ''}" onclick="aiTopic='all';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${tx('Alle', 'All')}</button>
-          ${Object.keys(AI_TOPICS).map(tp =>
-            `<button class="sel-btn ${aiTopic === tp ? 'selected' : ''}" onclick="aiTopic='${tp}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[tp].icon} ${tp(AI_TOPICS[tp])}</button>`
+          ${Object.keys(AI_TOPICS).map(topicKey =>
+            `<button class="sel-btn ${aiTopic === topicKey ? 'selected' : ''}" onclick="aiTopic='${topicKey}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[topicKey].icon} ${tp(AI_TOPICS[topicKey])}</button>`
           ).join('')}
         </div>
       </div>
