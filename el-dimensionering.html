@@ -12330,38 +12330,87 @@ function axInstallationToSLD(d) {
 }
 
 function axRenderSLD(m, highlightFault) {
-  var W = 380; var rowH = 64; var top = 96; var busX = 46; var H = top + m.feeders.length * rowH + 30;
-  function box(x, y, w, hh, txt, bad) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + hh + '" rx="4" fill="' + (bad ? '#d6454522' : '#8881') + '" stroke="' + (bad ? '#d64545' : 'currentColor') + '" stroke-width="' + (bad ? 2 : 1) + '"/>' + (txt ? '<text x="' + (x + w / 2) + '" y="' + (y + hh / 2 + 3) + '" font-size="9" text-anchor="middle" fill="currentColor">' + txt + '</text>' : ''); }
+  var W = 440; var rowH = 72; var top = 118; var busX = 56; var H = top + m.feeders.length * rowH + 36;
+  var cl = 'currentColor'; var faultCl = '#d64545'; var okCl = '#22a06b';
+  function lbl(x, y, txt, col, sz) { return '<text x="' + x + '" y="' + y + '" font-size="' + (sz || 9) + '" fill="' + (col || cl) + '">' + txt + '</text>'; }
   function warn(x, y) { return '<text x="' + x + '" y="' + y + '" font-size="14">\u26A0\uFE0F</text>'; }
-  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;color:var(--text)">';
-  // transformer
-  s += '<circle cx="40" cy="22" r="11" fill="none" stroke="currentColor"/><circle cx="40" cy="32" r="11" fill="none" stroke="currentColor"/>';
-  s += '<text x="58" y="22" font-size="10" fill="currentColor">Trafo ' + m.trafo.SN + ' kVA</text><text x="58" y="35" font-size="10" fill="currentColor">ek=' + axFmt(m.trafo.ek) + '% \u00b7 Ik,max=' + axFmt(m.trafo.IkkA) + ' kA</text>';
-  s += '<line x1="40" y1="43" x2="40" y2="58" stroke="currentColor"/>';
-  // main switch + main breaker
+  // IEC MCB symbol: rectangle with a diagonal slash (trip indicator)
+  function mcbSym(x, y, w, hh, txt, bad) {
+    var col = bad ? faultCl : cl; var fill = bad ? '#d6454518' : 'none';
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + hh + '" rx="3" fill="' + fill + '" stroke="' + col + '" stroke-width="' + (bad ? 1.8 : 1) + '"/>' +
+      '<line x1="' + (x + 3) + '" y1="' + (y + hh - 3) + '" x2="' + (x + w - 3) + '" y2="' + (y + 3) + '" stroke="' + col + '" stroke-width="0.8" opacity="0.5"/>' +
+      lbl(x + w / 2, y + hh / 2 + 3.5, txt, col, 8.5);
+  }
+  // IEC RCD symbol: circle with I\u0394 label
+  function rcdSym(x, y, r, mA, bad) {
+    var col = bad ? faultCl : cl;
+    return '<circle cx="' + (x + r) + '" cy="' + y + '" r="' + r + '" fill="none" stroke="' + col + '"/>' +
+      '<text x="' + (x + r) + '" y="' + (y + 3) + '" font-size="7.5" text-anchor="middle" fill="' + col + '">I\u0394' + mA + '</text>';
+  }
+  // Isolator/switch symbol: diagonal line
+  function switchSym(x, y, open) {
+    if (!open) return '<line x1="' + x + '" y1="' + (y + 8) + '" x2="' + (x + 12) + '" y2="' + y + '" stroke="' + cl + '" stroke-width="1.5"/><circle cx="' + x + '" cy="' + (y + 8) + '" r="2" fill="' + cl + '"/>';
+    return ''; // no switch drawn when missing
+  }
+  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;font-family:\'Segoe UI\',system-ui,sans-serif;color:var(--text,#ccc)">';
+  // --- Title bar ---
+  s += '<rect x="0" y="0" width="' + W + '" height="18" fill="#8881" rx="4"/>';
+  s += lbl(6, 13, tx('Enstregsdiagram', 'Single-line diagram') + ' \u2014 ' + axL(m.building) + ' (' + m.earthing + ')', cl, 9.5);
+  // --- Transformer (IEC symbol: two overlapping circles + winding marks) ---
+  var txC = 52, txY = 34;
+  s += '<circle cx="' + txC + '" cy="' + (txY - 6) + '" r="12" fill="none" stroke="' + cl + '" stroke-width="1.2"/>';
+  s += '<circle cx="' + txC + '" cy="' + (txY + 6) + '" r="12" fill="none" stroke="' + cl + '" stroke-width="1.2"/>';
+  // Winding dot (HV) and arrow (LV)
+  s += '<circle cx="' + (txC - 5) + '" cy="' + (txY - 10) + '" r="1.5" fill="' + cl + '"/>';
+  s += '<polygon points="' + (txC - 5) + ',' + (txY + 3) + ' ' + (txC - 8) + ',' + (txY + 8) + ' ' + (txC - 2) + ',' + (txY + 8) + '" fill="' + cl + '" opacity="0.6"/>';
+  s += lbl(txC + 16, txY - 10, m.trafo.SN + ' kVA', cl, 9);
+  s += lbl(txC + 16, txY, 'ek=' + axFmt(m.trafo.ek) + '%', cl, 8.5);
+  s += lbl(txC + 16, txY + 10, 'Ik,max=' + axFmt(m.trafo.IkkA) + ' kA', cl, 8.5);
+  // Vertical lead from trafo to main breaker
+  s += '<line x1="' + txC + '" y1="' + (txY + 18) + '" x2="' + txC + '" y2="' + 62 + '" stroke="' + cl + '"/>';
+  // --- Main switch / isolator ---
   var mainBad = highlightFault && m.main.faulty;
-  if (m.main.hasSwitch) s += '<line x1="40" y1="58" x2="52" y2="50" stroke="currentColor" stroke-width="1.5"/>';
-  else if (highlightFault) s += warn(50, 58);
-  s += box(8, 60, 130, 24, 'Q0  ' + m.main.In + ' A / Icu ' + m.main.Icu + ' kA', mainBad);
-  if (mainBad) s += warn(140, 78);
-  s += '<line x1="40" y1="84" x2="40" y2="' + (top) + '" stroke="currentColor"/>';
-  // busbar (vertical)
-  s += '<line x1="' + busX + '" y1="' + top + '" x2="' + busX + '" y2="' + (top + m.feeders.length * rowH - 20) + '" stroke="currentColor" stroke-width="3"/>';
-  s += '<text x="2" y="' + (top - 4) + '" font-size="9" fill="currentColor">' + m.earthing + '</text>';
-  // feeders
+  if (m.main.hasSwitch) { s += switchSym(txC - 6, 55, false); }
+  else if (highlightFault) { s += warn(txC + 8, 60); s += lbl(txC + 22, 60, tx('mangler', 'missing'), faultCl, 8); }
+  // --- Main MCB ---
+  s += mcbSym(txC - 32, 68, 64, 20, 'Q0  ' + m.main.In + ' A / Icu ' + m.main.Icu + ' kA', mainBad);
+  if (mainBad) s += warn(txC + 36, 82);
+  // Lead from main to busbar
+  s += '<line x1="' + txC + '" y1="88" x2="' + txC + '" y2="' + top + '" stroke="' + cl + '"/>';
+  // --- Busbar (horizontal, professional IEC style) ---
+  s += '<rect x="' + (busX - 4) + '" y="' + (top - 3) + '" width="' + (W - busX - 20) + '" height="6" fill="' + cl + '" rx="2" opacity="0.35"/>';
+  s += lbl(busX - 4, top - 8, tx('Samleskinne', 'Busbar') + ' (' + m.earthing + ')', cl, 8);
+  // --- PE/N rail ---
+  var peY = top + m.feeders.length * rowH + 10;
+  s += '<line x1="' + busX + '" y1="' + peY + '" x2="' + (W - 30) + '" y2="' + peY + '" stroke="' + okCl + '" stroke-width="1.5" stroke-dasharray="6 3"/>';
+  s += lbl(busX - 4, peY + 10, 'PE/N', okCl, 8);
+  // --- Feeders (vertical from busbar down to load) ---
   m.feeders.forEach(function (f, i) {
-    var y = top + i * rowH + 8; var bad = highlightFault && f.faulty;
-    s += '<line x1="' + busX + '" y1="' + y + '" x2="' + (busX + 14) + '" y2="' + y + '" stroke="currentColor"/>';
-    s += box(busX + 14, y - 11, 60, 22, f.curve + ' ' + f.In + ' A', bad && (m.faultId === 'underrated' || m.faultId === 'selectivity'));
-    var x2 = busX + 78;
+    var x = busX + 16 + i * Math.floor((W - busX - 50) / Math.max(1, m.feeders.length));
+    var yTop = top + 3; var yBot = top + rowH * 0.85;
+    var bad = highlightFault && f.faulty;
+    // Vertical feeder lead
+    s += '<line x1="' + x + '" y1="' + yTop + '" x2="' + x + '" y2="' + (yTop + 14) + '" stroke="' + cl + '"/>';
+    // MCB
+    var mcbY = yTop + 14;
+    s += mcbSym(x - 20, mcbY, 40, 16, f.curve + f.In, bad && (m.faultId === 'underrated' || m.faultId === 'selectivity'));
+    var ny = mcbY + 16;
     // RCD
-    if (f.rcd) { s += box(x2, y - 11, 40, 22, f.rcdMa + ' mA', false); x2 += 44; }
-    else if (highlightFault && m.faultId === 'missing_rcd' && f.faulty) { s += '<text x="' + x2 + '" y="' + (y + 4) + '" font-size="11" fill="#d64545">\u2298 ' + axL({ da: 'ingen HPFI', en: 'no RCD' }) + '</text>'; x2 += 70; }
-    // cable label
+    if (f.rcd) { s += '<line x1="' + x + '" y1="' + ny + '" x2="' + x + '" y2="' + (ny + 4) + '" stroke="' + cl + '"/>'; s += rcdSym(x - 10, ny + 14, 10, f.rcdMa, false); ny += 30; }
+    else if (highlightFault && m.faultId === 'missing_rcd' && f.faulty) { s += lbl(x - 14, ny + 16, '\u2298 ' + tx('ingen', 'no') + ' HPFI', faultCl, 8); ny += 22; }
+    else { ny += 4; }
+    // Cable segment
     var cableBad = bad && m.faultId === 'undersized_cable';
-    s += '<text x="' + (x2 + 2) + '" y="' + (y - 1) + '" font-size="8.5" fill="' + (cableBad ? '#d64545' : 'currentColor') + '">' + f.csa + ' mm\u00b2 ' + f.material + ' (Iz ' + axFmt(f.Iz) + ')</text>';
-    s += '<text x="' + (x2 + 2) + '" y="' + (y + 9) + '" font-size="8.5" fill="currentColor">' + axL(f.name) + ' \u00b7 IB ' + axFmt(f.IB, 1) + ' A</text>';
-    if (bad) s += warn(W - 20, y + 4);
+    s += '<line x1="' + x + '" y1="' + ny + '" x2="' + x + '" y2="' + (ny + 18) + '" stroke="' + (cableBad ? faultCl : cl) + '" stroke-width="' + (cableBad ? 2 : 1.2) + '"/>';
+    s += lbl(x + 5, ny + 10, f.csa + 'mm\u00b2 ' + f.material, cableBad ? faultCl : cl, 7.5);
+    ny += 20;
+    // Load label
+    s += lbl(x - 18, ny + 8, axL(f.name), cl, 7.5);
+    s += lbl(x - 18, ny + 17, 'IB ' + axFmt(f.IB, 1) + ' A \u00b7 Iz ' + axFmt(f.Iz), cl, 7);
+    // PE connection
+    s += '<line x1="' + x + '" y1="' + (ny + 20) + '" x2="' + x + '" y2="' + peY + '" stroke="' + okCl + '" stroke-width="0.7" stroke-dasharray="3 2"/>';
+    // Fault marker
+    if (bad) s += warn(x + 22, mcbY + 10);
   });
   s += '</svg>';
   return s;
