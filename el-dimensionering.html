@@ -8565,28 +8565,45 @@ function calcDetailIB(power_kW, cosPhi, voltage, ib, sf, ef) {
 function renderLoad() {
   const ib = calcIB();
   const S = calcS();
+  const da = (lang === 'da');
   const powerSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500];
   const cosPhiSteps = [0.7, 0.75, 0.8, 0.85, 0.87, 0.9, 0.92, 0.95, 0.97, 1.0];
   const sfSteps = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
   const efSteps = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
 
+  // --- Executive Summary (always visible, replaces raw result dump) ---
+  const summaryItems = [
+    { label: tx('Beregnet strøm IB', 'Design current IB'), value: ib.toFixed(1) + ' A', status: ib > 0 ? 'pass' : '' },
+    { label: tx('Tilsyneladende effekt S', 'Apparent power S'), value: S.toFixed(1) + ' kVA', status: '' },
+    { label: tx('Forsyning', 'Supply'), value: loadState.voltage + ' V', status: '' },
+    { label: 'cos \u03c6', value: loadState.cosPhi.toString(), status: loadState.cosPhi < 0.85 ? 'warn' : '' }
+  ];
+
+  // --- Smart Card Presets (visual, descriptive) ---
+  const presetCards = [
+    { id: 'ev11', icon: '\uD83D\uDD0C', title: tx('EV 11 kW', 'EV 11 kW'), desc: tx('3×400V, Type B RCD', '3×400V, Type B RCD') },
+    { id: 'ev22', icon: '\u26A1', title: tx('EV 22 kW', 'EV 22 kW'), desc: tx('3×400V, Type B RCD', '3×400V, Type B RCD') },
+    { id: 'heatpump', icon: '\u2744\uFE0F', title: tx('Varmepumpe', 'Heat pump'), desc: tx('6 kW, induktiv', '6 kW, inductive') },
+    { id: 'cooker', icon: '\uD83C\uDF73', title: tx('Komfur', 'Cooker'), desc: tx('11 kW, sf=0,7', '11 kW, sf=0.7') },
+    { id: 'sockets', icon: '\uD83D\uDD0C', title: tx('Stikgruppe', 'Sockets'), desc: tx('1×230V, 3,7 kW', '1×230V, 3.7 kW') },
+    { id: 'light', icon: '\uD83D\uDCA1', title: tx('Lysgruppe', 'Lighting'), desc: tx('1×230V, 1,5 kW', '1×230V, 1.5 kW') },
+    { id: 'pv', icon: '\u2600\uFE0F', title: tx('Solcelle', 'Solar PV'), desc: tx('10 kW inverter', '10 kW inverter') }
+  ];
+
+  // --- Power selector (most relevant sizes first based on preset) ---
+  const commonPowers = ib > 0 ? powerSteps : [1, 2, 3, 5, 7, 10, 11, 15, 20, 22, 25, 30, 40, 50];
+
   return `
     <div class="card fade-in">
       <div class="card-title">${t('loadTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+      <div class="info-row">${tx('Vælg en typisk belastning eller angiv effekt manuelt. Beregningen viser IB og anbefaler komponenter automatisk.', 'Select a typical load or specify power manually. The calculation shows IB and recommends components automatically.')}</div>
+
+      ${uxSummary(summaryItems)}
 
       <div class="select-group">
-        <div class="select-label">${tx('Hurtigvalg (typiske belastninger)', 'Quick presets (typical loads)')}</div>
-        <div class="select-grid">
-          <button class="sel-btn" onclick="applyLoadPreset('ev11')">${tx('EV-lader 11kW', 'EV charger 11kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('ev22')">${tx('EV-lader 22kW', 'EV charger 22kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('pv')">${tx('Solcelle 10kW', 'Solar PV 10kW')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('cooker')">${tx('Komfur', 'Cooker')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('heatpump')">${tx('Varmepumpe', 'Heat pump')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('sockets')">${tx('Stikgruppe', 'Socket circuit')}</button>
-          <button class="sel-btn" onclick="applyLoadPreset('light')">${tx('Lysgruppe', 'Lighting')}</button>
-        </div>
-        ${loadState._preset ? `<div style="font-size:0.74rem;color:var(--primary);margin-top:6px">${tx('Forudindstilling:', 'Preset:')} <strong>${loadState._preset}</strong> ${loadState._presetNote ? '\u2014 ' + loadState._presetNote : ''}</div>` : ''}
+        <div class="select-label">${tx('Hurtigvalg — typiske belastninger', 'Quick select — typical loads')}</div>
+        ${uxSmartCards(presetCards, loadState._preset || '', 'applyLoadPreset')}
+        ${loadState._preset ? '<div style="font-size:0.74rem;color:var(--primary);margin-top:6px">\u2705 ' + (loadState._presetNote || '') + '</div>' : ''}
       </div>
 
       <div class="select-group">
@@ -8599,51 +8616,45 @@ function renderLoad() {
       </div>
 
       <div class="select-group">
-        <div class="select-label">${t('power')}</div>
+        <div class="select-label">${t('power')} [kW]</div>
         <div class="select-grid">
-          ${powerSteps.map(p =>
+          ${commonPowers.map(p =>
             `<button class="sel-btn ${loadState.power === p ? 'selected' : ''}" onclick="loadState.power=${p};renderModule('load')">${p}</button>`
           ).join('')}
         </div>
       </div>
 
-      <div class="select-group">
-        <div class="select-label">${t('powerFactor')}</div>
-        <div class="select-grid">
-          ${cosPhiSteps.map(c =>
-            `<button class="sel-btn ${loadState.cosPhi === c ? 'selected' : ''}" onclick="loadState.cosPhi=${c};renderModule('load')">${c}</button>`
-          ).join('')}
+      ${uxPanel(tx('\u2699\uFE0F Avancerede parametre (cos\u03c6, samtid, udbygning)', '\u2699\uFE0F Advanced parameters (cos\u03c6, simultaneity, expansion)'), `
+        <div class="select-group">
+          <div class="select-label">${t('powerFactor')} (cos \u03c6)</div>
+          <div class="select-grid">
+            ${cosPhiSteps.map(c =>
+              `<button class="sel-btn ${loadState.cosPhi === c ? 'selected' : ''}" onclick="loadState.cosPhi=${c};renderModule('load')">${c}</button>`
+            ).join('')}
+          </div>
         </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${t('simultaneity')}</div>
-        <div class="select-grid">
-          ${sfSteps.map(s =>
-            `<button class="sel-btn ${loadState.simFactor === s ? 'selected' : ''}" onclick="loadState.simFactor=${s};renderModule('load')">${s}</button>`
-          ).join('')}
+        <div class="select-group">
+          <div class="select-label">${t('simultaneity')} (${tx('samtighedsfaktor', 'simultaneity factor')})</div>
+          <div class="select-grid">
+            ${sfSteps.map(s =>
+              `<button class="sel-btn ${loadState.simFactor === s ? 'selected' : ''}" onclick="loadState.simFactor=${s};renderModule('load')">${s}</button>`
+            ).join('')}
+          </div>
         </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${t('expansion')}</div>
-        <div class="select-grid">
-          ${efSteps.map(e =>
-            `<button class="sel-btn ${loadState.expFactor === e ? 'selected' : ''}" onclick="loadState.expFactor=${e};renderModule('load')">${e}</button>`
-          ).join('')}
+        <div class="select-group">
+          <div class="select-label">${t('expansion')} (${tx('udbygningsfaktor', 'expansion factor')})</div>
+          <div class="select-grid">
+            ${efSteps.map(e =>
+              `<button class="sel-btn ${loadState.expFactor === e ? 'selected' : ''}" onclick="loadState.expFactor=${e};renderModule('load')">${e}</button>`
+            ).join('')}
+          </div>
         </div>
-      </div>
+      `, { level: null, id: 'load_advanced', open: (uxModeLevel() >= 2 || loadState.cosPhi !== 0.95 || loadState.simFactor !== 1.0 || loadState.expFactor !== 1.0) })}
     </div>
 
+    ${ib > 0 ? `
     <div class="card fade-in">
       <div class="card-title">${t('loadResult')}</div>
-      <div class="result-box">
-        <div class="result-title">${t('result')}</div>
-        <div class="result-row"><span class="label">${t('ib')}</span><span class="value">${ib.toFixed(1)} A</span></div>
-        <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
-        <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
-        <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
-      </div>
       ${calcDetailIB(loadState.power, loadState.cosPhi, loadState.voltage, ib, loadState.simFactor, loadState.expFactor)}
     </div>
 
@@ -8652,15 +8663,15 @@ function renderLoad() {
     ${renderRecommendations(tx('Anbefalede automatsikringer', 'Recommended MCBs'), recommendMCBs(ib), 'mcb')}
     ${ib > 63 ? renderRecommendations(tx('Anbefalede maksimalafbrydere', 'Recommended MCCBs'), recommendMCCBs(ib), 'mccb') : ''}
     ${renderRecommendations(tx('Anbefalet HPFI/RCD', 'Recommended RCD'), recommendRCDs(ib, loadState.voltage), 'rcd')}
-    ${renderRecommendations(tx('Anbefalede kontaktorer (motor)', 'Recommended contactors (motor)'), recommendContactors(ib), 'contactor')}
-    ${renderRecommendations(tx('Anbefalet motorv\u00E6rn', 'Recommended motor protection'), recommendMPCBs(ib), 'mpcb')}
-    ${renderRecommendations(tx('Anbefalet termorel\u00E6', 'Recommended overload relay'), recommendOverloadRelays(ib), 'relay')}
+    ${uxModeLevel() >= 2 ? renderRecommendations(tx('Anbefalede kontaktorer (motor)', 'Recommended contactors (motor)'), recommendContactors(ib), 'contactor') : ''}
+    ${uxModeLevel() >= 2 ? renderRecommendations(tx('Anbefalet motorv\u00E6rn', 'Recommended motor protection'), recommendMPCBs(ib), 'mpcb') : ''}
+    ${uxModeLevel() >= 2 ? renderRecommendations(tx('Anbefalet termorel\u00E6', 'Recommended overload relay'), recommendOverloadRelays(ib), 'relay') : ''}
+    ` : ''}
 
     ${renderLoadSchedule()}
 
-    <div class="card fade-in">
-      <div class="card-title">\uD83C\uDFD8\uFE0F ${tx('Boligudstykning \u2013 diversitet (Fællesregulativet)', 'Housing estate \u2013 diversity (net-company formula)')}</div>
-      <div class="info-row">${tx('Netselskabets erfaringsformel: Pb = 0,834 \u00B7 (W\u00B7n)^0,89. Klik antal boliger og energi/bolig.', 'Net-company experience formula: Pb = 0.834 \u00B7 (W\u00B7n)^0.89. Click number of homes and energy/home.')}</div>
+    ${uxPanel(tx('\uD83C\uDFD8\uFE0F Boligudstykning \u2013 diversitet', '\uD83C\uDFD8\uFE0F Housing estate \u2013 diversity'), `
+      <div class="info-row">${tx('Netselskabets erfaringsformel: Pb = 0,834 \u00B7 (W\u00B7n)^0,89', 'Net-company experience formula: Pb = 0.834 \u00B7 (W\u00B7n)^0.89')}</div>
       <div class="select-group">
         <div class="select-label">${tx('Antal boliger (n)', 'Number of homes (n)')}</div>
         <div class="select-grid">
@@ -8668,18 +8679,17 @@ function renderLoad() {
         </div>
       </div>
       <div class="select-group">
-        <div class="select-label">${tx('Energi pr. bolig (kWh/\u00E5r) \u2013 inkl. evt. EV', 'Energy per home (kWh/yr) \u2013 incl. any EV')}</div>
+        <div class="select-label">${tx('Energi pr. bolig (kWh/\u00E5r)', 'Energy per home (kWh/yr)')}</div>
         <div class="select-grid">
           ${[2000,3000,4300,5000,6000,8300,10000,12000].map(v=>`<button class="sel-btn ${diversityState.kwhPerHome===v?'selected':''}" onclick="diversityState.kwhPerHome=${v};renderModule('load')">${v}</button>`).join('')}
         </div>
       </div>
       <div class="result-box">
         <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
-        <div class="result-row"><span class="label">W \u00B7 n</span><span class="value">${(diversityState.kwhPerHome/1000*diversityState.homes).toFixed(0)} MWh/\u00E5r</span></div>
-        <div class="result-row"><span class="label">Pb = 0,834 \u00B7 (W\u00B7n)^0,89</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
-        <div class="result-row"><span class="label">${tx('IB (cos\u03C6 0,95)', 'IB (cos\u03C6 0.95)')}</span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">Pb</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
+        <div class="result-row"><span class="label">IB</span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
       </div>
-    </div>
+    `, { level: 'engineer', id: 'load_diversity' })}
   `;
 }
 
