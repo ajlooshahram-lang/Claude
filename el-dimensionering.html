@@ -17315,6 +17315,20 @@ function renderSolar() {
   }
   html += '</div>';
 
+  // Energy reduction — how PV reduces grid consumption
+  var pvSelfPct = solarState.selfConsumption || 0.5;
+  var pvSelfKWh = annualYield * pvSelfPct;
+  var pvGridReductionDKK = pvSelfKWh * 2.5;
+  var pvExportKWh = annualYield * (1 - pvSelfPct);
+  var pvExportDKK = pvExportKWh * 0.6; // export tariff
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energireduktion — netforbrug & CO\u2082', 'Energy Reduction — grid use & CO\u2082') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Egetforbrug (' + (pvSelfPct * 100).toFixed(0) + '%)', 'Self-consumption (' + (pvSelfPct * 100).toFixed(0) + '%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + pvSelfKWh.toFixed(0) + ' kWh/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reduceret netforbrug', 'Reduced grid consumption') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (pvGridReductionDKK / 1000).toFixed(1) + 'k DKK/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Eksport til net', 'Export to grid') + '</span><span class="value">' + pvExportKWh.toFixed(0) + ' kWh (' + pvExportDKK.toFixed(0) + ' DKK)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (annualYield * 0.085 / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '</div>';
+
   // Cable specs
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Kabler', 'Cables') + '</div>';
