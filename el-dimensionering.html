@@ -29642,6 +29642,24 @@ function renderMotorteori() {
     html += '</div>';
   }
 
+  html += calcDetail({
+    name: tx('Motorteori \u2014 samlet beregningsgang', 'Motor Theory \u2014 complete calculation'),
+    formula: 'n_s = 120f/p ;  s = (n_s\u2212n)/n_s ;  P\u2081 = \u221A3\u00B7U\u00B7I\u00B7cos\u03C6 ;  M = 9,55\u00B7P\u2082/n ;  P_ag = P\u2082/(1\u2212s)',
+    variables: [
+      { name: tx('Synkront omdrejningstal', 'Synchronous speed'), symbol: 'n_s', value: res.ns, unit: 'rpm', source: '120\u00B7f/p' },
+      { name: tx('Slip', 'Slip'), symbol: 's', value: res.slipPct, unit: '%', source: '(n_s\u2212n)/n_s' },
+      { name: tx('Tilf\u00f8rt effekt', 'Input power'), symbol: 'P\u2081', value: (res.P1 / 1000).toFixed(2), unit: 'kW', source: '\u221A3\u00B7U\u00B7I\u00B7cos\u03C6' },
+      { name: tx('Akseleffekt', 'Shaft power'), symbol: 'P\u2082', value: (res.P2 / 1000).toFixed(2), unit: 'kW' },
+      { name: tx('Virkningsgrad', 'Efficiency'), symbol: '\u03b7', value: res.etaPct, unit: '%', source: 'P\u2082/P\u2081' },
+      { name: tx('Moment', 'Torque'), symbol: 'M', value: res.torque, unit: 'Nm', source: '9,55\u00B7P\u2082/n' },
+      { name: tx('Luftspalteeffekt', 'Air-gap power'), symbol: 'P_ag', value: (res.Pag / 1000).toFixed(3), unit: 'kW', source: 'P\u2082/(1\u2212s)' },
+      { name: tx('Rotortab', 'Rotor losses'), symbol: 'P_Cu,rotor', value: (res.PcuRotor / 1000).toFixed(3), unit: 'kW', source: 's\u00B7P_ag' }
+    ],
+    substitution: 'n_s = 120\u00D7' + motorteoriState.f + '/' + motorteoriState.poles + ' = ' + res.ns.toFixed(0) + ' rpm ;  s = (' + res.ns.toFixed(0) + '\u2212' + motorteoriState.n + ')/' + res.ns.toFixed(0) + ' = ' + res.slipPct.toFixed(2) + '%',
+    result: { value: res.torque, unit: 'Nm', status: 'ok' },
+    reference: 'Elektroteknik Opgavesamling 4. udg. Kap. 11; IEC 60034'
+  });
+
   html += symbolLegend([
     { name: tx('Synkront omdrejningstal', 'Synchronous speed'), symbol: 'n_s', unit: 'rpm' },
     { name: tx('Omdrejningstal', 'Speed'), symbol: 'n', unit: 'rpm' },
@@ -30189,6 +30207,27 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
   html += tx('Ref: DS/HD 60364-4-41 (beskyttelse), Tabel 41.1 (frakoblingstider), DS/HD 60364-6 (verifikation, 0.8-faktor)', 'Ref: DS/HD 60364-4-41 (protection), Table 41.1 (disconnection times), DS/HD 60364-6 (verification, 0.8 factor)');
   html += '</div>';
 
+  if (isTN) {
+    var _Ia2 = faultCalcIa(faultState.deviceType, faultState.deviceIn);
+    if (_Ia2 > 0) {
+      var _tn2 = faultCalcTN(faultState.zsValue, _Ia2, faultState.voltage);
+      html += calcDetail({
+        name: tx('Fejlsl\u00f8jfeverifikation (TN)', 'Fault loop verification (TN)'),
+        formula: 'Zs \u00B7 Ia \u2264 U\u2080   \u21d4   Zs \u2264 U\u2080/Ia',
+        variables: [
+          { name: 'Zs', symbol: 'Zs', value: faultState.zsValue, unit: '\u03A9', source: tx('m\u00e5lt/beregnet', 'measured/calculated') },
+          { name: 'Ia', symbol: 'Ia', value: _Ia2, unit: 'A', source: tx('Ber\u00f8ringsbeskyttelsesstr\u00f8m', 'Touch protection current') },
+          { name: 'U\u2080', symbol: 'U\u2080', value: faultState.voltage, unit: 'V' },
+          { name: tx('Zs,max', 'Zs,max'), symbol: 'Zs_max', value: _tn2.ZsMax.toFixed(3), unit: '\u03A9', source: 'U\u2080/Ia' },
+          { name: tx('Margin (0,8\u00d7Zs,max)', 'Margin (0.8\u00d7Zs,max)'), symbol: 'Zs_safe', value: (_tn2.ZsMax * 0.8).toFixed(3), unit: '\u03A9', source: 'DS/HD 60364-6 cl.6' }
+        ],
+        substitution: 'Zs_max = ' + faultState.voltage + ' / ' + _Ia2 + ' = ' + _tn2.ZsMax.toFixed(3) + ' \u03A9',
+        result: { value: _tn2.ok ? 1 : 0, unit: '', status: _tn2.ok ? 'ok' : 'fail' },
+        reference: 'DS/HD 60364-4-41 cl.411.4.4; Tabel 41.1'
+      });
+    }
+  }
+
   return html;
 }
 
@@ -30547,8 +30586,21 @@ function renderDCOhm() {
   html += '<div class="result-row"><span class="label">U (' + tx('Spænding', 'Voltage') + ')</span><span class="value">' + res.U.toFixed(4) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">R (' + tx('Modstand', 'Resistance') + ')</span><span class="value">' + dcFmtR(res.R) + '</span></div>';
   html += '<div class="result-row"><span class="label">I (' + tx('Strøm', 'Current') + ')</span><span class="value">' + res.I.toFixed(4) + ' A</span></div>';
-  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U = R \u00D7 I = ' + res.R + ' \u00D7 ' + res.I + ' = ' + res.U.toFixed(4) + ' V</span></div>';
-  html += '</div></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('U = R \u00D7 I = ' + res.R + ' \u00D7 ' + res.I + ' = ' + res.U.toFixed(4) + ' V') + '</span></div>';
+  html += '</div>';
+  html += calcDetail({
+    name: tx('Ohms lov', 'Ohm\'s Law'),
+    formula: 'U = R \u00B7 I',
+    variables: [
+      { name: tx('Sp\u00e6nding', 'Voltage'), symbol: 'U', value: res.U.toFixed(4), unit: 'V' },
+      { name: tx('Modstand', 'Resistance'), symbol: 'R', value: res.R, unit: '\u03A9' },
+      { name: tx('Str\u00f8m', 'Current'), symbol: 'I', value: res.I.toFixed(4), unit: 'A' }
+    ],
+    substitution: dcState.ohmKnown === 'ri' ? 'U = ' + res.R + ' \u00D7 ' + res.I + ' = ' + res.U.toFixed(4) + ' V' : (dcState.ohmKnown === 'ru' ? 'I = ' + res.U.toFixed(2) + ' / ' + res.R + ' = ' + res.I.toFixed(4) + ' A' : 'R = ' + res.U.toFixed(2) + ' / ' + res.I + ' = ' + res.R.toFixed(4) + ' \u03A9'),
+    result: { value: dcState.ohmKnown === 'ri' ? res.U : (dcState.ohmKnown === 'ru' ? res.I : res.R), unit: dcState.ohmKnown === 'ri' ? 'V' : (dcState.ohmKnown === 'ru' ? 'A' : '\u03A9'), status: 'ok' },
+    reference: 'Opgavesamling 4. udg. Kap. 1'
+  });
+  html += '</div>';
   return html;
 }
 
