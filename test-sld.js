@@ -13675,6 +13675,23 @@ test('standards: faultCalcMinCSA implements Smin = sqrt(I^2 t)/k = I*sqrt(t)/k',
   assert.ok(faultCalcMinCSA(1000, 0.2, 103) > smin, 'lower k => larger Smin');
 });
 
+test('standards: fuse Ia uses real FUSE_5S currents, not arbitrary multiples (life-safety)', function () {
+  // The old code used 2.1*In (≤63A) which gave DANGEROUSLY LOW Ia values,
+  // resulting in Zs_max TOO HIGH (would approve installations that can't clear faults).
+  // The correct Ia is the verified 5s fusing current from IEC 60269-2 / DS/HD 60364 Table 41.5.
+  [16, 25, 32, 63, 100].forEach(function (In) {
+    var Ia = faultCalcIa('fuse', In);
+    assert.strictEqual(Ia, FUSE_5S[In], 'fuse In=' + In + ' uses FUSE_5S=' + FUSE_5S[In]);
+    // Zs_max must be MORE restrictive than the old wrong formula (safety direction).
+    var oldIa = In <= 63 ? 2.1 * In : 1.6 * In;
+    assert.ok(Ia > oldIa, 'real Ia > old approximate Ia (more restrictive Zs_max)');
+  });
+  // MCB Ia unchanged (factor-based, correct per IEC 60898-1 Table 2).
+  assert.strictEqual(faultCalcIa('mcbB', 16), 80, 'MCB B 16A: Ia=80A (5*In)');
+  assert.strictEqual(faultCalcIa('mcbC', 16), 160, 'MCB C 16A: Ia=160A (10*In)');
+  assert.strictEqual(faultCalcIa('mcbD', 16), 320, 'MCB D 16A: Ia=320A (20*In)');
+});
+
 test('rcd: rcdTripMaxAt exact at standard test points (general)', function () {
   assert.strictEqual(rcdTripMaxAt(1, false), 0.300);
   assert.strictEqual(rcdTripMaxAt(2, false), 0.150);
