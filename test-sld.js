@@ -13967,6 +13967,24 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- HV ring-network diagram in forsyning exams -----
+test('autoexam/hv-ring: forsyning exams carry a ring-network diagram with stations and cable data', function () {
+  var p = axGenerate(7, 'fabrik', 'ekspert', 'fuld');
+  var fop = p.opgaver.filter(function (o) { return o.type === 'forsyning'; })[0];
+  assert.ok(fop, 'fabrik/fuld has a forsyning opgave');
+  assert.ok(fop.data.stations && fop.data.stations.length >= 2, 'has stations');
+  assert.ok(fop.data.cableCSA > 0 && fop.data.cableLengths && fop.data.cableLengths.length > 0, 'has cable data');
+  var svg = axRenderHVRing(fop.data);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid SVG');
+  assert.ok(svg.indexOf('<ellipse') >= 0, 'ring ellipse present');
+  assert.ok(svg.indexOf('50/10 kV') >= 0, 'shows the 50/10 kV source station');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  var db = axDataBlockForsyning(fop.data);
+  assert.ok(db.indexOf('Ringforbindelse') >= 0 && db.indexOf('<svg') >= 0, 'embedded in on-screen view');
+  var ex = axBuildExamHtml(p);
+  assert.ok(ex.indexOf('<ellipse') >= 0 && ex.indexOf('undefined') < 0, 'embedded in printable exam');
+});
+
 // ----- Batch 12: motor starting-current verification task -----
 test('autoexam/motorstart: DOL motor starting task appears for motor-tier buildings and solves correctly', function () {
   var found = 0;

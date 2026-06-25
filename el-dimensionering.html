@@ -11697,7 +11697,16 @@ function axGenForsyning(rng, b, tier) {
   var ek = axRngPick(rng, [4, 5, 6]);
   var tr = axIkTrafoSecondary(SN, 400, ek);
   var ambient = axRngPick(rng, [30, 35]);
-  var data = { SN: SN, ek: ek, Un1: 10, Un2: 400, In: tr.In, Ik: tr.Ik, IkkA: tr.IkkA, ambient: ambient, vector: 'Dyn1', ki: axRngPick(rng, [300, 400, 600]) };
+  // Ring-network topology: 2-4 stations on a 10 kV ring from a 50/10 kV station
+  var nStations = axRngInt(rng, 2, tier.lvl >= 4 ? 4 : 3);
+  var stations = [];
+  for (var si = 0; si < nStations; si++) {
+    var load = axRngPick(rng, [0.5, 1, 1.5, 2, 3, 4]) ; // MW
+    stations.push({ id: 'T' + (si + 1), SN: SN, load_MW: load, cos: axRngPick(rng, [0.9, 0.95]) });
+  }
+  var cableCSA = axRngPick(rng, [95, 150, 240]);
+  var cableLengths = []; for (var ci = 0; ci <= nStations; ci++) cableLengths.push(axRound(axRngInt(rng, 200, 1500), 50));
+  var data = { SN: SN, ek: ek, Un1: 10, Un2: 400, In: tr.In, Ik: tr.Ik, IkkA: tr.IkkA, ambient: ambient, vector: 'Dyn1', ki: axRngPick(rng, [300, 400, 600]), stations: stations, cableCSA: cableCSA, cableLengths: cableLengths, nStations: nStations };
   var tasks = [];
   var n1 = axNumOpts(tr.IkkA, [Math.round(tr.IkkA * 1.3 * 10) / 10, Math.round(tr.IkkA * 0.7 * 10) / 10]);
   tasks.push({ id: 'f_ik', kind: 'iktrafo', prompt: { da: 'Beregn Ik,max p\u00e5 lavsp\u00e6ndingssiden af transformeren (' + SN + ' kVA, ek = ' + axFmt(ek) + ' %).', en: 'Calculate Ik,max on the LV side of the transformer (' + SN + ' kVA, ek = ' + axFmt(ek) + ' %).' }, given: { SN: SN, Un: 400, ek: ek }, answer: tr.IkkA, opts: n1.opts, ci: n1.ci, unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5', cat: 'shortcircuit' });
@@ -12327,6 +12336,49 @@ function axInstallationToSLD(d) {
     return { id: 'q' + (i + 1), name: { da: l.da, en: l.en }, IB: l.IB, In: inF, curve: 'C', csa: csa, material: 'Cu', Iz: iz, rcd: needRcd, rcdMa: 30, faulty: false };
   });
   return { earthing: d.earthing, building: { da: '', en: '' }, trafo: { SN: d.trafo.SN, ek: d.trafo.ek, IkkA: d.trafo.IkkA, In: d.trafo.In }, main: { In: mainIn, Icu: Icu, hasSwitch: true, faulty: false }, feeders: feeders, faultId: 'none' };
+}
+
+// Render a 10 kV ring-network single-line diagram (HV forsyning bilag).
+function axRenderHVRing(d) {
+  var W = 440, H = 260; var cx = W / 2, cy = 135, R = 85;
+  var n = d.nStations || 2; var cl = 'currentColor';
+  function lbl(x, y, txt, sz) { return '<text x="' + x + '" y="' + y + '" font-size="' + (sz || 8.5) + '" fill="' + cl + '" text-anchor="middle">' + txt + '</text>'; }
+  var s = '<svg width="' + W + '" height="' + H + '" style="max-width:100%;font-family:\'Segoe UI\',system-ui,sans-serif;color:var(--text,#ccc)">';
+  // title
+  s += '<rect x="0" y="0" width="' + W + '" height="16" fill="#8881" rx="4"/>';
+  s += '<text x="6" y="12" font-size="9" fill="' + cl + '">' + tx('Bilag: 10 kV Ringforbindelse', 'Appendix: 10 kV Ring network') + '</text>';
+  // 50/10 kV station at top
+  s += '<rect x="' + (cx - 40) + '" y="22" width="80" height="24" rx="4" fill="none" stroke="' + cl + '"/>';
+  s += lbl(cx, 37, '50/10 kV', 9);
+  s += '<line x1="' + cx + '" y1="46" x2="' + cx + '" y2="' + (cy - R - 6) + '" stroke="' + cl + '"/>';
+  // Ring (ellipse)
+  s += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + R + '" ry="' + (R * 0.55) + '" fill="none" stroke="' + cl + '" stroke-width="2"/>';
+  // cable labels on ring arcs
+  var lens = d.cableLengths || [];
+  for (var li = 0; li <= n; li++) {
+    var ang = -Math.PI / 2 + (li + 0.5) * (2 * Math.PI) / (n + 1);
+    var lx = cx + (R + 14) * Math.cos(ang), ly = cy + (R * 0.55 + 14) * Math.sin(ang);
+    if (lens[li]) s += '<text x="' + Math.round(lx) + '" y="' + Math.round(ly) + '" font-size="7" fill="' + cl + '" text-anchor="middle">W' + (li + 1) + ' ' + lens[li] + ' m</text>';
+  }
+  // cable CSA label
+  s += '<text x="' + (cx + R + 22) + '" y="' + (cy - 2) + '" font-size="7.5" fill="' + cl + '">' + (d.cableCSA || 240) + ' mm\u00b2 PEX-Al 12 kV</text>';
+  // stations around the ring
+  var stations = d.stations || [];
+  for (var i = 0; i < n; i++) {
+    var a = -Math.PI / 2 + (i + 1) * (2 * Math.PI) / (n + 1);
+    var sx = cx + R * Math.cos(a), sy = cy + (R * 0.55) * Math.sin(a);
+    // trafo symbol (small)
+    s += '<circle cx="' + Math.round(sx) + '" cy="' + Math.round(sy - 4) + '" r="7" fill="none" stroke="' + cl + '"/>';
+    s += '<circle cx="' + Math.round(sx) + '" cy="' + Math.round(sy + 4) + '" r="7" fill="none" stroke="' + cl + '"/>';
+    var st = stations[i] || {};
+    s += '<text x="' + Math.round(sx) + '" y="' + Math.round(sy + 20) + '" font-size="7.5" fill="' + cl + '" text-anchor="middle">' + (st.id || ('T' + (i + 1))) + ' ' + (d.SN || 1000) + ' kVA</text>';
+    s += '<text x="' + Math.round(sx) + '" y="' + Math.round(sy + 29) + '" font-size="7" fill="' + cl + '" text-anchor="middle">' + (st.load_MW || 1) + ' MW cos\u03c6 ' + (st.cos || 0.95) + '</text>';
+  }
+  // relay labels
+  s += '<text x="' + (cx - R - 8) + '" y="' + (cy - R * 0.55 - 4) + '" font-size="7" fill="' + cl + '">I> ' + axFmt(0.3 * (d.ki || 600) / 5, 0) + ' A (ki=' + (d.ki || 600) + '/5)</text>';
+  s += '<text x="' + (cx + 2) + '" y="' + (H - 6) + '" font-size="7" fill="' + cl + '" text-anchor="middle">ek=' + axFmt(d.ek) + '% \u00b7 ' + d.vector + ' \u00b7 ' + axFmt(d.ambient) + ' \u00b0C</text>';
+  s += '</svg>';
+  return s;
 }
 
 function axRenderSLD(m, highlightFault) {
@@ -13015,7 +13067,11 @@ function axDataBlockForsyning(d) {
   h += '<div><strong>' + tx('Str\u00f8mtransformere', 'Current transformers') + ':</strong> ki = ' + d.ki + '/5 A</div>';
   h += '<div><strong>' + tx('Omgivelsestemperatur', 'Ambient temperature') + ':</strong> ' + d.ambient + ' \u00b0C</div>';
   h += '<div><strong>' + tx('Rel\u00e6beskyttelse', 'Relay protection') + ':</strong> ' + tx('konstanttidsrel\u00e6', 'constant-time relay') + ' I> / t></div>';
+  if (d.stations && d.stations.length) { h += '<div><strong>' + tx('Stationer', 'Stations') + ':</strong> ' + d.stations.map(function (st) { return st.id + ' (' + st.load_MW + ' MW, cos\u03c6 ' + st.cos + ')'; }).join(', ') + '</div>'; }
+  if (d.cableCSA) h += '<div><strong>' + tx('Ringkabel', 'Ring cable') + ':</strong> ' + d.cableCSA + ' mm\u00b2 PEX-Al 12 kV</div>';
   h += '</div></div>';
+  // Bilag: HV ring-network diagram
+  if (d.nStations) h += '<div class="result-box" style="margin:8px 0"><div class="result-title">' + tx('Bilag: Ringforbindelse', 'Appendix: Ring network') + '</div><div style="overflow-x:auto;padding:4px">' + axRenderHVRing(d) + '</div></div>';
   return h;
 }
 
@@ -13271,7 +13327,12 @@ function axPrintDataBlock(op) {
   }
   if (op.type === 'forsyning') {
     var f = op.data;
-    return '<div class="box"><strong>' + tx('Forsyningsforhold', 'Supply conditions') + '</strong><br>' + tx('Transformer', 'Transformer') + ': SN = ' + axEsc(axFmt(f.SN)) + ' kVA, UN = 3\u00d710/0,4 kV, ' + f.vector + ', ek = ' + axEsc(axFmt(f.ek)) + ' %<br>' + tx('Fuldlaststr\u00f8m (LV)', 'Full-load current (LV)') + ': In \u2248 ' + axEsc(axFmt(f.In, 0)) + ' A \u00b7 ki = ' + f.ki + '/5 A</div>';
+    var h2 = '<div class="box"><strong>' + tx('Forsyningsforhold', 'Supply conditions') + '</strong><br>' + tx('Transformer', 'Transformer') + ': SN = ' + axEsc(axFmt(f.SN)) + ' kVA, UN = 3\u00d710/0,4 kV, ' + f.vector + ', ek = ' + axEsc(axFmt(f.ek)) + ' %<br>' + tx('Fuldlaststr\u00f8m (LV)', 'Full-load current (LV)') + ': In \u2248 ' + axEsc(axFmt(f.In, 0)) + ' A \u00b7 ki = ' + f.ki + '/5 A';
+    if (f.stations && f.stations.length) h2 += '<br>' + tx('Stationer', 'Stations') + ': ' + f.stations.map(function (st) { return st.id + ' (' + st.load_MW + ' MW)'; }).join(', ');
+    if (f.cableCSA) h2 += '<br>' + tx('Ringkabel', 'Ring cable') + ': ' + f.cableCSA + ' mm\u00b2 PEX-Al 12 kV';
+    h2 += '</div>';
+    if (f.nStations) h2 += '<h3>' + tx('Bilag: Ringforbindelse', 'Appendix: Ring network') + '</h3><div style="color:#111">' + axRenderHVRing(f) + '</div>';
+    return h2;
   }
   return '';
 }
