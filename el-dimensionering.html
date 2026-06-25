@@ -9218,6 +9218,26 @@ function renderMCCB() {
         <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
         <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
       </div>
+      ${calcDetail({
+        name: tx('MCCB Dimensionering', 'MCCB Dimensioning'),
+        formula: 'IB \u2264 Ir \u2264 In, Isd = Io \u00d7 multiplier, Icu \u2265 Ik,max',
+        variables: [
+          { name: tx('M\u00e6rkestr\u00f8m', 'Rated current'), symbol: 'In', value: mccbState.inVal, unit: 'A', source: mccbState.frame },
+          { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mccbState.trip },
+          { name: tx('Overbelastning Io', 'Overload Io'), symbol: 'Io', value: io.toFixed(0), unit: 'A', source: mccbState.ioMult + ' \u00d7 In' },
+          { name: tx('Kortslutning Isd', 'Short-time Isd'), symbol: 'Isd', value: isdCalc.toFixed(0), unit: 'A', source: mccbState.isdMult + ' \u00d7 Io' },
+          { name: tx('Momentan Ii', 'Instantaneous Ii'), symbol: 'Ii', value: ii, unit: 'A', source: '12 \u00d7 In' }
+        ],
+        substitution: 'Io = ' + mccbState.ioMult + ' \u00d7 ' + mccbState.inVal + ' = ' + io.toFixed(0) + ' A; Isd = ' + mccbState.isdMult + ' \u00d7 ' + io.toFixed(0) + ' = ' + isdCalc.toFixed(0) + ' A',
+        steps: [
+          { desc: tx('Overbelastning Io = mult \u00d7 In', 'Overload Io = mult \u00d7 In'), expr: mccbState.ioMult + ' \u00d7 ' + mccbState.inVal, result: io.toFixed(0) + ' A' },
+          { desc: tx('Kortslutning Isd = mult \u00d7 Io', 'Short-time Isd = mult \u00d7 Io'), expr: mccbState.isdMult + ' \u00d7 ' + io.toFixed(0), result: isdCalc.toFixed(0) + ' A' },
+          { desc: tx('Isd tolerance \u00b110%', 'Isd tolerance \u00b110%'), expr: isdCalc.toFixed(0) + ' \u00d7 0.9 til ' + isdCalc.toFixed(0) + ' \u00d7 1.1', result: isdMin.toFixed(0) + ' - ' + isdMax.toFixed(0) + ' A' },
+          { desc: tx('Momentan Ii = 12 \u00d7 In', 'Instantaneous Ii = 12 \u00d7 In'), expr: '12 \u00d7 ' + mccbState.inVal, result: ii + ' A' }
+        ],
+        result: { value: mccbState.inVal, unit: 'A', status: 'ok' },
+        reference: 'IEC 60947-2; DS/HD 60364-4-43 cl.433'
+      })}
     </div>
 
     <div class="card fade-in">
@@ -16806,6 +16826,27 @@ function renderEV() {
   }
   html += '</div>';
 
+  // calcDetail for EV charging
+  html += calcDetail({
+    name: tx('Elbil-lader dimensionering', 'EV Charger Dimensioning'),
+    formula: evState.phases === 3 ? 'I = P / (\u221A3 \u00D7 U \u00D7 cos\u03C6)' : 'I = P / (U \u00D7 cos\u03C6)',
+    variables: [
+      { name: tx('Effekt', 'Power'), symbol: 'P', value: evState.powerKW, unit: 'kW', source: tx('Valgt', 'Selected') },
+      { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: evState.phases === 3 ? 400 : 230, unit: 'V', source: evState.phases + tx('-faset', '-phase') },
+      { name: tx('Antal ladere', 'Number of chargers'), symbol: 'n', value: evState.numChargers, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('Samtidighedsfaktor', 'Simultaneity factor'), symbol: 'SF', value: sf, unit: '', source: 'DS/HD 60364-7-722 Annex A' },
+      { name: tx('Sp\u00E6ndingsfald', 'Voltage drop'), symbol: '\u0394U%', value: vdrop.toFixed(2), unit: '%', source: tx('Beregnet', 'Calculated') }
+    ],
+    substitution: evState.powerKW + '\u00D71000 / (' + (evState.phases === 3 ? '\u221A3\u00D7400' : '230') + ') \u00D7 ' + evState.numChargers + ' \u00D7 ' + sf,
+    steps: [
+      { desc: tx('Enkeltstroem', 'Single charger current'), expr: evState.powerKW + '\u00D71000 / ' + (evState.phases === 3 ? '(\u221A3\u00D7400)' : '230'), result: current + ' A' },
+      { desc: tx('Designstroem med samtidighed', 'Design current with simultaneity'), expr: current + ' \u00D7 ' + evState.numChargers + ' \u00D7 ' + sf, result: designCurrent + ' A' },
+      { desc: tx('Sp\u00E6ndingsfald', 'Voltage drop'), expr: '\u0394U = ' + vdrop.toFixed(2) + '%', result: (vdropOk ? '\u2264 3% \u2705' : '> 3% \u274C') }
+    ],
+    result: { value: designCurrent, unit: 'A', status: vdropOk ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-7-722; cl.722.525'
+  });
+
   // Verdict
   var safe = vdropOk && !grid.overloaded && rcdTypeB;
   html += renderVerdict(safe, safe ? tx('Installation opfylder DS/HD 60364-7-722', 'Installation complies with DS/HD 60364-7-722') : tx('Krav IKKE opfyldt - se advarsler', 'Requirements NOT met - see warnings'));
@@ -17048,6 +17089,27 @@ function renderSolar() {
 
   // Verdict
   var safe = stringCheck.ok;
+  // calcDetail for Solar
+  html += calcDetail({
+    name: tx('Solcelle-dimensionering', 'Solar PV Dimensioning'),
+    formula: 'kWp = n \u00D7 Wp / 1000; Voc_cold = Voc \u00D7 1.10',
+    variables: [
+      { name: tx('Antal paneler', 'Panel count'), symbol: 'n', value: solarState.panelCount, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('Panel effekt', 'Panel wattage'), symbol: 'Wp', value: solarState.panelWp, unit: 'Wp', source: tx('Valgt', 'Selected') },
+      { name: 'Voc (STC)', symbol: 'Voc', value: stringCheck.voc, unit: 'V', source: SOLAR_VOC_PER_PANEL + ' V/panel' },
+      { name: 'Voc (kulde)', symbol: 'Voc_cold', value: stringCheck.vocCold, unit: 'V', source: '+10% temp.koeff.' },
+      { name: tx('Inverter maks', 'Inverter max'), symbol: 'Vdc_max', value: stringCheck.maxVdc, unit: 'V', source: tx('Inverter', 'Inverter') }
+    ],
+    substitution: solarState.panelCount + ' \u00D7 ' + solarState.panelWp + ' / 1000 = ' + kWp.toFixed(1) + ' kWp',
+    steps: [
+      { desc: tx('Total effekt', 'Total power'), expr: solarState.panelCount + ' \u00D7 ' + solarState.panelWp + ' / 1000', result: kWp.toFixed(1) + ' kWp' },
+      { desc: tx('Inverter anbefalet', 'Inverter recommended'), expr: kWp.toFixed(1) + ' \u00D7 0.8-1.2', result: inverter.recommended + ' kW' },
+      { desc: 'Voc (kulde +10%)', expr: stringCheck.voc + ' \u00D7 1.10', result: stringCheck.vocCold + ' V ' + (stringCheck.ok ? '\u2264' : '>') + ' ' + stringCheck.maxVdc + 'V' }
+    ],
+    result: { value: kWp.toFixed(1), unit: 'kWp', status: stringCheck.ok ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-7-712; DS/EN 62446-1'
+  });
+
   html += renderVerdict(safe, safe ? tx('System opfylder DS/HD 60364-7-712 + DS/EN 62446', 'System complies with DS/HD 60364-7-712 + DS/EN 62446') : tx('Strengspaending overskrider inverter maks!', 'String voltage exceeds inverter maximum!'));
 
   html += '</div>';
@@ -17573,6 +17635,27 @@ function renderMotor() {
   html += '</div>';
 
   // Verdict
+  // calcDetail for Motor
+  html += calcDetail({
+    name: tx('Motorstart-analyse', 'Motor Start Analysis'),
+    formula: 'I_start = FLC \u00D7 k_start; \u0394U% = I_start \u00D7 Z_cable / U',
+    variables: [
+      { name: tx('Motoreffekt', 'Motor power'), symbol: 'P', value: motorState.kW, unit: 'kW', source: tx('Valgt', 'Selected') },
+      { name: tx('Fuldlaststr\u00F8m', 'Full load current'), symbol: 'FLC', value: flc, unit: 'A', source: 'IEC 60947' },
+      { name: tx('Startfaktor', 'Starting factor'), symbol: 'k', value: mult.typical, unit: '\u00D7 FLC', source: motorState.startType },
+      { name: tx('Startstr\u00F8m', 'Start current'), symbol: 'I_start', value: iStart, unit: 'A', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Kabell\u00E6ngde', 'Cable length'), symbol: 'L', value: motorState.cableLength, unit: 'm', source: tx('Valgt', 'Selected') }
+    ],
+    substitution: 'I_start = ' + flc + ' \u00D7 ' + mult.typical + ' = ' + iStart + ' A',
+    steps: [
+      { desc: tx('Fuldlaststr\u00F8m FLC', 'Full load current FLC'), expr: motorState.kW + ' kW @ ' + motorState.poles + 'P/400V', result: flc + ' A' },
+      { desc: tx('Startstr\u00F8m', 'Starting current'), expr: flc + ' \u00D7 ' + mult.typical, result: iStart + ' A' },
+      { desc: tx('Sp\u00E6ndingsdyk', 'Voltage dip'), expr: '\u0394U% = f(I_start, Z_cable)', result: vdip.toFixed(2) + '% ' + (vdipOk ? '\u2264 3% \u2705' : '> 3% \u274C') }
+    ],
+    result: { value: vdip.toFixed(2), unit: '%', status: vdipOk ? 'ok' : 'fail' },
+    reference: 'IEC 60947; DS/HD 60364-5-52 cl.525'
+  });
+
   html += renderVerdict(vdipOk, vdipOk ? tx('Sp\u00E6ndingsdyk OK - starter opfylder DS/HD 60364-5-52 cl.525', 'Voltage dip OK - starter complies with DS/HD 60364-5-52 cl.525') : tx('Sp\u00E6ndingsdyk for h\u00F8jt - brug bl\u00F8dere startmetode eller kortere kabel', 'Voltage dip exceeded - use softer starting method or shorter cable'));
 
   html += '</div>';
@@ -17838,6 +17921,27 @@ function renderHarmonic() {
   html += '</div>';
 
   // Verdict
+  // calcDetail for Harmonic
+  html += calcDetail({
+    name: tx('THD Harmonisk analyse', 'THD Harmonic Analysis'),
+    formula: 'THD = \u221A(\u03A3 Ih\u00B2) [%]',
+    variables: [
+      { name: tx('Belastningstype', 'Load type'), symbol: tx('Type', 'Type'), value: tx(spec.label_da, spec.label_en), unit: '', source: tx('Valgt', 'Selected') },
+      { name: 'H5', symbol: 'I5', value: thdResult.harmonics.h5.toFixed(1), unit: '%', source: 'EN 61000-3-2' },
+      { name: 'H7', symbol: 'I7', value: thdResult.harmonics.h7.toFixed(1), unit: '%', source: 'EN 61000-3-2' },
+      { name: tx('Diversitetsfaktor', 'Diversity factor'), symbol: 'DF', value: thdResult.diversity, unit: '', source: tx('n=' + harmonicState.numLoads + ' belastninger', 'n=' + harmonicState.numLoads + ' loads') },
+      { name: 'K-faktor', symbol: 'K', value: kResult.kFactor.toFixed(2), unit: '', source: 'IEEE C57.110' }
+    ],
+    substitution: '\u221A(' + thdResult.harmonics.h3.toFixed(1) + '\u00B2 + ' + thdResult.harmonics.h5.toFixed(1) + '\u00B2 + ' + thdResult.harmonics.h7.toFixed(1) + '\u00B2 + ...)',
+    steps: [
+      { desc: 'THD', expr: '\u221A(\u03A3 Ih\u00B2)', result: thdResult.thd.toFixed(2) + ' %' },
+      { desc: 'K-faktor (trafo)', expr: '\u03A3(h\u00B2\u00D7Ih\u00B2) / \u03A3(Ih\u00B2)', result: kResult.kFactor.toFixed(2) },
+      { desc: tx('Trafo-derating', 'Transformer derating'), expr: '1/\u221AK', result: kResult.derating.toFixed(2) }
+    ],
+    result: { value: thdResult.thd.toFixed(2), unit: '%', status: thdOk ? 'ok' : 'fail' },
+    reference: 'EN 50160 cl.4.2.5; EN 61000-3-2; IEEE C57.110'
+  });
+
   html += renderVerdict(thdOk, thdOk ? tx('THD inden for gr\u00E6nse - opfylder EN 50160 cl.4.2.5', 'THD within limits - complies with EN 50160 cl.4.2.5') : tx('THD overskrider 8% - aktivt filter p\u00E5kr\u00E6vet per EN 50160', 'THD exceeds 8% - active filter required per EN 50160'));
 
   html += '</div>';
@@ -18114,6 +18218,27 @@ function renderVFD() {
 
   // Verdict
   var allOk = outputCable.lengthOk;
+  // calcDetail for VFD
+  html += calcDetail({
+    name: tx('VFD-dimensionering', 'VFD Sizing'),
+    formula: 'I_vfd = FLC \u00D7 k_app; I_input = I_vfd / (\u03B7 \u00D7 PF)',
+    variables: [
+      { name: tx('Motoreffekt', 'Motor power'), symbol: 'P', value: vfdState.motorKW, unit: 'kW', source: tx('Valgt', 'Selected') },
+      { name: 'Motor FLC', symbol: 'FLC', value: sizing.motorFLC, unit: 'A', source: 'IEC 61800' },
+      { name: tx('Applikationsfaktor', 'Application factor'), symbol: 'k', value: sizing.sizingFactor, unit: '', source: tx(app.label_da, app.label_en) },
+      { name: tx('VFD min. str\u00F8m', 'VFD min. current'), symbol: 'I_vfd', value: sizing.vfdCurrent, unit: 'A', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Maks. kabell\u00E6ngde', 'Max cable length'), symbol: 'L_max', value: outputCable.maxLength, unit: 'm', source: 'EMC ' + vfdState.emcCategory }
+    ],
+    substitution: 'I_vfd = ' + sizing.motorFLC + ' \u00D7 ' + sizing.sizingFactor + ' = ' + sizing.vfdCurrent + ' A',
+    steps: [
+      { desc: 'Motor FLC (400V, 4P)', expr: vfdState.motorKW + ' kW / (\u221A3\u00D7400\u00D70.85)', result: sizing.motorFLC + ' A' },
+      { desc: tx('VFD dimensionering', 'VFD sizing'), expr: sizing.motorFLC + ' \u00D7 ' + sizing.sizingFactor, result: sizing.vfdCurrent + ' A' },
+      { desc: tx('Kabell\u00E6ngde kontrol', 'Cable length check'), expr: vfdState.cableLength + 'm vs max ' + outputCable.maxLength + 'm', result: outputCable.lengthOk ? 'OK \u2705' : tx('FOR LANG', 'TOO LONG') + ' \u274C' }
+    ],
+    result: { value: sizing.vfdCurrent, unit: 'A', status: allOk ? 'ok' : 'fail' },
+    reference: 'IEC 61800-1 cl.5.2; IEC 61800-3'
+  });
+
   html += renderVerdict(allOk, allOk ? tx('VFD-installation opfylder IEC 61800 + DS/HD 60364', 'VFD installation complies with IEC 61800 + DS/HD 60364') : tx('Motorkabel for lang - reducer l\u00E6ngde eller brug sk\u00E6rmet kabel', 'Motor cable too long - reduce length or use shielded cable'));
 
   html += '</div>';
@@ -18318,6 +18443,27 @@ function renderLighting() {
 
   // Verdict
   var allOk = calc.uniformityOk && calc.leniOk;
+  // calcDetail for Lighting
+  html += calcDetail({
+    name: tx('Belysningsberegning', 'Lighting Calculation'),
+    formula: 'N = (E \u00D7 A) / (\u03A6 \u00D7 UF \u00D7 MF)',
+    variables: [
+      { name: tx('M\u00E5l-belysningsstyrke', 'Target illuminance'), symbol: 'E', value: calc.targetLux, unit: 'lux', source: 'DS/EN 12464-1' },
+      { name: tx('Rumareal', 'Room area'), symbol: 'A', value: calc.area, unit: 'm\u00B2', source: lightingState.length + '\u00D7' + lightingState.width },
+      { name: tx('Armaturlumen', 'Luminaire lumens'), symbol: '\u03A6', value: calc.lumens, unit: 'lm', source: lightingState.wattage + 'W \u00D7 ' + src.lmPerW + ' lm/W' },
+      { name: tx('Udnyttelsesfaktor', 'Utilization factor'), symbol: 'UF', value: calc.uf, unit: '', source: 'k = ' + calc.roomIndex },
+      { name: tx('Vedligeholdelsesfaktor', 'Maintenance factor'), symbol: 'MF', value: calc.mf, unit: '', source: tx('Valgt', 'Selected') }
+    ],
+    substitution: '(' + calc.targetLux + ' \u00D7 ' + calc.area + ') / (' + calc.lumens + ' \u00D7 ' + calc.uf + ' \u00D7 ' + calc.mf + ')',
+    steps: [
+      { desc: tx('Rumindeks k', 'Room index k'), expr: lightingState.length + '\u00D7' + lightingState.width + ' / (' + (lightingState.height - 0.85).toFixed(2) + '\u00D7(' + lightingState.length + '+' + lightingState.width + '))', result: calc.roomIndex.toString() },
+      { desc: tx('Beregnet antal', 'Calculated count'), expr: (calc.targetLux * calc.area).toFixed(0) + ' / ' + (calc.lumens * calc.uf * calc.mf).toFixed(0), result: calc.count + ' stk' },
+      { desc: tx('Effektdensitet', 'Power density'), expr: calc.totalWattage + ' / ' + calc.area, result: calc.powerDensity + ' W/m\u00B2 ' + (calc.leniOk ? '\u2264' : '>') + ' ' + calc.leniMax }
+    ],
+    result: { value: calc.count, unit: tx('armaturer', 'luminaires'), status: allOk ? 'ok' : 'fail' },
+    reference: 'DS/EN 12464-1; DS/EN 15193 (LENI)'
+  });
+
   html += renderVerdict(allOk, allOk ? tx('Belysningsdesign opfylder DS/EN 12464-1 + DS/EN 15193', 'Lighting design complies with DS/EN 12464-1 + DS/EN 15193') : tx('Tilpas layout - uniformitet eller energi overskrider graense', 'Adjust layout - uniformity or energy exceeds limit'));
 
   html += '</div>';
@@ -18527,6 +18673,28 @@ function renderHeatPump() {
 
   // Verdict
   var allOk = calc.vdrop.ok;
+  // calcDetail for HeatPump
+  html += calcDetail({
+    name: tx('Varmepumpe el-dimensionering', 'Heat Pump Electrical Sizing'),
+    formula: 'P_el = P_varme / COP; I = P_el / (\u221A3 \u00D7 U)',
+    variables: [
+      { name: tx('Varmeeffekt', 'Heating capacity'), symbol: 'P_varme', value: heatpumpState.heatingKW, unit: 'kW', source: tx('Valgt', 'Selected') },
+      { name: 'COP', symbol: 'COP', value: heatpumpState.cop, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('El-indgangseffekt', 'Electrical input'), symbol: 'P_el', value: calc.electricalKW, unit: 'kW', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Driftsstr\u00F8m', 'Operating current'), symbol: 'FLC', value: calc.flc, unit: 'A', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Startfaktor', 'Inrush factor'), symbol: 'LRA', value: heatpumpState.inrushFactor, unit: '\u00D7 FLC', source: tx('Valgt', 'Selected') }
+    ],
+    substitution: 'P_el = ' + heatpumpState.heatingKW + ' / ' + heatpumpState.cop + ' = ' + calc.electricalKW + ' kW',
+    steps: [
+      { desc: tx('El-indgangseffekt', 'Electrical input power'), expr: heatpumpState.heatingKW + ' / ' + heatpumpState.cop, result: calc.electricalKW + ' kW' },
+      { desc: tx('Driftsstr\u00F8m FLC', 'Operating current FLC'), expr: calc.electricalKW + '\u00D71000 / (' + (calc.phase === 3 ? '\u221A3\u00D7400' : '230') + ')', result: calc.flc + ' A' },
+      { desc: tx('Startstr\u00F8m LRA', 'Starting current LRA'), expr: calc.flc + ' \u00D7 ' + heatpumpState.inrushFactor, result: calc.startCurrent + ' A' },
+      { desc: tx('Sp\u00E6ndingsfald', 'Voltage drop'), expr: '\u0394U = ' + calc.vdrop.percent + '%', result: calc.vdrop.ok ? '\u2264 3% \u2705' : '> 3% \u274C' }
+    ],
+    result: { value: calc.flc, unit: 'A', status: allOk ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-4-43; Installationsbekendtg\u00F8relsen'
+  });
+
   html += renderVerdict(allOk, allOk ? tx('Varmepumpeinstallation opfylder DS/HD 60364', 'Heat pump installation complies with DS/HD 60364') : tx('Spaendingsfald for hoejt - vaelg stoerre kabel eller kortere laengde', 'Voltage drop too high - select larger cable or shorter length'));
 
   html += '</div>';
@@ -18851,6 +19019,27 @@ function renderBusbar() {
   }
 
   // Verdict
+  // calcDetail for Busbar
+  html += calcDetail({
+    name: tx('Skinnesystem-dimensionering', 'Busbar Trunking Dimensioning'),
+    formula: 'Iz_eff = In \u00D7 k_temp \u00D7 k_IP \u00D7 k_install',
+    variables: [
+      { name: tx('M\u00E6rkestr\u00F8m', 'Rated current'), symbol: 'In', value: busbarState.ratedCurrent, unit: 'A', source: tx('Valgt', 'Selected') },
+      { name: tx('Temp.faktor', 'Temp.factor'), symbol: 'k_temp', value: calc.derating.tempFactor, unit: '', source: busbarState.ambientTemp + '\u00B0C' },
+      { name: tx('IP-faktor', 'IP factor'), symbol: 'k_IP', value: calc.derating.ipFactor, unit: '', source: 'IP' + busbarState.ipRating },
+      { name: tx('Mont.faktor', 'Install.factor'), symbol: 'k_inst', value: calc.derating.installFactor, unit: '', source: busbarState.installMethod },
+      { name: tx('Effektiv kapacitet', 'Effective capacity'), symbol: 'Iz_eff', value: calc.effectiveCapacity, unit: 'A', source: tx('Beregnet', 'Calculated') }
+    ],
+    substitution: busbarState.ratedCurrent + ' \u00D7 ' + calc.derating.tempFactor + ' \u00D7 ' + calc.derating.ipFactor + ' \u00D7 ' + calc.derating.installFactor + ' = ' + calc.effectiveCapacity + ' A',
+    steps: [
+      { desc: tx('Kombineret derating', 'Combined derating'), expr: calc.derating.tempFactor + ' \u00D7 ' + calc.derating.ipFactor + ' \u00D7 ' + calc.derating.installFactor, result: calc.derating.combined.toString() },
+      { desc: tx('Systembelastning (med diversitet)', 'System load (with diversity)'), expr: busbarState.tapOffCount + ' \u00D7 ' + busbarState.tapOffRating + ' \u00D7 ' + calc.systemLoad.diversity, result: calc.systemLoad.totalDemand + ' A' },
+      { desc: tx('Termisk kontrol', 'Thermal check'), expr: calc.systemLoad.totalDemand + ' vs ' + calc.effectiveCapacity, result: calc.thermal.ok ? 'OK \u2705' : tx('OVERBELASTET', 'OVERLOADED') + ' \u274C' }
+    ],
+    result: { value: calc.effectiveCapacity, unit: 'A', status: calc.allOk ? 'ok' : 'fail' },
+    reference: 'IEC 61439-6 cl.9.2 + cl.10.10'
+  });
+
   html += renderVerdict(calc.allOk, calc.allOk ? tx('Skinnesystem opfylder IEC 61439-6 + DS/HD 60364', 'Busbar trunking complies with IEC 61439-6 + DS/HD 60364') : tx('System overskider gr\u00E6nse - juster parametre', 'System exceeds limits - adjust parameters'));
 
   html += '</div>';
@@ -19088,6 +19277,19 @@ function renderBathroom() {
 
   // Verdict
   var safe = check.allowed;
+  html += calcDetail({
+    name: tx('Baderum zoneklassificering', 'Bathroom Zone Classification'),
+    formula: tx('Zone + IP krav iht. DS/HD 60364-7-701', 'Zone + IP requirements per DS/HD 60364-7-701'),
+    variables: [
+      { name: tx('Zone', 'Zone'), symbol: tx('Zone', 'Zone'), value: bathroomState.selectedZone, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('Udstyr', 'Equipment'), symbol: tx('Udst.', 'Equip.'), value: tx(BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].da, BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].en), unit: '', source: tx('Valgt', 'Selected') },
+      { name: 'IP ' + tx('krav', 'requirement'), symbol: 'IP', value: check.ipRequired, unit: '', source: 'cl.701.512' },
+      { name: tx('Tilladt', 'Allowed'), symbol: tx('Status', 'Status'), value: check.allowed ? tx('Ja', 'Yes') : tx('Nej', 'No'), unit: '', source: 'cl.701.55' }
+    ],
+    substitution: tx('Zone ', 'Zone ') + bathroomState.selectedZone + ': IP' + check.ipRequired + ', ' + tx(BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].da, BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].en),
+    result: { value: check.allowed ? 'OK' : tx('IKKE TILLADT', 'NOT ALLOWED'), unit: '', status: safe ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-7-701 cl.701.512 + cl.701.55'
+  });
   html += renderVerdict(safe, safe ? tx('Udstyr tilladt i valgt zone iht. DS/HD 60364-7-701', 'Equipment allowed in selected zone per DS/HD 60364-7-701') : tx('Udstyr IKKE tilladt i valgt zone iht. DS/HD 60364-7-701', 'Equipment NOT allowed in selected zone per DS/HD 60364-7-701'));
 
   html += '</div>';
@@ -19325,6 +19527,24 @@ function renderFireAlarm() {
 
   // Compliance verdict
   var compliant = calc.heightOk;
+  html += calcDetail({
+    name: tx('Brandalarm detektorberegning', 'Fire Alarm Detector Calculation'),
+    formula: 'n = A / A_detektor',
+    variables: [
+      { name: tx('Rumareal', 'Room area'), symbol: 'A', value: firealarmState.roomArea, unit: 'm\u00B2', source: tx('Valgt', 'Selected') },
+      { name: tx('Detektorareal', 'Detector coverage'), symbol: 'A_det', value: calc.coverageM2, unit: 'm\u00B2', source: 'DS/EN 54-1' },
+      { name: tx('Antal detektorer', 'Detector count'), symbol: 'n', value: calc.count, unit: 'stk', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Lofth\u00F8jde', 'Ceiling height'), symbol: 'h', value: firealarmState.ceilingHeight, unit: 'm', source: tx('Valgt', 'Selected') },
+      { name: tx('Maks h\u00F8jde', 'Max height'), symbol: 'h_max', value: calc.maxHeight, unit: 'm', source: tx('Detektortype', 'Detector type') }
+    ],
+    substitution: firealarmState.roomArea + ' / ' + calc.coverageM2 + ' = ' + calc.count,
+    steps: [
+      { desc: tx('Antal detektorer', 'Detector count'), expr: firealarmState.roomArea + ' / ' + calc.coverageM2, result: calc.count + ' stk' },
+      { desc: tx('H\u00F8jdekontrol', 'Height check'), expr: firealarmState.ceilingHeight + 'm vs max ' + calc.maxHeight + 'm', result: calc.heightOk ? 'OK \u2705' : tx('FOR H\u00D8JT', 'TOO HIGH') + ' \u274C' }
+    ],
+    result: { value: calc.count, unit: tx('detektorer', 'detectors'), status: compliant ? 'ok' : 'fail' },
+    reference: 'DS/EN 54-1; DBI retningslinje 232'
+  });
   html += renderVerdict(compliant, compliant ? tx('Brandalarm opfylder DS/EN 54 + DBI retningslinje 232', 'Fire alarm complies with DS/EN 54 + DBI guideline 232') : tx('Lofthoejde overstiger detektorens maks - vaelg anden type', 'Ceiling height exceeds detector max - select different type'));
 
   html += '</div>';
@@ -19641,6 +19861,25 @@ function renderData() {
 
   // Verdict
   var allOk = distCheck.ok && (!fiberBudget || fiberBudget.distanceOk);
+  // calcDetail for Data
+  html += calcDetail({
+    name: tx('Datainstallation', 'Structured Cabling'),
+    formula: tx('Permanent link \u2264 90m + 2\u00D75m patch', 'Permanent link \u2264 90m + 2\u00D75m patch'),
+    variables: [
+      { name: tx('Kategori', 'Category'), symbol: 'Cat', value: dataState.cableCategory.toUpperCase(), unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('Afstand', 'Distance'), symbol: 'L', value: dataState.distance, unit: 'm', source: tx('Valgt', 'Selected') },
+      { name: tx('Maks. afstand', 'Max distance'), symbol: 'L_max', value: distCheck.maxPermanent || 90, unit: 'm', source: 'ISO 11801' },
+      { name: tx('Antal udtag', 'Outlet count'), symbol: 'n', value: outlets.outlets, unit: 'stk', source: outlets.outletsPerM2 + '/m\u00B2' }
+    ],
+    substitution: dataState.distance + 'm vs max ' + (distCheck.maxPermanent || 90) + 'm',
+    steps: [
+      { desc: tx('Afstandskontrol', 'Distance check'), expr: dataState.distance + ' \u2264 ' + (distCheck.maxPermanent || 90), result: distCheck.ok ? 'OK \u2705' : tx('FOR LANG', 'TOO LONG') + ' \u274C' },
+      { desc: tx('Udtag beregnet', 'Outlets calculated'), expr: dataState.floorArea + 'm\u00B2 \u00D7 ' + outlets.outletsPerM2, result: outlets.outlets + ' stk' }
+    ],
+    result: { value: dataState.distance, unit: 'm', status: distCheck.ok ? 'ok' : 'fail' },
+    reference: 'ISO 11801; DS/EN 50173'
+  });
+
   html += renderVerdict(allOk, allOk ? tx('Datainstallation opfylder ISO 11801 + DS/EN 50173', 'Structured cabling complies with ISO 11801 + DS/EN 50173') : tx('Afstand overskrider graenser - brug fiber eller ekstra teknikrum', 'Distance exceeds limits - use fiber or additional telecom room'));
 
   html += '</div>';
@@ -19833,6 +20072,25 @@ function renderSPD() {
   html += '</div>';
 
   // Verdict
+  // calcDetail for SPD
+  html += calcDetail({
+    name: tx('SPD Risikovurdering', 'SPD Risk Assessment'),
+    formula: 'Nd = Ng \u00D7 Ac \u00D7 Cd \u00D7 10\u207B\u2076',
+    variables: [
+      { name: tx('Lynfrekvens', 'Lightning density'), symbol: 'Ng', value: spdState.ng, unit: 'km\u207B\u00B2/\u00E5r', source: tx('DK gennemsnit', 'DK average') },
+      { name: tx('Opsamlingsareal', 'Collection area'), symbol: 'Ac', value: acResult.ac, unit: 'm\u00B2', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Placeringsfaktor', 'Location factor'), symbol: 'Cd', value: loc.cd, unit: '', source: tx(loc.da, loc.en) },
+      { name: tx('Forventet nedslag', 'Expected strikes'), symbol: 'Nd', value: strikeResult.nd.toFixed(4), unit: '/\u00E5r', source: tx('Beregnet', 'Calculated') }
+    ],
+    substitution: spdState.ng + ' \u00D7 ' + acResult.ac + ' \u00D7 ' + loc.cd + ' \u00D7 10\u207B\u2076 = ' + strikeResult.nd.toFixed(4),
+    steps: [
+      { desc: tx('Opsamlingsareal Ac', 'Collection area Ac'), expr: '(' + spdState.length + '+2\u00D7' + spdState.height + ')\u00D7(' + spdState.width + '+2\u00D7' + spdState.height + ')', result: acResult.ac + ' m\u00B2' },
+      { desc: tx('Risiko vurdering', 'Risk assessment'), expr: 'Nd=' + strikeResult.nd.toFixed(4) + ' vs grense 10\u207B\u00B3', result: risk.mandatory ? tx('OBLIGATORISK', 'MANDATORY') : tx('Anbefalet', 'Recommended') }
+    ],
+    result: { value: risk.mandatory ? tx('P\u00E5kr\u00E6vet', 'Required') : tx('Anbefalet', 'Recommended'), unit: '', status: 'ok' },
+    reference: 'DS/HD 60364-4-443 cl.443.4; IEC 62305-2'
+  });
+
   html += renderVerdict(!risk.mandatory || types.length > 0, risk.mandatory ? tx('SPD obligatorisk iht. DS/HD 60364-4-443 cl.443.4 - ' + product.brand + ' ' + product.model + ' anbefalet', 'SPD mandatory per DS/HD 60364-4-443 cl.443.4 - ' + product.brand + ' ' + product.model + ' recommended') : tx('SPD anbefalet som god praksis', 'SPD recommended as good practice'));
 
   html += '</div>';
@@ -20022,6 +20280,24 @@ function renderUPS() {
 
   // Verdict
   var safe = load.totalVA > 0 && loadPct <= 80;
+  html += calcDetail({
+    name: tx('UPS-dimensionering', 'UPS Sizing'),
+    formula: 'S_ups \u2265 S_load \u00D7 1.25 (maks 80% belastning)',
+    variables: [
+      { name: tx('Total belastning', 'Total load'), symbol: 'S_load', value: load.totalVA, unit: 'VA', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Valgt UPS', 'Selected UPS'), symbol: 'S_ups', value: upsSize, unit: 'VA', source: tx('Standard st\u00F8rrelse', 'Standard size') },
+      { name: tx('Belastningsgrad', 'Loading'), symbol: '%', value: loadPct, unit: '%', source: 'S_load/S_ups' },
+      { name: tx('Autonomi', 'Autonomy'), symbol: 't', value: upsState.autonomy, unit: 'min', source: tx('Valgt', 'Selected') },
+      { name: tx('Batteri', 'Battery'), symbol: 'Ah', value: battery.ah, unit: 'Ah/' + battery.voltage + 'V', source: upsState.batteryType.toUpperCase() }
+    ],
+    substitution: load.totalVA + ' \u00D7 1.25 = ' + Math.ceil(load.totalVA * 1.25) + ' VA \u2264 ' + upsSize + ' VA',
+    steps: [
+      { desc: tx('P\u00E5kr\u00E6vet UPS', 'Required UPS'), expr: load.totalVA + ' \u00D7 1.25', result: Math.ceil(load.totalVA * 1.25) + ' VA' },
+      { desc: tx('Belastningsgrad', 'Loading'), expr: load.totalVA + ' / ' + upsSize + ' \u00D7 100', result: loadPct + '% ' + (loadPct <= 80 ? '\u2264 80% \u2705' : '> 80% \u274C') }
+    ],
+    result: { value: upsSize, unit: 'VA', status: safe ? 'ok' : 'fail' },
+    reference: 'IEC 62040-1; DS/HD 60364-5-56'
+  });
   html += renderVerdict(safe, safe ? tx('UPS korrekt dimensioneret iht. IEC 62040 (belastning <= 80%)', 'UPS correctly sized per IEC 62040 (loading <= 80%)') : tx('Vaelg udstyr for at dimensionere UPS', 'Select equipment to size UPS'));
 
   html += '</div>';
@@ -20237,6 +20513,24 @@ function renderPFC() {
     verdictText = tx('PF-korrektion dimensioneret iht. IEC 61921 og DS/HD 60364-5-52 cl.523', 'PF correction sized per IEC 61921 and DS/HD 60364-5-52 cl.523');
     safe = true;
   }
+  html += calcDetail({
+    name: tx('Effektfaktorkorrektion', 'Power Factor Correction'),
+    formula: 'Qc = P \u00D7 (tan\u03C6\u2081 - tan\u03C6\u2082)',
+    variables: [
+      { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: pfcState.activePower, unit: 'kW', source: tx('Valgt', 'Selected') },
+      { name: tx('Aktuel cos\u03C6', 'Current cos\u03C6'), symbol: 'cos\u03C6\u2081', value: pfcState.currentPF, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('M\u00E5l cos\u03C6', 'Target cos\u03C6'), symbol: 'cos\u03C6\u2082', value: pfcState.targetPF, unit: '', source: tx('Valgt', 'Selected') },
+      { name: tx('Beregnet Qc', 'Calculated Qc'), symbol: 'Qc', value: calc.kvar, unit: 'kvar', source: tx('Beregnet', 'Calculated') },
+      { name: tx('Standard bank', 'Standard bank'), symbol: 'Qc_std', value: standardSize, unit: 'kvar', source: tx('N\u00E6rmeste', 'Nearest') }
+    ],
+    substitution: pfcState.activePower + ' \u00D7 (tan(arccos ' + pfcState.currentPF + ') - tan(arccos ' + pfcState.targetPF + ')) = ' + calc.kvar + ' kvar',
+    steps: [
+      { desc: tx('Beregnet Qc', 'Calculated Qc'), expr: pfcState.activePower + ' \u00D7 \u0394tan\u03C6', result: calc.kvar + ' kvar' },
+      { desc: tx('Resonansfrekvens', 'Resonance frequency'), expr: '50 \u00D7 \u221A(Sk/Qc)', result: resonance.fr + ' Hz' + (resonance.risk ? ' \u26A0\uFE0F' : ' \u2705') }
+    ],
+    result: { value: standardSize, unit: 'kvar', status: safe ? 'ok' : 'fail' },
+    reference: 'IEC 61921; DS/HD 60364-5-52 cl.523'
+  });
   html += renderVerdict(safe, verdictText);
 
   html += '</div>';
@@ -20613,6 +20907,29 @@ function renderZs() {
     verdictText = tx('Zs OK men momentan udloesning ikke sikret - kontroller kredsloeb', 'Zs OK but instantaneous trip not guaranteed - verify circuit');
   }
   html += renderVerdict(pass && instantTrip, verdictText);
+
+  // Calculation sheet
+  html += calcDetail({
+    name: tx('Fejlsloejfeimpedans Zs', 'Earth Fault Loop Impedance Zs'),
+    formula: 'Zs = Ze + (R1+R2)/1000 \u00D7 L \u00D7 1.2',
+    variables: [
+      { name: tx('Kildeimpedans', 'Source impedance'), symbol: 'Ze', value: zsState.ze, unit: '\u03A9', source: tx('valgt', 'selected') },
+      { name: tx('Ledermodstand', 'Conductor resistance'), symbol: 'R1+R2', value: r1r2, unit: 'm\u03A9/m', source: zsState.cableSize + ' mm\u00B2' },
+      { name: tx('Kabellaengde', 'Cable length'), symbol: 'L', value: zsState.cableLength, unit: 'm', source: tx('valgt', 'selected') },
+      { name: tx('Temp.faktor', 'Temp. factor'), symbol: 'k', value: 1.2, unit: '', source: tx('drift ved maks. temp.', 'operating at max temp.') },
+      { name: tx('Maks Zs', 'Max Zs'), symbol: 'Zs_max', value: zsMax, unit: '\u03A9', source: zsState.device + ' (Tabel 41.1-4)' }
+    ],
+    substitution: zsState.ze + ' + (' + r1r2 + '/1000) \u00D7 ' + zsState.cableLength + ' \u00D7 1.2',
+    steps: [
+      { desc: tx('Kabelimpedans', 'Cable impedance'), expr: '(' + r1r2 + '/1000) \u00D7 ' + zsState.cableLength + ' \u00D7 1.2', result: ((r1r2 / 1000) * zsState.cableLength * 1.2).toFixed(4) + ' \u03A9' },
+      { desc: 'Zs', expr: zsState.ze + ' + ' + ((r1r2 / 1000) * zsState.cableLength * 1.2).toFixed(4), result: zsCalc.toFixed(4) + ' \u03A9' },
+      { desc: tx('Fejlstroem If = Uo/Zs', 'Fault current If = Uo/Zs'), expr: '230 / ' + zsCalc.toFixed(4), result: faultCurrent.toFixed(1) + ' A' },
+      { desc: tx('Kontrol: Zs \u2264 Zs_max \u00D7 0.8', 'Check: Zs \u2264 Zs_max \u00D7 0.8'), expr: zsCalc.toFixed(4) + ' \u2264 ' + (zsMax * 0.8).toFixed(3), result: pass ? 'OK \u2705' : 'FEJL \u274C' },
+      { desc: tx('Maks kabellaengde', 'Max cable length'), expr: '(Zs_max\u00D70.8 - Ze) / ((R1+R2)/1000 \u00D7 1.2)', result: Math.max(0, maxLength).toFixed(1) + ' m' }
+    ],
+    result: { value: zsCalc.toFixed(3), unit: '\u03A9', status: pass ? 'ok' : 'fail' },
+    reference: 'DS/HD 60364-6 cl.6.2.3.5 + DS/HD 60364-4-41 Tabel 41.1-4'
+  });
 
   html += '</div>';
   return html;
@@ -21242,6 +21559,29 @@ function renderGenerator() {
     tx('OK: Generator ' + selectedKva + ' kVA dimensioneret med 25% reserve iht. DS/HD 60364-5-56. ATS ' + atsRating + 'A.', 'OK: Generator ' + selectedKva + ' kVA sized with 25% reserve per DS/HD 60364-5-56. ATS ' + atsRating + 'A.') :
     tx('FEJL: Ingen standardstørrelse tilgængelig', 'FAIL: No standard size available');
   html += renderVerdict(safe, verdictText);
+
+  // Calculation sheet
+  html += calcDetail({
+    name: tx('Generatordimensionering', 'Generator Sizing'),
+    formula: 'S_gen = (P_total + P_motor) / cos\u03C6 \u00D7 1.25',
+    variables: [
+      { name: tx('Total last (med diversitet)', 'Total load (with diversity)'), symbol: 'P_total', value: totalKw.toFixed(1), unit: 'kW', source: tx('sum af belastninger', 'sum of loads') },
+      { name: tx('Motorstarttillaeg', 'Motor start allowance'), symbol: 'P_motor', value: motorAllowance.toFixed(1), unit: 'kW', source: generatorState.motorStart === 'dol' ? 'DOL (6x - 1) \u00D7 30%' : 'Soft (3x - 1) \u00D7 30%' },
+      { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: 0.8, unit: '', source: 'IEC 62034' },
+      { name: tx('Reserve', 'Reserve'), symbol: 'k', value: 1.25, unit: '', source: 'DS/HD 60364-5-56' }
+    ],
+    substitution: '(' + totalKw.toFixed(1) + ' + ' + motorAllowance.toFixed(1) + ') / 0.8 \u00D7 1.25',
+    steps: [
+      { desc: tx('Stoerste motor (30% af total)', 'Largest motor (30% of total)'), expr: totalKw.toFixed(1) + ' \u00D7 0.3', result: (totalKw * 0.3).toFixed(1) + ' kW' },
+      { desc: tx('Motorstarttillaeg', 'Motor start allowance'), expr: (totalKw * 0.3).toFixed(1) + ' \u00D7 ' + (generatorState.motorStart === 'dol' ? '5' : '2'), result: motorAllowance.toFixed(1) + ' kW' },
+      { desc: tx('Beregnet kVA', 'Required kVA'), expr: '(' + totalKw.toFixed(1) + ' + ' + motorAllowance.toFixed(1) + ') / 0.8 \u00D7 1.25', result: requiredKva + ' kVA' },
+      { desc: tx('Valgt standardstoerrelse', 'Selected standard size'), expr: '\u2265 ' + requiredKva + ' kVA', result: selectedKva + ' kVA' },
+      { desc: tx('ATS rating', 'ATS rating'), expr: selectedKva + '\u00D71000 / (\u221A3\u00D7400)', result: atsRating + ' A' }
+    ],
+    result: { value: selectedKva, unit: 'kVA', status: safe ? 'ok' : 'fail' },
+    reference: 'IEC 62034 + DS/HD 60364-5-56'
+  });
+
   html += '</div>';
   return html;
 }
@@ -21663,6 +22003,28 @@ function renderDiscrim() {
     tx('OK: Fuld selektivitet iht. ' + analysis.citation, 'OK: Full selectivity per ' + analysis.citation) :
     analysis.recommendation;
   html += renderVerdict(safe, verdictText);
+
+  // Calculation sheet
+  var isDisplay2 = analysis.is !== null ? ((analysis.is >= 1000) ? (analysis.is / 1000) + ' kA' : analysis.is + ' A') : tx('Ingen data', 'No data');
+  html += calcDetail({
+    name: tx('Selektivitetsberegning (I2t koordinering)', 'Selectivity Calculation (I2t Coordination)'),
+    formula: tx('Is >= Ik_max => fuld selektivitet', 'Is >= Ik_max => full selectivity'),
+    variables: [
+      { name: tx('Opstroems enhed', 'Upstream device'), symbol: tx('Op', 'Up'), value: discrimState.upstreamType + ' ' + discrimState.upstreamRating + 'A', unit: '', source: tx('valgt', 'selected') },
+      { name: tx('Nedstroems enhed', 'Downstream device'), symbol: tx('Ned', 'Down'), value: discrimState.downstreamType + ' ' + discrimState.downstreamRating + 'A', unit: '', source: tx('valgt', 'selected') },
+      { name: tx('Forventet kortslutning', 'Prospective fault current'), symbol: 'Ik_max', value: discrimState.ikMax / 1000, unit: 'kA', source: tx('valgt', 'selected') },
+      { name: tx('Selektivitetsgraense', 'Selectivity limit'), symbol: 'Is', value: isDisplay2, unit: '', source: analysis.citation },
+      { name: tx('Stroemforhold', 'Current ratio'), symbol: 'n', value: analysis.ratio.toFixed(2), unit: ':1', source: discrimState.upstreamRating + '/' + discrimState.downstreamRating }
+    ],
+    substitution: 'Is = ' + isDisplay2 + (analysis.is !== null ? (analysis.is >= discrimState.ikMax ? ' >= ' : ' < ') + (discrimState.ikMax / 1000) + ' kA' : ''),
+    steps: [
+      { desc: tx('Opslag i selektivitetstabel', 'Table lookup'), expr: discrimState.upstreamType + ' ' + discrimState.upstreamRating + 'A / ' + discrimState.downstreamType + ' ' + discrimState.downstreamRating + 'A', result: isDisplay2 },
+      { desc: tx('Sammenligning Is vs Ik_max', 'Comparison Is vs Ik_max'), expr: isDisplay2 + ' vs ' + (discrimState.ikMax / 1000) + ' kA', result: analysis.verdict === 'full' ? tx('Fuld selektivitet', 'Full selectivity') : (analysis.verdict === 'partial' ? tx('Delvis selektivitet', 'Partial selectivity') : tx('Uafklaret', 'Unresolved')) }
+    ],
+    result: { value: analysis.verdict === 'full' ? 'FULD' : (analysis.verdict === 'partial' ? 'DELVIS' : '?'), unit: '', status: safe ? 'ok' : 'warning' },
+    reference: analysis.citation
+  });
+
   html += '</div>';
   return html;
 }
@@ -22322,6 +22684,31 @@ function renderArcFlash() {
   html += '</div>';
   var safe = ppe.category >= 0 && ppe.category <= 4;
   html += renderVerdict(safe, safe ? tx('Energi ' + E.toFixed(1) + ' cal/cm2. PPE Kat.' + ppe.category + '. Graense ' + boundary + 'mm. IEC 62271-200.', 'Energy ' + E.toFixed(1) + ' cal/cm2. PPE Cat.' + ppe.category + '. Boundary ' + boundary + 'mm. IEC 62271-200.') : tx('FORBUDT: ' + E.toFixed(1) + ' cal/cm2 > 40. Reducer energi.', 'PROHIBITED: ' + E.toFixed(1) + ' cal/cm2 > 40. Reduce energy.'));
+
+  // Calculation sheet
+  var Cf_arc = arcflashState.voltage <= 1000 ? 1.0 : 1.5;
+  html += calcDetail({
+    name: tx('Incident Energi (IEEE 1584)', 'Incident Energy (IEEE 1584)'),
+    formula: 'E = 0.0093 \u00D7 Cf \u00D7 Iarc \u00D7 t \u00D7 (610/D)\u00B2 / 10',
+    variables: [
+      { name: tx('Spaending', 'Voltage'), symbol: 'V', value: arcflashState.voltage, unit: 'V', source: tx('valgt', 'selected') },
+      { name: tx('Korrektionsfaktor', 'Correction factor'), symbol: 'Cf', value: Cf_arc, unit: '', source: arcflashState.voltage <= 1000 ? 'LV (1.0)' : 'MV/HV (1.5)' },
+      { name: tx('Fejlstroem', 'Fault current'), symbol: 'Iarc', value: arcflashState.faultCurrent * 1000, unit: 'A', source: arcflashState.faultCurrent + ' kA' },
+      { name: tx('Afbrydelsestid', 'Clearing time'), symbol: 't', value: arcflashState.clearingTime, unit: 's', source: tx('valgt', 'selected') },
+      { name: tx('Arbejdsafstand', 'Working distance'), symbol: 'D', value: arcflashState.workingDistance, unit: 'mm', source: tx('valgt', 'selected') }
+    ],
+    substitution: '0.0093 \u00D7 ' + Cf_arc + ' \u00D7 ' + (arcflashState.faultCurrent * 1000) + ' \u00D7 ' + arcflashState.clearingTime + ' \u00D7 (610/' + arcflashState.workingDistance + ')\u00B2 / 10',
+    steps: [
+      { desc: tx('Buestroemsfaktor Cf', 'Arc current factor Cf'), expr: arcflashState.voltage + 'V ' + (arcflashState.voltage <= 1000 ? '\u2264' : '>') + ' 1000V', result: Cf_arc.toString() },
+      { desc: tx('Afstandsfaktor (610/D)\u00B2', 'Distance factor (610/D)\u00B2'), expr: '(610/' + arcflashState.workingDistance + ')\u00B2', result: Math.pow(610 / arcflashState.workingDistance, 2).toFixed(4) },
+      { desc: tx('Incident energi E', 'Incident energy E'), expr: '0.0093 \u00D7 ' + Cf_arc + ' \u00D7 ' + (arcflashState.faultCurrent * 1000) + ' \u00D7 ' + arcflashState.clearingTime + ' \u00D7 ' + Math.pow(610 / arcflashState.workingDistance, 2).toFixed(4) + ' / 10', result: E.toFixed(1) + ' cal/cm\u00B2' },
+      { desc: tx('PPE kategori', 'PPE category'), expr: E.toFixed(1) + ' cal/cm\u00B2', result: tx(ppe.da, ppe.en) },
+      { desc: tx('Lysbuegraense', 'Arc flash boundary'), expr: '\u221A(0.0093\u00D7Cf\u00D7Iarc\u00D7t\u00D7610\u00B2 / (1.2\u00D710))', result: boundary + ' mm' }
+    ],
+    result: { value: E.toFixed(1), unit: 'cal/cm\u00B2', status: safe ? 'ok' : 'fail' },
+    reference: 'IEEE 1584 / IEC 62271-200'
+  });
+
   html += '</div>';
   return html;
 }
@@ -27650,6 +28037,94 @@ function renderTrefase() {
     html += '</div>';
   }
 
+  // Calculation sheets per load type
+  if (trefaseState.loadType === 'symStar') {
+    var _r = trefaseCalcSymStar(trefaseState.UL, trefaseState.Z, trefaseState.phi);
+    html += calcDetail({
+      name: tx('Symmetrisk stjerne (Y)', 'Symmetric Star (Y)'),
+      formula: 'Up = UL/\u221A3, Ip = Up/Z, P = \u221A3\u00B7UL\u00B7IL\u00B7cos\u03C6',
+      variables: [
+        { name: tx('Linjespaending', 'Line voltage'), symbol: 'UL', value: trefaseState.UL, unit: 'V', source: tx('valgt', 'selected') },
+        { name: tx('Impedans', 'Impedance'), symbol: 'Z', value: trefaseState.Z, unit: '\u03A9', source: tx('valgt', 'selected') },
+        { name: tx('Fasevinkel', 'Phase angle'), symbol: '\u03C6', value: (trefaseState.phi * 180 / Math.PI).toFixed(1) + '\u00B0', unit: '', source: 'cos\u03C6 = ' + Math.cos(trefaseState.phi).toFixed(4) }
+      ],
+      substitution: 'Up = ' + trefaseState.UL + '/\u221A3 = ' + _r.Up.toFixed(1) + ' V',
+      steps: [
+        { desc: 'Up = UL/\u221A3', expr: trefaseState.UL + '/\u221A3', result: _r.Up.toFixed(1) + ' V' },
+        { desc: 'Ip = Up/Z', expr: _r.Up.toFixed(1) + '/' + trefaseState.Z, result: _r.Ip.toFixed(2) + ' A' },
+        { desc: 'P = \u221A3\u00B7UL\u00B7IL\u00B7cos\u03C6', expr: '\u221A3\u00D7' + trefaseState.UL + '\u00D7' + _r.IL.toFixed(2) + '\u00D7' + _r.cosPhi.toFixed(4), result: _r.P.toFixed(1) + ' W' },
+        { desc: 'Q = \u221A3\u00B7UL\u00B7IL\u00B7sin\u03C6', expr: '\u221A3\u00D7' + trefaseState.UL + '\u00D7' + _r.IL.toFixed(2) + '\u00D7' + Math.sin(trefaseState.phi).toFixed(4), result: _r.Q.toFixed(1) + ' var' },
+        { desc: 'S = \u221A3\u00B7UL\u00B7IL', expr: '\u221A3\u00D7' + trefaseState.UL + '\u00D7' + _r.IL.toFixed(2), result: _r.S.toFixed(1) + ' VA' }
+      ],
+      result: { value: _r.P.toFixed(1), unit: 'W', status: 'ok' },
+      reference: 'Elektroteknik Opgavesamling 4. udg. Kap. 7'
+    });
+  } else if (trefaseState.loadType === 'symDelta') {
+    var _r = trefaseCalcSymDelta(trefaseState.UL, trefaseState.Z, trefaseState.phi);
+    html += calcDetail({
+      name: tx('Symmetrisk trekant (\u0394)', 'Symmetric Delta (\u0394)'),
+      formula: 'Up = UL, Ip = Up/Z, IL = \u221A3\u00B7Ip, P = \u221A3\u00B7UL\u00B7IL\u00B7cos\u03C6',
+      variables: [
+        { name: tx('Linjespaending', 'Line voltage'), symbol: 'UL', value: trefaseState.UL, unit: 'V', source: tx('valgt', 'selected') },
+        { name: tx('Impedans', 'Impedance'), symbol: 'Z', value: trefaseState.Z, unit: '\u03A9', source: tx('valgt', 'selected') },
+        { name: tx('Fasevinkel', 'Phase angle'), symbol: '\u03C6', value: (trefaseState.phi * 180 / Math.PI).toFixed(1) + '\u00B0', unit: '', source: 'cos\u03C6 = ' + Math.cos(trefaseState.phi).toFixed(4) }
+      ],
+      substitution: 'Ip = ' + trefaseState.UL + '/' + trefaseState.Z + ' = ' + _r.Ip.toFixed(2) + ' A',
+      steps: [
+        { desc: 'Up = UL', expr: trefaseState.UL.toString(), result: _r.Up.toFixed(1) + ' V' },
+        { desc: 'Ip = Up/Z', expr: _r.Up.toFixed(1) + '/' + trefaseState.Z, result: _r.Ip.toFixed(2) + ' A' },
+        { desc: 'IL = \u221A3\u00B7Ip', expr: '\u221A3\u00D7' + _r.Ip.toFixed(2), result: _r.IL.toFixed(2) + ' A' },
+        { desc: 'P = \u221A3\u00B7UL\u00B7IL\u00B7cos\u03C6', expr: '\u221A3\u00D7' + trefaseState.UL + '\u00D7' + _r.IL.toFixed(2) + '\u00D7' + _r.cosPhi.toFixed(4), result: _r.P.toFixed(1) + ' W' },
+        { desc: 'S = \u221A3\u00B7UL\u00B7IL', expr: '\u221A3\u00D7' + trefaseState.UL + '\u00D7' + _r.IL.toFixed(2), result: _r.S.toFixed(1) + ' VA' }
+      ],
+      result: { value: _r.P.toFixed(1), unit: 'W', status: 'ok' },
+      reference: 'Elektroteknik Opgavesamling 4. udg. Kap. 7'
+    });
+  } else if (trefaseState.loadType === 'twoWatt') {
+    var _r = trefaseCalcTwoWatt(trefaseState.W1, trefaseState.W2);
+    html += calcDetail({
+      name: tx('To-wattmeter metode', 'Two-Wattmeter Method'),
+      formula: 'P = W1+W2, Q = \u221A3\u00B7(W1-W2), S = \u221A(P\u00B2+Q\u00B2)',
+      variables: [
+        { name: 'Wattmeter 1', symbol: 'W1', value: trefaseState.W1, unit: 'W', source: tx('valgt', 'selected') },
+        { name: 'Wattmeter 2', symbol: 'W2', value: trefaseState.W2, unit: 'W', source: tx('valgt', 'selected') }
+      ],
+      substitution: 'P = ' + trefaseState.W1 + ' + ' + trefaseState.W2 + ' = ' + _r.P.toFixed(1) + ' W',
+      steps: [
+        { desc: 'P = W1 + W2', expr: trefaseState.W1 + ' + ' + trefaseState.W2, result: _r.P.toFixed(1) + ' W' },
+        { desc: 'Q = \u221A3\u00B7(W1-W2)', expr: '\u221A3\u00D7(' + trefaseState.W1 + '-' + trefaseState.W2 + ')', result: _r.Q.toFixed(1) + ' var' },
+        { desc: 'S = \u221A(P\u00B2+Q\u00B2)', expr: '\u221A(' + _r.P.toFixed(1) + '\u00B2 + ' + _r.Q.toFixed(1) + '\u00B2)', result: _r.S.toFixed(1) + ' VA' },
+        { desc: 'cos\u03C6 = P/S', expr: _r.P.toFixed(1) + '/' + _r.S.toFixed(1), result: _r.cosPhi.toFixed(4) }
+      ],
+      result: { value: _r.P.toFixed(1), unit: 'W', status: 'ok' },
+      reference: 'Elektroteknik Opgavesamling 4. udg. Kap. 7'
+    });
+  } else if (trefaseState.loadType === 'pfc') {
+    var _cosPhi1 = Math.cos(trefaseState.phi);
+    var _pfc = trefaseCalcPFC(trefaseState.W1, _cosPhi1, trefaseState.pfcTarget);
+    var _Cstar = trefaseCalcCapStar(_pfc.Qc, trefaseState.UL, trefaseState.f);
+    var _Cdelta = trefaseCalcCapDelta(_pfc.Qc, trefaseState.UL, trefaseState.f);
+    html += calcDetail({
+      name: tx('Effektfaktorkorrektion (PFC)', 'Power Factor Correction (PFC)'),
+      formula: 'Qc = P\u00B7(tan\u03C6\u2081 - tan\u03C6\u2082), C = Qc/(3\u00B7U\u00B2\u00B7\u03C9)',
+      variables: [
+        { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: trefaseState.W1, unit: 'W', source: tx('valgt', 'selected') },
+        { name: tx('Nuv. cos\u03C6', 'Current cos\u03C6'), symbol: 'cos\u03C61', value: _cosPhi1.toFixed(4), unit: '', source: tx('valgt', 'selected') },
+        { name: tx('Maal cos\u03C6', 'Target cos\u03C6'), symbol: 'cos\u03C62', value: trefaseState.pfcTarget, unit: '', source: tx('valgt', 'selected') },
+        { name: tx('Frekvens', 'Frequency'), symbol: 'f', value: trefaseState.f, unit: 'Hz', source: tx('valgt', 'selected') }
+      ],
+      substitution: 'Qc = ' + trefaseState.W1 + ' \u00D7 (tan(' + _pfc.phi1Deg.toFixed(1) + '\u00B0) - tan(' + _pfc.phi2Deg.toFixed(1) + '\u00B0))',
+      steps: [
+        { desc: 'tan\u03C61 - tan\u03C62', expr: Math.tan(trefaseState.phi).toFixed(4) + ' - ' + Math.tan(Math.acos(trefaseState.pfcTarget)).toFixed(4), result: (Math.tan(trefaseState.phi) - Math.tan(Math.acos(trefaseState.pfcTarget))).toFixed(4) },
+        { desc: 'Qc = P\u00B7(\u0394tan)', expr: trefaseState.W1 + ' \u00D7 ' + (Math.tan(trefaseState.phi) - Math.tan(Math.acos(trefaseState.pfcTarget))).toFixed(4), result: _pfc.Qc.toFixed(1) + ' var' },
+        { desc: 'C_Y (stjerne/star)', expr: 'Qc/(3\u00B7Up\u00B2\u00B7\u03C9)', result: (_Cstar*1e6).toFixed(1) + ' \u00B5F' },
+        { desc: 'C_\u0394 (trekant/delta)', expr: 'Qc/(3\u00B7UL\u00B2\u00B7\u03C9)', result: (_Cdelta*1e6).toFixed(1) + ' \u00B5F' }
+      ],
+      result: { value: _pfc.Qc.toFixed(1), unit: 'var', status: 'ok' },
+      reference: 'Elektroteknik Opgavesamling 4. udg. Kap. 7'
+    });
+  }
+
   html += symbolLegend([
     { name: tx('Linjesp\u00E6nding', 'Line voltage'), symbol: 'U_L', unit: 'V' },
     { name: tx('Fasesp\u00E6nding', 'Phase voltage'), symbol: 'U_f', unit: 'V' },
@@ -28163,6 +28638,30 @@ function renderRelay() {
   var allOk = coord.coordinated && fuseCheck.ok && inrushOk;
   var verdictText = allOk ? tx('Releindstillinger og sikring er koordinerede', 'Relay settings and fuse are coordinated') : tx('Juster indstillinger - se advarsler ovenfor', 'Adjust settings - see warnings above');
   html += renderVerdict(allOk, verdictText);
+
+  // Calculation sheet
+  html += calcDetail({
+    name: tx('HV Relebeskyttelse', 'HV Relay Protection'),
+    formula: 'I1N = S / (\u221A3 \u00D7 U1), I> = Igt \u00D7 I1N, I>> = Igg \u00D7 I1N',
+    variables: [
+      { name: tx('Transformator', 'Transformer'), symbol: 'S', value: relayState.trafoKVA, unit: 'kVA', source: tx('valgt', 'selected') },
+      { name: tx('Primaer spaending', 'Primary voltage'), symbol: 'U1', value: relayState.primaryKV, unit: 'kV', source: tx('valgt', 'selected') },
+      { name: tx('Overstroem multipel', 'Overcurrent multiple'), symbol: 'Igt', value: relayState.Igt, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
+      { name: tx('Kortslutning multipel', 'Short-circuit multiple'), symbol: 'Igg', value: relayState.Igg, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
+      { name: tx('Tidsforsinkelse', 'Time delay'), symbol: 't>', value: relayState.tGt, unit: 's', source: tx('valgt', 'selected') },
+      { name: tx('Egentid', 'Inherent time'), symbol: 't_egen', value: relayState.egentid * 1000, unit: 'ms', source: tx('valgt', 'selected') }
+    ],
+    substitution: 'I1N = ' + relayState.trafoKVA + ' / (\u221A3 \u00D7 ' + relayState.primaryKV + ') = ' + I1N.toFixed(2) + ' A',
+    steps: [
+      { desc: tx('Primaer nominel stroem I1N', 'Primary nominal current I1N'), expr: relayState.trafoKVA + ' / (\u221A3 \u00D7 ' + relayState.primaryKV + ')', result: I1N.toFixed(2) + ' A' },
+      { desc: tx('Overstroems-pickup I>', 'Overcurrent pickup I>'), expr: relayState.Igt + ' \u00D7 ' + I1N.toFixed(2), result: Ipickup.toFixed(2) + ' A' },
+      { desc: tx('Momentan I>>', 'Instantaneous I>>'), expr: relayState.Igg + ' \u00D7 ' + I1N.toFixed(2), result: Iinstant.toFixed(1) + ' A' },
+      { desc: tx('Indkoblingsstr. (12-15 \u00D7 I1N)', 'Inrush (12-15 \u00D7 I1N)'), expr: '12\u00D7' + I1N.toFixed(2) + ' til 15\u00D7' + I1N.toFixed(2), result: inrush.Imin.toFixed(1) + ' - ' + inrush.Imax.toFixed(1) + ' A' },
+      { desc: tx('Tidskoordinering', 'Time coordination'), expr: 't> = ' + relayState.tGt + ' > t_inrush + t_egen = ' + coord.requiredTime.toFixed(3), result: coord.coordinated ? 'OK \u2705' : tx('IKKE koordineret', 'NOT coordinated') + ' \u274C' }
+    ],
+    result: { value: I1N.toFixed(2), unit: 'A', status: allOk ? 'ok' : 'fail' },
+    reference: 'IEC 60255 + IEC 60282-1 + DS/HD 60076'
+  });
 
   html += '<div class="info-row" style="margin-top:12px;font-size:0.82em;opacity:0.7">';
   html += tx('Ref: IEC 60255 (rele), IEC 60282-1 (HV-sikringer), DS/HD 60076 (trafo). Egentid = releets iboende mekaniske/elektroniske forsinkelse.', 'Ref: IEC 60255 (relay), IEC 60282-1 (HV fuses), DS/HD 60076 (transformer). Inherent time = relay own mechanical/electronic delay.');
