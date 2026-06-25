@@ -13967,6 +13967,32 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// ----- Time tracking + lifetime stats banner -----
+test('autoexam/time: analytics computes time stats from log entries with elapsed field', function () {
+  var log = [
+    { ts: 1, building: 'fabrik', tier: 'kandidat', mode: 'case', score: 85, verdict: 'pass', catPct: { overload: 100 }, elapsed: 1800 },
+    { ts: 2, building: 'kontor', tier: 'avanceret', mode: 'case', score: 90, verdict: 'pass', catPct: { overload: 100 }, elapsed: 2400 }
+  ];
+  var a = axAnalytics(log);
+  assert.strictEqual(a.totalElapsed, 4200, 'total elapsed');
+  assert.strictEqual(a.avgElapsed, 2100, 'avg elapsed');
+  assert.strictEqual(a.fastestElapsed, 1800, 'fastest');
+});
+test('autoexam/time: stats banner shows at the top of the module when history exists', function () {
+  var prev = lang; lang = 'da';
+  // inject a log entry
+  try { localStorage.setItem('autoexamLog', JSON.stringify([{ ts: 1, building: 'fabrik', tier: 'kandidat', mode: 'case', score: 85, verdict: 'pass', catPct: {}, elapsed: 1200 }])); } catch (e) {}
+  autoexamState.seed = 2024; autoexamState.building = 'fabrik'; autoexamState.tier = 'ekspert'; autoexamState.mode = 'fuld';
+  axUIgenerate(true); autoexamState.tab = 'opgave';
+  var out = renderAutoExam();
+  assert.ok(out.indexOf('pr\u00f8ver') >= 0, 'shows attempt count');
+  assert.ok(out.indexOf('best\u00e5et') >= 0, 'shows pass rate');
+  assert.ok(out.indexOf('samlet') >= 0 || out.indexOf('total') >= 0, 'shows total time');
+  assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks');
+  try { localStorage.removeItem('autoexamLog'); } catch (e) {}
+  lang = prev;
+});
+
 // ----- Standards quick-reference tab -----
 test('autoexam/standards: Standards tab renders the DS/HD 60364 reference with MathML in da and en', function () {
   var prev = lang;

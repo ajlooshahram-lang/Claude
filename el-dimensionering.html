@@ -12165,12 +12165,14 @@ function axAnalytics(log) {
   log = log || [];
   var n = log.length, passN = 0, sum = 0, best = 0;
   var byCat = {}, byBuild = {}, byTier = {}, trend = [], streak = 0;
+  var totalElapsed = 0, elapsedN = 0, fastest = Infinity;
   log.forEach(function (r) {
     sum += r.score; if (r.score > best) best = r.score; if (r.verdict === 'pass') passN++;
     trend.push({ ts: r.ts, score: r.score, verdict: r.verdict });
     if (r.catPct) Object.keys(r.catPct).forEach(function (c) { if (!byCat[c]) byCat[c] = { sum: 0, n: 0 }; byCat[c].sum += r.catPct[c]; byCat[c].n++; });
     if (r.building) { if (!byBuild[r.building]) byBuild[r.building] = { sum: 0, n: 0, best: 0 }; byBuild[r.building].sum += r.score; byBuild[r.building].n++; if (r.score > byBuild[r.building].best) byBuild[r.building].best = r.score; }
     if (r.tier) { if (!byTier[r.tier]) byTier[r.tier] = { sum: 0, n: 0 }; byTier[r.tier].sum += r.score; byTier[r.tier].n++; }
+    if (r.elapsed > 0) { totalElapsed += r.elapsed; elapsedN++; if (r.elapsed < fastest) fastest = r.elapsed; }
   });
   for (var i = log.length - 1; i >= 0; i--) { if (log[i].verdict === 'pass') streak++; else break; }
   var catAvg = {}; Object.keys(byCat).forEach(function (c) { catAvg[c] = Math.round(byCat[c].sum / byCat[c].n); });
@@ -12178,7 +12180,7 @@ function axAnalytics(log) {
   var tierAvg = {}; Object.keys(byTier).forEach(function (t) { tierAvg[t] = { avg: Math.round(byTier[t].sum / byTier[t].n), n: byTier[t].n }; });
   var weakest = null, strongest = null;
   Object.keys(catAvg).forEach(function (c) { if (weakest === null || catAvg[c] < catAvg[weakest]) weakest = c; if (strongest === null || catAvg[c] > catAvg[strongest]) strongest = c; });
-  return { attempts: n, passCount: passN, passRate: n ? Math.round(100 * passN / n) : 0, avgScore: n ? Math.round(sum / n) : 0, bestScore: best, catAvg: catAvg, buildAvg: buildAvg, tierAvg: tierAvg, trend: trend, streak: streak, weakest: weakest, strongest: strongest };
+  return { attempts: n, passCount: passN, passRate: n ? Math.round(100 * passN / n) : 0, avgScore: n ? Math.round(sum / n) : 0, bestScore: best, catAvg: catAvg, buildAvg: buildAvg, tierAvg: tierAvg, trend: trend, streak: streak, weakest: weakest, strongest: strongest, totalElapsed: totalElapsed, avgElapsed: elapsedN ? Math.round(totalElapsed / elapsedN) : 0, fastestElapsed: fastest < Infinity ? fastest : 0 };
 }
 
 // --- Inline SVG charts (no dependencies) --------------------------------------
@@ -12936,7 +12938,7 @@ function axSetTier(id) { autoexamState.tier = id; axUIgenerate(true); renderModu
 function axSetMode(id) { autoexamState.mode = id; axUIgenerate(true); renderModule('autoexam'); }
 function axUITab(t) { autoexamState.tab = t; renderModule('autoexam'); }
 function axPick(taskId, i) { autoexamState.answers[taskId] = i; renderModule('autoexam'); }
-function axGrade() { var p = axEnsure(); autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.revealFacit = true; var st = axStoreGet(); var key = p.buildingId + ':' + p.tierId + ':' + p.modeId; st[key] = Math.max(st[key] || 0, autoexamState.result.score); axStoreSet(st); axLogPush({ ts: Date.now(), building: p.buildingId, tier: p.tierId, mode: p.modeId, score: autoexamState.result.score, verdict: autoexamState.result.verdict, catPct: autoexamState.result.catPct, correctCount: autoexamState.result.correctCount, totalCount: autoexamState.result.totalCount }); if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; } autoexamState.tab = 'censor'; renderModule('autoexam'); }
+function axGrade() { var p = axEnsure(); autoexamState.result = axExamine(p, autoexamState.answers); autoexamState.revealFacit = true; var st = axStoreGet(); var key = p.buildingId + ':' + p.tierId + ':' + p.modeId; st[key] = Math.max(st[key] || 0, autoexamState.result.score); axStoreSet(st); var elapsed = Math.max(0, autoexamState.timerSec - autoexamState.timerLeft); axLogPush({ ts: Date.now(), building: p.buildingId, tier: p.tierId, mode: p.modeId, score: autoexamState.result.score, verdict: autoexamState.result.verdict, catPct: autoexamState.result.catPct, correctCount: autoexamState.result.correctCount, totalCount: autoexamState.result.totalCount, elapsed: elapsed }); if (autoexamTimer) { clearInterval(autoexamTimer); autoexamTimer = null; autoexamState.timerOn = false; } autoexamState.tab = 'censor'; renderModule('autoexam'); }
 function axResetAnswers() { autoexamState.answers = {}; autoexamState.result = null; autoexamState.revealFacit = false; autoexamState.hints = {}; renderModule('autoexam'); }
 function axHint(taskId) { autoexamState.hints[taskId] = (autoexamState.hints[taskId] || 0) + 1; renderModule('autoexam'); }
 // Complex (Viggo) drill flow.
@@ -13226,6 +13228,10 @@ function axRenderDashboard() {
   h += stat(a.avgScore + '%', tx('Gennemsnit', 'Average'));
   h += stat(a.bestScore + '%', tx('Bedste', 'Best'), 'var(--success)');
   h += stat('\uD83D\uDD25 ' + a.streak, tx('Stime (best\u00e5et)', 'Streak (passed)'));
+  if (a.totalElapsed > 0) {
+    h += stat(axFmtTime(a.avgElapsed), tx('Gns. tid', 'Avg time'));
+    h += stat(axFmtTime(a.totalElapsed), tx('Total tr\u00e6ningstid', 'Total training time'));
+  }
   h += '</div>';
   h += '<div style="padding:6px 2px"><div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:2px">' + tx('Score over tid', 'Score over time') + '</div>' + axSvgLine(a.trend) + '</div>';
   h += '</div>';
@@ -13432,6 +13438,17 @@ function renderAutoExam() {
   var h = '<div class="card fade-in"><div class="card-title">\uD83C\uDFD7\uFE0F ' + tx('Autorisationspr\u00f8ve-generator', 'Authorization exam generator') + '</div>';
   h += '<div class="info-row">' + tx('Genererer komplette danske el-autorisationspr\u00f8ver \u2014 struktur, sprog, metode og bed\u00f8mmelse som de rigtige pr\u00f8ver. V\u00e6lg bygningstype, niveau og varighed, l\u00f8s opgaverne (klik-only), og lad censoren bed\u00f8mme.', 'Generates complete Danish electrical authorization exams \u2014 structure, language, method and grading like the real exams. Choose building type, level and duration, solve the tasks (click-only) and let the censor grade.') + '</div>';
   h += '<div class="result-box warning" style="margin-bottom:10px"><div class="result-title">\u26A0\uFE0F ' + tx('Sikkerhedsforbehold', 'Safety disclaimer') + '</div><div style="padding:6px 2px;line-height:1.5">' + tx('L\u00e6ringsv\u00e6rkt\u00f8j \u2014 ikke en projekteringsfacitliste. Verificér altid mod g\u00e6ldende DS/HD 60364 og Sikkerhedsstyrelsen.dk. V\u00e6lg ved tvivl den sikrere l\u00f8sning.', 'Learning tool \u2014 not a design authority. Always verify against current DS/HD 60364 and Sikkerhedsstyrelsen.dk. When in doubt, choose the safer option.') + '</div></div>';
+  // Compact lifetime stats banner (only when there's history)
+  var _aLog = axLogList(); var _a = axAnalytics(_aLog);
+  if (_a.attempts > 0) {
+    h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--border-light);font-size:0.82rem">';
+    h += '<span>\uD83C\uDFAF <strong>' + _a.attempts + '</strong> ' + tx('pr\u00f8ver', 'exams') + '</span>';
+    h += '<span>' + (_a.passRate >= 50 ? '\u2705' : '\u26D4') + ' ' + _a.passRate + '% ' + tx('best\u00e5et', 'pass rate') + '</span>';
+    h += '<span>\uD83C\uDFC6 ' + _a.bestScore + '%</span>';
+    if (_a.streak > 0) h += '<span>\uD83D\uDD25 ' + _a.streak + ' ' + tx('i tr\u00e6k', 'streak') + '</span>';
+    if (_a.totalElapsed > 0) h += '<span>\u23F1 ' + axFmtTime(_a.totalElapsed) + ' ' + tx('samlet', 'total') + '</span>';
+    h += '</div>';
+  }
   // pickers
   h += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building type') + '</div><div class="select-grid">';
   AX_BUILDINGS.forEach(function (b) { h += '<button class="sel-btn' + (autoexamState.building === b.id ? ' selected' : '') + '" onclick="axSetBuilding(\'' + b.id + '\')">' + b.icon + ' ' + tx(b.da, b.en) + '</button>'; });
