@@ -13967,6 +13967,75 @@ test('analyzer: full exam build finds questions per opgave (no all-empty wall)',
 });
 
 
+// =====================================================================
+// ===== MASTER INVARIANT SWEEP (full 13 x 5 x 5 = 325-combo contract) ==
+// =====================================================================
+test('autoexam/MASTER: full matrix sweep \u2014 every generated exam satisfies the complete contract', function () {
+  var KNOWN_CATS = { overload: 1, cable: 1, vdrop: 1, shortcircuit: 1, fault: 1, pfc: 1 };
+  var combos = 0, tasksSeen = 0, solsChecked = 0, kindsSeen = {};
+  var problems = [];
+  for (var bi = 0; bi < AX_BUILDINGS.length; bi++) {
+    for (var ti = 0; ti < AX_TIERS.length; ti++) {
+      for (var mi = 0; mi < AX_MODES.length; mi++) {
+        combos++;
+        var seed = combos * 101 + 7;
+        var b = AX_BUILDINGS[bi].id, tr = AX_TIERS[ti].id, md = AX_MODES[mi].id;
+        var tag = b + '/' + tr + '/' + md;
+        var p, sol;
+        try { p = axGenerate(seed, b, tr, md); } catch (e) { problems.push('GEN THREW ' + tag + ': ' + e.message); continue; }
+        // determinism
+        if (JSON.stringify(p) !== JSON.stringify(axGenerate(seed, b, tr, md))) problems.push('NON-DETERMINISTIC ' + tag);
+        if (!p.opgaver || !p.opgaver.length) { problems.push('NO OPGAVER ' + tag); continue; }
+        // weights sum to 100
+        var wsum = 0; p.opgaver.forEach(function (o) { wsum += o.weightPct; });
+        if (wsum !== 100) problems.push('WEIGHT!=100 (' + wsum + ') ' + tag);
+        try { sol = axSolve(p); } catch (e) { problems.push('SOLVE THREW ' + tag + ': ' + e.message); continue; }
+        var refAns = {};
+        p.opgaver.forEach(function (op, oi) {
+          if (!op.tasks.length) problems.push('EMPTY OPGAVE ' + tag);
+          op.tasks.forEach(function (t, k) {
+            tasksSeen++; kindsSeen[t.kind] = (kindsSeen[t.kind] || 0) + 1;
+            // task contract
+            if (!Array.isArray(t.opts) || t.opts.length < 2) problems.push('BAD OPTS ' + tag + '/' + t.id);
+            if (typeof t.ci !== 'number' || t.ci < 0 || t.ci >= t.opts.length) problems.push('BAD CI ' + tag + '/' + t.id);
+            if (t.answer === undefined || t.answer === null) problems.push('NO ANSWER ' + tag + '/' + t.id);
+            if (!t.clause) problems.push('NO CLAUSE ' + tag + '/' + t.id);
+            if (!KNOWN_CATS[t.cat]) problems.push('UNKNOWN CAT ' + t.cat + ' ' + tag + '/' + t.id);
+            if (!t.prompt || !t.prompt.da || !t.prompt.en) problems.push('NO BILINGUAL PROMPT ' + tag + '/' + t.id);
+            refAns[t.id] = t.ci;
+            // solution contract
+            var s = sol[oi].tasks[k]; solsChecked++;
+            if (!s || !s.assumptions || !s.assumptions.length) problems.push('SOL NO ASSUMPTIONS ' + tag + '/' + t.id);
+            else if (!s.standard || !s.verification || !s.conclusion || !s.compliance.length || !s.result) problems.push('SOL INCOMPLETE ' + tag + '/' + t.id);
+            else if (typeof t.answer === 'number' && typeof s.result.value === 'number' && Math.abs(s.result.value - t.answer) > 0.06 * Math.abs(t.answer) + 0.01) problems.push('SOL DRIFT ' + tag + '/' + t.id + ' (' + s.result.value + ' vs ' + t.answer + ')');
+          });
+        });
+        // examiner: reference answers => 100/pass; empty => fail
+        var rPerfect = axExamine(p, refAns);
+        if (rPerfect.score !== 100) problems.push('PERFECT!=100 (' + rPerfect.score + ') ' + tag);
+        if (rPerfect.verdict !== 'pass') problems.push('PERFECT NOT PASS ' + tag);
+        if (axExamine(p, {}).verdict !== 'fail') problems.push('EMPTY NOT FAIL ' + tag);
+      }
+    }
+  }
+  // printable builders on a representative subset (da + en)
+  ['da', 'en'].forEach(function (lg) {
+    var prev = lang; lang = lg;
+    ['parcelhus', 'fabrik', 'hospital', 'marina', 'koelehus'].forEach(function (b) {
+      var p = axGenerate(999, b, 'ekspert', 'fuld');
+      var ex = axBuildExamHtml(p), so = axBuildSolutionHtml(p);
+      if (ex.indexOf('undefined') >= 0 || ex.indexOf('NaN') >= 0 || ex.indexOf('</html>') < 0) problems.push('EXAM HTML BAD ' + lg + '/' + b);
+      if (so.indexOf('undefined') >= 0 || so.indexOf('NaN') >= 0 || so.indexOf('</html>') < 0) problems.push('SOL HTML BAD ' + lg + '/' + b);
+    });
+    lang = prev;
+  });
+  assert.strictEqual(combos, AX_BUILDINGS.length * AX_TIERS.length * AX_MODES.length, 'swept the full matrix');
+  assert.ok(combos >= 325, 'at least 325 combos, got ' + combos);
+  assert.ok(tasksSeen > 1500, 'exercised many tasks (' + tasksSeen + ')');
+  assert.ok(Object.keys(kindsSeen).length >= 10, 'covered the task-kind variety (' + Object.keys(kindsSeen).join(',') + ')');
+  assert.strictEqual(problems.length, 0, problems.length + ' contract violations:\n  ' + problems.slice(0, 20).join('\n  '));
+});
+
 // ----- CT + relay primary pickup task (forsyning) -----
 test('autoexam/ct-relay: relay primary pickup = factor x ki, present in every forsyning opgave', function () {
   var ct = null;

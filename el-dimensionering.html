@@ -11660,7 +11660,9 @@ function axTasksInstallation(d, tier, maxTasks, rng, topicWeights) {
   var bigLoad = null; d.loads.forEach(function (l) { if ((l.type === 'motor' || l.type === 'ev') && (!bigLoad || l.IB > bigLoad.IB)) bigLoad = l; });
   if (!bigLoad) bigLoad = d.loads[d.loads.length - 1];
   var gIn = axDeviceRating(bigLoad.IB); var gSel = axSelectCable(gIn, 'Cu', d.stik.insulation, kTemp, 1, 1); var gCsa = gSel ? gSel.csa : 16;
-  tasks.push({ id: 't_grp', kind: 'cable', prompt: { da: 'Dimensionér gruppeledningen til \u201e' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201c (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) i kobber/' + d.stik.insulation + ' ved ' + d.ambient + ' \u00b0C, egen f\u00f8ringsvej.', en: 'Size the group circuit to \u201c' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201d (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) in copper/' + d.stik.insulation + ' at ' + d.ambient + ' \u00b0C, own routing.' }, given: { In: gIn, material: 'Cu', insulation: d.stik.insulation, kTemp: kTemp, kGroup: 1, kInstall: 1 }, answer: gCsa, opts: csaList, ci: csaList.indexOf(gCsa), unit: 'mm\u00b2', clause: 'DS/HD 60364-5-52 \u00a7523', cat: 'cable' });
+  var gCsaList = Object.keys(axIzTable('Cu', d.stik.insulation)).map(Number).sort(function (a, b) { return a - b; });
+  if (gCsaList.indexOf(gCsa) < 0) gCsa = gCsaList[gCsaList.length - 1];
+  tasks.push({ id: 't_grp', kind: 'cable', prompt: { da: 'Dimensionér gruppeledningen til \u201e' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201c (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) i kobber/' + d.stik.insulation + ' ved ' + d.ambient + ' \u00b0C, egen f\u00f8ringsvej.', en: 'Size the group circuit to \u201c' + axL({ da: bigLoad.da, en: bigLoad.en }) + '\u201d (IB = ' + axFmt(bigLoad.IB, 1) + ' A \u21d2 In = ' + gIn + ' A) in copper/' + d.stik.insulation + ' at ' + d.ambient + ' \u00b0C, own routing.' }, given: { In: gIn, material: 'Cu', insulation: d.stik.insulation, kTemp: kTemp, kGroup: 1, kInstall: 1 }, answer: gCsa, opts: gCsaList, ci: gCsaList.indexOf(gCsa), unit: 'mm\u00b2', clause: 'DS/HD 60364-5-52 \u00a7523', cat: 'cable' });
   // T9: RCD type selection (EV => Type B unless built-in 6 mA DC; otherwise Type A 30 mA)
   var hasEV = d.loads.some(function (l) { return l.type === 'ev'; });
   var rcdOpts = [{ da: 'Type A, 30 mA', en: 'Type A, 30 mA' }, { da: 'Type B, 30 mA', en: 'Type B, 30 mA' }, { da: 'Type AC, 30 mA', en: 'Type AC, 30 mA' }, { da: 'Ingen HPFI n\u00f8dvendig', en: 'No RCD needed' }];
@@ -11730,7 +11732,11 @@ function axGenForsyning(rng, b, tier) {
   var n2 = axNumOpts(mainIn, [AX_STD_RATINGS[Math.max(0, AX_STD_RATINGS.indexOf(mainIn) - 1)], AX_STD_RATINGS[Math.min(AX_STD_RATINGS.length - 1, AX_STD_RATINGS.indexOf(mainIn) + 1)]]);
   tasks.push({ id: 'f_dev', kind: 'device', prompt: { da: 'Bestem hovedbeskyttelsens m\u00e6rkestr\u00f8m In p\u00e5 lavsp\u00e6ndingstavlen (IB = transformerens fuldlaststr\u00f8m = ' + axFmt(tr.In, 0) + ' A).', en: 'Determine the main protection rating In on the LV board (IB = transformer full-load current = ' + axFmt(tr.In, 0) + ' A).' }, given: { IB: tr.In }, answer: mainIn, opts: n2.opts, ci: n2.ci, unit: 'A', clause: 'DS/HD 60364-4-43 \u00a7433.1', cat: 'overload' });
   var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var needIcu = stdIcu.filter(function (v) { return v >= tr.IkkA - 1e-9; })[0] || 100;
-  var icuOpts = stdIcu.filter(function (v) { return v >= tr.IkkA - 5 && v <= tr.IkkA + 30; }); if (icuOpts.indexOf(needIcu) < 0) icuOpts.push(needIcu); icuOpts.sort(function (a, b) { return a - b; });
+  var icuIdx = stdIcu.indexOf(needIcu); var icuOpts = [];
+  [icuIdx - 1, icuIdx, icuIdx + 1].forEach(function (ii) { if (stdIcu[ii] !== undefined && icuOpts.indexOf(stdIcu[ii]) < 0) icuOpts.push(stdIcu[ii]); });
+  if (icuOpts.indexOf(needIcu) < 0) icuOpts.push(needIcu);
+  if (icuOpts.length < 2) icuOpts.push(stdIcu[Math.max(0, icuIdx - 2)] || 10);
+  icuOpts = icuOpts.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
   tasks.push({ id: 'f_icu', kind: 'breaking', prompt: { da: 'V\u00e6lg mindste standard brydeevne Icu for hovedafbryderen (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).', en: 'Choose the smallest standard breaking capacity Icu for the main breaker (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).' }, given: { IkkA: tr.IkkA }, answer: needIcu, opts: icuOpts, ci: icuOpts.indexOf(needIcu), unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5.1', cat: 'shortcircuit' });
   // CT + relay: primary pickup current I> = factor x ki_primary (relay IN = 5 A)
   var relayFactor = axRngPick(rng, [0.3, 0.4, 0.5]);
