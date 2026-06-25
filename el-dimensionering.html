@@ -9041,10 +9041,30 @@ function renderCable() {
   const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
   const correctedIz = baseIz * kTotal;
 
+  // Wizard step calculation
+  const wizStep = !cableState.type ? 0 : (!cableState.cores ? 1 : (!cableState.crossSection ? 2 : 3));
+  const wizSteps = [
+    { label: tx('Materiale', 'Material') },
+    { label: tx('Kabeltype', 'Cable type') },
+    { label: tx('Tværsnit', 'Cross-section') },
+    { label: tx('Resultat', 'Result') }
+  ];
+
+  // Executive summary (only when we have a result)
+  const summaryHtml = cableState.crossSection && selectedCable ? uxSummary([
+    { label: tx('Iz (korrigeret)', 'Iz (corrected)'), value: correctedIz.toFixed(1) + ' A', status: correctedIz > 0 ? 'pass' : '' },
+    { label: tx('Kabel', 'Cable'), value: cableState.type + ' ' + cableState.crossSection + ' mm\u00B2', status: '' },
+    { label: tx('K-faktor', 'K-factor'), value: kTotal.toFixed(3), status: kTotal < 0.8 ? 'warn' : '' },
+    { label: tx('Metode', 'Method'), value: cableState.installMethod, status: '' }
+  ]) : '';
+
   return `
     <div class="card fade-in">
       <div class="card-title">${t('cableTitle')}</div>
-      <div class="info-row">${t('infoClick')}</div>
+      <div class="info-row">${tx('Vælg materiale, type og tværsnit trin for trin. Korrektionsfaktorer kan justeres under avancerede parametre.', 'Select material, type and cross-section step by step. Correction factors can be adjusted under advanced parameters.')}</div>
+
+      ${summaryHtml}
+      ${uxWizardSteps(wizSteps, wizStep)}
 
       <div class="select-group">
         <div class="select-label">${t('cableMaterial')}</div>
@@ -9072,19 +9092,19 @@ function renderCable() {
         </div>
       </div>
 
+      ${crossSections.length > 0 ? `
       <div class="select-group">
-        <div class="select-label">${t('cableCrossSection')}</div>
+        <div class="select-label">${t('cableCrossSection')} [mm\u00B2]</div>
         <div class="select-grid">
           ${crossSections.map(cs =>
             `<button class="sel-btn ${cableState.crossSection === cs ? 'selected' : ''}" onclick="cableState.crossSection='${cs}';renderModule('cable')">${cs}</button>`
           ).join('')}
         </div>
       </div>
+      ` : ''}
     </div>
 
-    <div class="card fade-in">
-      <div class="card-title">${tx('Korrektionsfaktorer', 'Correction Factors')}</div>
-
+    ${uxPanel(tx('\u2699\uFE0F Korrektionsfaktorer (temperatur, gruppering, fremføring)', '\u2699\uFE0F Correction factors (temperature, grouping, installation)'), `
       <div class="select-group">
         <div class="select-label">${tx('Fremf\u00F8ringsmetode', 'Installation Method')}</div>
         <div class="select-grid">
@@ -9093,7 +9113,6 @@ function renderCable() {
           ).join('')}
         </div>
       </div>
-
       <div class="select-group">
         <div class="select-label">${tx('Temperatur [\u00B0C]', 'Temperature [\u00B0C]')}</div>
         <div class="select-grid">
@@ -9102,7 +9121,6 @@ function renderCable() {
           ).join('')}
         </div>
       </div>
-
       <div class="select-group">
         <div class="select-label">${tx('Gruppering (antal kabler)', 'Grouping (number of cables)')}</div>
         <div class="select-grid">
@@ -9111,7 +9129,7 @@ function renderCable() {
           ).join('')}
         </div>
       </div>
-    </div>
+    `, { id: 'cable_corrections', open: (uxModeLevel() >= 2 || kTotal !== 1.0) })}
 
     ${cableState.crossSection && selectedCable ? `
     <div class="card fade-in">
