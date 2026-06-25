@@ -23455,6 +23455,23 @@ function renderBESS() {
   html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + safety.room.clause + '</span></div>';
   html += '</div>';
   var safe = bessState.voltDC <= 800 && dcI.current <= dcCable.iz;
+  // Economic value — peak shaving + arbitrage savings (how BESS reduces grid consumption cost)
+  var bessUsableKWh = bessState.capacityKWh * 0.9; // 90% depth of discharge
+  var cyclesPerYear = 300; // typical daily cycling
+  var bessAnnualKWh = bessUsableKWh * cyclesPerYear;
+  var spotSpread = 1.2; // DKK/kWh difference between peak and off-peak (Danish spot)
+  var bessAnnualSaving = bessAnnualKWh * spotSpread;
+  var bessInvestment = bessState.capacityKWh * 4000; // DKK/kWh installed
+  var bessPayback = (bessInvestment / bessAnnualSaving).toFixed(1);
+
+  html += '<div class="result-box" style="border-left:4px solid var(--success)">';
+  html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energiøkonomi — lastflytning & spidslastreduktion', 'Energy Economy — load shifting & peak shaving') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brugbar kapacitet (90% DoD)', 'Usable capacity (90% DoD)') + '</span><span class="value">' + bessUsableKWh.toFixed(1) + ' kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Årlig gennemsætning', 'Annual throughput') + '</span><span class="value">' + bessAnnualKWh.toFixed(0) + ' kWh (' + cyclesPerYear + ' ' + tx('cyklusser', 'cycles') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse (spot-spread ' + spotSpread + ' DKK/kWh)', 'Savings (spot spread ' + spotSpread + ' DKK/kWh)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + (bessAnnualSaving / 1000).toFixed(1) + 'k DKK/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spidslastreduktion', 'Peak demand reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + inv.kW + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling', 'Payback') + '</span><span class="value">\u2248 ' + bessPayback + ' \u00e5r</span></div>';
+  html += '</div>';
   html += renderVerdict(safe, safe ? tx('Systemet er korrekt dimensioneret iht. DS/EN 62619 + DS/HD 60364-5-56', 'System correctly sized per DS/EN 62619 + DS/HD 60364-5-56') : tx('ADVARSEL: Kabelkapacitet overskredet. DS/HD 60364-5-56.', 'WARNING: Cable capacity exceeded. DS/HD 60364-5-56.'));
   html += '</div>';
   return html;
