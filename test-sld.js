@@ -14180,6 +14180,103 @@ test('lsig: I dial hidden for Micrologic 2.2 (LS only), shown for 5.2+', functio
 });
 
 
+console.log('\n=== Phasor Diagram + Power Triangle + Impedance Vector Tests ===\n');
+
+test('phasor: utility conversions are correct', function () {
+  assert.ok(Math.abs(pDeg2Rad(180) - Math.PI) < 1e-10, '180° = π');
+  assert.ok(Math.abs(pRad2Deg(Math.PI) - 180) < 1e-10, 'π = 180°');
+  var r = pPolar2Rect(10, 60);
+  assert.ok(Math.abs(r.re - 5) < 1e-6, 'rect re for 10∠60°');
+  assert.ok(Math.abs(r.im - 8.6602) < 0.001, 'rect im');
+  var p = pRect2Polar(3, 4);
+  assert.ok(Math.abs(p.mag - 5) < 1e-6, 'polar mag for 3+j4');
+  assert.ok(Math.abs(p.ang - 53.13) < 0.01, 'polar ang');
+});
+
+test('phasor: power triangle at cos φ = 0.8 (36.87°) is correct', function () {
+  var pw = pPowerTriangle(230, 100, 36.87);
+  assert.ok(Math.abs(pw.S - 23000) < 1, 'S = V×I');
+  assert.ok(Math.abs(pw.P - 18400) < 10, 'P = S cos φ ≈ 18400 W');
+  assert.ok(Math.abs(pw.Q - 13800) < 10, 'Q = S sin φ ≈ 13800 var');
+  assert.ok(Math.abs(pw.cosPhi - 0.8) < 0.001, 'cos φ = 0.8');
+});
+
+test('phasor: 3-phase balanced power is √3 × ULL × I', function () {
+  var pw = p3phPower(230, 100, 0);
+  // S = √3 × ULL × I = √3 × (230×√3) × 100 = 3 × 230 × 100 = 69000 W
+  assert.ok(Math.abs(pw.S - 69000) < 1, 'S = 3 × ULN × I = 69000 VA (got ' + pw.S.toFixed(0) + ')');
+  assert.ok(Math.abs(pw.P - 69000) < 1, 'P = S at cos φ = 1');
+  assert.ok(Math.abs(pw.Q) < 1, 'Q ≈ 0 at φ = 0');
+});
+
+test('phasor: impedance from V/I/phi is correct', function () {
+  var z = pImpedance(230, 100, 30);
+  assert.ok(Math.abs(z.Z - 2.3) < 0.001, 'Z = V/I = 2.3 Ω');
+  assert.ok(Math.abs(z.R - 2.3 * Math.cos(pDeg2Rad(30))) < 0.001, 'R = Z cos φ');
+  assert.ok(Math.abs(z.X - 2.3 * Math.sin(pDeg2Rad(30))) < 0.001, 'X = Z sin φ');
+  var z0 = pImpedance(230, 0, 30);
+  assert.strictEqual(z0.Z, 0, 'Z=0 when I=0 (safe guard)');
+});
+
+test('phasor: phasorRenderVoltage produces valid SVG with no leaks (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var svg = phasorRenderVoltage(phasorState);
+    assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + ')');
+    assert.ok(svg.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(svg.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+    assert.ok(svg.indexOf('U\u2081') >= 0, 'U1 label present');
+    assert.ok(svg.indexOf('I\u2081') >= 0, 'I1 label present');
+  });
+  lang = prev;
+});
+
+test('phasor: phasorRenderPowerTriangle produces valid SVG with P/Q/S labels', function () {
+  var prev = lang; lang = 'en';
+  var svg = phasorRenderPowerTriangle(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('kW') > 0, 'P in kW');
+  assert.ok(svg.indexOf('kvar') > 0, 'Q in kvar');
+  assert.ok(svg.indexOf('kVA') > 0, 'S in kVA');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: phasorRenderImpedance shows polar + rectangular, no leaks', function () {
+  var prev = lang; lang = 'da';
+  var svg = phasorRenderImpedance(phasorState);
+  assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg');
+  assert.ok(svg.indexOf('\u03a9') >= 0, 'ohm symbol present');
+  assert.ok(svg.indexOf('\u2220') >= 0, 'angle symbol (polar form)');
+  assert.ok(svg.indexOf('+') >= 0 || svg.indexOf('j') >= 0, 'rectangular form');
+  assert.ok(svg.indexOf('NaN') < 0 && svg.indexOf('undefined') < 0, 'no leaks');
+  lang = prev;
+});
+
+test('phasor: renderStandards embeds phasor card with computed values (da/en)', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var out = renderStandards();
+    assert.ok(out.indexOf('cos \u03c6') >= 0, 'cos phi present (' + lg + ')');
+    assert.ok(out.indexOf('kW') >= 0, 'P in kW (' + lg + ')');
+    assert.ok(out.indexOf('<svg') >= 0, 'SVG embedded (' + lg + ')');
+    assert.ok(out.indexOf('undefined') < 0, 'no undefined (' + lg + ')');
+    assert.ok(out.indexOf('NaN') < 0, 'no NaN (' + lg + ')');
+  });
+  lang = prev;
+});
+
+test('phasor: state setters update correctly', function () {
+  var prevI = phasorState.iA, prevPhi = phasorState.phiA, prevView = phasorState.view;
+  phasorState.iA = 200; phasorState.phiA = 45; phasorState.view = 'impedance';
+  var z = pImpedance(phasorState.uLN, phasorState.iA, phasorState.phiA);
+  assert.ok(Math.abs(z.Z - 230 / 200) < 0.001, 'Z updated to 1.15 Ω');
+  phasorState.iA = prevI; phasorState.phiA = prevPhi; phasorState.view = prevView;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
