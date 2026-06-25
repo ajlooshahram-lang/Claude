@@ -14826,6 +14826,32 @@ test('motor: overload protection card is embedded in standards module', function
   lang = prev;
 });
 
+test('trafo: inrush curve renders valid SVG with MCB zones, no leaks', function () {
+  var prev = lang;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    [8, 12, 14, 18].forEach(function (pk) {
+      var svg = trafoRenderInrushCurve(400, 4, 400, pk);
+      assert.ok(svg.indexOf('<svg') === 0 && svg.indexOf('</svg>') > 0, 'valid svg (' + lg + '/pk' + pk + ')');
+      assert.ok(svg.indexOf('svg-animated') >= 0, 'animated');
+      assert.ok(svg.indexOf('MCB') >= 0, 'MCB zones shown');
+      assert.ok(svg.indexOf('undefined') < 0 && svg.indexOf('NaN') < 0, 'no leaks (' + lg + '/pk' + pk + ')');
+    });
+  });
+  lang = prev;
+});
+
+test('trafo: inrush sub-module renders in trafo card with peak selector and calcDetail', function () {
+  var prev = lang; lang = 'da';
+  trafoState.calcType = 'inrush'; trafoState.inrushPeak = 14;
+  var out = renderTrafo();
+  assert.ok(out.indexOf('Indkoblingsstr') >= 0, 'inrush card titled');
+  assert.ok(out.indexOf('MCB-kurve') >= 0, 'MCB verdict shown');
+  assert.ok(out.indexOf('<svg') >= 0, 'SVG curve embedded');
+  assert.ok(out.indexOf('undefined') < 0 && out.indexOf('NaN') < 0, 'no leaks');
+  trafoState.calcType = 'sizing'; lang = prev;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

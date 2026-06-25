@@ -10263,7 +10263,9 @@ let trafoState = {
   // Parallel
   parTrafo2size: 630, parTrafo2uk: 6,
   // Vector group
-  vecGroup: 'Dy11'
+  vecGroup: 'Dy11',
+  // Inrush
+  inrushPeak: 14
 };
 
 // --- Transformer calculation functions (unit-testable, no DOM) ---
@@ -10545,6 +10547,7 @@ function renderTrafo() {
     { key: 'regulation', da: 'Spændingsregulering', en: 'Voltage Regulation' },
     { key: 'efficiency', da: 'Virkningsgrad', en: 'Efficiency' },
     { key: 'parallel', da: 'Paralleldrift', en: 'Parallel Operation' },
+    { key: 'inrush', da: 'Indkoblingsstr\u00F8m', en: 'Inrush Current' },
     { key: 'vectorgroup', da: 'Vektorgruppe', en: 'Vector Group' }
   ];
   trafoTypes.forEach(function(ct) {
@@ -10558,6 +10561,7 @@ function renderTrafo() {
   else if (trafoState.calcType === 'regulation') html += renderTrafoRegulation();
   else if (trafoState.calcType === 'efficiency') html += renderTrafoEfficiency();
   else if (trafoState.calcType === 'parallel') html += renderTrafoParallel();
+  else if (trafoState.calcType === 'inrush') html += renderTrafoInrush();
   else if (trafoState.calcType === 'vectorgroup') html += renderTrafoVectorGroup();
   return html;
 }
@@ -10937,6 +10941,86 @@ function trafoRenderEffCurve(SN, P0, Pcu, cosPhi, currentLoadPct) {
   return svg;
 }
 
+// ---------------------------------------------------------------------------
+// Transformer inrush-current envelope (magnetizing inrush decay vs time).
+// On energization, inrush peaks at 10–15× In (worst case: residual flux = max,
+// closing angle = 0°) and decays with time-constant τ ≈ L_sat/R. Modelled as
+// I_peak * e^(-t/τ) with τ = 0.3 s (typical distribution trafo).
+// Also shows the MCB D-curve 20×In instantaneous band and the B/C regions
+// to visualize nuisance-trip risk. DS/HD 60364 clause 4-43.3.
+// ---------------------------------------------------------------------------
+
+function trafoRenderInrushCurve(SN, ukPct, voltageV, peakMult) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var In = (SN * 1000) / (Math.sqrt(3) * (voltageV || 400));
+  var pk = peakMult || 14; // peak inrush multiple
+  var tau = 0.30; // decay time constant [s]
+  var w = 560, h = 340, mL = 52, mR = 16, mT = 28, mB = 44;
+  var plotW = w - mL - mR, plotH = h - mT - mB;
+  var tMax = 2.0; // seconds displayed
+  var iMax = Math.ceil(pk / 5) * 5 + 2; // Y-axis top
+  function xPos(t) { return mL + (t / tMax) * plotW; }
+  function yPos(iMult) { return mT + (1 - iMult / iMax) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="svg-animated" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:' + w + 'px;background:#fff;border:1px solid #d0d5dd;border-radius:8px">';
+  // grid x (time)
+  for (var gt = 0; gt <= tMax; gt += 0.5) {
+    var gx = xPos(gt);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 15) + '" text-anchor="middle" font-size="9" fill="#475467">' + gt.toFixed(1) + ' s</text>';
+  }
+  // grid y (I/In)
+  for (var gi = 0; gi <= iMax; gi += 5) {
+    var gy = yPos(gi);
+    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3"/>';
+    svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#475467">' + gi + '\u00d7</text>';
+  }
+  // In = 1 reference line
+  svg += '<line x1="' + mL + '" y1="' + yPos(1).toFixed(1) + '" x2="' + (w - mR) + '" y2="' + yPos(1).toFixed(1) + '" stroke="#64748b" stroke-width="1" stroke-dasharray="3,3"/>';
+  svg += '<text x="' + (w - mR - 3) + '" y="' + (yPos(1) - 4).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#64748b">In=' + In.toFixed(0) + ' A</text>';
+  // MCB trip bands (horizontal zones)
+  var mcbZones = [{ lo: 3, hi: 5, label: 'B', col: 'rgba(5,150,105,0.08)' }, { lo: 5, hi: 10, label: 'C', col: 'rgba(37,99,235,0.08)' }, { lo: 10, hi: 20, label: 'D', col: 'rgba(220,38,38,0.06)' }];
+  mcbZones.forEach(function (z) {
+    if (z.lo >= iMax) return;
+    var y1 = yPos(Math.min(z.hi, iMax)), y2 = yPos(z.lo);
+    svg += '<rect x="' + mL + '" y="' + y1.toFixed(1) + '" width="' + plotW + '" height="' + (y2 - y1).toFixed(1) + '" fill="' + z.col + '"/>';
+    svg += '<text x="' + (mL + 6) + '" y="' + (y1 + 12).toFixed(1) + '" font-size="9" fill="#475467">' + (da ? 'MCB ' : 'MCB ') + z.label + ' (' + z.lo + '-' + z.hi + '\u00d7)</text>';
+  });
+  // Inrush envelope (exponential decay of peak current)
+  var envPath = '';
+  var negPath = '';
+  for (var j = 0; j <= 80; j++) {
+    var t = (j / 80) * tMax;
+    var iEnv = pk * Math.exp(-t / tau);
+    envPath += (j === 0 ? 'M' : 'L') + xPos(t).toFixed(1) + ',' + yPos(iEnv).toFixed(1);
+    negPath += (j === 0 ? 'M' : 'L') + xPos(t).toFixed(1) + ',' + yPos(-iEnv * 0.7 + iMax * 0.5).toFixed(1); // asymmetric negative peaks (visual only)
+  }
+  svg += '<path class="svg-curve-path" d="' + envPath + '" fill="none" stroke="#dc2626" stroke-width="2.5"/>';
+  // fill under envelope
+  svg += '<path d="' + envPath + 'L' + xPos(tMax).toFixed(1) + ',' + yPos(0).toFixed(1) + 'L' + xPos(0).toFixed(1) + ',' + yPos(0).toFixed(1) + 'Z" fill="rgba(220,38,38,0.07)" stroke="none"/>';
+  // Annotation: first half-cycle peak
+  svg += '<circle cx="' + xPos(0.01).toFixed(1) + '" cy="' + yPos(pk).toFixed(1) + '" r="4" fill="#dc2626"/>';
+  svg += '<text x="' + xPos(0.04).toFixed(1) + '" y="' + (yPos(pk) - 6).toFixed(1) + '" font-size="9.5" fill="#b42318" font-weight="700">' + pk + '\u00d7In = ' + (pk * In).toFixed(0) + ' A</text>';
+  // t = 5τ mark (inrush essentially decayed)
+  var t5tau = 5 * tau;
+  if (t5tau < tMax) {
+    svg += '<line x1="' + xPos(t5tau).toFixed(1) + '" y1="' + mT + '" x2="' + xPos(t5tau).toFixed(1) + '" y2="' + (h - mB) + '" stroke="#059669" stroke-width="1" stroke-dasharray="4,3"/>';
+    svg += '<text x="' + (xPos(t5tau) + 4).toFixed(1) + '" y="' + (mT + 12) + '" font-size="9" fill="#059669">5\u03C4=' + t5tau.toFixed(2) + ' s</text>';
+  }
+  // legend
+  var leg = [['#dc2626', (da ? 'Inrush-konvolut' : 'Inrush envelope')], ['#059669', (da ? '5\u03C4 (henfaldet)' : '5\u03C4 (decayed)')]];
+  for (var li = 0; li < leg.length; li++) {
+    svg += '<rect x="' + (w - 155) + '" y="' + (mT + 6 + li * 15) + '" width="11" height="11" fill="' + leg[li][0] + '"/>';
+    svg += '<text x="' + (w - 140) + '" y="' + (mT + 16 + li * 15) + '" font-size="9" fill="#344054">' + leg[li][1] + '</text>';
+  }
+  // axis titles
+  svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Tid [s]' : 'Time [s]') + '</text>';
+  svg += '<text x="13" y="' + (mT + plotH / 2) + '" text-anchor="middle" font-size="11" fill="#1d2939" transform="rotate(-90 13 ' + (mT + plotH / 2) + ')">' + (da ? 'Str\u00f8m I / In' : 'Current I / In') + '</text>';
+  svg += '<text x="' + mL + '" y="' + (mT - 10) + '" font-size="10" fill="#475467">' + SN + ' kVA \u2014 ' + (da ? 'magnetiseringsindkobling (worst case \u03C4=' + tau + ' s)' : 'magnetizing inrush (worst case \u03C4=' + tau + ' s)') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
 function renderTrafoEfficiency() {
   var S = trafoState.size;
   var losses = TRAFO_LOSSES[S] || { p0: 610, pk: 6900 };
@@ -10960,6 +11044,35 @@ function renderTrafoEfficiency() {
   html += '<div class="result-box"><div class="result-title">' + tx('Virkningsgradskurve (\u03B7 vs. belastning)', 'Efficiency curve (\u03B7 vs. load)') + '</div>' + trafoRenderEffCurve(S, losses.p0, losses.pk, trafoState.effCosPhi, trafoState.effLoadPct) + '</div>';
   html += calcDetail({ name: tx('Virkningsgrad', 'Efficiency'), formula: '\u03B7 = P2 / (P2 + P0 + Pcu\u00D7(S/SN)\u00B2)', variables: [{ name: 'P2', symbol: 'P2', value: eff.P2, unit: 'W' }, { name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }, { name: 'S/SN', symbol: 'S/SN', value: trafoState.effLoadPct/100 }], substitution: eff.P2.toFixed(0) + ' / (' + eff.P2.toFixed(0) + ' + ' + losses.p0 + ' + ' + eff.Pcu_load.toFixed(0) + ')', result: { value: eff.eta * 100, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
   html += calcDetail({ name: tx('Optimal belastning', 'Optimum load'), formula: 'S_opt/SN = \u221A(P0/Pcu)', variables: [{ name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }], substitution: '\u221A(' + losses.p0 + '/' + losses.pk + ')', result: { value: eff.optLoad * 100, unit: '% af SN' }, reference: 'Opgavesamling Kap. 9' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoInrush() {
+  var S = trafoState.size;
+  var uk = TRAFO_UK[S] || 4;
+  var In = (S * 1000) / (Math.sqrt(3) * 400);
+  var peakOptions = [8, 10, 12, 14, 15, 18];
+  var peak = trafoState.inrushPeak || 14;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Indkoblingsstr\u00f8m (Magnetiseringsrush)', 'Inrush Current (Magnetizing Rush)') + '</div>';
+  html += '<div class="info-row">' + tx('Ved tilkobling kan transformerens magnetiseringsstr\u00f8m n\u00e5 10\u201315\u00d7In i f\u00f8rste halvperiode (worst case: remanent flux = max, indkoblingsvinkel = 0\u00b0). Henfalder eksponentielt med \u03c4 \u2248 L_sat/R. MCB skal t\u00e5le inrush uden falsk udkobling \u2014 kurve D kr\u00e6ves ofte.', 'On energization, the transformer magnetizing inrush can reach 10\u201315\u00d7In in the first half-cycle (worst case: residual flux = max, closing angle = 0\u00b0). Decays exponentially with \u03c4 \u2248 L_sat/R. MCB must withstand inrush without nuisance tripping \u2014 curve D often required.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Peak indkoblings-multipel', 'Peak inrush multiple') + '</div><div class="select-grid">';
+  peakOptions.forEach(function(p) { html += '<button class="sel-btn' + (peak === p ? ' selected' : '') + '" onclick="trafoState.inrushPeak=' + p + ';renderModule(\'trafo\')">' + p + '\u00d7In</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">In (' + S + ' kVA, 400 V)</span><span class="value">' + In.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Peak inrush', 'Peak inrush') + '</span><span class="value" style="font-weight:700;color:var(--danger)">' + peak + '\u00d7In = ' + (peak * In).toFixed(0) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tidskonstant \u03c4', 'Time constant \u03c4') + '</span><span class="value">0,30 s (typisk)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('5\u03c4 (henfaldet)', '5\u03c4 (decayed)') + '</span><span class="value">1,50 s</span></div>';
+  // MCB coordination verdict
+  var mcbOK = peak <= 20;
+  var mcbType = peak <= 5 ? 'B' : (peak <= 10 ? 'C' : (peak <= 20 ? 'D' : 'K'));
+  html += '<div class="result-row"><span class="label">' + tx('P\u00e5kr\u00e6vet MCB-kurve', 'Required MCB curve') + '</span><span class="value" style="font-weight:700;color:' + (mcbOK ? 'var(--success)' : 'var(--danger)') + '">' + mcbType + (mcbOK ? '' : ' (UTILSTR\u00c6KKELIG!)') + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Indkoblingskonvolut vs. MCB-zoner', 'Inrush envelope vs. MCB zones') + '</div>';
+  html += trafoRenderInrushCurve(S, uk, 400, peak);
+  html += '</div>';
+  html += calcDetail({ name: tx('Indkoblingsstr\u00f8m', 'Inrush current'), formula: 'I_peak = k \u00D7 In (exponential decay: I(t) = I_peak \u00D7 e^(-t/\u03C4))', variables: [{ name: 'In', symbol: 'In', value: In, unit: 'A' }, { name: 'k', symbol: 'k', value: peak }, { name: '\u03c4', symbol: '\u03c4', value: 0.3, unit: 's' }], substitution: peak + ' \u00d7 ' + In.toFixed(1) + ' = ' + (peak * In).toFixed(0) + ' A', result: { value: peak * In, unit: 'A (peak)' }, reference: 'DS/HD 60364-4-43.3; IEC 60076-3' });
   html += '</div>';
   return html;
 }
