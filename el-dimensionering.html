@@ -9531,7 +9531,7 @@ function calcDetailVdrop(ib, length_m, r, x, cosPhi, voltage, vdrop, vdropPercen
       { name: tx('Resistans', 'Resistance'), symbol: 'r', value: r, unit: '\u03A9/km', source: tx('kabeltabel', 'cable table') },
       { name: tx('Reaktans', 'Reactance'), symbol: 'x', value: x, unit: '\u03A9/km', source: tx('kabeltabel', 'cable table') },
       { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: cosPhi, unit: '', source: tx('valgt', 'selected') },
-      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Un', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
+      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Uₙ', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
     ],
     substitution: '\u0394U = ' + prefix + ' \u00D7 ' + ib.toFixed(1) + ' \u00D7 ' + L_km.toFixed(3) + ' \u00D7 (' + r + '\u00D7' + cosPhi.toFixed(2) + ' + ' + x + '\u00D7' + sinPhi.toFixed(3) + ')',
     steps: [
@@ -9556,7 +9556,7 @@ function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTo
       { name: tx('Trafoimpedans', 'Transformer impedance'), symbol: 'Zt', value: zTrafo, unit: 'm\u03A9', source: tx('transformer uk%', 'transformer uk%') },
       { name: tx('Kabelimpedans', 'Cable impedance'), symbol: 'Zk', value: zCable.toFixed(2), unit: 'm\u03A9', source: tx('kabel r,x + l\u00E6ngde', 'cable r,x + length') },
       { name: tx('Sp\u00E6ndingsfaktor c', 'Voltage factor c'), symbol: 'c', value: cFactor, unit: '', source: 'IEC 60909-0' },
-      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Un', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
+      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Uₙ', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
     ],
     substitution: 'Ik3max = ' + cFactor + ' \u00D7 ' + Un + ' / (\u221A3 \u00D7 ' + (zNet + zTrafo).toFixed(1) + ' m\u03A9)\nIk2min = 0.95 \u00D7 ' + Un + ' / (2 \u00D7 ' + zTotal.toFixed(1) + ' m\u03A9)',
     steps: [
@@ -9825,7 +9825,7 @@ function renderFuse() {
         name: tx('Sikringsdimensionering', 'Fuse Dimensioning'),
         formula: 'IB \u2264 In, I\u2082t \u2264 k\u00b2S\u00b2, Icu \u2265 Ik,max',
         variables: [
-          { name: tx('Mærkestrøm', 'Rated current'), symbol: 'In', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
           { name: tx('5s strøm', '5s current'), symbol: 'I5s', value: FUSE_5S[fuseState.size] || 0, unit: 'A', source: 'IEC 60269 / ' + tx('fabrikantdata', 'manufacturer data') },
           { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: holder.ikMax, unit: 'kA', source: fuseState.holder },
           { name: tx('Holder', 'Holder'), symbol: fuseState.holder, value: holder.range, unit: '', source: tx('valgt system', 'selected system') }
@@ -9952,7 +9952,7 @@ function renderMCB() {
         name: tx('MCB Dimensionering', 'MCB Dimensioning'),
         formula: 'IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max',
         variables: [
-          { name: tx('Mærkestrøm', 'Rated current'), symbol: 'In', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
           { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mcbState.type + ' (' + mcb.standard + ')' },
           { name: tx('Kurve', 'Curve'), symbol: mcbState.curve, value: isdMin + '-' + isdMax, unit: 'A', source: 'Isd = ' + curve.isdMin + '-' + curve.isdMax + '\u00d7In' },
           { name: tx('Serviceevne', 'Service capacity'), symbol: 'Ics', value: (icu * mcb.ics).toFixed(1), unit: 'kA', source: mcb.ics + '\u00d7Icu' }
@@ -10125,7 +10125,7 @@ function renderMCCB() {
         name: tx('MCCB Dimensionering', 'MCCB Dimensioning'),
         formula: 'IB \u2264 Ir \u2264 In, Isd = Io \u00d7 multiplier, Icu \u2265 Ik,max',
         variables: [
-          { name: tx('M\u00e6rkestr\u00f8m', 'Rated current'), symbol: 'In', value: mccbState.inVal, unit: 'A', source: mccbState.frame },
+          { name: tx('M\u00e6rkestr\u00f8m', 'Rated current'), symbol: 'Iₙ', value: mccbState.inVal, unit: 'A', source: mccbState.frame },
           { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'Icu', value: icu, unit: 'kA', source: mccbState.trip },
           { name: tx('Overbelastning Io', 'Overload Io'), symbol: 'Io', value: io.toFixed(0), unit: 'A', source: mccbState.ioMult + ' \u00d7 In' },
           { name: tx('Kortslutning Isd', 'Short-time Isd'), symbol: 'Isd', value: isdCalc.toFixed(0), unit: 'A', source: mccbState.isdMult + ' \u00d7 Io' },
@@ -10854,7 +10854,7 @@ function renderTrafoSizing() {
   html += '<div class="result-row"><span class="label">' + tx('Ik (sekundær skinne)', 'Ik (secondary busbar)') + '</span><span class="value">' + (Ik/1000).toFixed(2) + ' kA</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + Ploss.toFixed(0) + ' W</span></div>';
   html += '</div>';
-  html += calcDetail({ name: tx('Fuldlaststrøm', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U2', value: 400, unit: 'V', source: tx('Sekundær', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
+  html += calcDetail({ name: tx('FuldlaststrÃ¸m', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U₂', value: 400, unit: 'V', source: tx('SekundÃ¦r', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
   html += calcDetail({ name: tx('Kortslutningsstrøm', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
   html += '</div>';
   return html;
@@ -11338,7 +11338,7 @@ function renderTrafoInrush() {
   html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Indkoblingskonvolut vs. MCB-zoner', 'Inrush envelope vs. MCB zones') + '</div>';
   html += trafoRenderInrushCurve(S, uk, 400, peak);
   html += '</div>';
-  html += calcDetail({ name: tx('Indkoblingsstr\u00f8m', 'Inrush current'), formula: 'I_peak = k \u00D7 In (exponential decay: I(t) = I_peak \u00D7 e^(-t/\u03C4))', variables: [{ name: 'In', symbol: 'In', value: In, unit: 'A' }, { name: 'k', symbol: 'k', value: peak }, { name: '\u03c4', symbol: '\u03c4', value: trafoInrushTau(S), unit: 's' }], substitution: peak + ' \u00d7 ' + In.toFixed(1) + ' = ' + (peak * In).toFixed(0) + ' A', result: { value: peak * In, unit: 'A (peak)' }, reference: 'DS/HD 60364-4-43.3; IEC 60076-3' });
+  html += calcDetail({ name: tx('Indkoblingsstr\u00f8m', 'Inrush current'), formula: 'I_peak = k \u00D7 In (exponential decay: I(t) = I_peak \u00D7 e^(-t/\u03C4))', variables: [{ name: 'In', symbol: 'Iₙ', value: In, unit: 'A' }, { name: 'k', symbol: 'k', value: peak }, { name: '\u03c4', symbol: '\u03c4', value: trafoInrushTau(S), unit: 's' }], substitution: peak + ' \u00d7 ' + In.toFixed(1) + ' = ' + (peak * In).toFixed(0) + ' A', result: { value: peak * In, unit: 'A (peak)' }, reference: 'DS/HD 60364-4-43.3; IEC 60076-3' });
   html += '</div>';
   return html;
 }
@@ -20314,7 +20314,7 @@ function renderBusbar() {
     name: tx('Skinnesystem-dimensionering', 'Busbar Trunking Dimensioning'),
     formula: 'Iz_eff = In \u00D7 k_temp \u00D7 k_IP \u00D7 k_install',
     variables: [
-      { name: tx('M\u00E6rkestr\u00F8m', 'Rated current'), symbol: 'In', value: busbarState.ratedCurrent, unit: 'A', source: tx('Valgt', 'Selected') },
+      { name: tx('M\u00E6rkestr\u00F8m', 'Rated current'), symbol: 'Iₙ', value: busbarState.ratedCurrent, unit: 'A', source: tx('Valgt', 'Selected') },
       { name: tx('Temp.faktor', 'Temp.factor'), symbol: 'k_temp', value: calc.derating.tempFactor, unit: '', source: busbarState.ambientTemp + '\u00B0C' },
       { name: tx('IP-faktor', 'IP factor'), symbol: 'k_IP', value: calc.derating.ipFactor, unit: '', source: 'IP' + busbarState.ipRating },
       { name: tx('Mont.faktor', 'Install.factor'), symbol: 'k_inst', value: calc.derating.installFactor, unit: '', source: busbarState.installMethod },
@@ -22314,7 +22314,7 @@ function renderZs() {
     formula: 'Zs = Ze + (R1+R2)/1000 \u00D7 L \u00D7 1.2',
     variables: [
       { name: tx('Kildeimpedans', 'Source impedance'), symbol: 'Ze', value: zsState.ze, unit: '\u03A9', source: tx('valgt', 'selected') },
-      { name: tx('Ledermodstand', 'Conductor resistance'), symbol: 'R1+R2', value: r1r2, unit: 'm\u03A9/m', source: zsState.cableSize + ' mm\u00B2' },
+      { name: tx('Ledermodstand', 'Conductor resistance'), symbol: 'R₁+R₂', value: r1r2, unit: 'm\u03A9/m', source: zsState.cableSize + ' mm\u00B2' },
       { name: tx('Kabellængde', 'Cable length'), symbol: 'L', value: zsState.cableLength, unit: 'm', source: tx('valgt', 'selected') },
       { name: tx('Temp.faktor', 'Temp. factor'), symbol: 'k', value: 1.2, unit: '', source: tx('drift ved maks. temp.', 'operating at max temp.') },
       { name: tx('Maks Zs', 'Max Zs'), symbol: 'Zs_max', value: zsMax, unit: '\u03A9', source: zsState.device + ' (Tabel 41.1-4)' }
@@ -24413,7 +24413,7 @@ function renderBESS() {
       { name: tx('Kapacitet', 'Capacity'), symbol: 'E', value: bessState.capacityKWh, unit: 'kWh' },
       { name: tx('Inverterstørrelse', 'Inverter size'), symbol: 'P_inv', value: inv.kW, unit: 'kW' },
       { name: tx('DC-sikring', 'DC fuse'), symbol: 'I_fuse', value: prot.dcFuse.rating, unit: 'A', source: 'IEC 60269' },
-      { name: tx('AC MCB', 'AC MCB'), symbol: 'In', value: prot.acMCB.rating, unit: 'A', source: 'IEC 60898' },
+      { name: tx('AC MCB', 'AC MCB'), symbol: 'Iₙ', value: prot.acMCB.rating, unit: 'A', source: 'IEC 60898' },
       { name: tx('RCD type', 'RCD type'), symbol: prot.rcd.type, value: prot.rcd.rating, unit: 'mA', source: prot.rcd.clause }
     ],
     substitution: 'I_dc = ' + inv.kW + '\u00d710\u00b3 / ' + bessState.voltDC + ' V = ' + dcI.current.toFixed(1) + ' A',
@@ -27159,7 +27159,7 @@ function upRenderFindingDetail(finding) {
         formula: 'IB \u2264 In \u2264 Iz',
         variables: [
           { symbol: 'IB', value: m[1], unit: 'A', source: tx('beregnet last', 'computed load') },
-          { symbol: 'In', value: m[2], unit: 'A', source: tx('beskyttelsesapparat', 'protective device') },
+          { symbol: 'Iₙ', value: m[2], unit: 'A', source: tx('beskyttelsesapparat', 'protective device') },
           { symbol: 'Iz', value: m[3], unit: 'A', source: 'officialIz (DS/HD 60364-5-52)' }
         ],
         substitution: m[1] + ' A \u2264 ' + m[2] + ' A \u2264 ' + m[3] + ' A',
@@ -30116,7 +30116,7 @@ function renderRelay() {
     formula: 'I1N = S / (\u221A3 \u00D7 U1), I> = Igt \u00D7 I1N, I>> = Igg \u00D7 I1N',
     variables: [
       { name: tx('Transformator', 'Transformer'), symbol: 'S', value: relayState.trafoKVA, unit: 'kVA', source: tx('valgt', 'selected') },
-      { name: tx('Primær spænding', 'Primary voltage'), symbol: 'U1', value: relayState.primaryKV, unit: 'kV', source: tx('valgt', 'selected') },
+      { name: tx('PrimÃ¦r spÃ¦nding', 'Primary voltage'), symbol: 'U₁', value: relayState.primaryKV, unit: 'kV', source: tx('valgt', 'selected') },
       { name: tx('Overstrøm multipel', 'Overcurrent multiple'), symbol: 'Igt', value: relayState.Igt, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
       { name: tx('Kortslutning multipel', 'Short-circuit multiple'), symbol: 'Igg', value: relayState.Igg, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
       { name: tx('Tidsforsinkelse', 'Time delay'), symbol: 't>', value: relayState.tGt, unit: 's', source: tx('valgt', 'selected') },
@@ -32939,7 +32939,7 @@ function analyzerSolve(data) {
       formula: 'IB \u2264 In \u2264 Iz',
       variables: [
         { name: 'IB', symbol: 'IB', value: ib.toFixed(1), unit: 'A', source: tx('beregnet', 'calculated') },
-        { name: 'In', symbol: 'In', value: data.deviceIn, unit: 'A', source: tx('valgt beskyttelse', 'selected device') },
+        { name: 'In', symbol: 'Iₙ', value: data.deviceIn, unit: 'A', source: tx('valgt beskyttelse', 'selected device') },
         { name: 'Iz', symbol: 'Iz', value: izCorrected.toFixed(1), unit: 'A', source: tx('derateret', 'derated') }
       ],
       substitution: ib.toFixed(1) + ' A \u2264 ' + data.deviceIn + ' A \u2264 ' + izCorrected.toFixed(1) + ' A',
@@ -32967,7 +32967,7 @@ function analyzerSolve(data) {
       name: tx('Fejlbeskyttelse (automatisk frakobling)', 'Fault protection (automatic disconnection)'),
       formula: 'If = U0 / Zs \u2265 Ia',
       variables: [
-        { name: tx('Fase-jord sp\u00e6nding', 'Phase-earth voltage'), symbol: 'U0', value: u0, unit: 'V', source: 'TN/TT system' },
+        { name: tx('Fase-jord sp\u00e6nding', 'Phase-earth voltage'), symbol: 'U₀', value: u0, unit: 'V', source: 'TN/TT system' },
         { name: tx('Fejlsl\u00f8jfeimpedans', 'Fault loop impedance'), symbol: 'Zs', value: data.zsValue, unit: '\u03A9', source: tx('opgivet', 'specified') },
         { name: tx('Udl\u00f8sestr\u00f8m', 'Trip current'), symbol: 'Ia', value: ia, unit: 'A', source: 'MCB ' + (data.deviceCurve || 'B') + data.deviceIn }
       ],
@@ -33104,7 +33104,7 @@ function analyzerSolve(data) {
       name: tx('Maks. tilladt fejlsl\u00f8jfeimpedans Zs,max (bonus)', 'Max permissible loop impedance Zs,max (bonus)'),
       formula: 'Zs,max = U0 / Ia',
       variables: [
-        { name: tx('Fase-jord sp\u00e6nding', 'Phase-earth voltage'), symbol: 'U0', value: u0Zs, unit: 'V', source: 'TN' },
+        { name: tx('Fase-jord sp\u00e6nding', 'Phase-earth voltage'), symbol: 'U₀', value: u0Zs, unit: 'V', source: 'TN' },
         { name: tx('Udl\u00f8sestr\u00f8m', 'Trip current'), symbol: 'Ia', value: iaForZs, unit: 'A', source: 'MCB ' + (data.deviceCurve || 'B') + data.deviceIn }
       ],
       substitution: 'Zs,max = ' + u0Zs + ' / ' + iaForZs + ' = ' + zsMaxAllowed.toFixed(3) + ' \u03A9',
