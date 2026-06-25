@@ -7188,6 +7188,160 @@ function energyGetPQStatus(voltage, freq, thd, flicker, unbalance) {
   };
 }
 
+// Energy optimization recommendations engine
+function energyOptimizationRecommendations(state) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var recs = [];
+  var totalSavingKWh = 0;
+  var totalSavingDKK = 0;
+  var avgRate = 2.5; // DKK/kWh average Danish electricity price 2024
+
+  // 1. Power factor correction
+  var pf = energyCalcPowerFactor(state.loads);
+  if (pf.pf < 0.92) {
+    var pfLoss = state.powerKW * (1 / pf.pf - 1 / 0.95) * 8760 * 0.3; // annual kWh loss from reactive power
+    var pfSaving = pfLoss * avgRate;
+    totalSavingKWh += pfLoss;
+    totalSavingDKK += pfSaving;
+    recs.push({
+      priority: 1,
+      icon: '\u26A1',
+      title: da ? 'Effektfaktorkorrektion' : 'Power Factor Correction',
+      desc: da ? 'Installér kondensatorbatteri for at hæve cos\u03c6 fra ' + pf.pf.toFixed(2) + ' til 0,95. Reducerer reaktivt strømforbrug og netafgifter.' : 'Install capacitor bank to raise cos\u03c6 from ' + pf.pf.toFixed(2) + ' to 0.95. Reduces reactive current consumption and grid penalties.',
+      saving_kwh: Math.round(pfLoss),
+      saving_dkk: Math.round(pfSaving),
+      investment_dkk: Math.round(state.powerKW * 80),
+      roi_months: Math.round((state.powerKW * 80) / (pfSaving / 12)),
+      standard: 'IEC 60831; DS/HD 60364-5-52'
+    });
+  }
+
+  // 2. VFD for motors (huge savings)
+  if (state.loads.indexOf('motor') >= 0 && state.loads.indexOf('vfd') < 0) {
+    var motorSaving = state.powerKW * 0.3 * 8760 * 0.4; // 30% of power is motors, VFD saves 40%
+    var motorDKK = motorSaving * avgRate;
+    totalSavingKWh += motorSaving;
+    totalSavingDKK += motorDKK;
+    recs.push({
+      priority: 1,
+      icon: '\uD83D\uDD04',
+      title: da ? 'Frekvensomformer (VFD) på motorer' : 'Variable Frequency Drive on motors',
+      desc: da ? 'Motorer uden hastighedsregulering spilder energi ved dellast. VFD kan spare 20-50% på pumper, ventilatorer og kompressorer.' : 'Motors without speed control waste energy at partial load. VFDs can save 20-50% on pumps, fans and compressors.',
+      saving_kwh: Math.round(motorSaving),
+      saving_dkk: Math.round(motorDKK),
+      investment_dkk: Math.round(state.powerKW * 0.3 * 1500),
+      roi_months: Math.round((state.powerKW * 0.3 * 1500) / (motorDKK / 12)),
+      standard: 'IEC 61800-9-2 (IE-classes for drives)'
+    });
+  }
+
+  // 3. LED conversion
+  if (state.loads.indexOf('led') < 0) {
+    var ledSaving = state.powerKW * 0.15 * 8760 * 0.6; // 15% is lighting, LED saves 60%
+    var ledDKK = ledSaving * avgRate;
+    totalSavingKWh += ledSaving;
+    totalSavingDKK += ledDKK;
+    recs.push({
+      priority: 2,
+      icon: '\uD83D\uDCA1',
+      title: da ? 'LED-konvertering' : 'LED conversion',
+      desc: da ? 'Udskift ældre lyskilder (T8 lysstofrør, halogen, HQL) med LED. Typisk 50-70% besparelse på belysning + længere levetid.' : 'Replace older light sources (T8 fluorescent, halogen, HQL) with LED. Typically 50-70% savings on lighting + longer life.',
+      saving_kwh: Math.round(ledSaving),
+      saving_dkk: Math.round(ledDKK),
+      investment_dkk: Math.round(state.powerKW * 0.15 * 200),
+      roi_months: Math.round((state.powerKW * 0.15 * 200) / (ledDKK / 12)),
+      standard: 'EN 12464-1 (belysning); BR18 §377-378'
+    });
+  }
+
+  // 4. Peak shaving / load management
+  var peak = energyCalcPeakShaving(state.profile);
+  if (peak.potentialSaving > 0) {
+    var peakDKK = peak.potentialSaving * 365;
+    totalSavingDKK += peakDKK;
+    recs.push({
+      priority: 2,
+      icon: '\uD83D\uDCC9',
+      title: da ? 'Spidslastreduktion (peak shaving)' : 'Peak shaving / load management',
+      desc: da ? 'Forskyd tung last (EV-ladning, varmepumpe, vaskemaskiner) til lavtarif-timer. Reducerer effektafgift og netbelastning.' : 'Shift heavy loads (EV charging, heat pumps, washing machines) to off-peak hours. Reduces demand charges and grid stress.',
+      saving_kwh: 0,
+      saving_dkk: Math.round(peakDKK),
+      investment_dkk: 5000,
+      roi_months: Math.round(5000 / (peakDKK / 12)),
+      standard: 'DS/HD 60364-7-722 (dynamisk laststyring)'
+    });
+  }
+
+  // 5. Standby elimination
+  if (state.loads.indexOf('pc') >= 0) {
+    var standbySaving = state.powerKW * 0.05 * 8760; // 5% wasted on standby
+    var standbyDKK = standbySaving * avgRate;
+    totalSavingKWh += standbySaving;
+    totalSavingDKK += standbyDKK;
+    recs.push({
+      priority: 3,
+      icon: '\uD83D\uDD0C',
+      title: da ? 'Eliminér standby-forbrug' : 'Eliminate standby consumption',
+      desc: da ? 'Brug master-slave stikdåser og tidsure. Kontorbyggerier spilder typisk 5-10% på standby i aften/nat/weekend.' : 'Use master-slave socket strips and timers. Office buildings typically waste 5-10% on standby during evenings/nights/weekends.',
+      saving_kwh: Math.round(standbySaving),
+      saving_dkk: Math.round(standbyDKK),
+      investment_dkk: 2000,
+      roi_months: Math.round(2000 / (standbyDKK / 12)),
+      standard: 'EU 2019/2021 (standby regulation)'
+    });
+  }
+
+  // 6. Solar PV (always a recommendation for commercial/industrial)
+  if (state.profile !== 'residential' || state.powerKW > 30) {
+    var pvSize = Math.min(state.powerKW * 0.5, 200); // kWp
+    var pvYield = pvSize * 950; // kWh/year in Denmark
+    var pvSaving = pvYield * avgRate * 0.7; // 70% self-consumption
+    totalSavingKWh += pvYield * 0.7;
+    totalSavingDKK += pvSaving;
+    recs.push({
+      priority: 2,
+      icon: '\u2600\uFE0F',
+      title: da ? 'Solcelleanlæg (PV)' : 'Solar PV system',
+      desc: da ? 'Installér ' + pvSize.toFixed(0) + ' kWp solceller. Danmark: ~950 kWh/kWp/år. Ved 70% egetforbrug spares ' + Math.round(pvYield * 0.7) + ' kWh/år.' : 'Install ' + pvSize.toFixed(0) + ' kWp solar panels. Denmark: ~950 kWh/kWp/year. At 70% self-consumption, saves ' + Math.round(pvYield * 0.7) + ' kWh/year.',
+      saving_kwh: Math.round(pvYield * 0.7),
+      saving_dkk: Math.round(pvSaving),
+      investment_dkk: Math.round(pvSize * 8000),
+      roi_months: Math.round((pvSize * 8000) / (pvSaving / 12)),
+      standard: 'IEC 62548; DS/HD 60364-7-712'
+    });
+  }
+
+  return { recommendations: recs.sort(function(a, b) { return a.priority - b.priority; }), totalSavingKWh: Math.round(totalSavingKWh), totalSavingDKK: Math.round(totalSavingDKK) };
+}
+
+function energyRenderOptimization(state) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var opt = energyOptimizationRecommendations(state);
+  var h = '';
+
+  // Executive summary
+  h += uxSummary([
+    { label: da ? 'Årlig besparelse' : 'Annual savings', value: (opt.totalSavingDKK / 1000).toFixed(0) + 'k DKK', status: opt.totalSavingDKK > 10000 ? 'pass' : '' },
+    { label: da ? 'kWh reduceret' : 'kWh reduced', value: (opt.totalSavingKWh / 1000).toFixed(0) + ' MWh', status: 'pass' },
+    { label: da ? 'CO\u2082 reduktion' : 'CO\u2082 reduction', value: (opt.totalSavingKWh * 0.085 / 1000).toFixed(1) + ' ton', status: 'pass' },
+    { label: da ? 'Anbefalinger' : 'Recommendations', value: opt.recommendations.length.toString(), status: '' }
+  ]);
+
+  // Recommendations
+  opt.recommendations.forEach(function(rec) {
+    h += '<div class="result-box" style="margin-top:10px;border-left:4px solid var(--success)">';
+    h += '<div class="result-title">' + rec.icon + ' ' + rec.title + '</div>';
+    h += '<div style="font-size:0.82rem;margin-bottom:8px;line-height:1.4">' + rec.desc + '</div>';
+    h += '<div class="result-row"><span class="label">' + (da ? 'Besparelse' : 'Saving') + '</span><span class="value" style="color:var(--success)">' + rec.saving_kwh + ' kWh/\u00e5r (' + rec.saving_dkk + ' DKK)</span></div>';
+    if (rec.investment_dkk) h += '<div class="result-row"><span class="label">' + (da ? 'Investering' : 'Investment') + '</span><span class="value">' + rec.investment_dkk + ' DKK</span></div>';
+    if (rec.roi_months && rec.roi_months < 120) h += '<div class="result-row"><span class="label">' + (da ? 'Tilbagebetalingstid' : 'Payback time') + '</span><span class="value">' + rec.roi_months + ' ' + (da ? 'mdr' : 'months') + '</span></div>';
+    h += '<div class="result-row"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value" style="font-size:0.75rem;color:var(--text-muted)">' + rec.standard + '</span></div>';
+    h += '</div>';
+  });
+
+  return h;
+}
+
 function renderEnergy() {
   const pf = energyCalcPowerFactor(energyState.loads);
   const pq = energyGetPQStatus(230, 50, energyCalcTHD(energyState.loads).thd, 0.5, 1.0);
@@ -7238,6 +7392,11 @@ function renderEnergy() {
       <div class="result-row"><span class="label">${tx('Kondensator','Capacitor')} kvar</span><span class="value">${capSize.kvar}</span></div>
       <div class="result-row"><span class="label">${tx('Besparelse','Saving')} DKK</span><span class="value">${peak.potentialSaving}</span></div>
     </div>
+  </div>
+  <div class="card fade-in">
+    <div class="card-title">\uD83C\uDF31 ${tx('Energioptimering — Anbefalinger til reduktion', 'Energy Optimization — Reduction Recommendations')}</div>
+    <div class="info-row">${tx('Baseret på din lastprofil og installerede udstyr beregner systemet konkrete besparelsesmuligheder med investering, tilbagebetalingstid og CO\u2082-reduktion.', 'Based on your load profile and installed equipment, the system calculates specific savings opportunities with investment, payback time and CO\u2082 reduction.')}</div>
+    ${energyRenderOptimization(energyState)}
   </div>`;
 }
 
