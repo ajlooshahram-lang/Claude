@@ -7961,6 +7961,16 @@ function energyCalcPeakShaving(profile) {
   return { recommendations: recommendations, potentialSaving: Math.round(potentialSaving * 100) / 100 };
 }
 
+// Render one EN 50160 power-quality row: actual value, limit, and a localized
+// colored verdict badge (God/D\u00e5rlig) — never a bare English 'good'/'poor'.
+function pqRow(label, d) {
+  if (!d) return '';
+  var ok = d.ok;
+  var badge = '<span style="font-weight:700;padding:1px 8px;border-radius:10px;font-size:0.82em;color:#fff;background:' + (ok ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)') + '">' + (ok ? tx('God \u2713', 'Good \u2713') : tx('D\u00e5rlig \u2717', 'Poor \u2717')) + '</span>';
+  var valStr = (typeof d.v === 'number' ? (Math.round(d.v * 100) / 100) : d.v) + (d.unit && d.unit !== 'P_lt' ? ' ' + d.unit : (d.unit === 'P_lt' ? '' : ''));
+  return '<div class="result-row"><span class="label">' + label + '</span><span class="value">' + valStr + ' <span style="opacity:0.6;font-size:0.85em">(' + tx('gr\u00e6nse', 'limit') + ' ' + d.lim + ')</span> ' + badge + '</span></div>';
+}
+
 function energyGetPQStatus(voltage, freq, thd, flicker, unbalance) {
   const vGood = voltage >= 207 && voltage <= 253;
   const fGood = freq >= 49.5 && freq <= 50.5;
@@ -7973,6 +7983,14 @@ function energyGetPQStatus(voltage, freq, thd, flicker, unbalance) {
     thd: thdGood ? 'good' : 'poor',
     flicker: flickerGood ? 'good' : 'poor',
     unbalance: unbalanceGood ? 'good' : 'poor',
+    // Rich detail for professional display (actual value + EN 50160 limit).
+    vals: {
+      voltage:   { v: voltage, unit: 'V',  lim: '207\u2013253 V (\u00b110 %)', ok: vGood },
+      frequency: { v: freq,    unit: 'Hz', lim: '49,5\u201350,5 Hz (\u00b11 %)', ok: fGood },
+      thd:       { v: thd,     unit: '%',  lim: '\u2264 8 %', ok: thdGood },
+      flicker:   { v: flicker, unit: 'P_lt', lim: '\u2264 1,0', ok: flickerGood },
+      unbalance: { v: unbalance, unit: '%', lim: '\u2264 2 %', ok: unbalanceGood }
+    },
     clause: 'EN 50160'
   };
 }
@@ -8166,11 +8184,13 @@ function renderEnergy() {
     </div>
     <div class="result-box">
       <div class="result-title">${tx('Effektkvalitet','Power Quality')} - EN 50160</div>
-      <div class="result-row"><span class="label">${tx('Spænding','Voltage')}</span><span class="value">${pq.voltage}</span></div>
-      <div class="result-row"><span class="label">${tx('Frekvens','Frequency')}</span><span class="value">${pq.frequency}</span></div>
-      <div class="result-row"><span class="label">THD</span><span class="value">${pq.thd}</span></div>
+      ${pqRow(tx('Sp\u00e6nding','Voltage'), pq.vals.voltage)}
+      ${pqRow(tx('Frekvens','Frequency'), pq.vals.frequency)}
+      ${pqRow('THD', pq.vals.thd)}
+      ${pqRow(tx('Flicker','Flicker') + ' (P<sub>lt</sub>)', pq.vals.flicker)}
+      ${pqRow(tx('Ubalance','Unbalance'), pq.vals.unbalance)}
       <div class="result-row"><span class="label">${tx('Effektfaktor','Power Factor')}</span><span class="value">${pf.pf}</span></div>
-      <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${pq.clause}</span></div>
+      <div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">${tx('Reference','Reference')}</span><span class="value">${pq.clause} \u00b7 ${tx('sp\u00e6nding/frekvens er nominelle antagelser','voltage/frequency are nominal assumptions')}</span></div>
     </div>
     <div class="result-box">
       <div class="result-title">${tx('Daglig omkostning','Daily Cost')}</div>
