@@ -16323,6 +16323,22 @@ test('analyzerParseCMap maps bfchar and bfrange entries to Unicode', function ()
   assert.strictEqual(cm.map[0x0006], 'D', 'bfrange end -> D');
 });
 
+// Benchmark floor: the offline analyzer must keep solving a meaningful share of a
+// real exam (guards against extraction/detection regressions). Auto aug 2019 went
+// from 3/39 to 10/39 after the detection+extraction hardening.
+test('Offline analyzer solves a real exam PDF above the benchmark floor', function () {
+  var f = __dirname + '/Auto aug 2019.pdf';
+  if (!fs.existsSync(f)) return; // skip if fixture absent
+  var savedLang = lang; lang = 'da';
+  analyzerRun(analyzerExtractPdf(new Uint8Array(fs.readFileSync(f))));
+  var sol = examBuildSolution(analyzerState);
+  var tot = 0, solved = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { tot++; if (q.solved) solved++; }); });
+  assert(tot >= 25, 'detects most sub-questions (got ' + tot + ')');
+  assert(solved >= 7, 'solves at least the benchmark floor (got ' + solved + '/' + tot + ')');
+  lang = savedLang;
+});
+
 
 test('renderRecommendations highlights the chosen product and labels the alternatives', function () {
   var savedLang = lang; lang = 'da';

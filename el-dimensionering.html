@@ -33956,9 +33956,12 @@ function analyzerExtract(text) {
   // cos phi: "cos(phi) = 0,86", "cos\u03C6 = 0.86", "cos phi 0,86", "effektfaktor 0,86", "PF 0,9"
   // The separator is OPTIONAL so natural phrasings without "=" are recognised;
   // a 0<value<=1 sanity clamp prevents false matches (e.g. an angle "cos 30").
+  // Load power factor: 0.50-1.00 (real loads). A "cos phi" below 0.5 is almost
+  // always the network short-circuit angle (cos phi_k), so it must NOT pollute the
+  // load cosPhi -- it is captured separately as cosPhiK below.
   var cosMatch = text.match(/cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?)?\s*[:=]?\s*(\d+[.,]\d+)/i);
   if (!cosMatch) cosMatch = text.match(/(?:effektfaktor|power\s*factor|\bPF)\s*[:=]?\s*(\d+[.,]\d+)/i);
-  if (cosMatch) { var cosV = parseFloat(cosMatch[1].replace(',', '.')); if (cosV > 0 && cosV <= 1) { data.cosPhi = cosV; data.confidence.cosPhi = 'high'; } }
+  if (cosMatch) { var cosV = parseFloat(cosMatch[1].replace(',', '.')); if (cosV >= 0.5 && cosV <= 1) { data.cosPhi = cosV; data.confidence.cosPhi = 'high'; } }
 
   // Efficiency eta: "eta = 0,93", "η = 0.93", "virkningsgrad 0,93"
   var etaMatch = text.match(/(?:eta|\u03B7|virkningsgrad)\s*[:=]\s*(\d+[.,]\d+)/i);
@@ -34153,8 +34156,11 @@ function analyzerExtract(text) {
   if (!skhMatch) skhMatch = text.match(/(\d+[.,]?\d*)\s*MVA/i);
   if (skhMatch) { data.Skh_MVA = parseFloat(skhMatch[1].replace(',', '.')); data.confidence.Skh_MVA = 'high'; }
   // Network short-circuit angle: "cos phi_k = 0,1" / "cos Fk 0,15" or R/X via "arccot 0,30"
+  // Network short-circuit angle cos(phi_k): explicit "cos phi_k = .." OR (fallback)
+  // any "cos phi = X" with X < 0.5 (a short-circuit angle, never a load PF).
   var coskMatch = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*_?\s*k\s*\)?\s*[:=]?\s*(\d+[.,]\d+)/i);
-  if (coskMatch) { var ck = parseFloat(coskMatch[1].replace(',', '.')); if (ck > 0 && ck <= 1) { data.cosPhiK = ck; data.confidence.cosPhiK = 'high'; } }
+  if (!coskMatch) { var lowCos = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*\)?\s*[:=]?\s*(0[.,][0-4]\d*)/i); if (lowCos) coskMatch = lowCos; }
+  if (coskMatch) { var ck = parseFloat(coskMatch[1].replace(',', '.')); if (ck > 0 && ck < 1) { data.cosPhiK = ck; data.confidence.cosPhiK = 'high'; } }
   var rxMatch = text.match(/(?:R\/X|arccot)\s*[:=(]?\s*(\d+[.,]\d+)/i);
   if (rxMatch) { data.netRX = parseFloat(rxMatch[1].replace(',', '.')); data.confidence.netRX = 'medium'; }
   // HV distribution voltage: "10 kV", "3 x 10 kV", "50/10 kV" -> take the lower (distribution) side
@@ -34162,7 +34168,10 @@ function analyzerExtract(text) {
   if (hvMatch) { data.UnHV_kV = parseFloat(hvMatch[2]); data.confidence.UnHV_kV = 'high'; }
   else { var hv2 = text.match(/\b(?:3\s*[x\u00d7]\s*)?(\d{1,2})\s*kV\b/i); if (hv2) { data.UnHV_kV = parseFloat(hv2[1]); data.confidence.UnHV_kV = 'medium'; } }
   // Capacitive earth-fault current stated directly: "jordfejlsstrøm ... 56 A", "op til 25 A"
-  var ijMatch = text.match(/(?:jordfejls?str.{0,2}m|jordslutningsstr.{0,2}m|ladestr.{0,2}m)[^.\n]{0,40}?(\d+[.,]?\d*)\s*A/i);
+  // Capacitive earth-fault current stated directly. Danish exams phrase this with
+  // a long lead-in ("jordslutningsstroemme i distributionsnettet kan antage
+  // vaerdier op til 25 A"), so allow a wide gap to the value.
+  var ijMatch = text.match(/(?:jordfejls?str.{0,3}m\w*|jordslutningsstr.{0,3}m\w*|ladestr.{0,3}m\w*)[^.\n]{0,90}?(\d+[.,]?\d*)\s*A\b/i);
   if (ijMatch) { data.earthFaultA = parseFloat(ijMatch[1].replace(',', '.')); data.confidence.earthFaultA = 'high'; }
   // Number of transformers in parallel: "to/tre transformere parallelt". If BOTH
   // are asked ("to ... og ... tre ... parallelt"), leave it open so the solver
@@ -34290,6 +34299,17 @@ function analyzerDetectQuestions(text) {
     { re: /(?:kondensator|kapacitor)\b|(?:beregn|bestem|find).{0,12}kapacitans|kondensatorens\s+(?:ladning|energi)/i, type: 'kapacitor', label: 'Kondensatorberegning', module: 'kapacitor' },
     { re: /U-?v.{1,2}rdi|varmetab|transmissionstab|varmebehov|isoleringskrav/i, type: 'varme', label: 'U-v\u00e6rdi/varmetab', module: 'varme' },
     { re: /(?:j.{1,2}vnstr.{1,2}ms?)(?:maskine|motor|generator)|ankerstr.{1,2}m|mod-?EMK|tv.{1,2}rmagnetisering/i, type: 'dcmaskine', label: 'DC-maskine', module: 'dcmaskine' },
+    // === REAL EXAM PHRASINGS (verbs: Dimensioner/Valg af/Foretag valg/Afklar/Kontrol om/Hvad er) ===
+    { re: /(?:beregn|bestem|find)[^.\n]{0,35}(?:st.rste|mindste|maks\w*|min\w*\b)?[^.\n]{0,15}kortslutningsstr/i, type: 'sk_net', label: 'Kortslutningsstr\u00f8m (net)', module: 'scircuit' },
+    { re: /(?:foretag\s+)?valg\s+af[^.\n]{0,60}(?:smeltesikring|automatsikring|kombiafbryder|sikring|MCCB|MCB|maksimalafbryder|str.mtransformer|konstanttidsrel.|rel.|lastadskiller)/i, type: 'device', label: 'Valg af beskyttelse', module: 'mcb' },
+    { re: /dimensioner[^.\n]{0,45}(?:hovedkabel|forsyningskred|gruppeledning|stikledning|tilledning|kabel|ledning)/i, type: 'cable', label: 'Dimensioner kabel/ledning', module: 'cable' },
+    { re: /(?:dimensioner|kontrol\w*)[^.\n]{0,30}kanalskinne|kanalskinne[^.\n]{0,30}(?:belastnings|kortslutnings|st.dstr.m)/i, type: 'busbar', label: 'Kanalskinne', module: 'busbar' },
+    { re: /(?:afklar|kontrol\w*|unders.g)[^.\n]{0,75}(?:kortslutningsbeskyt|overbelastningsbeskyt)/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
+    { re: /(?:hvad\s+er|bestem|find|beregn)[^.\n]{0,30}(?:maksimale?\s+)?ber.ringssp.nding/i, type: 'potential', label: 'Ber\u00f8ringssp\u00e6nding / R_E', module: 'scircuit' },
+    { re: /(?:kontrol\w*|unders.g)[^.\n]{0,35}fejlbeskyttet|er\s+\u2013?\w*\s*fejlbeskyttet/i, type: 'fault', label: 'Fejlbeskyttelse', module: 'fault' },
+    { re: /(?:bestem|find|beregn)[^.\n]{0,30}(?:antallet\s+af\s+)?fasekompens|fasekompensatorbatteri/i, type: 'pfc', label: 'Fasekompensering', module: 'trefase' },
+    { re: /tegn[^.\n]{0,30}(?:en-?stregs?skema|kredsskema|enstreg|diagram)/i, type: 'diagram', label: 'Tegn diagram (kredsskema)', module: 'draw' },
+    { re: /(?:dimensioner|bestem)[^.\n]{0,40}(?:potentialudligning|udligningsforbindelse|beskyttelsesleder|PE-?leder)/i, type: 'pe_sizing', label: 'PE/udligning tv\u00e6rsnit', module: 'cable' },
     { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
   ];
   for (var i = 0; i < patterns.length; i++) {
