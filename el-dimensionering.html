@@ -34341,8 +34341,14 @@ function analyzerDetectQuestions(text) {
     { re: /(?:dimensioner|bestem)[^.\n]{0,40}(?:potentialudligning|udligningsforbindelse|beskyttelsesleder|PE-?leder)/i, type: 'pe_sizing', label: 'PE/udligning tv\u00e6rsnit', module: 'cable' },
     { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
   ];
+  // Detection runs against the raw text AND a "despaced" copy that repairs PDF
+  // word-splitting ("D imensioner" -> "Dimensioner", "kortslutnings stroem" ->
+  // "kortslutningsstroem"). We collapse a space that sits between a letter and a
+  // following lowercase letter -- this merges some real word boundaries too, but
+  // since we only substring-match calc keywords, that is harmless for detection.
+  var softText = String(text).replace(/([A-Za-z\u00c6\u00d8\u00c5\u00e6\u00f8\u00e5])[ \t]+(?=[a-z\u00e6\u00f8\u00e5])/g, '$1');
   for (var i = 0; i < patterns.length; i++) {
-    if (patterns[i].re.test(text)) {
+    if (patterns[i].re.test(text) || patterns[i].re.test(softText)) {
       questions.push({ type: patterns[i].type, label: patterns[i].label, module: patterns[i].module, source: 'detected' });
     }
   }
