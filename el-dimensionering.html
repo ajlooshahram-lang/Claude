@@ -9790,7 +9790,7 @@ function renderLoad() {
       </div>
 
       <div class="select-group">
-        <div class="select-label">${t('power')} [kW]</div>
+        <div class="select-label">${t('power')}</div>
         <div class="select-grid">
           ${commonPowers.map(p =>
             `<button class="sel-btn ${loadState.power === p ? 'selected' : ''}" onclick="loadState.power=${p};renderModule('load')">${p}</button>`
@@ -10062,9 +10062,11 @@ function renderMCB() {
       <div class="select-group">
         <div class="select-label">${t('mcbCurve')}</div>
         <div class="select-grid">
-          ${Object.keys(MCB_CURVES).map(c =>
-            `<button class="sel-btn ${mcbState.curve === c ? 'selected' : ''}" onclick="mcbState.curve='${c}';renderModule('mcb')">${c}</button>`
-          ).join('')}
+          ${Object.keys(MCB_CURVES).map(c => {
+            var cv = MCB_CURVES[c];
+            var range = cv.isdMin + '\u2013' + cv.isdMax + '\u00d7I\u2099';
+            return `<button class="sel-btn ${mcbState.curve === c ? 'selected' : ''}" onclick="mcbState.curve='${c}';renderModule('mcb')"><strong>${c}</strong> <span style="font-size:0.75em;opacity:0.8">(${range})</span></button>`;
+          }).join('')}
         </div>
       </div>
 
