@@ -14668,6 +14668,78 @@ function axIkTrafoSecondary(SN_kVA, U_V, ek_pct) {
   var Ik = In / (ek_pct / 100);
   return { In: Math.round(In * 10) / 10, Ik: Math.round(Ik), IkkA: Math.round(Ik / 100) / 10 };
 }
+// Complex (IEC 60909 / El-7 / Viggo Bisch) prospective Ik3 at the LV board with the
+// network AND transformer impedances added as VECTORS (R + jX), not magnitudes.
+//  - Transformer angle uses the authorized nameplate method: phi_t = arccos(e_r/e_k),
+//    with e_r = P_Cu/S_N (resistive voltage %), e_x = sqrt(e_k^2 - e_r^2).
+//    Z_t = (e_k/100) * U^2 / S_N  (referred to the LV side).
+//  - Network angle from the supplied R/X: phi_n = arccot(R/X); Z_n = c * U^2 / S_k.
+// SN [kVA], ek [%], Pcu [W], Un [V], c (voltage factor), Sk_MVA [MVA], rxNet (R/X).
+// All impedances returned in milliohm. No fabricated data — Pcu, ek, Sk, R/X are given.
+function axIkComplexTrafo(SN, ek, Pcu, Un, c, Sk_MVA, rxNet) {
+  var In = (SN * 1000) / (Math.sqrt(3) * Un);
+  var Zt = (ek / 100) * (Un * Un) / (SN * 1000) * 1000;     // mOhm (LV side)
+  var er = Math.min((Pcu / (SN * 1000)) * 100, ek * 0.9999); // resistive voltage %
+  var ex = Math.sqrt(Math.max(0, ek * ek - er * er));
+  var phiT = Math.acos(er / ek);
+  var Rt = Zt * Math.cos(phiT), Xt = Zt * Math.sin(phiT);
+  var Zn = c * (Un * Un) / (Sk_MVA * 1e6) * 1000;            // mOhm
+  var rxn = (rxNet > 0) ? rxNet : 0.1;
+  var phiN = Math.atan(1 / rxn);
+  var Rn = Zn * Math.cos(phiN), Xn = Zn * Math.sin(phiN);
+  var Rtot = Rn + Rt, Xtot = Xn + Xt;
+  var Ztot = Math.sqrt(Rtot * Rtot + Xtot * Xtot);
+  var Ik3 = (c * Un) / (Math.sqrt(3) * Ztot / 1000);         // A
+  var ZtotScalar = Zn + Zt;
+  var Ik3scalar = (c * Un) / (Math.sqrt(3) * ZtotScalar / 1000);
+  return {
+    In: Math.round(In * 10) / 10,
+    Zt: Math.round(Zt * 1000) / 1000, er: Math.round(er * 1000) / 1000, ex: Math.round(ex * 1000) / 1000,
+    phiTdeg: Math.round(phiT * 1800 / Math.PI) / 10, Rt: Math.round(Rt * 1000) / 1000, Xt: Math.round(Xt * 1000) / 1000,
+    Zn: Math.round(Zn * 1000) / 1000, phiNdeg: Math.round(phiN * 1800 / Math.PI) / 10, Rn: Math.round(Rn * 1000) / 1000, Xn: Math.round(Xn * 1000) / 1000, rxNet: rxn,
+    Rtot: Math.round(Rtot * 1000) / 1000, Xtot: Math.round(Xtot * 1000) / 1000, Ztot: Math.round(Ztot * 1000) / 1000,
+    phiTotDeg: Math.round(Math.atan2(Xtot, Rtot) * 1800 / Math.PI) / 10,
+    Ik3kA: Math.round(Ik3 / 100) / 10, Ik3A: Math.round(Ik3),
+    Ik3scalarkA: Math.round(Ik3scalar / 100) / 10
+  };
+}
+// Standard load (copper) losses P_k [W] for oil distribution transformers, EN 50588-1
+// (Tier-2 reference list). Used as nameplate data in generated exam tasks.
+var AX_TRAFO_PCU = { 630: 6500, 1000: 9500, 1250: 11000, 1600: 14000 };
+// Inline SVG impedance-vector (phasor) diagram in the R-X plane for the complex
+// short-circuit result: Z_net (origin->net), Z_trafo stacked on top, and the
+// resultant Z_tot from origin. Axes are independently scaled (R<<X) and tick-
+// labelled so the distortion is explicit; the true angles are given numerically.
+function axPhasorZ(X) {
+  var maxR = Math.max(X.Rtot, 0.001), maxX = Math.max(X.Xtot, 0.001);
+  var W = 240, H = 190, padL = 34, padB = 26, padT = 14, padR = 12;
+  var sx = (W - padL - padR) / (maxR * 1.18);
+  var sy = (H - padB - padT) / (maxX * 1.18);
+  var ox = padL, oy = H - padB;
+  function px(r) { return (ox + r * sx).toFixed(1); }
+  function py(x) { return (oy - x * sy).toFixed(1); }
+  var s = '<svg class="svg-animated" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:300px;background:#fff;border:1px solid #e4e7ec;border-radius:6px">';
+  // axes
+  s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (W - padR) + '" y2="' + oy + '" stroke="#94a3b8" stroke-width="1"/>';
+  s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + ox + '" y2="' + padT + '" stroke="#94a3b8" stroke-width="1"/>';
+  s += '<text x="' + (W - padR) + '" y="' + (oy + 14) + '" text-anchor="end" font-size="9" fill="#475467">R [m\u03A9]</text>';
+  s += '<text x="' + (ox - 4) + '" y="' + (padT + 2) + '" text-anchor="end" font-size="9" fill="#475467">X [m\u03A9]</text>';
+  // Z_net (blue) origin -> net
+  s += '<line x1="' + px(0) + '" y1="' + py(0) + '" x2="' + px(X.Rn) + '" y2="' + py(X.Xn) + '" stroke="#2563eb" stroke-width="2.5"/>';
+  // Z_trafo (orange) net -> tot
+  s += '<line x1="' + px(X.Rn) + '" y1="' + py(X.Xn) + '" x2="' + px(X.Rtot) + '" y2="' + py(X.Xtot) + '" stroke="#ea580c" stroke-width="2.5"/>';
+  // Z_tot (green dashed) origin -> tot
+  s += '<line x1="' + px(0) + '" y1="' + py(0) + '" x2="' + px(X.Rtot) + '" y2="' + py(X.Xtot) + '" stroke="#059669" stroke-width="2" stroke-dasharray="5,3"/>';
+  // node dots
+  s += '<circle cx="' + px(X.Rn) + '" cy="' + py(X.Xn) + '" r="2.5" fill="#2563eb"/>';
+  s += '<circle cx="' + px(X.Rtot) + '" cy="' + py(X.Xtot) + '" r="2.5" fill="#059669"/>';
+  // labels
+  s += '<text x="' + px(X.Rn) + '" y="' + (Number(py(X.Xn)) - 4) + '" font-size="8.5" fill="#2563eb">Z\u0305_net</text>';
+  s += '<text x="' + (Number(px(X.Rtot)) + 3) + '" y="' + py((X.Xn + X.Xtot) / 2) + '" font-size="8.5" fill="#ea580c">Z\u0305_trafo</text>';
+  s += '<text x="' + (Number(px(X.Rtot)) + 3) + '" y="' + (Number(py(X.Xtot)) + 2) + '" font-size="8.5" fill="#059669" font-weight="700">Z\u0305_tot ' + X.Ztot.toFixed(1) + '\u2220' + X.phiTotDeg.toFixed(0) + '\u00B0</text>';
+  s += '</svg>';
+  return s;
+}
 // Adiabatic short-circuit check: conductor capability k\u00b2S\u00b2 >= I\u00b2t (let-through energy).
 // Returns { ok, Smin } where Smin = Ik\u00b7\u221at / k is the minimum permissible cross-section.
 function axAdiabatic(kVal, S_mm2, Ik_A, t_s) {
@@ -14930,6 +15002,19 @@ function axGenForsyning(rng, b, tier) {
   var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var needIcu = stdIcu.filter(function (v) { return v >= tr.IkkA - 1e-9; })[0] || 100;
   var icuOpts = stdIcu.filter(function (v) { return v >= tr.IkkA - 5 && v <= tr.IkkA + 30; }); if (icuOpts.indexOf(needIcu) < 0) icuOpts.push(needIcu); icuOpts.sort(function (a, b) { return a - b; });
   tasks.push({ id: 'f_icu', kind: 'breaking', prompt: { da: 'V\u00e6lg mindste standard brydeevne Icu for hovedafbryderen (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).', en: 'Choose the smallest standard breaking capacity Icu for the main breaker (Icu \u2265 Ik,max = ' + axFmt(tr.IkkA) + ' kA).' }, given: { IkkA: tr.IkkA }, answer: needIcu, opts: icuOpts, ci: icuOpts.indexOf(needIcu), unit: 'kA', clause: 'DS/HD 60364-4-43 \u00a7434.5.1', cat: 'shortcircuit' });
+  if (tier.lvl >= 4) {
+    // Complex (Viggo) short-circuit incl. network impedance + arccos transformer angle.
+    var Pcu = AX_TRAFO_PCU[SN] || 9500;
+    var Sk = axRngPick(rng, [250, 350, 500]);   // grid short-circuit power [MVA]
+    var rxN = axRngPick(rng, [0.1, 0.15, 0.2]); // network R/X
+    var cx = axIkComplexTrafo(SN, ek, Pcu, 400, 1.05, Sk, rxN);
+    var n4 = axNumOpts(cx.Ik3kA, [Math.round(cx.Ik3scalarkA * 10) / 10, Math.round(cx.Ik3kA * 0.7 * 10) / 10]);
+    data.Pcu = Pcu; data.Sk = Sk; data.rxNet = rxN;
+    tasks.push({ id: 'f_ikcx', kind: 'iktrafo_complex', prompt: {
+      da: 'Beregn den prospektive Ik3 ved tavlen med KOMPLEKS metode (net + trafo som vektorer). Trafo: ' + SN + ' kVA, e\u2096 = ' + axFmt(ek) + ' %, P_Cu = ' + Pcu + ' W. Net: S_k = ' + Sk + ' MVA, R/X = ' + String(rxN).replace('.', ',') + '. Brug \u03C6_trafo = arccos(e\u1d63/e\u2096).',
+      en: 'Calculate the prospective Ik3 at the board with the COMPLEX method (network + transformer as vectors). Transformer: ' + SN + ' kVA, e\u2096 = ' + axFmt(ek) + ' %, P_Cu = ' + Pcu + ' W. Grid: S_k = ' + Sk + ' MVA, R/X = ' + rxN + '. Use \u03C6_trafo = arccos(e\u1d63/e\u2096).'
+    }, given: { SN: SN, ek: ek, Pcu: Pcu, Un: 400, c: 1.05, Sk: Sk, rxNet: rxN }, answer: cx.Ik3kA, opts: n4.opts, ci: n4.ci, unit: 'kA', clause: 'IEC 60909-0 \u00b7 DS/HD 60364-4-43 \u00a7434.5', cat: 'shortcircuit' });
+  }
   if (tier.feat.selectivity) {
     tasks.push({ id: 'f_sel', kind: 'selectivity', prompt: { da: 'En 250 A afgang ligger nedstr\u00f8ms hovedbeskyttelsen. Hvad sikrer selektivitet?', en: 'A 250 A feeder sits downstream of the main protection. What ensures selectivity?' }, given: {}, answer: 0, opts: [{ da: 'Tid/str\u00f8m-graduering: hovedets korttidsforsinkelse l\u00e6gges over afgangens udl\u00f8sekurve i hele fejlomr\u00e5det', en: 'Time/current grading: the main short-time delay sits above the feeder curve across the whole fault range' }, { da: 'Samme m\u00e6rkestr\u00f8m i begge ender', en: 'Same rating at both ends' }, { da: 'Fjern den nedstr\u00f8ms beskyttelse', en: 'Remove the downstream protection' }], ci: 0, clause: 'DS/HD 60364-5-53 \u00a7536', cat: 'fault' });
   }
@@ -15085,6 +15170,28 @@ function axSolveTask(task, opgave) {
     sol.verification = S('Ik,max = ' + axFmt(tr.IkkA, 1) + ' kA er den dimensionerende v\u00e6rdi for brydeevne Icu. At se bort fra netimpedansen giver den h\u00f8jeste v\u00e6rdi \u2014 sikkerhedsm\u00e6ssigt korrekt.', 'Ik,max = ' + axFmt(tr.IkkA, 1) + ' kA is the design value for breaking capacity Icu. Ignoring grid impedance gives the highest value \u2014 the safe choice.');
     sol.compliance = [S('DS/HD 60364-4-43 \u00a7434.5.', 'DS/HD 60364-4-43 \u00a7434.5.')];
     sol.conclusion = S('Ik,max \u2248 ' + axFmt(tr.IkkA, 1) + ' kA.', 'Ik,max \u2248 ' + axFmt(tr.IkkA, 1) + ' kA.');
+  } else if (task.kind === 'iktrafo_complex') {
+    var X = axIkComplexTrafo(g.SN, g.ek, g.Pcu, g.Un, g.c, g.Sk, g.rxNet);
+    sol.assumptions = [
+      S('Net og trafo adderes som komplekse vektorer (R + jX), ikke som tal-v\u00e6rdier \u2014 IEC 60909 / El-7.', 'Network and transformer added as complex vectors (R + jX), not magnitudes \u2014 IEC 60909 / El-7.'),
+      S('Trafo-vinklen kommer fra m\u00e6rkepladen: e\u1d63 = P_Cu/S_N, \u03C6_trafo = arccos(e\u1d63/e\u2096) (Viggo Bisch-metoden).', 'Transformer angle from the nameplate: e\u1d63 = P_Cu/S_N, \u03C6_trafo = arccos(e\u1d63/e\u2096) (Viggo Bisch method).'),
+      S('Net-vinklen fra opgivet R/X: \u03C6_net = arccot(R/X). Sp\u00e6ndingsfaktor c = ' + axFmt(g.c, 2) + '.', 'Network angle from the supplied R/X: \u03C6_net = arccot(R/X). Voltage factor c = ' + axFmt(g.c, 2) + '.')
+    ];
+    sol.formula = 'Z<sub>t</sub> = (e\u2096/100)\u00b7U\u00b2/S<sub>N</sub> ;  e\u1d63 = P<sub>Cu</sub>/S<sub>N</sub> ;  \u03C6<sub>t</sub> = arccos(e\u1d63/e\u2096)\nZ<sub>n</sub> = c\u00b7U\u00b2/S<sub>k</sub> ;  \u03C6<sub>n</sub> = arccot(R/X)\nZ\u0305<sub>tot</sub> = (R<sub>n</sub>+R<sub>t</sub>) + j(X<sub>n</sub>+X<sub>t</sub>) ;  I<sub>k3</sub> = c\u00b7U/(\u221a3\u00b7|Z\u0305<sub>tot</sub>|)';
+    sol.substitution = 'Z\u0305_tot = (' + axFmt(X.Rn, 2) + '+' + axFmt(X.Rt, 2) + ') + j(' + axFmt(X.Xn, 2) + '+' + axFmt(X.Xt, 2) + ') = ' + axFmt(X.Rtot, 2) + ' + j' + axFmt(X.Xtot, 2) + ' m\u03A9';
+    sol.steps = [
+      { da: 'Trafo-impedans (LV)', en: 'Transformer impedance (LV)', expr: '(' + axFmt(g.ek) + '/100)\u00d7' + g.Un + '\u00b2/' + (g.SN * 1000), result: axFmt(X.Zt, 2) + ' m\u03A9' },
+      { da: 'Resistiv sp\u00e6nding e\u1d63', en: 'Resistive voltage e\u1d63', expr: g.Pcu + ' / ' + (g.SN * 1000) + ' \u00d7 100', result: axFmt(X.er, 2) + ' %' },
+      { da: 'Trafo-vinkel (arccos)', en: 'Transformer angle (arccos)', expr: 'arccos(' + axFmt(X.er, 2) + '/' + axFmt(g.ek) + ') \u21d2 ' + axFmt(X.Rt, 2) + ' + j' + axFmt(X.Xt, 2), result: axFmt(X.phiTdeg, 1) + '\u00b0' },
+      { da: 'Net-impedans', en: 'Network impedance', expr: axFmt(g.c, 2) + '\u00d7' + g.Un + '\u00b2/(' + g.Sk + '\u00d710\u2076)', result: axFmt(X.Zn, 2) + ' m\u03A9 \u2220 ' + axFmt(X.phiNdeg, 1) + '\u00b0' },
+      { da: 'Vektorsum', en: 'Vector sum', expr: axFmt(X.Rtot, 2) + ' + j' + axFmt(X.Xtot, 2), result: '|Z\u0305| = ' + axFmt(X.Ztot, 2) + ' m\u03A9 \u2220 ' + axFmt(X.phiTotDeg, 1) + '\u00b0' },
+      { da: 'Ik3 (kompleks)', en: 'Ik3 (complex)', expr: axFmt(g.c, 2) + '\u00d7' + g.Un + '/(\u221a3\u00d7' + axFmt(X.Ztot / 1000, 5) + ')', result: axFmt(X.Ik3kA, 1) + ' kA' }
+    ];
+    sol.result = { value: X.Ik3kA, unit: 'kA', da: 'Prospektiv Ik3 (kompleks)', en: 'Prospective Ik3 (complex)' };
+    sol.verification = S('Den komplekse |Z\u0305_tot| = ' + axFmt(X.Ztot, 2) + ' m\u03A9 \u2264 den skalare sum ' + axFmt(X.Zn + X.Zt, 2) + ' m\u03A9, s\u00e5 den eksakte Ik3 = ' + axFmt(X.Ik3kA, 1) + ' kA \u2265 skalar-overslaget ' + axFmt(X.Ik3scalarkA, 1) + ' kA. Vektormetoden er derfor mere konservativ for valg af brydeevne.', 'The complex |Z\u0305_tot| = ' + axFmt(X.Ztot, 2) + ' m\u03A9 \u2264 the scalar sum ' + axFmt(X.Zn + X.Zt, 2) + ' m\u03A9, so the exact Ik3 = ' + axFmt(X.Ik3kA, 1) + ' kA \u2265 the scalar estimate ' + axFmt(X.Ik3scalarkA, 1) + ' kA. The vector method is therefore more conservative for breaking-capacity selection.');
+    sol.compliance = [S('IEC 60909-0 (kortslutningsstr\u00f8mme) + DS/HD 60364-4-43 \u00a7434.5.', 'IEC 60909-0 (short-circuit currents) + DS/HD 60364-4-43 \u00a7434.5.')];
+    sol.conclusion = S('Ik3 \u2248 ' + axFmt(X.Ik3kA, 1) + ' kA (kompleks, net + trafo).', 'Ik3 \u2248 ' + axFmt(X.Ik3kA, 1) + ' kA (complex, network + transformer).');
+    sol.curve = axPhasorZ(X);
   } else if (task.kind === 'breaking') {
     var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var need = stdIcu.filter(function (v) { return v >= g.IkkA - 1e-9; })[0] || 100;
     sol.assumptions = [S('Brydeevne Icu skal mindst d\u00e6kke den prospektive Ik,max; mindste standardv\u00e6rdi over Ik,max v\u00e6lges.', 'Breaking capacity Icu must at least cover prospective Ik,max; pick the smallest standard value above it.')];

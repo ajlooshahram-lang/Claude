@@ -15300,6 +15300,39 @@ test('scircuit: complex calc uses Viggo trafo angle when selected; renders witho
   lang = savedLang; Object.assign(scState, saved);
 });
 
+test('exam: axIkComplexTrafo vector method (network + arccos transformer) is correct', function () {
+  // 630 kVA, ek=4%, Pcu=6500W, Sk=500 MVA, R/X=0.1
+  var X = axIkComplexTrafo(630, 4, 6500, 400, 1.05, 500, 0.1);
+  assert.ok(Math.abs(X.In - 909) < 1, 'In = 909 A');
+  assert.ok(Math.abs(X.Zt - 10.16) < 0.05, 'Zt = (ek/100)*U^2/SN = 10.16 mOhm');
+  assert.ok(Math.abs(X.er - 1.03) < 0.02, 'er = Pcu/SN = 1.03 %');
+  assert.ok(Math.abs(X.phiTdeg - Math.acos(X.er / 4) * 180 / Math.PI) < 0.2, 'phi_trafo = arccos(er/ek)');
+  // |Z_tot| must be the vector magnitude, <= scalar sum
+  assert.ok(X.Ztot <= X.Zn + X.Zt + 1e-6, 'vector |Z_tot| <= scalar sum');
+  assert.ok(X.Ik3kA >= X.Ik3scalarkA - 1e-9, 'complex Ik3 >= scalar estimate (conservative)');
+  // including network impedance lowers Ik below the c-scaled stiff-grid transformer-only value
+  assert.ok(X.Ik3kA > 20 && X.Ik3kA < 25, 'Ik3 in physical range ~23 kA (got ' + X.Ik3kA + ')');
+});
+
+test('exam: iktrafo_complex task generates at high tiers and solves with arccos + phasor', function () {
+  var rng = axRngMake(12345);
+  var gen = axGenForsyning(rng, axBuilding ? axBuilding('fabrik') : null, axTier('ekspert'));
+  var cxTask = gen.tasks.filter(function (t) { return t.kind === 'iktrafo_complex'; })[0];
+  assert.ok(cxTask, 'ekspert forsyning includes a complex short-circuit task');
+  assert.ok(cxTask.opts.indexOf(cxTask.answer) === cxTask.ci, 'answer index consistent');
+  var sol = axSolveTask(cxTask, gen.data);
+  assert.ok(sol.steps.length >= 5, 'worked solution has full step chain');
+  assert.ok(/arccos/.test(JSON.stringify(sol.steps)), 'solution shows arccos transformer angle');
+  assert.ok(typeof sol.curve === 'string' && /Z\u0305_tot/.test(sol.curve), 'phasor diagram drawn with Z_tot');
+  assert.ok(sol.curve.indexOf('NaN') === -1 && sol.curve.indexOf('undefined') === -1, 'phasor svg clean');
+});
+
+test('exam: lower tiers do NOT get the complex task (kept exam-appropriate)', function () {
+  var rng = axRngMake(777);
+  var gen = axGenForsyning(rng, null, axTier('laerling'));
+  assert.ok(gen.tasks.filter(function (t) { return t.kind === 'iktrafo_complex'; }).length === 0, 'apprentice has no complex SC task');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
