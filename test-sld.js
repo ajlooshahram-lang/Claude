@@ -15125,6 +15125,81 @@ test('standards: IZ_COPPER ampacity table is conservatively rounded down from DS
   });
 });
 
+test('standards: IZ_COPPER_XLPE matches DS/HD 60364-5-52 Table C.52.1 method C XLPE 90C exactly', function () {
+  // These are the EXACT standard values for method C, multicore, 3 loaded, Cu/XLPE
+  var std = {1.5:22, 2.5:30, 4:40, 6:51, 10:70, 16:94, 25:119, 35:147, 50:179, 70:229, 95:278, 120:322, 150:371, 185:424, 240:500};
+  Object.keys(std).forEach(function (csa) {
+    assert.strictEqual(IZ_COPPER_XLPE[Number(csa)], std[csa], 'IZ_COPPER_XLPE[' + csa + '] = ' + std[csa]);
+  });
+});
+
+test('standards: IZ_ALU values within 1A of DS/HD 60364-5-52 Table C.52.1 method C Al/PVC', function () {
+  // Standard values for method C, multicore, 3 loaded, Al/PVC 70C
+  var std = {16:57, 25:73, 35:90, 50:110, 70:140, 95:170, 120:197, 150:226, 185:256, 240:300};
+  Object.keys(std).forEach(function (csa) {
+    var appVal = IZ_ALU[Number(csa)];
+    assert.ok(Math.abs(appVal - std[csa]) <= 1, 'IZ_ALU[' + csa + ']=' + appVal + ' within 1A of ' + std[csa]);
+  });
+  // XLPE always exceeds PVC for same cross-section
+  Object.keys(IZ_ALU).forEach(function (csa) {
+    if (IZ_ALU_XLPE[csa]) {
+      assert.ok(IZ_ALU_XLPE[csa] > IZ_ALU[csa], 'Al XLPE(' + csa + ')=' + IZ_ALU_XLPE[csa] + ' > PVC=' + IZ_ALU[csa]);
+    }
+  });
+});
+
+test('standards: AX_R_CU matches IEC 60228 Table 1 Class 2 at 20C', function () {
+  // IEC 60228:2004 maximum DC resistance at 20C for Class 2 stranded Cu (ohm/km)
+  var iec = {1.5:12.1, 2.5:7.41, 4:4.61, 6:3.08, 10:1.83, 16:1.15, 25:0.727, 35:0.524, 50:0.387, 70:0.268, 95:0.193, 120:0.153, 150:0.124, 185:0.0991, 240:0.0754};
+  Object.keys(iec).forEach(function (csa) {
+    assert.strictEqual(AX_R_CU[Number(csa)], iec[csa], 'AX_R_CU[' + csa + '] = ' + iec[csa] + ' (IEC 60228)');
+  });
+});
+
+test('standards: AX_R_AL matches IEC 60228 Table 1 Class 2 at 20C for Al', function () {
+  // IEC 60228:2004 maximum DC resistance at 20C for Class 2 stranded Al (ohm/km)
+  var iec = {10:3.08, 16:1.91, 25:1.20, 35:0.868, 50:0.641, 70:0.443, 95:0.320, 120:0.253, 150:0.206, 185:0.164, 240:0.125};
+  Object.keys(iec).forEach(function (csa) {
+    assert.strictEqual(AX_R_AL[Number(csa)], iec[csa], 'AX_R_AL[' + csa + '] = ' + iec[csa] + ' (IEC 60228)');
+  });
+});
+
+test('standards: PRODUCTS.cables Cu r-values match AX_R_CU within 5% (DC vs AC resistance)', function () {
+  // NKT NOIKLX product r-values are AC resistance at 50Hz from the NKT datasheet.
+  // AX_R_CU is the IEC 60228 maximum DC resistance at 20C.
+  // For large cross-sections (>=120mm2), skin effect adds 1-5% to AC resistance.
+  // Both values are correct for their purpose:
+  //   AX_R_CU: exam engine (matches exam answer keys using IEC 60228)
+  //   PRODUCTS.r: engineering calculations (realistic AC operating conditions)
+  var cables = PRODUCTS.cables.filter(function (c) { return c.material === 'Cu'; });
+  cables.forEach(function (c) {
+    var expected = AX_R_CU[c.mm2];
+    if (expected !== undefined) {
+      var pctDiff = Math.abs(c.r - expected) / expected * 100;
+      assert.ok(pctDiff < 5, c.id + ' r=' + c.r + ' within 5% of AX_R_CU ' + expected + ' (diff=' + pctDiff.toFixed(1) + '%)');
+    }
+  });
+});
+
+test('standards: INSTALL_METHODS has correct structure and conservatism', function () {
+  // Method C is the reference (factor 1.0)
+  assert.strictEqual(INSTALL_METHODS['C'], 1.0, 'Method C = 1.0 (reference)');
+  // Methods with less cooling must have factor <= 1.0
+  assert.ok(INSTALL_METHODS['A1'] <= 1.0, 'A1 <= 1.0 (insulated wall)');
+  assert.ok(INSTALL_METHODS['A2'] <= 1.0, 'A2 <= 1.0 (conduit in insulated wall)');
+  assert.ok(INSTALL_METHODS['B2'] <= 1.0, 'B2 <= 1.0 (trunking)');
+  // Methods with better cooling must have factor >= 1.0
+  assert.ok(INSTALL_METHODS['E'] >= 1.0, 'E >= 1.0 (perforated tray)');
+  assert.ok(INSTALL_METHODS['F'] >= 1.0, 'F >= 1.0 (free air touching)');
+  assert.ok(INSTALL_METHODS['G'] >= 1.0, 'G >= 1.0 (free air spaced)');
+  // Physical ordering: better cooling = higher factor. E < F < G is certain.
+  assert.ok(INSTALL_METHODS['E'] <= INSTALL_METHODS['F'], 'E <= F');
+  assert.ok(INSTALL_METHODS['F'] <= INSTALL_METHODS['G'], 'F <= G');
+  // A-methods (enclosed) must both be below B-methods (surface) or equal
+  assert.ok(INSTALL_METHODS['A1'] <= INSTALL_METHODS['B1'], 'A1 <= B1');
+  assert.ok(INSTALL_METHODS['A2'] <= INSTALL_METHODS['B1'], 'A2 <= B1');
+});
+
 test('eng: stdChip renders clickable <details> with why + affects, graceful for unknown clause', function () {
   var prev = lang; lang = 'da';
   var chip = stdChip('DS/HD 60364-4-41');
