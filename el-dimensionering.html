@@ -3150,10 +3150,29 @@ const TEMP_FACTORS_XLPE = {
   10: 1.15, 15: 1.12, 20: 1.08, 25: 1.04, 30: 1.0, 35: 0.96, 40: 0.91, 45: 0.87, 50: 0.82
 };
 
-// Grouping correction
-const GROUP_FACTORS = {
+// Grouping correction — DS/HD 60364-5-52 has TWO grouping tables:
+//   Table B.52.17: bunched cables in enclosed spaces (methods A1/A2/B1/B2/C).
+//   Table B.52.18: single-layer cables on perforated trays / ladders (methods E/F).
+// Using B.52.17 for method E overstates the derating → forces oversized cables and
+// gives WRONG authorization-exam answers (Viggo Bisch 2018 august uses 0.82 for 3
+// circuits on cable tray, not 0.70).
+const GROUP_FACTORS_BUNCHED = {
   1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
 };
+const GROUP_FACTORS_TRAY = {
+  1: 1.0, 2: 0.88, 3: 0.82, 4: 0.77, 5: 0.75, 6: 0.73, 7: 0.72, 8: 0.71, 9: 0.70
+};
+// Legacy alias — used where installation method is unknown; defaults to the more
+// conservative (bunched) table so we never over-rate a cable.
+const GROUP_FACTORS = GROUP_FACTORS_BUNCHED;
+// Returns the correct grouping factor given installation method and circuit count.
+function groupFactorFor(method, circuits) {
+  var n = (circuits > 0) ? circuits : 1;
+  // Methods E and F (cable tray / ladder, single layer) use the less-severe table.
+  var tray = /^[EeFf]/.test(method || '');
+  var tbl = tray ? GROUP_FACTORS_TRAY : GROUP_FACTORS_BUNCHED;
+  return tbl[n] != null ? tbl[n] : (tray ? 0.70 : 0.50);
+}
 
 // True when the active cable uses XLPE/EPR (90°C) insulation, mirroring izTableFor().
 function isXlpeCable(typeStr) {
@@ -3669,7 +3688,7 @@ function renderRecommendations(title, products, type) {
       var topCable = products[0];
       var kI = INSTALL_METHODS[cableState.installMethod] || 1.0;
       var kT = tempFactorFor(cableState.temp);
-      var kG = GROUP_FACTORS[cableState.grouping] || 1.0;
+      var kG = groupFactorFor(cableState.installMethod, cableState.grouping);
       var baseIzVal = officialIz(topCable);
       var _csaLad = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
       var _csaSmaller = _csaLad.filter(function (s) { return s < topCable.mm2; }).pop();
@@ -3788,7 +3807,7 @@ function getAiAssistant(module) {
         const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
         const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
         const kTemp = tempFactorFor(cableState.temp);
-        const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+        const kGroup = groupFactorFor(cableState.installMethod, cableState.grouping);
         const correctedIz = baseIz * kInstall * kTemp * kGroup;
 
         if (correctedIz < ib) {
@@ -3909,7 +3928,7 @@ function runQiValidation() {
   if (mcbState.rating && cableState.crossSection) {
     const izTable = izTableFor();
     const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
-    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * tempFactorFor(cableState.temp) * (GROUP_FACTORS[cableState.grouping] || 1);
+    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * tempFactorFor(cableState.temp) * groupFactorFor(cableState.installMethod, cableState.grouping);
     const corrIz = baseIz * kTotal;
     if (mcbState.rating <= corrIz) {
       passed.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A \u2264 ' + corrIz.toFixed(1) + ' A' });
@@ -3945,7 +3964,7 @@ function runQiValidation() {
     const corrIz = (izTable[parseFloat(cableState.crossSection)] || 0) *
       (INSTALL_METHODS[cableState.installMethod] || 1) *
       tempFactorFor(cableState.temp) *
-      (GROUP_FACTORS[cableState.grouping] || 1);
+      groupFactorFor(cableState.installMethod, cableState.grouping);
     if (ib <= mcbState.rating && mcbState.rating <= corrIz) {
       passed.push({ rule: 'IB \u2264 In \u2264 Iz (koordination)', detail: ib.toFixed(1) + ' \u2264 ' + mcbState.rating + ' \u2264 ' + corrIz.toFixed(1) + ' A' });
     }

@@ -15410,6 +15410,25 @@ test('vdrop: redekamMinCsa ~ textbook 53 mm2 minimum for the 7% limit (Al)', fun
   assert.ok(sMin >= 48 && sMin <= 58, 'min CSA in textbook range ~53 mm2. Got ' + sMin);
 });
 
+// ===== GROUPING FACTOR — method-aware (B.52.17 vs B.52.18) =====
+test('cable: groupFactorFor uses B.52.17 (bunched) for methods A/B/C and B.52.18 (tray) for E/F', function () {
+  assert.ok(Math.abs(groupFactorFor('C', 3) - 0.70) < 1e-9, 'method C, 3 circuits: bunched 0.70');
+  assert.ok(Math.abs(groupFactorFor('E', 3) - 0.82) < 1e-9, 'method E, 3 circuits: tray 0.82 (Viggo 2018)');
+  assert.ok(Math.abs(groupFactorFor('F', 3) - 0.82) < 1e-9, 'method F, 3 circuits: tray 0.82');
+  assert.ok(Math.abs(groupFactorFor('B', 2) - 0.80) < 1e-9, 'method B, 2 circuits: bunched 0.80');
+  assert.ok(Math.abs(groupFactorFor('E', 2) - 0.88) < 1e-9, 'method E, 2 circuits: tray 0.88');
+  assert.ok(groupFactorFor('E', 9) > groupFactorFor('C', 9), 'tray always less severe than bunched');
+});
+
+test('cable: groupFactorFor matches Viggo 2018 august (method E, 3 circuits = 0.82)', function () {
+  // From Viggo Bitsch "Autoprøve MM 2018 august, Opgave 2.1.3":
+  //   "0,82 – 3 strømkredse, tabel B.52.17" (he cites B.52.17 but uses the
+  //   single-layer tray values because installation method is E — cable tray/ladder).
+  assert.ok(Math.abs(groupFactorFor('E', 3) - 0.82) < 1e-9, 'Viggo authorization answer = 0.82');
+  // The OLD single-table approach gave 0.70 for 3 circuits (too conservative, wrong exam answer).
+  assert.ok(Math.abs(GROUP_FACTORS_BUNCHED[3] - 0.70) < 1e-9, 'bunched table gives 0.70 (over-conservative for E)');
+});
+
 // ===== PARALLEL LINES — complex current divider validation (Eksempel 7.4.1.2) =====
 test('vdrop: redekam Sum(I*l) is a true moment — farther loads weigh more', function () {
   var near = redekamVoltageDrop([{ I: 100, l: 1 }], 0.3, 0.08, 0.9, 400);
