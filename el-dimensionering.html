@@ -35704,6 +35704,46 @@ function analyzerSolveOnline() {
   });
 }
 
+// Online pricing (Calcia/Sigma-style BOM) + live law-version check. Reuses the
+// configured AI channel: asks for current Danish wholesaler price levels for the
+// solved circuit's components, and verifies the cited standards/laws are current.
+function analyzerBuildPricingPrompt(examText, summary) {
+  var sys = 'Du er en dansk el-projekteringsekspert (Calcia/Sigma-stil). Ud fra opgaven og de beregnede komponenter: '
+    + '(1) Opstil en stykliste (BOM) med konkrete CE-m\u00e6rkede produkter (Schneider/ABB/Siemens/Hager/nkt) og '
+    + 'AKTUELT dansk grossist-prisniveau i DKK (Solar, Lemvigh-M\u00fcller, Sanist\u00e5l, Wex\u00f8e) \u2014 angiv enhedspris, antal og sum. '
+    + 'Markl\u00e9r tydeligt det VALGTE produkt pr. funktion. '
+    + '(2) Lav et LOVTJEK: list de relevante standarder/bekendtg\u00f8relser (DS/HD 60364, Elsikkerhedsloven, '
+    + 'Installationsbekendtg\u00f8relsen) og angiv om de citerede paragraffer er g\u00e6ldende; henvis til at den '
+    + 'aktuelle udgave verificeres p\u00e5 sikkerhedsstyrelsen.dk, og n\u00e6vn datoen for din viden. Svar i markdown, p\u00e5 dansk.';
+  return { system: sys, user: 'Opgave:\n' + (examText || '') + (summary ? ('\n\nBeregnede komponenter:\n' + summary) : '') };
+}
+
+function analyzerResultsSummary() {
+  // Compact summary of the local solve to feed the pricing/law prompt.
+  if (!analyzerState.results || !analyzerState.results.length) return '';
+  return analyzerState.results.map(function (r) { return '- ' + (r.label || r.type) + ': ' + (r.value != null ? r.value : '?'); }).join('\n');
+}
+
+function analyzerFetchPricingLaw() {
+  var cfg = {}; try { cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  if (!cfg.endpoint || !cfg.key) { analyzerState.notice = tx('Online AI er ikke tilsluttet. Upload en ai-config.json via "Tilslut AI".', 'Online AI is not connected. Upload an ai-config.json via "Connect AI".'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  if (!analyzerState.rawText) { analyzerState.notice = tx('Inds\u00e6t eller upload f\u00f8rst en opgave.', 'Paste or upload an exam first.'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  analyzerState.priceBusy = true; analyzerState.priceAnswer = null; analyzerState.notice = null;
+  if (typeof renderModule === 'function') renderModule('analyzer');
+  var p = analyzerBuildPricingPrompt(analyzerState.rawText, analyzerResultsSummary());
+  fetch(cfg.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model: cfg.model || 'gpt-4o', messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }], temperature: 0.1 })
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    analyzerState.priceAnswer = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    analyzerState.priceBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  }).catch(function (e) {
+    analyzerState.priceAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
+    analyzerState.priceBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  });
+}
+
 function renderAnalyzer() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('\uD83D\uDD0D Projektanalysator (Intelligent)', '\uD83D\uDD0D Project Analyzer (Intelligent)') + '</div>';
@@ -35758,6 +35798,7 @@ function renderAnalyzer() {
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
   html += '<label class="sel-btn" style="cursor:pointer">' + (aiConnected ? '\u2705 ' : '\uD83D\uDD0C ') + tx('Tilslut AI', 'Connect AI') + '<input type="file" accept=".json,application/json" style="display:none" onchange="analyzerLoadAiConfig(this)"></label>';
   html += '<button class="sel-btn' + (aiConnected ? ' selected' : '') + '"' + ((aiConnected && analyzerState.rawText && !analyzerState.onlineBusy) ? '' : ' disabled style="opacity:.5;pointer-events:none"') + ' onclick="analyzerSolveOnline()">' + (analyzerState.onlineBusy ? tx('\u23F3 L\u00f8ser online\u2026', '\u23F3 Solving online\u2026') : tx('\uD83C\uDF10 L\u00f8s med Online AI', '\uD83C\uDF10 Solve with Online AI')) + '</button>';
+  html += '<button class="sel-btn"' + ((aiConnected && analyzerState.rawText && !analyzerState.priceBusy) ? '' : ' disabled style="opacity:.5;pointer-events:none"') + ' onclick="analyzerFetchPricingLaw()">' + (analyzerState.priceBusy ? tx('\u23F3 Henter\u2026', '\u23F3 Fetching\u2026') : tx('\uD83D\uDCB0 Priser & lovtjek', '\uD83D\uDCB0 Pricing & law check')) + '</button>';
   html += '</div>';
   html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">' + tx('Tilslut en OpenAI-kompatibel tjeneste via en lille ai-config.json (endpoint, key, model). Bruges n\u00e5r den lokale motor mangler data \u2014 og holder pris/lovgivning opdateret.', 'Connect an OpenAI-compatible service via a small ai-config.json (endpoint, key, model). Used when the local engine lacks data \u2014 and keeps pricing/legislation current.') + '</div></div>';
 
@@ -35767,6 +35808,12 @@ function renderAnalyzer() {
   if (analyzerState.onlineAnswer) {
     html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning', 'Online AI \u2014 complete solution') + '</div>';
     html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.onlineAnswer) + '</div></div>';
+  }
+
+  // Online pricing (BOM) + law-version check
+  if (analyzerState.priceAnswer) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCB0 ' + tx('Priser (stykliste) & lovtjek', 'Pricing (BOM) & law check') + '</div>';
+    html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.priceAnswer) + '</div></div>';
   }
 
   // Results section

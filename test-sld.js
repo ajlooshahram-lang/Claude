@@ -16290,6 +16290,14 @@ test('analyzerLoadAiConfig + analyzerSolveOnline exist (online path wired)', fun
   assert.strictEqual(typeof analyzerSolveOnline, 'function', 'online solver present');
 });
 
+test('analyzerBuildPricingPrompt asks for Danish wholesaler pricing + a law-version check', function () {
+  var p = analyzerBuildPricingPrompt('Opgave 1\n1.1 ...', '- IB: 16 A');
+  assert(/Solar|Lemvigh|Sanist|grossist/i.test(p.system), 'requests Danish wholesaler price level');
+  assert(/stykliste|BOM/i.test(p.system), 'asks for a bill of materials');
+  assert(/sikkerhedsstyrelsen|lovtjek|bekendtg/i.test(p.system), 'includes a law-version check');
+  assert(p.user.indexOf('IB: 16 A') >= 0, 'feeds the computed components into the prompt');
+});
+
 
 test('analyzerExtractPdf reads real exam PDFs into readable Danish text', function () {
   var cases = [
