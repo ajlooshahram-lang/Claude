@@ -958,6 +958,20 @@ test('sldGetTripTime returns Infinity for current below device threshold', funct
   assert(tripTime === Infinity, 'MCB B16 at 10A should not trip (Infinity). Got: ' + tripTime);
 });
 
+// Test 41b: sldGetTripTime 'min' returns the FASTEST (tMin) trip time, never slower than tMax
+test('sldGetTripTime which=min returns tMin <= tMax (for conservative selectivity)', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'C' && m.rating === 25; });
+  assert(mcb, 'Should find MCB C25');
+  // In the thermal region (e.g. 3*In = 75A, below C-curve isdMin 7*25=175A)
+  var I = 3 * 25;
+  var tMax = sldGetTripTime(mcb, 25, I, null);
+  var tMin = sldGetTripTime(mcb, 25, I, null, 'min');
+  assert(tMin <= tMax + 1e-9, 'tMin (' + tMin + ') must be <= tMax (' + tMax + ')');
+  assert(tMin > 0 && tMin < Infinity, 'tMin finite and positive in thermal region');
+  // Below threshold both return Infinity
+  assert(sldGetTripTime(mcb, 25, 5, null, 'min') === Infinity, 'min mode also returns Infinity below threshold');
+});
+
 // Test 42: sldSimulateFault returns valid result object with all required fields
 test('sldSimulateFault returns complete result object', function() {
   sldNextId = 8000;

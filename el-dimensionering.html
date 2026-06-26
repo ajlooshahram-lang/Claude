@@ -16907,33 +16907,38 @@ var sldFaultSimFrame = 0;
 var sldFaultSimType = 'short_circuit'; // 'short_circuit' or 'earth_fault'
 
 // STEP 2: Trip time interpolation helper
-function sldGetTripTime(device, In, Ifault, settings) {
-  // Returns conservative (worst-case) trip time tMax at given fault current.
-  // Uses log-log interpolation between curve points.
+function sldGetTripTime(device, In, Ifault, settings, which) {
+  // Returns trip time at a given fault current using log-log interpolation.
+  // which: 'max' (default) = conservative SLOWEST clearing time tMax (used for
+  //        disconnection-time verification); 'min' = FASTEST possible trip time
+  //        tMin (used for selectivity, where the upstream device's earliest trip
+  //        must be compared against the downstream device's latest clear).
   // Returns Infinity if device will not trip at this current.
   if (!device || !In || !Ifault || Ifault <= 0) return Infinity;
+  var useMin = (which === 'min');
+  var fld = useMin ? 'tMin' : 'tMax';
   var curve = sldDeviceCurve(device, In, settings);
   if (!curve || curve.length === 0) return Infinity;
   // Sort curve by current ascending
   curve.sort(function(a, b) { return a.i - b.i; });
   // If fault current is below the first curve point, device won't trip
   if (Ifault < curve[0].i) return Infinity;
-  // If fault current is above or at the last curve point, return last tMax
-  if (Ifault >= curve[curve.length - 1].i) return curve[curve.length - 1].tMax;
+  // If fault current is above or at the last curve point, return last point
+  if (Ifault >= curve[curve.length - 1].i) return curve[curve.length - 1][fld];
   // Find bracketing points and interpolate in log-log space
   for (var k = 0; k < curve.length - 1; k++) {
     if (Ifault >= curve[k].i && Ifault <= curve[k + 1].i) {
       var logI1 = Math.log(curve[k].i);
       var logI2 = Math.log(curve[k + 1].i);
-      var logT1 = Math.log(Math.max(curve[k].tMax, 0.001));
-      var logT2 = Math.log(Math.max(curve[k + 1].tMax, 0.001));
+      var logT1 = Math.log(Math.max(curve[k][fld], 0.001));
+      var logT2 = Math.log(Math.max(curve[k + 1][fld], 0.001));
       var logIfault = Math.log(Ifault);
       var frac = (logIfault - logI1) / (logI2 - logI1);
       var logT = logT1 + frac * (logT2 - logT1);
       return Math.exp(logT);
     }
   }
-  return curve[curve.length - 1].tMax;
+  return curve[curve.length - 1][fld];
 }
 
 // STEP 1: Fault simulation calculation engine
@@ -16978,24 +16983,28 @@ function sldSimulateFault(tree, nodeId, faultType) {
     if (!pathNode || pathNode.type === 'transformer') continue;
     if (!pathNode.protection || !pathNode.protectionIn) continue;
     var devTripTime = sldGetTripTime(pathNode.protection, pathNode.protectionIn, ikFault, pathNode.mccbSettings);
-    allTripTimes.push({ nodeId: pathNodeId, tripTime: devTripTime, name: sldNodeName(pathNode) });
+    var devTripTimeMin = sldGetTripTime(pathNode.protection, pathNode.protectionIn, ikFault, pathNode.mccbSettings, 'min');
+    allTripTimes.push({ nodeId: pathNodeId, tripTime: devTripTime, tripTimeMin: devTripTimeMin, name: sldNodeName(pathNode) });
     if (devTripTime < tripTime) {
       tripTime = devTripTime;
       trippingDeviceNodeId = pathNodeId;
     }
   }
 
-  // Check for selectivity issues: upstream devices that also trip
+  // Check for selectivity issues: upstream devices whose FASTEST possible trip (tMin)
+  // could occur before the intended device finishes clearing (its worst-case tMax).
+  // Comparing upstream tMin vs downstream tMax is the conservative selectivity test
+  // (downstream must fully clear before upstream begins). Using tMin here flags real
+  // coordination risks that a tMax-vs-tMax comparison would miss.
   var selectivityIssues = [];
   if (trippingDeviceNodeId) {
     for (var si = 0; si < allTripTimes.length; si++) {
       var entry = allTripTimes[si];
       if (entry.nodeId === trippingDeviceNodeId) continue;
-      // If an upstream device trips within 150% of the first device trip time, flag as selectivity concern.
-      // NOTE: The 1.5x threshold is an approximation. MCB trip-time tolerance bands per IEC 60898
-      // are +/-20-30%, so real-world overlap may occur at higher ratios. This threshold provides
-      // a practical balance between false positives and missed cascading trips.
-      if (entry.tripTime < Infinity && entry.tripTime < tripTime * 1.5) {
+      var upMin = (entry.tripTimeMin != null) ? entry.tripTimeMin : entry.tripTime;
+      // Selectivity at risk if the upstream device can start tripping at or before the
+      // downstream device's slowest clearing time (with a small margin band).
+      if (upMin < Infinity && upMin <= tripTime * 1.5) {
         selectivityIssues.push({
           nodeId: entry.nodeId,
           name: entry.name,
