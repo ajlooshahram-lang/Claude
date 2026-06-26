@@ -35751,7 +35751,6 @@ function examBuildSolution(state) {
   var opgaver = [];
   var detectedCount = 0, solvedCount = 0, needInputCount = 0;
   segments.forEach(function (seg) {
-    var qs = analyzerDetectQuestions(seg.text || '');
     // Per-Opgave solving: each segment is solved with ITS OWN extracted
     // parameters (merged with the paper-wide context) so mixed-type Opgaver map
     // each sub-question to the right value. Falls back to the global solve when
@@ -35764,24 +35763,50 @@ function examBuildSolution(state) {
         (segSolution.results || []).forEach(function (r) { if (r && r.type && !segByType[r.type]) segByType[r.type] = r; });
       }
     } catch (e) { segByType = {}; }
-    var seen = {};
     var qBlocks = [];
-    qs.forEach(function (q) {
-      if (seen[q.type]) return; seen[q.type] = true;
-      var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
-      // Prefer this Opgave's own result; fall back to the global solve so a
-      // value stated once for the whole paper is still shown (never lost).
-      var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
+    // SUB-QUESTION DRIVEN: walk every sub-question in the exam's own order
+    // (1.1, 1.2, 1.3, ...) and solve each one individually. This guarantees the
+    // solution answers the questions in order, one row per sub-question, instead
+    // of collapsing them by calculation type.
+    var subs = (seg.subQuestions && seg.subQuestions.length) ? seg.subQuestions : [seg.text || ''];
+    var seenKey = {};
+    subs.forEach(function (subRaw) {
+      var raw = String(subRaw || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return;
+      var num = (typeof analyzerSubLabel === 'function') ? analyzerSubLabel(raw) : '';
+      var qtypes = analyzerDetectQuestions(raw).filter(function (t) { return t.source === 'detected'; });
+      // A dotted number N.M is only a real sub-question if N matches THIS Opgave
+      // (rejects clock times like "8.30"/"14.30" and stray decimals); letters and
+      // single numbers are accepted as written.
+      var numMain = (num.match(/^(\d+)\./) || [])[1];
+      var validNum = !!num && (numMain ? (parseInt(numMain, 10) === seg.id) : true);
+      if (num && !validNum) num = '';
+      // A real question row needs: a valid number, OR an explicit calc type, OR a
+      // short direct question ending in "?". In the pre-Opgave header (id 0) we
+      // require an explicit calc type so document metadata is never a "question".
+      var isQ = (seg.id > 0 && validNum) || qtypes.length > 0 || (/\?\s*$/.test(raw) && raw.length < 180);
+      if (!isQ) return;
+      var dispText = num ? raw.replace(ANALYZER_NUM_STRIP, '') : raw;
+      var key = (num || '') + '|' + dispText.toLowerCase().slice(0, 80);
+      if (seenKey[key]) return; seenKey[key] = true;
+      if (dispText.length > 260) dispText = dispText.slice(0, 260) + '\u2026';
+      // Solve: first detected type that has a worked result; else first type (for the method hint).
+      var primary = qtypes.length ? qtypes[0] : null;
+      var res = null, usedType = primary ? primary.type : null, usedModule = primary ? primary.module : null, usedLabel = primary ? primary.label : tx('Sp\u00f8rgsm\u00e5l', 'Question');
+      for (var ti = 0; ti < qtypes.length; ti++) {
+        var rt = EXAM_SOLUTION_RESULT_ALIAS[qtypes[ti].type] || qtypes[ti].type;
+        var r = segByType[rt] || segByType[qtypes[ti].type] || byType[rt] || byType[qtypes[ti].type];
+        if (r && r.html) { res = r; usedType = qtypes[ti].type; usedModule = qtypes[ti].module; usedLabel = qtypes[ti].label; break; }
+      }
       var solved = !!(res && res.html);
-      var qMeta = examFindQuestionMeta(seg, q.type);
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;
       qBlocks.push({
-        type: q.type,
-        num: qMeta.num,
-        label: q.label,
-        module: q.module,
-        questionText: qMeta.text,
+        type: usedType,
+        num: num,
+        label: usedLabel,
+        module: usedModule,
+        questionText: dispText,
         calcLabel: res ? res.label : null,
         calcHtml: res ? (res.html || '') : '',
         value: res ? res.value : null,
@@ -35790,6 +35815,22 @@ function examBuildSolution(state) {
         needsInput: !solved
       });
     });
+    // Fallback for unstructured segments (no sub-questions detected): keep the
+    // older type-driven detection so nothing is lost.
+    if (qBlocks.length === 0) {
+      var qs = analyzerDetectQuestions(seg.text || '');
+      var seen = {};
+      qs.forEach(function (q) {
+        if (seen[q.type]) return; seen[q.type] = true;
+        var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
+        var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
+        var solved = !!(res && res.html);
+        var qMeta = examFindQuestionMeta(seg, q.type);
+        detectedCount++;
+        if (solved) solvedCount++; else needInputCount++;
+        qBlocks.push({ type: q.type, num: qMeta.num, label: q.label, module: q.module, questionText: qMeta.text, calcLabel: res ? res.label : null, calcHtml: res ? (res.html || '') : '', value: res ? res.value : null, status: res ? (res.status || null) : null, solved: solved, needsInput: !solved });
+      });
+    }
     opgaver.push({ id: seg.id, title: seg.title, questions: qBlocks });
   });
 

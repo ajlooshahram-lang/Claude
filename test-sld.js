@@ -16222,6 +16222,32 @@ test('examRenderMethodHint gives the governing formula + needed inputs for a rec
   lang = savedLang;
 });
 
+test('examBuildSolution is SUB-QUESTION driven: answers 1.1, 1.2, 1.3 in document order', function () {
+  var savedLang = lang; lang = 'da';
+  var txt = 'Opgave 1\nData: 11 kW, 400 V, cos phi 0,9.\n1.1 Beregn IB.\n1.2 Beregn spaendingsfaldet for 20 m, 4 mm2.\n1.3 Vaelg sikring. In 20 A.';
+  analyzerRun(txt);
+  var sol = examBuildSolution(analyzerState);
+  var op1 = sol.opgaver.filter(function (o) { return o.id === 1; })[0];
+  assert(op1, 'has Opgave 1');
+  var nums = op1.questions.map(function (q) { return q.num; });
+  assert.deepStrictEqual(nums, ['1.1', '1.2', '1.3'], 'one row per sub-question, in order (got ' + JSON.stringify(nums) + ')');
+  lang = savedLang;
+});
+
+test('Clock times and mismatched decimals are NOT shown as questions', function () {
+  var savedLang = lang; lang = 'da';
+  // Header with a time range; the real question is 1.1.
+  var txt = 'El-pr\u00f8ve kl. 8.30 - 14.30\nOpgave 1\n1.1 Beregn IB for 10 kW, 400 V, cos phi 0,9.';
+  analyzerRun(txt);
+  var sol = examBuildSolution(analyzerState);
+  var allNums = [];
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.num) allNums.push(q.num); }); });
+  assert(allNums.indexOf('8.30') < 0 && allNums.indexOf('14.30') < 0, 'clock times are not question numbers');
+  assert(allNums.indexOf('1.1') >= 0, 'the real question 1.1 is present');
+  // N.M only valid if N matches its Opgave: a "3.4" sitting in Opgave 1 is not numbered "3.4"
+  lang = savedLang;
+});
+
 // === thermalCalcTemp physics correction (audit) ===
 // A conductor loaded to its DERATED ampacity must reach exactly the insulation's
 // max temperature at ANY ambient -- this is what the Table B.52.14/15 derating
