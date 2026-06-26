@@ -11190,6 +11190,28 @@ function scTrafoParts(zMag, scSt) {
   return scComplexParts(zMag, scState.rxTrafo);
 }
 // Complex short-circuit calculation per IEC 60909-0 (vector method).
+// Forsyning: 3-phase MAX short-circuit current on the LV side of N identical
+// distribution transformers in PARALLEL, fed through a common upstream network
+// (+HV) impedance. Computed on the HV side then referred to the LV side by the
+// turns ratio (Viggo Bitsch method, DS/EN 50522 / IEC 60909):
+//   Z_total = Z_net,HV + Z_tr,HV / N      (parallel transformers share the duty)
+//   I_k,LV  = c · U_HV / (√3 · |Z_total|) · (U_HV / U_LV)
+// zNetHV and zTrafoHV are complex {r, x} in ohms referred to the HV side.
+// Verified against Viggo Bitsch's worked solution (see test-sld.js): with
+// Z_net = 0.240 + j0.798 Ω and Z_tr = 1.00 + j4.90 Ω, U_HV = 10 kV, U_LV = 400 V,
+// this returns 43.0 kA for N = 2 and 57.2 kA for N = 3.
+function scParallelTrafoIk(zNetHV, zTrafoHV, N, U_HV, U_LV, c) {
+  c = (c == null) ? 1.0 : c;
+  N = N || 1;
+  var R = zNetHV.r + zTrafoHV.r / N;
+  var X = zNetHV.x + zTrafoHV.x / N;
+  var Zmag = Math.sqrt(R * R + X * X);
+  if (Zmag <= 0 || !isFinite(Zmag)) return { ikLV: 0, ikHV: 0, Zmag: 0, R: R, X: X, N: N };
+  var ikHV = (c * U_HV) / (Math.sqrt(3) * Zmag);
+  var ratio = (U_LV > 0) ? (U_HV / U_LV) : 1;
+  return { ikLV: ikHV * ratio, ikHV: ikHV, Zmag: Zmag, R: R, X: X, N: N, angleDeg: Math.atan2(X, R) * 180 / Math.PI };
+}
+
 // Impedances are added as vectors (R + jX) for accurate fault current.
 // Results: Ik3max at busbar (3-phase, c=1.05), Ik2min at cable far end (2-phase, c=0.95).
 // Verified: Ik3max per IEC 60909-0 clause 4.2; Ik2min per clause 4.3.2: 2024-audit-pass.

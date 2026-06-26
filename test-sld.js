@@ -16222,6 +16222,31 @@ test('examRenderMethodHint gives the governing formula + needed inputs for a rec
   lang = savedLang;
 });
 
+// === Forsyning: N transformers in parallel, short-circuit current (Opgave 1) ===
+// Verified against the Viggo Bitsch worked solution: with the HV-side network
+// impedance Z_net = 0.240 + j0.798 ohm and transformer Z_tr = 1.00 + j4.90 ohm,
+// 10 kV / 400 V, c = 1.0, the LV-side Ik3max is 43.0 kA (N=2) and 57.2 kA (N=3).
+test('scParallelTrafoIk reproduces Viggo Bitsch: 43 kA (2 trafo) / 57 kA (3 trafo)', function () {
+  var zNet = { r: 0.240, x: 0.798 }, zTr = { r: 1.00, x: 4.90 };
+  var r2 = scParallelTrafoIk(zNet, zTr, 2, 10000, 400, 1.0);
+  var r3 = scParallelTrafoIk(zNet, zTr, 3, 10000, 400, 1.0);
+  assert(Math.abs(r2.ikLV / 1000 - 43.0) < 1.0, '2 transformers -> ~43 kA (got ' + (r2.ikLV / 1000).toFixed(1) + ')');
+  assert(Math.abs(r3.ikLV / 1000 - 57.2) < 1.5, '3 transformers -> ~57 kA (got ' + (r3.ikLV / 1000).toFixed(1) + ')');
+  assert(r3.ikLV > r2.ikLV, '3 parallel gives higher Ik than 2');
+  var r1 = scParallelTrafoIk(zNet, zTr, 1, 10000, 400, 1.0);
+  var Zmag1 = Math.sqrt(Math.pow(0.240 + 1.00, 2) + Math.pow(0.798 + 4.90, 2));
+  var expect1 = (1.0 * 10000) / (Math.sqrt(3) * Zmag1) * 25;
+  assert(Math.abs(r1.ikLV - expect1) < 1, 'N=1 reduces to the single-transformer series formula');
+});
+
+test('scParallelTrafoIk exposes BOTH complex forms: rectangular (R,X) and polar (|Z|, angle)', function () {
+  var r = scParallelTrafoIk({ r: 0.240, x: 0.798 }, { r: 1.00, x: 4.90 }, 2, 10000, 400, 1.0);
+  assert(typeof r.R === 'number' && typeof r.X === 'number', 'rectangular R + jX present');
+  assert(typeof r.Zmag === 'number' && typeof r.angleDeg === 'number', 'polar |Z| and argument present');
+  assert(Math.abs(Math.sqrt(r.R * r.R + r.X * r.X) - r.Zmag) < 1e-9, '|Z| = sqrt(R^2+X^2)');
+  assert(Math.abs(Math.atan2(r.X, r.R) * 180 / Math.PI - r.angleDeg) < 1e-9, 'argument = atan2(X,R)');
+});
+
 test('examBuildSolution is SUB-QUESTION driven: answers 1.1, 1.2, 1.3 in document order', function () {
   var savedLang = lang; lang = 'da';
   var txt = 'Opgave 1\nData: 11 kW, 400 V, cos phi 0,9.\n1.1 Beregn IB.\n1.2 Beregn spaendingsfaldet for 20 m, 4 mm2.\n1.3 Vaelg sikring. In 20 A.';
