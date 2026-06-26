@@ -7817,10 +7817,17 @@ function thermalCalcDerating(ambientTemp, nCables, method) {
 
 function thermalCalcTemp(insulation, loadCurrent, iz, ambientTemp, deratingFactor) {
   const maxTemp = THERMAL_CABLE_DATA[insulation] ? THERMAL_CABLE_DATA[insulation].maxTemp : 70;
-  const refTemp = 30;
   const izDerated = iz * deratingFactor;
   const loadRatio = loadCurrent / izDerated;
-  const tempRise = (maxTemp - refTemp) * Math.pow(loadRatio, 2);
+  // Steady-state conductor temperature. The rise above ambient scales with I^2:
+  //   theta = theta_amb + (theta_max - theta_amb) * (I / Iz_derated)^2
+  // At I = Iz_derated the conductor reaches exactly theta_max regardless of the
+  // ambient, because the derating factors themselves satisfy
+  //   k_amb = sqrt((theta_max - theta_amb)/(theta_max - theta_ref)),
+  // which makes this form identical to theta_amb + (theta_max - theta_ref)*(I/Iz_ref)^2.
+  // (Using the fixed (theta_max - theta_ref) coefficient with the *derated* Iz is
+  // wrong: it over-states temperature above 30 C and under-states it below 30 C.)
+  const tempRise = (maxTemp - ambientTemp) * Math.pow(loadRatio, 2);
   const rawTemp = ambientTemp + tempRise;
   const currentTemp = Math.ceil(rawTemp * 10) / 10;
   const margin = Math.round((maxTemp - currentTemp) * 10) / 10;
