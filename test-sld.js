@@ -15458,6 +15458,29 @@ test('exam: 2023 Auto exam — network Z from Ik uses atan(1/(R/X)) = 84.3° for
   assert.ok(Math.abs(p.phiDeg - 84.3) < 0.1, 'scComplexParts matches 2023 exam');
 });
 
+test('exam: axVectorSumCurrents — phasor summation at cosφ angles (Viggo method)', function () {
+  // 100∠0 (cos=1) + 100∠-60° (cos=0.5) = 173.2 ∠ -30°
+  var r = axVectorSumCurrents([{ I: 100, cos: 1 }, { I: 100, cos: 0.5 }]);
+  assert.ok(Math.abs(r.mag - 173.2) < 0.1, '|ΣI| = 173.2 A. Got ' + r.mag);
+  assert.ok(Math.abs(r.angleDeg + 30) < 0.1, 'angle = -30°. Got ' + r.angleDeg);
+  // Vector sum is always <= scalar sum for differing angles
+  var scalar = 100 + 100;
+  assert.ok(r.mag < scalar, 'vector sum (' + r.mag + ') < scalar sum (' + scalar + ') for differing pf');
+  // Identical angles -> vector sum == scalar sum
+  var r2 = axVectorSumCurrents([{ I: 50, cos: 0.8 }, { I: 50, cos: 0.8 }]);
+  assert.ok(Math.abs(r2.mag - 100) < 0.01, 'same-angle currents add arithmetically');
+  // Leading (capacitive) load
+  var r3 = axVectorSumCurrents([{ I: 100, cos: 0.8 }, { I: 50, cos: 0.7, leading: true }]);
+  assert.ok(r3.im > -100 * Math.sin(Math.acos(0.8)), 'leading load partially cancels lagging reactive current');
+});
+
+test('exam: axGenInstallation exposes IBvector (Viggo vector sum) <= scalar IBtotal', function () {
+  var rng = axRngMake(2024);
+  var d = axGenInstallation(rng, axBuilding('fabrik'), axTier('kandidat'));
+  assert.ok(d.IBvector && typeof d.IBvector.mag === 'number', 'IBvector present');
+  assert.ok(d.IBvector.mag <= d.IBtotal + 0.5, 'vector sum <= scalar IBtotal (conservative sizing preserved). vec=' + d.IBvector.mag + ' scalar=' + d.IBtotal);
+});
+
 test('scircuit: netAngleMode cosphi uses arccos (Viggo 2019: cos=0.11 -> 83.7°)', function () {
   var saved = JSON.parse(JSON.stringify(scState));
   scState.scMethod = 'complex'; scState.netAngleMode = 'cosphi'; scState.cosPhiNet = 0.11; scState.zNet = 444;

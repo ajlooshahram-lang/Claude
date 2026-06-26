@@ -14825,6 +14825,28 @@ function axIB(P_kW, U_V, cosPhi, eta, phases) {
   var den = (phases === 3) ? (Math.sqrt(3) * U_V * c * e) : (U_V * c * e);
   return den > 0 ? P / den : 0;
 }
+// Vector (phasor) summation of load currents — the authorized Viggo Bisch method.
+// Each load current is a phasor I∠φ with φ = -arccos(cosφ) (lagging/inductive).
+// Returns the magnitude and angle of the resultant. For loads of differing power
+// factor, |ΣĪ| ≤ Σ|I| (scalar), so the vector sum is the ACCURATE dimensioning
+// current; the scalar sum is a conservative (larger) upper bound used for sizing.
+// items: [{ I, cos, leading }]  (leading=true for capacitive, default lagging).
+function axVectorSumCurrents(items) {
+  var re = 0, im = 0;
+  for (var i = 0; i < items.length; i++) {
+    var c = Math.min(1, Math.max(0, items[i].cos != null ? items[i].cos : 1));
+    var phi = Math.acos(c) * (items[i].leading ? 1 : -1);
+    re += items[i].I * Math.cos(phi);
+    im += items[i].I * Math.sin(phi);
+  }
+  var mag = Math.sqrt(re * re + im * im);
+  return {
+    mag: Math.round(mag * 100) / 100,
+    angleDeg: Math.round(Math.atan2(im, re) * 1800 / Math.PI) / 10,
+    re: Math.round(re * 100) / 100, im: Math.round(im * 100) / 100,
+    pf: mag > 0 ? Math.round((re / mag) * 1000) / 1000 : 1
+  };
+}
 // Smallest standard device rating In with In >= IB (conservative: never below IB).
 function axDeviceRating(IB) {
   for (var i = 0; i < AX_STD_RATINGS.length; i++) { if (AX_STD_RATINGS[i] >= IB - 1e-9) return AX_STD_RATINGS[i]; }
@@ -15141,9 +15163,13 @@ function axGenInstallation(rng, b, tier) {
   });
   var IBtotal = 0; loads.forEach(function (l) { IBtotal += l.IBdiv; });
   IBtotal = Math.round(IBtotal * 10) / 10;
+  // Viggo vector summation (accurate) — currents at their cosφ angles. Used for
+  // teaching; the larger scalar IBtotal stays the conservative sizing current.
+  var IBvec = axVectorSumCurrents(loads.map(function (l) { return { I: l.IBdiv, cos: l.cos }; }));
   return {
     earthing: b.earthing, trafo: { SN: SN, ek: ek, Un1: 10, Un2: 400, In: trafo.In, Ik: trafo.Ik, IkkA: trafo.IkkA, vector: 'Dyn1', PCu: Math.round(SN * 10) },
     ambient: ambient, grouping: grouping,
+    IBvector: IBvec,
     stik: { material: stikMat, insulation: stikIns, length: stikLen, cos: 0.9 },
     installMethod: axRngPick(rng, ['C', 'E', 'E', 'C']),  // cable tray (E) common in industrial/commercial
     loads: loads, IBtotal: IBtotal
@@ -15959,6 +15985,9 @@ function axDataBlockInstallation(d) {
   h += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:4px 6px">' + tx('Brugsgenstand', 'Load') + '</td><td style="padding:4px 6px">P [kW]</td><td style="padding:4px 6px">cos\u03c6</td><td style="padding:4px 6px">\u03b7</td><td style="padding:4px 6px">' + tx('Faser', 'Phases') + '</td><td style="padding:4px 6px">Sf</td><td style="padding:4px 6px">IB [A]</td></tr>';
   d.loads.forEach(function (l) { h += '<tr style="border-bottom:1px solid var(--border-light)"><td style="padding:4px 6px">' + axL({ da: l.da, en: l.en }) + '</td><td style="padding:4px 6px">' + axFmt(l.P) + '</td><td style="padding:4px 6px">' + axFmt(l.cos) + '</td><td style="padding:4px 6px">' + axFmt(l.eta) + '</td><td style="padding:4px 6px">' + (l.ph === 3 ? '3~' : '1~') + '</td><td style="padding:4px 6px">' + axFmt(l.sf) + '</td><td style="padding:4px 6px">' + axFmt(l.IB, 1) + '</td></tr>'; });
   h += '<tr style="font-weight:700;background:var(--primary-glow)"><td style="padding:4px 6px" colspan="6">' + tx('Dimensionsgivende IB (med samtidighed)', 'Dimensioning IB (with diversity)') + '</td><td style="padding:4px 6px">' + axFmt(d.IBtotal, 1) + '</td></tr>';
+  if (d.IBvector) {
+    h += '<tr style="font-size:0.85em;opacity:0.85"><td style="padding:3px 6px" colspan="6">' + tx('— heraf vektorsum (Viggo: \u03A3 I\u2220\u03C6)', '— of which vector sum (Viggo: \u03A3 I\u2220\u03C6)') + '</td><td style="padding:3px 6px">' + axFmt(d.IBvector.mag, 1) + ' A \u2220 ' + axFmt(d.IBvector.angleDeg, 1) + '\u00b0</td></tr>';
+  }
   h += '</table></div>';
   return h;
 }
