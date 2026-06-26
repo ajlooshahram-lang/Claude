@@ -16091,6 +16091,47 @@ test('thermalCalcTemp: no longer over-states temperature at 40C (regression vs o
   assert.strictEqual(r.overloaded, false, 'cable at its own derated limit is not overloaded');
 });
 
+// === Inline trip curve + catalog references (presentation P0) ===
+console.log('\n=== Device Curve & Catalog Reference Tests ===\n');
+
+test('renderMCB embeds an inline trip-curve SVG when a rating is selected', function () {
+  mcbState = { type: 'C60N', curve: 'C', rating: 16, poles: 'multi' };
+  var out = renderMCB();
+  assert.ok(out.indexOf('<svg') >= 0, 'MCB result must contain an inline SVG trip curve');
+  assert.ok(/Udl\u00f8sekarakteristik|Trip characteristic/.test(out), 'must label the trip characteristic');
+  // Curve C magnetic band = 7-10 x In = 112-160 A for In=16 A; the annotation must cite it.
+  assert.ok(out.indexOf('112') >= 0 && out.indexOf('160') >= 0,
+    'magnetic-trip band Isd = 112-160 A must be stated for C16');
+});
+
+test('renderMCB still shows the Schneider Acti9 catalog reference', function () {
+  mcbState = { type: 'C60N', curve: 'B', rating: 20, poles: 'multi' };
+  var out = renderMCB();
+  assert.ok(out.indexOf('se.com') >= 0, 'MCB must keep its manufacturer catalog link');
+});
+
+test('rcdProductRef returns verified products for every RCD type', function () {
+  ['Type AC', 'Type A', 'Type F', 'Type B'].forEach(function (t) {
+    var p = rcdProductRef(t);
+    assert.ok(p && p.brand === 'Schneider Electric', t + ': brand must be Schneider Electric');
+    assert.ok(/^Acti9 iID/.test(p.series), t + ': series must be an Acti9 iID variant');
+    assert.ok(p.url.indexOf('se.com') >= 0, t + ': must link to se.com catalog');
+    assert.ok(/IEC 61008-1/.test(p.standard), t + ': must cite IEC 61008-1');
+  });
+  // Type A/F/B additionally invoke the waveform-classifying standard IEC 62423.
+  ['Type A', 'Type F', 'Type B'].forEach(function (t) {
+    assert.ok(/IEC 62423/.test(rcdProductRef(t).standard), t + ': must cite IEC 62423');
+  });
+});
+
+test('renderMotor surfaces Type-2 coordination warning + manufacturer catalog link', function () {
+  motorState = { kW: 7.5, poles: 4, startType: 'dol', duty: 'S1', cableLength: 30 };
+  var out = renderMotor();
+  assert.ok(out.indexOf('IEC 60947-4-1') >= 0, 'motor result must cite Type-2 coordination standard');
+  assert.ok(out.indexOf('se.com/TeSys') >= 0 || out.indexOf('abb.com') >= 0,
+    'motor result must include a manufacturer motor-control catalog link');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
