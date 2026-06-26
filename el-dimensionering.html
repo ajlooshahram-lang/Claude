@@ -4735,7 +4735,11 @@ let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection
 // Voltage drop state
 let vdropState = { length: 50 };
 // Short circuit state
-let scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1, trafoAngleMode: 'rx', trafoUk: 4, trafoEr: 1 };
+let scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1, trafoAngleMode: 'rx', trafoUk: 4, trafoEr: 1, netAngleMode: 'rx', cosPhiNet: 0.1 };
+// netAngleMode: 'rx'     = network angle from R/X ratio via arccot(R/X) = atan(1/(R/X));
+//               'cosphi' = network angle from R/|Z| = cos(φ) via arccos(cos(φ)).
+//               Both are used in real exams (Viggo 2019 august uses both notations
+//               depending on how the grid operator reports the grid data).
 // trafoAngleMode: 'rx'    = transformer angle from user-supplied R/X (arccot);
 //                 'viggo' = authorized Viggo Bisch method — derive the transformer
 //                 impedance angle from the nameplate short-circuit voltage u_k [%]
@@ -10682,7 +10686,15 @@ function scTrafoParts(zMag, scSt) {
   return scComplexParts(zMag, scState.rxTrafo);
 }
 function scComplexCalc(scSt, rCableMohm, xCableMohm, Un, cFactor) {
-  var net = scComplexParts(scSt.zNet, scState.rxNet);
+  var net;
+  if (scSt.netAngleMode === 'cosphi') {
+    // cos(φ) = R/|Z| supplied directly. arccos gives the angle.
+    var cp = Math.min(0.9999, Math.max(0.0001, scSt.cosPhiNet));
+    var phi = Math.acos(cp);
+    net = { mag: scSt.zNet, rx: cp / Math.sin(phi), phiDeg: phi * 180 / Math.PI, R: scSt.zNet * cp, X: scSt.zNet * Math.sin(phi) };
+  } else {
+    net = scComplexParts(scSt.zNet, scState.rxNet);
+  }
   var tr = scTrafoParts(scSt.zTrafo, scSt);
   // Busbar (3-phase max): net + trafo only
   var Rbus = net.R + tr.R;
@@ -10815,14 +10827,34 @@ function renderShortCircuit() {
 
       ${isComplex ? `
       <div class="select-group">
+        <div class="select-label">${tx('Net-vinkel: kilde', 'Network angle: source')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${scState.netAngleMode!=='cosphi' ? 'selected' : ''}" onclick="scState.netAngleMode='rx';renderModule('scircuit')">${tx('R/X (arccot)', 'R/X (arccot)')}</button>
+          <button class="sel-btn ${scState.netAngleMode==='cosphi' ? 'selected' : ''}" onclick="scState.netAngleMode='cosphi';renderModule('scircuit')">${tx('cos\u03C6 = R/|Z| (arccos)', 'cos\u03C6 = R/|Z| (arccos)')}</button>
+        </div>
+      </div>
+
+      ${scState.netAngleMode === 'cosphi' ? `
+      <div class="select-group">
+        <div class="select-label">${tx('cos(\u03C6_net) = R/|Z| (netselskabet oplyser)', 'cos(\u03C6_net) = R/|Z| (grid operator supplies)')}</div>
+        <div class="select-grid">
+          ${[0.05, 0.1, 0.11, 0.15, 0.2, 0.25, 0.3, 0.4].map(c =>
+            `<button class="sel-btn ${scState.cosPhiNet === c ? 'selected' : ''}" onclick="scState.cosPhiNet=${c};renderModule('scircuit')">${String(c).replace('.', ',')}</button>`
+          ).join('')}
+        </div>
+        <div class="info-row" style="margin-top:4px">\u03C6_net = arccos(${scState.cosPhiNet}) = ${cx.net.phiDeg.toFixed(1)}\u00B0 \u00B7 R = ${cx.net.R.toFixed(2)} m\u03A9, X = ${cx.net.X.toFixed(2)} m\u03A9</div>
+      </div>
+      ` : `
+      <div class="select-group">
         <div class="select-label">${tx('R/X-forhold — net (du angiver)', 'R/X ratio — network (you supply)')}</div>
         <div class="select-grid">
           ${rxSteps.map(r =>
             `<button class="sel-btn ${scState.rxNet === r ? 'selected' : ''}" onclick="scState.rxNet=${r};renderModule('scircuit')">${String(r).replace('.', ',')}</button>`
           ).join('')}
         </div>
-        <div class="info-row" style="margin-top:4px">φ_net = arccot(R/X) = ${cx.net.phiDeg.toFixed(1)}° \u00B7 R = ${cx.net.R.toFixed(2)} m\u03A9, X = ${cx.net.X.toFixed(2)} m\u03A9</div>
+        <div class="info-row" style="margin-top:4px">\u03C6_net = arccot(R/X) = ${cx.net.phiDeg.toFixed(1)}\u00B0 \u00B7 R = ${cx.net.R.toFixed(2)} m\u03A9, X = ${cx.net.X.toFixed(2)} m\u03A9</div>
       </div>
+      `}
 
       <div class="select-group">
         <div class="select-label">${tx('Trafo-vinkel: kilde', 'Transformer angle: source')}</div>

@@ -15458,6 +15458,23 @@ test('exam: 2023 Auto exam — network Z from Ik uses atan(1/(R/X)) = 84.3° for
   assert.ok(Math.abs(p.phiDeg - 84.3) < 0.1, 'scComplexParts matches 2023 exam');
 });
 
+test('scircuit: netAngleMode cosphi uses arccos (Viggo 2019: cos=0.11 -> 83.7°)', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.scMethod = 'complex'; scState.netAngleMode = 'cosphi'; scState.cosPhiNet = 0.11; scState.zNet = 444;
+  var cx = scComplexCalc(scState, 0, 0, 10000, 1.0);
+  assert.ok(Math.abs(cx.net.phiDeg - 83.68) < 0.1, 'arccos(0.11) = 83.7°. Got ' + cx.net.phiDeg.toFixed(2));
+  // arccos(0.11) != atan(1/0.11) — the difference matters at larger cos values
+  scState.netAngleMode = 'rx'; scState.rxNet = 0.3;
+  var cxRx = scComplexCalc(scState, 0, 0, 10000, 1.0);
+  scState.netAngleMode = 'cosphi'; scState.cosPhiNet = 0.3;
+  var cxCos = scComplexCalc(scState, 0, 0, 10000, 1.0);
+  // atan(1/0.3)=73.3° vs arccos(0.3)=72.5° — 0.8° difference
+  assert.ok(Math.abs(cxRx.net.phiDeg - 73.3) < 0.1, 'R/X=0.3: atan(1/0.3) = 73.3°');
+  assert.ok(Math.abs(cxCos.net.phiDeg - 72.5) < 0.1, 'cos=0.3: arccos(0.3) = 72.5°');
+  assert.ok(Math.abs(cxRx.net.phiDeg - cxCos.net.phiDeg) > 0.5, 'the two modes give different angles (0.8° at 0.3)');
+  Object.assign(scState, saved);
+});
+
 test('exam: axCableR Al uses NKT catalog values (matches 2023 exam r150=0.206)', function () {
   // 2023 exam uses r150 = 0.206 Ω/km for 3x150+25 PEX-M-AL
   assert.ok(Math.abs(axCableR(150, 'Al') - 0.206) < 0.001, 'Al 150mm2: 0.206 Ohm/km. Got ' + axCableR(150, 'Al'));
