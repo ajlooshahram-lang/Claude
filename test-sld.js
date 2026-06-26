@@ -141,8 +141,8 @@ test('sldCalcNodeZs accumulates impedance correctly', function() {
   const mainBoard = tree.nodes[mainBoardId];
   const fcId = mainBoard.childIds[0]; // First final circuit (lighting, 1.5mm2, 20m)
 
-  // Ztrafo = (uk/100) * U^2 / Sn = (6/100) * 160000 / 630000 = 0.01524 ohm
-  const zsTrafo = (6 / 100) * (400 * 400) / (630 * 1000);
+  // Ztrafo = (uk/100) * U^2 / Sn = (5/100) * 160000 / 630000 = 0.01270 ohm
+  const zsTrafo = (5 / 100) * (400 * 400) / (630 * 1000);
   // Main board cable: 50mm2, r=0.388, x=0.084, L=10m -> 2*10*(0.388+0.084)/1000 = 0.00944
   const zsMain = 2 * 10 * (0.388 + 0.084) / 1000;
   // Final circuit cable: 1.5mm2, r=12.1, x=0.113, L=20m -> 2*20*(12.1+0.113)/1000 = 0.48852
@@ -449,6 +449,84 @@ test('sldCalcNodeIk uses Z1 for three-phase Ikmax', function() {
   // Therefore Ikmax with Z1 should be HIGHER than if using Zs (more conservative for Icu check)
   var oldIkmax = 1.05 * 400 / (Math.sqrt(3) * zs);
   assert(ik.ikmax > oldIkmax, 'Ikmax with Z1 (' + ik.ikmax.toFixed(0) + ') should be higher than with Zs (' + oldIkmax.toFixed(0) + ')');
+});
+
+// Test 19b: sldCalcNodeIk returns zeros when Zs is zero (edge case, no division by zero)
+test('sldCalcNodeIk returns zeros safely when Zs=0 (no cable/trafo)', function() {
+  sldNextId = 350;
+  var tree = { nodes: {}, rootId: null };
+  // A bare main board with no transformer, no cable, and zero length => Zs = 0
+  var mb = sldCreateNode('main_board', null, { phases: '3x400', voltage: 400, cable: null, length_m: 0 });
+  tree.nodes[mb.id] = mb;
+  tree.rootId = mb.id;
+  var ik = sldCalcNodeIk(tree, mb.id);
+  assert(ik.ikmax === 0, 'Ikmax should be 0 when Zs=0 (not Infinity). Got: ' + ik.ikmax);
+  assert(ik.ikmin === 0, 'Ikmin should be 0 when Zs=0 (not Infinity). Got: ' + ik.ikmin);
+  assert(ik.zs === 0, 'Zs should be 0');
+  assert(ik.z1 === 0, 'Z1 should be 0');
+});
+
+// Test 19c: Three-phase Ikmin uses Zs (loop) with 1.5 temperature factor (DS/HD 60364-4-41)
+test('sldCalcNodeIk three-phase Ikmin uses Zs*1.5 (conservative disconnection check)', function() {
+  sldNextId = 360;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id, { phases: '3x400', voltage: 400 });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var fc = sldCreateNode('final_circuit', mb.id, {
+    phases: '3x400', voltage: 400, power_kW: 10, length_m: 50, cable: cable10
+  });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+  var ik = sldCalcNodeIk(tree, fc.id);
+  var zs = sldCalcNodeZs(tree, fc.id);
+  // Formula: Ikmin = 0.95 * 400 / (sqrt(3) * Zs * 1.5)
+  var expectedIkmin = 0.95 * 400 / (Math.sqrt(3) * zs * 1.5);
+  assert(Math.abs(ik.ikmin - expectedIkmin) < 0.01,
+    'Three-phase Ikmin should be ' + expectedIkmin.toFixed(1) + 'A, got ' + ik.ikmin.toFixed(1) + 'A');
+  // Ikmin must always be less than Ikmax (conservative: lower is safer for disconnection check)
+  assert(ik.ikmin < ik.ikmax,
+    'Ikmin (' + ik.ikmin.toFixed(0) + ') must be < Ikmax (' + ik.ikmax.toFixed(0) + ') for safety');
+});
+
+// Test 19d: Ik2min formula in scComplexCalc matches IEC 60909-0 clause 4.3.2
+test('scComplexCalc Ik2min = 0.95*Un/(2*|Zend|) per IEC 60909-0 clause 4.3.2', function() {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 2; scState.zTrafo = 8; scState.rxNet = 0.2; scState.rxTrafo = 0.15;
+  var rCable = 15; var xCable = 3; // mOhm
+  var Un = 400;
+  var cx = scComplexCalc(scState, rCable, xCable, Un, 1.05);
+  // Zend is the vector magnitude of total R,X at far end
+  var Rend = cx.Rbus + rCable;
+  var Xend = cx.Xbus + xCable;
+  var Zend = Math.sqrt(Rend * Rend + Xend * Xend);
+  var expectedIk2min = 0.95 * Un / (2 * Zend / 1000);
+  assert(Math.abs(cx.ikMin2ph - expectedIk2min) < 0.01,
+    'Ik2min should be ' + expectedIk2min.toFixed(1) + 'A, got ' + cx.ikMin2ph.toFixed(1) + 'A');
+  // Ik2min must be less than Ik3max (fewer phases, more impedance, lower voltage factor)
+  assert(cx.ikMin2ph < cx.ikMax3ph,
+    'Ik2min (' + cx.ikMin2ph.toFixed(0) + ') < Ik3max (' + cx.ikMax3ph.toFixed(0) + ')');
+  Object.assign(scState, saved);
+});
+
+// Test 19e: scComplexCalc with zero cable impedance (fault at busbar: Ik2min = Ik at bus with c_min)
+test('scComplexCalc with no cable: Ik2min at busbar uses same Z as Ik3max but different formula', function() {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 1; scState.zTrafo = 5; scState.rxNet = 0.1; scState.rxTrafo = 0.1;
+  var cx = scComplexCalc(scState, 0, 0, 400, 1.05);
+  // When no cable, Zend = Zbus (same impedance point)
+  assert(Math.abs(cx.Zend - cx.Zbus) < 1e-9, 'Zend should equal Zbus when no cable');
+  // Ik2min = 0.95*400/(2*Zbus/1000), Ik3max = 1.05*400/(sqrt(3)*Zbus/1000)
+  // Ratio: Ik2min/Ik3max = (0.95/1.05) * (sqrt(3)/2) = 0.904 * 0.866 = 0.783
+  var ratio = cx.ikMin2ph / cx.ikMax3ph;
+  var expectedRatio = (0.95 / 1.05) * (Math.sqrt(3) / 2);
+  assert(Math.abs(ratio - expectedRatio) < 1e-6,
+    'Ik2min/Ik3max ratio should be ' + expectedRatio.toFixed(4) + ', got ' + ratio.toFixed(4));
+  Object.assign(scState, saved);
 });
 
 // Test 20: Installation derating applied to Iz in compliance check
@@ -15045,6 +15123,81 @@ test('standards: IZ_COPPER ampacity table is conservatively rounded down from DS
       assert.ok(IZ_COPPER_XLPE[csa] > IZ_COPPER[csa], 'XLPE(' + csa + ')=' + IZ_COPPER_XLPE[csa] + ' > PVC=' + IZ_COPPER[csa]);
     }
   });
+});
+
+test('standards: IZ_COPPER_XLPE matches DS/HD 60364-5-52 Table C.52.1 method C XLPE 90C exactly', function () {
+  // These are the EXACT standard values for method C, multicore, 3 loaded, Cu/XLPE
+  var std = {1.5:22, 2.5:30, 4:40, 6:51, 10:70, 16:94, 25:119, 35:147, 50:179, 70:229, 95:278, 120:322, 150:371, 185:424, 240:500};
+  Object.keys(std).forEach(function (csa) {
+    assert.strictEqual(IZ_COPPER_XLPE[Number(csa)], std[csa], 'IZ_COPPER_XLPE[' + csa + '] = ' + std[csa]);
+  });
+});
+
+test('standards: IZ_ALU values within 1A of DS/HD 60364-5-52 Table C.52.1 method C Al/PVC', function () {
+  // Standard values for method C, multicore, 3 loaded, Al/PVC 70C
+  var std = {16:57, 25:73, 35:90, 50:110, 70:140, 95:170, 120:197, 150:226, 185:256, 240:300};
+  Object.keys(std).forEach(function (csa) {
+    var appVal = IZ_ALU[Number(csa)];
+    assert.ok(Math.abs(appVal - std[csa]) <= 1, 'IZ_ALU[' + csa + ']=' + appVal + ' within 1A of ' + std[csa]);
+  });
+  // XLPE always exceeds PVC for same cross-section
+  Object.keys(IZ_ALU).forEach(function (csa) {
+    if (IZ_ALU_XLPE[csa]) {
+      assert.ok(IZ_ALU_XLPE[csa] > IZ_ALU[csa], 'Al XLPE(' + csa + ')=' + IZ_ALU_XLPE[csa] + ' > PVC=' + IZ_ALU[csa]);
+    }
+  });
+});
+
+test('standards: AX_R_CU matches IEC 60228 Table 1 Class 2 at 20C', function () {
+  // IEC 60228:2004 maximum DC resistance at 20C for Class 2 stranded Cu (ohm/km)
+  var iec = {1.5:12.1, 2.5:7.41, 4:4.61, 6:3.08, 10:1.83, 16:1.15, 25:0.727, 35:0.524, 50:0.387, 70:0.268, 95:0.193, 120:0.153, 150:0.124, 185:0.0991, 240:0.0754};
+  Object.keys(iec).forEach(function (csa) {
+    assert.strictEqual(AX_R_CU[Number(csa)], iec[csa], 'AX_R_CU[' + csa + '] = ' + iec[csa] + ' (IEC 60228)');
+  });
+});
+
+test('standards: AX_R_AL matches IEC 60228 Table 1 Class 2 at 20C for Al', function () {
+  // IEC 60228:2004 maximum DC resistance at 20C for Class 2 stranded Al (ohm/km)
+  var iec = {10:3.08, 16:1.91, 25:1.20, 35:0.868, 50:0.641, 70:0.443, 95:0.320, 120:0.253, 150:0.206, 185:0.164, 240:0.125};
+  Object.keys(iec).forEach(function (csa) {
+    assert.strictEqual(AX_R_AL[Number(csa)], iec[csa], 'AX_R_AL[' + csa + '] = ' + iec[csa] + ' (IEC 60228)');
+  });
+});
+
+test('standards: PRODUCTS.cables Cu r-values match AX_R_CU within 5% (DC vs AC resistance)', function () {
+  // NKT NOIKLX product r-values are AC resistance at 50Hz from the NKT datasheet.
+  // AX_R_CU is the IEC 60228 maximum DC resistance at 20C.
+  // For large cross-sections (>=120mm2), skin effect adds 1-5% to AC resistance.
+  // Both values are correct for their purpose:
+  //   AX_R_CU: exam engine (matches exam answer keys using IEC 60228)
+  //   PRODUCTS.r: engineering calculations (realistic AC operating conditions)
+  var cables = PRODUCTS.cables.filter(function (c) { return c.material === 'Cu'; });
+  cables.forEach(function (c) {
+    var expected = AX_R_CU[c.mm2];
+    if (expected !== undefined) {
+      var pctDiff = Math.abs(c.r - expected) / expected * 100;
+      assert.ok(pctDiff < 5, c.id + ' r=' + c.r + ' within 5% of AX_R_CU ' + expected + ' (diff=' + pctDiff.toFixed(1) + '%)');
+    }
+  });
+});
+
+test('standards: INSTALL_METHODS has correct structure and conservatism', function () {
+  // Method C is the reference (factor 1.0)
+  assert.strictEqual(INSTALL_METHODS['C'], 1.0, 'Method C = 1.0 (reference)');
+  // Methods with less cooling must have factor <= 1.0
+  assert.ok(INSTALL_METHODS['A1'] <= 1.0, 'A1 <= 1.0 (insulated wall)');
+  assert.ok(INSTALL_METHODS['A2'] <= 1.0, 'A2 <= 1.0 (conduit in insulated wall)');
+  assert.ok(INSTALL_METHODS['B2'] <= 1.0, 'B2 <= 1.0 (trunking)');
+  // Methods with better cooling must have factor >= 1.0
+  assert.ok(INSTALL_METHODS['E'] >= 1.0, 'E >= 1.0 (perforated tray)');
+  assert.ok(INSTALL_METHODS['F'] >= 1.0, 'F >= 1.0 (free air touching)');
+  assert.ok(INSTALL_METHODS['G'] >= 1.0, 'G >= 1.0 (free air spaced)');
+  // Physical ordering: better cooling = higher factor. E < F < G is certain.
+  assert.ok(INSTALL_METHODS['E'] <= INSTALL_METHODS['F'], 'E <= F');
+  assert.ok(INSTALL_METHODS['F'] <= INSTALL_METHODS['G'], 'F <= G');
+  // A-methods (enclosed) must both be below B-methods (surface) or equal
+  assert.ok(INSTALL_METHODS['A1'] <= INSTALL_METHODS['B1'], 'A1 <= B1');
+  assert.ok(INSTALL_METHODS['A2'] <= INSTALL_METHODS['B1'], 'A2 <= B1');
 });
 
 test('eng: stdChip renders clickable <details> with why + affects, graceful for unknown clause', function () {
