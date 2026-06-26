@@ -34340,9 +34340,14 @@ function analyzerDetectQuestions(text) {
     { re: /tegn[^.\n]{0,30}(?:en-?stregs?skema|kredsskema|enstreg|diagram)/i, type: 'diagram', label: 'Tegn diagram (kredsskema)', module: 'draw' },
     { re: /(?:dimensioner|bestem)[^.\n]{0,40}(?:potentialudligning|udligningsforbindelse|beskyttelsesleder|PE-?leder)/i, type: 'pe_sizing', label: 'PE/udligning tv\u00e6rsnit', module: 'cable' },
     { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' },
+    // More real-exam phrasings (kept before the catch-all rule pattern)
+    { re: /(?:v.{1,2}lg|indstil)[^.\n]{0,48}(?:kredsbryder|minikredsbryder|smeltesikring\w*|kombiafbryder|udl\u00f8ser)/i, type: 'device', label: 'Valg/indstilling af beskyttelse', module: 'mcb' },
+    { re: /unders.g[^.\n]{0,55}(?:indirekte\s+ber.ring|beskyttet\s+mod\s+indirekte)/i, type: 'fault', label: 'Indirekte ber\u00f8ring (fejlbeskyttelse)', module: 'fault' },
+    { re: /(?:afklar|kontrol\w*|unders.g)[^.\n]{0,75}kortslutnings\s?beskyt/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
+    { re: /enstregs?\s?diagram|en-?stregs?\s?skema|kredsskema/i, type: 'diagram', label: 'Enstregsdiagram', module: 'draw' },
     // Regulatory question (no calculation) -- recognise so it is not 'Mangler input'.
     // Kept LAST so any calc pattern wins first.
-    { re: /\b(?:m\u00e5\s+(?:der|en|man|installationen|hovedstr)|skal\s+(?:der|en|man|ledere|belysning)|hvilke[nt]?\b|hvor\s+(?:mange|stor|lang|h\u00f8j)|hvordan\b|hvorn\u00e5r\b|redeg\u00f8r|er\s+hovedstr\w*kredse|hvad\s+er\s+den\s+maksimale\s+ber)/i, type: 'rule', label: 'Regelsp\u00f8rgsm\u00e5l', module: 'standards' }
+    { re: /\b(?:m\u00e5\s+(?:der|en|man|installationen|hovedstr)|skal\s+(?:der|en|man|ledere|belysning)|hvilke[nt]?\b|hvor\s+(?:mange|stor|lang|h\u00f8j|dyb)|hvordan\b|hvorn\u00e5r\b|redeg\u00f8r|er\s+hovedstr\w*kredse|er\s+det\s+(?:en\s+)?lovlig|hvad\s+er\s+(?:kravet|mindste|den\s+maksimale|IP))/i, type: 'rule', label: 'Regelsp\u00f8rgsm\u00e5l', module: 'standards' }
   ];
   // Detection runs against the raw text AND a "despaced" copy that repairs PDF
   // word-splitting ("D imensioner" -> "Dimensioner", "kortslutnings stroem" ->
