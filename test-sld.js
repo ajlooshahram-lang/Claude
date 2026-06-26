@@ -16298,6 +16298,18 @@ test('analyzerBuildPricingPrompt asks for Danish wholesaler pricing + a law-vers
   assert(p.user.indexOf('IB: 16 A') >= 0, 'feeds the computed components into the prompt');
 });
 
+test('Online AI: prompt requests per-Opgave JSON, and the parser binds it to numbers', function () {
+  var p = analyzerBuildOnlinePrompt('Opgave 1\n1.1 Beregn IB.');
+  assert(/JSON/.test(p.system) && /"num"/.test(p.system) && /"udregning"/.test(p.system), 'asks for structured per-question JSON');
+  // tolerant parse: code-fenced JSON with prose around it
+  var raw = 'Her er svaret:\n```json\n[{"num":"1.1","spm":"Beregn IB","svar":"62,1 A","udregning":"IB = P/(sqrt3*U*cos) = 62,1 A"}]\n```';
+  var arr = analyzerParseOnlineJson(raw);
+  assert(Array.isArray(arr) && arr.length === 1, 'parses the JSON array');
+  assert.strictEqual(arr[0].num, '1.1', 'binds to Opgave number 1.1');
+  assert.strictEqual(arr[0].svar, '62,1 A', 'carries the short answer');
+  assert.strictEqual(analyzerParseOnlineJson('not json at all'), null, 'non-JSON -> null (falls back to raw)');
+});
+
 
 test('analyzerExtractPdf reads real exam PDFs into readable Danish text', function () {
   var cases = [

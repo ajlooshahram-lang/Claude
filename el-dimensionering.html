@@ -35717,7 +35717,29 @@ function analyzerBuildOnlinePrompt(examText) {
     + 'angiv dansk grossist-prisniveau (Solar/Lemvigh-M\u00fcller/Sanist\u00e5l) i Calcia/Sigma-stil hvor relevant. '
     + 'Henvis til den relevante DS/HD 60364-paragraf. N\u00e6vn hvis en regel kan v\u00e6re opdateret og b\u00f8r verificeres hos Sikkerhedsstyrelsen (sikkerhedsstyrelsen.dk). '
     + 'Svar struktureret i markdown, p\u00e5 dansk.';
-  return { system: sys, user: 'L\u00f8s f\u00f8lgende autorisationspr\u00f8ve fuldst\u00e6ndigt, opgave for opgave med fulde udregninger:\n\n' + (examText || '') };
+  // Structured output so each answer can be bound to its Opgave-nummer in the UI.
+  var jsonReq = '\n\nVIGTIGT \u2014 returner KUN gyldig JSON (intet andet, ingen markdown-fence): '
+    + 'et array af objekter, \u00e9t pr. delsp\u00f8rgsm\u00e5l, i opgaver\u00e6kkef\u00f8lge, med felterne: '
+    + '"num" (opgavenummer pr\u00e6cis som i pr\u00f8ven, fx "1.1"), '
+    + '"spm" (kort gengivelse af sp\u00f8rgsm\u00e5let), '
+    + '"svar" (kort slutresultat med enhed og korrekt notation), '
+    + '"udregning" (FULD trinvis udregning som tekst: formel \u2192 indsatte tal \u2192 resultat, '
+    + 'komplekse tal i B\u00c5DE rektangul\u00e6r og pol\u00e6r form, med DS/HD 60364-henvisning). '
+    + 'Eksempel: [{"num":"1.1","spm":"Beregn IB","svar":"62,1 A","udregning":"IB = P/(\u221a3\u00b7U\u00b7cos\u03c6) = ..."}]';
+  return { system: sys + jsonReq, user: 'L\u00f8s f\u00f8lgende autorisationspr\u00f8ve fuldst\u00e6ndigt, opgave for opgave med fulde udregninger:\n\n' + (examText || '') };
+}
+
+// Parse the model's JSON solution (tolerant: strips code fences / prose around it).
+function analyzerParseOnlineJson(text) {
+  if (!text) return null;
+  var s = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+  var a = s.indexOf('['), b = s.lastIndexOf(']');
+  if (a < 0 || b <= a) return null;
+  try {
+    var arr = JSON.parse(s.substring(a, b + 1));
+    if (Array.isArray(arr) && arr.length && arr[0] && (arr[0].num != null || arr[0].svar != null)) return arr;
+  } catch (e) { return null; }
+  return null;
 }
 
 // Read a small ai-config.json {endpoint, key, model} (click-only, no typing).
@@ -35742,7 +35764,7 @@ function analyzerSolveOnline() {
   var cfg = {}; try { cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
   if (!cfg.endpoint || !cfg.key) { analyzerState.notice = tx('Online AI er ikke tilsluttet. Upload en ai-config.json via "Tilslut AI".', 'Online AI is not connected. Upload an ai-config.json via "Connect AI".'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
   if (!analyzerState.rawText) { analyzerState.notice = tx('Inds\u00e6t eller upload f\u00f8rst en opgave.', 'Paste or upload an exam first.'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
-  analyzerState.onlineBusy = true; analyzerState.onlineAnswer = null; analyzerState.notice = null;
+  analyzerState.onlineBusy = true; analyzerState.onlineAnswer = null; analyzerState.onlineStructured = null; analyzerState.notice = null;
   if (typeof renderModule === 'function') renderModule('analyzer');
   var p = analyzerBuildOnlinePrompt(analyzerState.rawText);
   fetch(cfg.endpoint, {
@@ -35750,7 +35772,9 @@ function analyzerSolveOnline() {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
     body: JSON.stringify({ model: cfg.model || 'gpt-4o', messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }], temperature: 0.1 })
   }).then(function (res) { return res.json(); }).then(function (data) {
-    analyzerState.onlineAnswer = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    var content = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    analyzerState.onlineStructured = analyzerParseOnlineJson(content);
+    analyzerState.onlineAnswer = analyzerState.onlineStructured ? null : content; // keep raw only if not structured
     analyzerState.onlineBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
   }).catch(function (e) {
     analyzerState.onlineAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
@@ -35796,6 +35820,32 @@ function analyzerFetchPricingLaw() {
     analyzerState.priceAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
     analyzerState.priceBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
   });
+}
+
+// Render the online AI solution bound to each Opgave-nummer (matches the offline
+// panel layout): grouped by Opgave, each sub-question with its short answer and
+// an expandable full working.
+function analyzerRenderOnlineStructured() {
+  var arr = analyzerState.onlineStructured || [];
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning (alle opgaver)', 'Online AI \u2014 complete solution (all tasks)') + ' (' + arr.length + ')</div>';
+  html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  var curOp = null;
+  arr.forEach(function (q) {
+    var num = String((q && q.num) != null ? q.num : '').trim();
+    var op = (num.match(/^(\d+)/) || [])[1];
+    if (op && op !== curOp) { curOp = op; html += '<div style="padding:5px 10px;background:var(--primary-glow);font-weight:700;font-size:0.82rem">Opgave ' + mmlEsc(op) + '</div>'; }
+    html += '<div style="padding:7px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
+    html += '<div style="flex:1">' + (num ? '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc('Opgave ' + num) + '</strong> ' : '') + mmlEsc((q && q.spm) || '') + '</div>';
+    html += '<span style="white-space:nowrap;color:var(--success);font-weight:700;font-family:monospace">' + mmlEsc((q && q.svar) || '') + '</span></div>';
+    if (q && q.udregning) {
+      html += '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:0.76rem;color:var(--text-muted)">' + tx('Vis udregning', 'Show working') + '</summary>';
+      html += '<div style="white-space:pre-wrap;font-size:0.82rem;line-height:1.5;margin-top:4px">' + mmlEsc(q.udregning) + '</div></details>';
+    }
+    html += '</div>';
+  });
+  html += '</div></div>';
+  return html;
 }
 
 function renderAnalyzer() {
@@ -35858,8 +35908,10 @@ function renderAnalyzer() {
 
   html += '</div>';
 
-  // Online AI answer (complete solution)
-  if (analyzerState.onlineAnswer) {
+  // Online AI answer: structured per Opgave-nummer, or raw text fallback.
+  if (analyzerState.onlineStructured) {
+    html += analyzerRenderOnlineStructured();
+  } else if (analyzerState.onlineAnswer) {
     html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning', 'Online AI \u2014 complete solution') + '</div>';
     html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.onlineAnswer) + '</div></div>';
   }
