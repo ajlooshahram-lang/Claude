@@ -34438,8 +34438,9 @@ function analyzerSolve(data) {
     if (hasQuestion(data, 'sk_net') && data.Skh_MVA) {
       var sk = forsyningNetworkSk(zNetHV.r, zNetHV.x, UnHV, cF);
       var h = '<div class="result-box"><div class="result-title">\u26A1 Kortslutningseffekt / Ik (' + nf(UnHV / 1000, 0) + ' kV)</div>'
-        + row('S\u2096', nf(sk.Sk / 1e6, 1) + ' MVA') + row('Z\u2099\u2091\u209c', fmtZ(zNetHV.r, zNetHV.x))
-        + row('I\u2096\u2083max', nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0')
+        + row('Z\u2099\u2091\u209c = c\u00b7U\u00b2/S\u2096', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/(' + nf(data.Skh_MVA, 0) + '\u00b710\u2076) = ' + fmtZ(zNetHV.r, zNetHV.x))
+        + row('S\u2096 = c\u00b7U\u00b2/|Z|', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/' + nf(zNetHV.mag, 3) + ' = ' + nf(sk.Sk / 1e6, 1) + ' MVA')
+        + row('I\u2096\u2083max = c\u00b7U/(\u221a3\u00b7|Z|)', nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zNetHV.mag, 3) + ') = ' + nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0')
         + '<div class="info-row" style="font-size:0.76rem">S\u2096 = c\u00b7U\u00b2/|Z|, I\u2096 = c\u00b7U/(\u221a3\u00b7|Z|); IEC 60909 / DS/EN 50522. Kabelimpedanser frem til en nedstr\u00f8ms station skal l\u00e6gges til Z\u2099\u2091\u209c.</div></div>';
       results.push({ type: 'sk_net', label: 'Kortslutningseffekt S\u2096', value: nf(sk.Sk / 1e6, 1) + ' MVA / ' + nf(sk.Ik / 1000, 2) + ' kA', html: h, asked: true });
       solved++;
@@ -34455,14 +34456,17 @@ function analyzerSolve(data) {
       var zTr = { r: ztrMag * Math.cos(phiT), x: ztrMag * Math.sin(phiT) };
       var Ns = data.parallelTrafos ? [data.parallelTrafos] : [2, 3];
       var hh = '<div class="result-box"><div class="result-title">\u26A1 Ik p\u00e5 LV-siden \u2014 transformere parallelt</div>'
-        + row('Z\u2099\u2091\u209c (HV)', fmtZ(zNetHV.r, zNetHV.x)) + row('Z\u209c\u1d63 (HV)', fmtZ(zTr.r, zTr.x));
+        + row('Z\u2099\u2091\u209c (HV)', fmtZ(zNetHV.r, zNetHV.x))
+        + row('Z\u209c\u1d63 = u\u2096\u00b7U\u00b2/S\u2099', nf(uk, 3) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/' + nf(Sn, 0) + ' = ' + fmtZ(zTr.r, zTr.x) + (erPct ? ' (\u03c6=arccos(e\u1d63/u\u2096))' : ''))
+        + row('Omsætningsforhold', nf(UnHV, 0) + '/' + nf(UnLV, 0) + ' = ' + nf(UnHV / UnLV, 0));
       var vals = [];
       Ns.forEach(function (N) {
         var R = scParallelTrafoIk(zNetHV, zTr, N, UnHV, UnLV, cF);
-        hh += row('N = ' + N + ': Z\u209c\u2092\u209c', fmtZ(R.R, R.X)) + row('N = ' + N + ': I\u2096,LV', '<strong>' + nf(R.ikLV / 1000, 1) + ' kA</strong> \u2220 \u2212' + nf(R.angleDeg, 1) + '\u00b0');
+        hh += row('N = ' + N + ': Z\u209c\u2092\u209c = Z\u2099\u2091\u209c + Z\u209c\u1d63/' + N, fmtZ(R.R, R.X))
+          + row('N = ' + N + ': I\u2096,LV = c\u00b7U/(\u221a3\u00b7|Z|)\u00b7' + nf(UnHV / UnLV, 0), nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(R.Zmag, 3) + ')\u00b7' + nf(UnHV / UnLV, 0) + ' = <strong>' + nf(R.ikLV / 1000, 1) + ' kA</strong> \u2220 \u2212' + nf(R.angleDeg, 1) + '\u00b0');
         vals.push(N + '\u00d7: ' + nf(R.ikLV / 1000, 1) + ' kA');
       });
-      hh += '<div class="info-row" style="font-size:0.76rem">I\u2096,LV = c\u00b7U_HV/(\u221a3\u00b7|Z\u2099\u2091\u209c + Z\u209c\u1d63/N|)\u00b7(U_HV/U_LV). Viggo Bitsch / IEC 60909.</div></div>';
+      hh += '<div class="info-row" style="font-size:0.76rem">I\u2096,LV = c\u00b7U_HV/(\u221a3\u00b7|Z\u2099\u2091\u209c + Z\u209c\u1d63/N|)\u00b7(U_HV/U_LV). N parallelle transformere \u21d2 Z\u209c\u1d63/N. Viggo Bitsch / IEC 60909.</div></div>';
       results.push({ type: 'ik_par', label: 'Ik (parallelle transformere)', value: vals.join(', '), html: hh, asked: true });
       solved++;
     } else if (hasQuestion(data, 'ik_par')) { flagged.push('Ik parallel: mangler Skh, trafo kVA eller uk%'); }
@@ -34482,8 +34486,9 @@ function analyzerSolve(data) {
     if (hasQuestion(data, 'petersen') && data.earthFaultA) {
       var coil = forsyningPetersenCoil(data.earthFaultA, UnHV, 50);
       var hp = '<div class="result-box"><div class="result-title">\u26A1 Slukkespole (ideel kompensation)</div>'
-        + row('I_j (kompenseres)', nf(data.earthFaultA, 1) + ' A') + row('U_fase', nf(coil.Uphase, 0) + ' V')
-        + row('X_L', nf(coil.XL, 1) + ' \u03a9') + row('L', '<strong>' + nf(coil.L, 3) + ' H</strong>')
+        + row('I_j (kompenseres)', nf(data.earthFaultA, 1) + ' A') + row('U_fase = U_n/\u221a3', nf(UnHV, 0) + '/\u221a3 = ' + nf(coil.Uphase, 0) + ' V')
+        + row('X_L = U_fase/I_j', nf(coil.Uphase, 0) + '/' + nf(data.earthFaultA, 1) + ' = ' + nf(coil.XL, 1) + ' \u03a9')
+        + row('L = X_L/\u03c9', nf(coil.XL, 1) + '/(2\u03c0\u00b750) = <strong>' + nf(coil.L, 3) + ' H</strong>')
         + '<div class="info-row" style="font-size:0.76rem">Ideel slukkespole: I_L = I_j \u21d2 X_L = U_fase/I_j, L = X_L/\u03c9 (resonans, L = 1/(3\u03c9\u00b2C\u2080)).</div></div>';
       results.push({ type: 'petersen', label: 'Slukkespole L', value: nf(coil.L, 3) + ' H', html: hp, asked: true });
       solved++;
