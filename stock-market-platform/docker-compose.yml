@@ -110,6 +110,26 @@ services:
     environment:
       PORT: 3010
 
+  valuation:
+    build:
+      context: ./src/ml-services/valuation
+      dockerfile: Dockerfile
+    container_name: investoriq-valuation
+    ports:
+      - "3015:3015"
+    environment:
+      PORT: 3015
+
+  investment-score:
+    build:
+      context: ./src/ml-services/investment-score
+      dockerfile: Dockerfile
+    container_name: investoriq-investment-score
+    ports:
+      - "3016:3016"
+    environment:
+      PORT: 3016
+
   # ---------------------------------------------------------------
   # Frontend
   # ---------------------------------------------------------------
