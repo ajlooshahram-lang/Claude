@@ -8021,7 +8021,7 @@ function energyRenderOptimization(state) {
     h += '<div class="result-box" style="margin-top:10px;border-left:4px solid var(--success)">';
     h += '<div class="result-title">' + rec.icon + ' ' + rec.title + '</div>';
     h += '<div style="font-size:0.82rem;margin-bottom:8px;line-height:1.4">' + rec.desc + '</div>';
-    h += '<div class="result-row"><span class="label">' + (da ? 'Besparelse' : 'Saving') + '</span><span class="value" style="color:var(--success)">' + rec.saving_kwh + ' kWh/\u00e5r (' + rec.saving_dkk + ' DKK)</span></div>';
+    h += '<div class="result-row"><span class="label">' + (da ? 'Besparelse' : 'Saving') + '</span><span class="value" style="color:var(--success)">' + rec.saving_kwh + ' kWh/' + tx('\u00e5r','yr') + ' (' + rec.saving_dkk + ' DKK)</span></div>';
     if (rec.investment_dkk) h += '<div class="result-row"><span class="label">' + (da ? 'Investering' : 'Investment') + '</span><span class="value">' + rec.investment_dkk + ' DKK</span></div>';
     if (rec.roi_months && rec.roi_months < 120) h += '<div class="result-row"><span class="label">' + (da ? 'Tilbagebetalingstid' : 'Payback time') + '</span><span class="value">' + rec.roi_months + ' ' + (da ? 'mdr' : 'months') + '</span></div>';
     h += '<div class="result-row"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value" style="font-size:0.75rem;color:var(--text-muted)">' + rec.standard + '</span></div>';
@@ -8096,7 +8096,7 @@ function renderEnergy() {
         { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: energyState.powerKW, unit: 'kW' },
         { name: tx('Kondensatorbehov', 'Capacitor bank'), symbol: 'Q_c', value: capSize.kvar, unit: 'kvar', source: 'IEC 60831-1' },
         { name: tx('Daglig energiomkostning', 'Daily energy cost'), symbol: 'C_dag', value: cost.dailyCostDKK, unit: 'DKK/dag' },
-        { name: tx('Peak shaving-potentiale', 'Peak shaving potential'), symbol: '\u0394P', value: peak.potentialSaving, unit: 'DKK/m\u00e5ned' }
+        { name: tx('Peak shaving-potentiale', 'Peak shaving potential'), symbol: '\u0394P', value: peak.potentialSaving, unit: 'DKK/' + tx('m\u00e5ned','month') + '' }
       ],
       substitution: 'Q_c = ' + energyState.powerKW + ' \u00d7 (tan(arccos ' + pf.pf.toFixed(2) + ') - tan(arccos ' + energyState.targetPF + ')) = ' + capSize.kvar + ' kvar',
       result: { value: capSize.kvar, unit: 'kvar', status: capSize.kvar > 0 ? 'ok' : 'info' },
@@ -18048,10 +18048,10 @@ function renderEV() {
   html += '<div class="result-box" style="border-left:4px solid var(--success)">';
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — EV vs. fossilt brændstof', 'Energy Savings — EV vs. fossil fuel') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Årlig kørsel', 'Annual driving') + '</span><span class="value">' + evAnnualKm + ' km</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('EV elforbrug', 'EV electricity use') + '</span><span class="value" style="color:var(--success);font-weight:700">' + evAnnualKwh + ' kWh/\u00e5r (' + evAnnualCost.toFixed(0) + ' DKK)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Benzin/diesel', 'Petrol/diesel') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + fossilAnnualL + ' L/\u00e5r (' + fossilAnnualCost.toFixed(0) + ' DKK)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + evSavingDKK.toFixed(0) + ' DKK/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (evCO2saving / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('EV elforbrug', 'EV electricity use') + '</span><span class="value" style="color:var(--success);font-weight:700">' + evAnnualKwh + ' kWh/' + tx('\u00e5r','yr') + ' (' + evAnnualCost.toFixed(0) + ' DKK)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Benzin/diesel', 'Petrol/diesel') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + fossilAnnualL + ' L/' + tx('\u00e5r','yr') + ' (' + fossilAnnualCost.toFixed(0) + ' DKK)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + evSavingDKK.toFixed(0) + ' DKK/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (evCO2saving / 1000).toFixed(1) + ' ton/' + tx('\u00e5r','yr') + '</span></div>';
   html += '</div>';
 
   // Verdict
@@ -18260,10 +18260,10 @@ function renderSolar() {
   var pvExportDKK = pvExportKWh * 0.6; // export tariff
   html += '<div class="result-box" style="border-left:4px solid var(--success)">';
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energireduktion — netforbrug & CO\u2082', 'Energy Reduction — grid use & CO\u2082') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Egetforbrug (' + (pvSelfPct * 100).toFixed(0) + '%)', 'Self-consumption (' + (pvSelfPct * 100).toFixed(0) + '%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + pvSelfKWh.toFixed(0) + ' kWh/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Reduceret netforbrug', 'Reduced grid consumption') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (pvGridReductionDKK / 1000).toFixed(1) + 'k DKK/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Egetforbrug (' + (pvSelfPct * 100).toFixed(0) + '%)', 'Self-consumption (' + (pvSelfPct * 100).toFixed(0) + '%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + pvSelfKWh.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reduceret netforbrug', 'Reduced grid consumption') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (pvGridReductionDKK / 1000).toFixed(1) + 'k DKK/' + tx('\u00e5r','yr') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Eksport til net', 'Export to grid') + '</span><span class="value">' + pvExportKWh.toFixed(0) + ' kWh (' + pvExportDKK.toFixed(0) + ' DKK)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (annualYield * 0.085 / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (annualYield * 0.085 / 1000).toFixed(1) + ' ton/' + tx('\u00e5r','yr') + '</span></div>';
   html += '</div>';
 
   // Cable specs
@@ -19493,10 +19493,10 @@ function renderVFD() {
 
   html += '<div class="result-box" style="border-left:4px solid var(--success)">';
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — VFD vs. direkte drift', 'Energy Savings — VFD vs. direct-on-line') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Motor uden VFD (DOL)', 'Motor without VFD (DOL)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + dolConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Motor med VFD (\u221235%)', 'Motor with VFD (\u221235%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + vfdConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + vfdSavingKWh.toFixed(0) + ' kWh (' + (vfdSavingDKK / 1000).toFixed(0) + 'k DKK/\u00e5r)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (vfdSavingKWh * 0.085 / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motor uden VFD (DOL)', 'Motor without VFD (DOL)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + dolConsumption.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motor med VFD (\u221235%)', 'Motor with VFD (\u221235%)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + vfdConsumption.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + vfdSavingKWh.toFixed(0) + ' kWh (' + (vfdSavingDKK / 1000).toFixed(0) + 'k DKK/' + tx('\u00e5r','yr') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (vfdSavingKWh * 0.085 / 1000).toFixed(1) + ' ton/' + tx('\u00e5r','yr') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling', 'Payback') + '</span><span class="value">\u2248 ' + Math.round(vfdInvestment / (vfdSavingDKK)) + ' \u00e5r (IEC 61800-9-2)</span></div>';
   html += '</div>';
 
@@ -19750,10 +19750,10 @@ function renderLighting() {
 
   html += '<div class="result-box" style="border-left:4px solid var(--success)">';
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse \u2014 LED vs. konventionel', 'Energy Savings \u2014 LED vs. conventional') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('LED-belysning', 'LED lighting') + '</span><span class="value" style="color:var(--success);font-weight:700">' + ledAnnualKWh.toFixed(0) + ' kWh/\u00e5r (' + ledWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Konventionel (T8/T5)', 'Conventional (T8/T5)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + convAnnualKWh.toFixed(0) + ' kWh/\u00e5r (' + conventionalWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + lightSavingKWh.toFixed(0) + ' kWh (' + (lightSavingDKK / 1000).toFixed(1) + 'k DKK/\u00e5r)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (lightSavingKWh * 0.085 / 1000).toFixed(2) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('LED-belysning', 'LED lighting') + '</span><span class="value" style="color:var(--success);font-weight:700">' + ledAnnualKWh.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + ' (' + ledWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Konventionel (T8/T5)', 'Conventional (T8/T5)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + convAnnualKWh.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + ' (' + conventionalWPerM2.toFixed(1) + ' W/m\u00b2)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse', 'Savings') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + lightSavingKWh.toFixed(0) + ' kWh (' + (lightSavingDKK / 1000).toFixed(1) + 'k DKK/' + tx('\u00e5r','yr') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (lightSavingKWh * 0.085 / 1000).toFixed(2) + ' ton/' + tx('\u00e5r','yr') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value" style="font-size:0.75rem;color:var(--text-muted)">DS/EN 15193-1 (LENI); BR18 \u00a7377-378</span></div>';
   html += '</div>';
 
@@ -20014,10 +20014,10 @@ function renderHeatPump() {
   html += '<div class="result-box" style="border-left:4px solid var(--success)">';
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energibesparelse — Varmepumpen vs. alternativer', 'Energy Savings — Heat pump vs. alternatives') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Årligt varmebehov', 'Annual heating demand') + '</span><span class="value">' + annualHeatDemand.toFixed(0) + ' kWh</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('VP elforbrug (COP ' + heatpumpState.cop + ')', 'HP electricity use (COP ' + heatpumpState.cop + ')') + '</span><span class="value" style="color:var(--success);font-weight:700">' + hpConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Direkte elvarme (COP 1)', 'Direct electric heating (COP 1)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + directElectricConsumption.toFixed(0) + ' kWh/\u00e5r</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Besparelse vs. elvarme', 'Savings vs. electric heating') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + hpSavingVsElectric.toFixed(0) + ' kWh (' + (hpSavingVsElectric * elPrice / 1000).toFixed(1) + 'k DKK/\u00e5r)</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (hpSavingVsElectric * co2PerKwh / 1000).toFixed(1) + ' ton/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('VP elforbrug (COP ' + heatpumpState.cop + ')', 'HP electricity use (COP ' + heatpumpState.cop + ')') + '</span><span class="value" style="color:var(--success);font-weight:700">' + hpConsumption.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Direkte elvarme (COP 1)', 'Direct electric heating (COP 1)') + '</span><span class="value" style="text-decoration:line-through;color:var(--danger)">' + directElectricConsumption.toFixed(0) + ' kWh/' + tx('\u00e5r','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse vs. elvarme', 'Savings vs. electric heating') + '</span><span class="value" style="color:var(--success);font-weight:700">\u2193 ' + hpSavingVsElectric.toFixed(0) + ' kWh (' + (hpSavingVsElectric * elPrice / 1000).toFixed(1) + 'k DKK/' + tx('\u00e5r','yr') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('CO\u2082-reduktion', 'CO\u2082 reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + (hpSavingVsElectric * co2PerKwh / 1000).toFixed(1) + ' ton/' + tx('\u00e5r','yr') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling (vs. elvarme)', 'Payback (vs. electric heating)') + '</span><span class="value">\u2248 ' + Math.round(80000 / (hpSavingVsElectric * elPrice)) + ' ' + tx('\u00e5r', 'years') + '</span></div>';
   html += '</div>';
 
@@ -24435,7 +24435,7 @@ function renderBESS() {
   html += '<div class="result-title">\uD83C\uDF31 ' + tx('Energiøkonomi — lastflytning & spidslastreduktion', 'Energy Economy — load shifting & peak shaving') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Brugbar kapacitet (90% DoD)', 'Usable capacity (90% DoD)') + '</span><span class="value">' + bessUsableKWh.toFixed(1) + ' kWh</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Årlig gennemsætning', 'Annual throughput') + '</span><span class="value">' + bessAnnualKWh.toFixed(0) + ' kWh (' + cyclesPerYear + ' ' + tx('cyklusser', 'cycles') + ')</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Besparelse (spot-spread ' + spotSpread + ' DKK/kWh)', 'Savings (spot spread ' + spotSpread + ' DKK/kWh)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + (bessAnnualSaving / 1000).toFixed(1) + 'k DKK/\u00e5r</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse (spot-spread ' + spotSpread + ' DKK/kWh)', 'Savings (spot spread ' + spotSpread + ' DKK/kWh)') + '</span><span class="value" style="color:var(--success);font-weight:700">' + (bessAnnualSaving / 1000).toFixed(1) + 'k DKK/' + tx('\u00e5r','yr') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Spidslastreduktion', 'Peak demand reduction') + '</span><span class="value" style="color:var(--success)">\u2193 ' + inv.kW + ' kW</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetaling', 'Payback') + '</span><span class="value">\u2248 ' + bessPayback + ' \u00e5r</span></div>';
   html += '</div>';
