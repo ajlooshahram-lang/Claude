@@ -21693,7 +21693,7 @@ function renderUPS() {
     result: { value: upsSize, unit: 'VA', status: safe ? 'ok' : 'fail' },
     reference: 'IEC 62040-1; DS/HD 60364-5-56'
   });
-  html += renderVerdict(safe, safe ? tx('UPS korrekt dimensioneret iht. IEC 62040 (belastning <= 80%)', 'UPS correctly sized per IEC 62040 (loading <= 80%)') : tx('Vælg udstyr for at dimensionere UPS', 'Select equipment to size UPS'));
+  html += renderVerdict(safe, safe ? tx('UPS korrekt dimensioneret iht. IEC 62040 (belastning ≤ 80%)', 'UPS correctly sized per IEC 62040 (loading ≤ 80%)') : tx('Vælg udstyr for at dimensionere UPS', 'Select equipment to size UPS'));
 
   html += '</div>';
   return html;
@@ -21894,7 +21894,7 @@ function renderPFC() {
     html += '<div class="result-row"><span class="label">' + tx('Månedlig straf før korrektion', 'Monthly Penalty Before Correction') + '</span><span class="value" style="color:var(--danger)">~' + penalty.penalty + ' DKK</span></div>';
     html += '<div class="result-row"><span class="label">' + tx('Estimeret månedlig besparelse', 'Estimated Monthly Savings') + '</span><span class="value" style="color:var(--success)">~' + penalty.savings + ' DKK</span></div>';
   } else {
-    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">\u2705 ' + tx('Ingen straf (cos \u03C6 >= 0.90)', 'No penalty (cos \u03C6 >= 0.90)') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">\u2705 ' + tx('Ingen straf (cos φ ≥ 0,90)', 'No penalty (cos φ ≥ 0.90)') + '</span></div>';
   }
   html += '</div>';
 
@@ -22412,10 +22412,10 @@ var TEST_ITEMS = [
   { id: 't3', da: 'SELV/PELV beskyttelse (separationstest)', en: 'Protection by SELV/PELV (separation test)', method: 'Insulation test', instrument: 'Insulation tester 500V', pass: '>= 1 M ohm separation' },
   { id: 't4', da: 'Polaritet (korrekt L/N/E i alle punkter)', en: 'Polarity (correct L/N/E at every point)', method: 'Voltage/continuity', instrument: 'Multifunction tester', pass: 'Correct polarity all points' },
   { id: 't5', da: 'Fejlsløjfeimpedans Zs (iht. tabelværdier)', en: 'Earth fault loop impedance Zs (per table values)', method: 'Loop test', instrument: 'Loop impedance tester', pass: 'Zs <= Zs_max x 0.8' },
-  { id: 't6', da: 'RCD funktion (udløsningstid <= 40ms ved 5xI_delta_n)', en: 'RCD operation (trip time <= 40ms at 5xI_delta_n, <= 200ms at I_delta_n)', method: 'RCD test', instrument: 'RCD tester', pass: '<= 40ms at 5x, <= 200ms at 1x' },
+  { id: 't6', da: 'RCD funktion (udløsningstid ≤ 40ms ved 5×IΔₙ)', en: 'RCD operation (trip time ≤ 40ms at 5×IΔₙ, ≤ 200ms at IΔₙ)', method: 'RCD test', instrument: 'RCD tester', pass: '<= 40ms at 5x, <= 200ms at 1x' },
   { id: 't7', da: 'Fasefølge (for 3-fase installationer)', en: 'Phase sequence (for 3-phase installations)', method: 'Phase rotation', instrument: 'Phase rotation meter', pass: 'Correct L1-L2-L3 sequence' },
   { id: 't8', da: 'Funktionstest (kontakter, styring, blokering)', en: 'Functional testing (all switches, controls, interlocks)', method: 'Operation test', instrument: 'N/A', pass: 'All devices function correctly' },
-  { id: 't9', da: 'Spændingsfald (max 3% belysning, 5% øvrige)', en: 'Voltage drop measurement (<= 3% lighting, <= 5% other)', method: 'Voltage measurement', instrument: 'Multimeter / MFT', pass: '<= 3% lighting, <= 5% other' },
+  { id: 't9', da: 'Spændingsfald (max 3% belysning, 5% øvrige)', en: 'Voltage drop measurement (≤ 3% lighting, ≤ 5% other)', method: 'Voltage measurement', instrument: 'Multimeter / MFT', pass: '<= 3% lighting, <= 5% other' },
   { id: 't10', da: 'Forventet kortslutningsstrm', en: 'Prospective fault current measurement', method: 'PSC test', instrument: 'Loop/PSC tester', pass: 'Within device rating' }
 ];
 
@@ -23444,7 +23444,7 @@ function renderDiscrim() {
   var isDisplay2 = analysis.is !== null ? ((analysis.is >= 1000) ? (analysis.is / 1000) + ' kA' : analysis.is + ' A') : tx('Ingen data', 'No data');
   html += calcDetail({
     name: tx('Selektivitetsberegning (I2t koordinering)', 'Selectivity Calculation (I2t Coordination)'),
-    formula: tx('Is >= Ik_max => fuld selektivitet', 'Is >= Ik_max => full selectivity'),
+    formula: tx('Iₛ ≥ Iₖ,ₘₐₓ ⇒ fuld selektivitet', 'Iₛ ≥ Iₖ,ₘₐₓ ⇒ full selectivity'),
     variables: [
       { name: tx('Opstrøms enhed', 'Upstream device'), symbol: tx('Op', 'Up'), value: discrimState.upstreamType + ' ' + discrimState.upstreamRating + 'A', unit: '', source: tx('valgt', 'selected') },
       { name: tx('Nedstrøms enhed', 'Downstream device'), symbol: tx('Ned', 'Down'), value: discrimState.downstreamType + ' ' + discrimState.downstreamRating + 'A', unit: '', source: tx('valgt', 'selected') },
@@ -30138,7 +30138,7 @@ function renderRelay() {
   html += '<div class="result-row"><span class="label">I<sub>N,fuse</sub></span><span class="value">' + fuse.rating + ' A</span></div>';
   html += '<div class="result-row"><span class="label">I<sub>min</sub></span><span class="value">' + fuse.Imin + ' A</span></div>';
   html += '<div class="result-row"><span class="label">I<sub>max</sub></span><span class="value">' + fuse.Imax + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Sikring >= I1N?', 'Fuse >= I1N?') + '</span><span class="value">' + (fuseCheck.ok ? '✅ ' + fuse.rating + ' ≥ ' + I1N.toFixed(2) + ' A' : '❌ ' + fuse.rating + ' < ' + I1N.toFixed(2) + ' A') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sikring ≥ I₁N?', 'Fuse ≥ I₁N?') + '</span><span class="value">' + (fuseCheck.ok ? '✅ ' + fuse.rating + ' ≥ ' + I1N.toFixed(2) + ' A' : '❌ ' + fuse.rating + ' < ' + I1N.toFixed(2) + ' A') + '</span></div>';
   html += '</div>';
 
   // Overall verdict
