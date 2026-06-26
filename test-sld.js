@@ -16066,6 +16066,97 @@ test('Torque/speed curve text says Y-delta reduces torque to ~1/3 (not "halves")
 });
 
 
+// === Analyzer Q&A: numbered questions bound to answers (user-reported fixes) ===
+console.log('\n=== Analyzer Q&A Binding & Coverage Tests ===\n');
+
+// A realistic single-paper exam where the data for each Opgave is present.
+var QA_EXAM_TEXT = [
+  'Opgave 1',
+  'En 3-faset belastning 37 kW, 400 V, cos phi 0,86, NOIKLX 16 mm\u00B2, l\u00e6ngde 45 m, metode C.',
+  '1.1 Beregn IB.',
+  '1.2 Beregn sp\u00e6ndingsfaldet.',
+  'Opgave 2',
+  'Transformer 630 kVA, uk 4%.',
+  '2.1 Beregn kortslutningsstr\u00f8mmen Ik.',
+  '2.2 V\u00e6lg sikring. In 25 A, kurve C.',
+  'Opgave 3',
+  'TN-S, Zs 0,8 ohm.',
+  '3.1 Er fejlbeskyttelsen tilstr\u00e6kkelig?'
+].join('\n');
+
+test('analyzerSubLabel parses the exam\u2019s own numbering', function () {
+  assert.strictEqual(analyzerSubLabel('1.1 Beregn IB.'), '1.1');
+  assert.strictEqual(analyzerSubLabel('2.3 Noget'), '2.3');
+  assert.strictEqual(analyzerSubLabel('a) Beregn'), 'a');
+  assert.strictEqual(analyzerSubLabel('(3) test'), '3');
+  assert.strictEqual(analyzerSubLabel('Beregn uden nummer'), '');
+});
+
+test('Broadened extraction: natural phrasings for cos phi and uk are recognised', function () {
+  assert(Math.abs(analyzerExtract('cos phi 0,86').cosPhi - 0.86) < 1e-9, '"cos phi 0,86" -> 0.86');
+  assert(Math.abs(analyzerExtract('cos(phi) = 0,86').cosPhi - 0.86) < 1e-9, 'locked "cos(phi) = 0,86" still works');
+  assert(Math.abs(analyzerExtract('effektfaktor 0,9').cosPhi - 0.9) < 1e-9, '"effektfaktor 0,9" -> 0.9');
+  assert.strictEqual(analyzerExtract('Transformer 630 kVA, uk 4%.').trafoUk, 4, '"uk 4%" -> 4');
+  assert.strictEqual(analyzerExtract('uk = 6%').trafoUk, 6, '"uk = 6%" -> 6');
+  // cosPhi sanity clamp: an out-of-range value must not be accepted as cos phi
+  assert.strictEqual(analyzerExtract('vinkel cos 30 grader').cosPhi, null, 'angle "cos 30" not taken as cosPhi');
+});
+
+test('examFindQuestionMeta returns the exam number from the EXPLICIT sub-question (not an inferred data line)', function () {
+  var segs = analyzerSegment(QA_EXAM_TEXT);
+  var op1 = segs.filter(function (s) { return s.id === 1; })[0];
+  var meta = examFindQuestionMeta(op1, 'ib');
+  assert.strictEqual(meta.num, '1.1', 'IB maps to sub-question 1.1, not the Opgave header');
+});
+
+test('examBuildSolution carries the original numbering on every question', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var nums = [];
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.num) nums.push(q.num); }); });
+  assert(nums.indexOf('1.1') >= 0 && nums.indexOf('1.2') >= 0, 'has 1.1 and 1.2');
+  assert(nums.indexOf('2.1') >= 0 && nums.indexOf('3.1') >= 0, 'has 2.1 and 3.1');
+  lang = savedLang;
+});
+
+test('Analyzer answers ALL opgaver of a complete paper (full coverage)', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var total = 0, solved = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) solved++; }); });
+  assert(total >= 5, 'detects all sub-questions (got ' + total + ')');
+  assert.strictEqual(solved, total, 'every detected question is answered (' + solved + '/' + total + ')');
+  lang = savedLang;
+});
+
+test('Ik uses the extracted transformer uk (not a wrong default) once uk is parsed', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var ik = analyzerState.results.filter(function (r) { return r.type === 'ik'; })[0];
+  assert(ik, 'Ik result exists');
+  // 630 kVA, uk=4%: Zt = 0.04*400^2/630000 = 10.16 mOhm; Ik3max = 1.05*400/(sqrt(3)*0.01116) ~ 21.7 kA
+  var ikStr = String(ik.value);
+  var ikNum = ikStr.indexOf('=') >= 0 ? ikStr.split('=')[1] : ikStr;
+  var kA = parseFloat(ikNum.replace(/[^0-9.,]/g, '').replace(',', '.'));
+  assert(kA > 20 && kA < 24, 'Ik3max ~21.7 kA with uk=4% (got ' + kA + ' kA from "' + ikStr + '")');
+  lang = savedLang;
+});
+
+test('analyzerRenderQuestionOutline binds questions to answers (numbers + Svar + status, no NaN)', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var html = analyzerRenderQuestionOutline();
+  assert(html.indexOf('Opgave 1') >= 0, 'shows Opgave 1 header');
+  assert(html.indexOf('1.1') >= 0 && html.indexOf('2.1') >= 0, 'shows original numbering');
+  assert(html.indexOf('Svar') >= 0, 'binds an answer line');
+  assert(html.indexOf('Besvaret') >= 0, 'shows an Answered status badge');
+  assert(html.indexOf('NaN') < 0 && html.indexOf('undefined') < 0, 'no NaN/undefined leakage');
+  assert(html.indexOf('<script') < 0, 'pasted text is escaped (no raw script tag)');
+  lang = savedLang;
+});
+
 // === thermalCalcTemp physics correction (audit) ===
 // A conductor loaded to its DERATED ampacity must reach exactly the insulation's
 // max temperature at ANY ambient -- this is what the Table B.52.14/15 derating
