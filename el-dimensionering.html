@@ -4585,16 +4585,28 @@ const DK_STANDARDS = {
 // Transformer data (from Dim-af-trafo.ppx)
 const TRAFO_SIZES = [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
 // Standard transformer impedance in % (uk%)
+// NOTE: 6% for >=630 kVA is the conservative Danish utility default used by DEFU and
+// many existing installations. EN 50588-1 specifies uk = 4-5% for new units <=630 kVA
+// (e.g. ABB TR-ONAN-630 has uk = 5%). We retain 6% as the DEFAULT because:
+//  (a) it yields higher Ztrafo -> lower Ik3max -> conservative for protection sizing,
+//  (b) it matches the older installed base that dominates Danish distribution grids.
+// For specific new installations, override uk_pct per transformer in the SLD.
 const TRAFO_UK = {
   50: 4, 100: 4, 160: 4, 200: 4, 250: 4, 315: 4, 400: 4, 500: 4, 630: 6, 800: 6, 1000: 6, 1250: 6, 1600: 6, 2000: 6, 2500: 6
 };
-// Transformer losses (no-load / load in W, approximate)
+// Transformer losses: P0 = no-load (core/iron) losses [W], Pk = load (copper) losses [W]
+// Source: EN 50588-1:2017 Tier-1 maximum values (level Ck for Pk, level A0 for P0),
+// oil-immersed distribution transformers (ONAN), Um <= 24 kV.
+// Anchor points from ABB Oil DTR catalog (EN 50588-1 compliant):
+//   50/100/250/400/630/1000/2500 kVA - see transformers[] product database above.
+// Intermediate sizes (160/200/315/500/800/1250/1600/2000) interpolated proportionally.
+// These values replace the pre-2005 legacy data (which had ~60% higher Pk for large units).
 const TRAFO_LOSSES = {
-  50: { p0: 145, pk: 1350 }, 100: { p0: 210, pk: 2150 }, 160: { p0: 300, pk: 3100 },
-  200: { p0: 350, pk: 3800 }, 250: { p0: 420, pk: 4600 }, 315: { p0: 500, pk: 5600 },
-  400: { p0: 610, pk: 6900 }, 500: { p0: 720, pk: 8400 }, 630: { p0: 860, pk: 10500 },
-  800: { p0: 1030, pk: 13000 }, 1000: { p0: 1200, pk: 15000 }, 1250: { p0: 1450, pk: 18500 },
-  1600: { p0: 1750, pk: 22000 }, 2000: { p0: 2100, pk: 27000 }, 2500: { p0: 2500, pk: 33000 }
+  50: { p0: 190, pk: 1100 }, 100: { p0: 320, pk: 1750 }, 160: { p0: 460, pk: 2400 },
+  200: { p0: 530, pk: 2750 }, 250: { p0: 650, pk: 3250 }, 315: { p0: 780, pk: 3900 },
+  400: { p0: 930, pk: 4600 }, 500: { p0: 1100, pk: 5500 }, 630: { p0: 1300, pk: 6500 },
+  800: { p0: 1500, pk: 8400 }, 1000: { p0: 1700, pk: 10500 }, 1250: { p0: 2100, pk: 12900 },
+  1600: { p0: 2600, pk: 16000 }, 2000: { p0: 3100, pk: 19000 }, 2500: { p0: 3800, pk: 24000 }
 };
 
 // RCD/HPFI types (Danish requirement)
@@ -15173,8 +15185,9 @@ function axIkComplexTrafo(SN, ek, Pcu, Un, c, Sk_MVA, rxNet) {
   };
 }
 // Standard load (copper) losses P_k [W] for oil distribution transformers, EN 50588-1
-// (Tier-2 reference list). Used as nameplate data in generated exam tasks.
-var AX_TRAFO_PCU = { 630: 6500, 1000: 9500, 1250: 11000, 1600: 14000 };
+// Tier-1 (level Ck). Used as nameplate data in generated exam tasks. Consistent with
+// TRAFO_LOSSES table above and ABB Oil DTR product database.
+var AX_TRAFO_PCU = { 50: 1100, 100: 1750, 160: 2400, 200: 2750, 250: 3250, 315: 3900, 400: 4600, 500: 5500, 630: 6500, 800: 8400, 1000: 10500, 1250: 12900, 1600: 16000, 2000: 19000, 2500: 24000 };
 // Inline SVG impedance-vector (phasor) diagram in the R-X plane for the complex
 // short-circuit result: Z_net (origin->net), Z_trafo stacked on top, and the
 // resultant Z_tot from origin. Axes are independently scaled (R<<X) and tick-
