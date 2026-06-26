@@ -5465,20 +5465,26 @@ function lsigRenderCurve(settings) {
   }
   for (var a = 0; a < xTicks.length; a++) {
     var gx = xPos(xTicks[a]);
-    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#eef0f3"/>';
+    var xIsMajor = (Math.abs(Math.log10(xTicks[a]) - Math.round(Math.log10(xTicks[a]))) < 0.001);
+    svg += '<line x1="' + gx.toFixed(1) + '" y1="' + mT + '" x2="' + gx.toFixed(1) + '" y2="' + (h - mB) + '" stroke="' + (xIsMajor ? '#cbd5e1' : '#eef0f3') + '"/>';
     var lbl = xTicks[a] >= 1000 ? (xTicks[a] / 1000).toFixed(xTicks[a] % 1000 === 0 ? 0 : 1) + 'k' : Math.round(xTicks[a]);
     svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - mB + 15) + '" text-anchor="middle" font-size="9" fill="#475467">' + lbl + ' A</text>';
   }
   // grid y
-  var yTicks = [0.01, 0.1, 1, 10, 100, 1000];
+  var yTicks = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
   for (var b = 0; b < yTicks.length; b++) {
+    if (yTicks[b] < tMin || yTicks[b] > tMax) continue;
     var gy = yPos(yTicks[b]);
-    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f3"/>';
-    var tLbl = yTicks[b] >= 1 ? yTicks[b] + ' s' : Math.round(yTicks[b] * 1000) + ' ms';
-    svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#475467">' + tLbl + '</text>';
+    var yIsMajor = (Math.abs(Math.log10(yTicks[b]) - Math.round(Math.log10(yTicks[b]))) < 0.001);
+    svg += '<line x1="' + mL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - mR) + '" y2="' + gy.toFixed(1) + '" stroke="' + (yIsMajor ? '#cbd5e1' : '#eef0f3') + '"/>';
+    // Only label decade values
+    if (yIsMajor) {
+        var tLbl = yTicks[b] >= 1 ? yTicks[b] + ' s' : Math.round(yTicks[b] * 1000) + ' ms';
+        svg += '<text x="' + (mL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-size="8.5" fill="#475467">' + tLbl + '</text>';
+    }
   }
   // segments
-  var segColors = { L: '#2563eb', S: '#7c3aed', I: '#dc2626', G: '#059669' };
+  var segColors = { L: '#1d4ed8', S: '#7c3aed', I: '#dc2626', G: '#059669' };
   var segLabels = { L: (da ? 'Langsom (L)' : 'Long-time (L)'), S: (da ? 'Kort-tid (S)' : 'Short-time (S)'), I: (da ? 'Momentan (I)' : 'Instantaneous (I)'), G: (da ? 'Jordfejl (G)' : 'Ground (G)') };
   var segs = ['L', 'S', 'I', 'G'];
   var legIdx = 0;
@@ -5495,12 +5501,17 @@ function lsigRenderCurve(settings) {
     var band = maxPath;
     for (var r = pts.length - 1; r >= 0; r--) band += 'L' + xPos(pts[r].i).toFixed(1) + ',' + yPos(pts[r].tMin).toFixed(1);
     band += 'Z';
-    svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.12" stroke="none"/>';
-    svg += '<path class="svg-curve-path" d="' + maxPath + '" fill="none" stroke="' + col + '" stroke-width="2.2"/>';
-    svg += '<path class="svg-curve-path" d="' + minPath + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    svg += '<path d="' + band + '" fill="' + col + '" fill-opacity="0.28" stroke="none"/>';
+    svg += '<path class="svg-curve-path" d="' + maxPath + '" fill="none" stroke="' + col + '" stroke-width="2.8"/>';
+    svg += '<path class="svg-curve-path" d="' + minPath + '" fill="none" stroke="' + col + '" stroke-width="1.8" stroke-dasharray="4,3"/>';
     // legend
+    var legLabel = segLabels[seg];
+    if (seg === 'L') legLabel += ' Ir=' + Math.round(env.settings.io) + ' A';
+    else if (seg === 'S') legLabel += ' Isd=' + Math.round(env.settings.isd) + ' A';
+    else if (seg === 'I') legLabel += ' Ii=' + Math.round(env.settings.ii) + ' A';
+    else if (seg === 'G') legLabel += ' Ig=' + Math.round(env.settings.ig) + ' A';
     svg += '<rect x="' + (w - 160) + '" y="' + (mT + 6 + legIdx * 16) + '" width="11" height="11" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '"/>';
-    svg += '<text x="' + (w - 145) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="10" fill="' + col + '">' + segLabels[seg] + '</text>';
+    svg += '<text x="' + (w - 145) + '" y="' + (mT + 16 + legIdx * 16) + '" font-size="11" fill="' + col + '">' + legLabel + '</text>';
     legIdx++;
   }
   // pickup annotations (vertical markers)
@@ -5509,8 +5520,14 @@ function lsigRenderCurve(settings) {
   if (env.G.length) pickups.push({ v: env.settings.ig, l: 'Ig=' + Math.round(env.settings.ig) + ' A' });
   for (var q = 0; q < pickups.length; q++) {
     var px = xPos(pickups[q].v);
-    svg += '<line x1="' + px.toFixed(1) + '" y1="' + mT + '" x2="' + px.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#64748b" stroke-width="0.7" stroke-dasharray="3,3"/>';
+    svg += '<line x1="' + px.toFixed(1) + '" y1="' + mT + '" x2="' + px.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#334155" stroke-width="1.2" stroke-dasharray="3,3"/>';
     svg += '<text x="' + (px + 3).toFixed(1) + '" y="' + (mT + 12 + q * 11) + '" font-size="8.5" fill="#475467">' + pickups[q].l + '</text>';
+  }
+  // Ik reference line (optional)
+  if (typeof settings.ikPlot === 'number' && settings.ikPlot > 0) {
+    var ikX = xPos(settings.ikPlot);
+    svg += '<line x1="' + ikX.toFixed(1) + '" y1="' + mT + '" x2="' + ikX.toFixed(1) + '" y2="' + (h - mB) + '" stroke="#b91c1c" stroke-width="2" stroke-dasharray="6,3"/>';
+    svg += '<text x="' + (ikX + 4).toFixed(1) + '" y="' + (h - mB - 8) + '" font-size="10" font-weight="bold" fill="#b91c1c">Ik = ' + Math.round(settings.ikPlot) + ' A</text>';
   }
   // titles
   svg += '<text x="' + (mL + plotW / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="11" fill="#1d2939">' + (da ? 'Str\u00f8m [A]' : 'Current [A]') + '</text>';
@@ -9815,6 +9832,48 @@ function renderLoad() {
         var _chainOk = (_IB <= _In) && (_In <= _izCorr);
         var _allOk = _chainOk && (_dUpct <= _dUlim) && _adiaOk;
 
+        // --- WHY panel: coordination bar chart SVG ---
+        var _barMax = Math.max(_izCorr, _In * 1.2, _IB * 1.5);
+        var _barW = 360;
+        var _barSvg = '<svg viewBox="0 0 400 90" width="100%" style="max-width:400px" xmlns="http://www.w3.org/2000/svg">';
+        _barSvg += '<rect x="30" y="10" width="' + (_IB / _barMax * _barW).toFixed(0) + '" height="18" rx="3" fill="#3b82f6"/>';
+        _barSvg += '<text x="28" y="23" text-anchor="end" font-size="10" fill="#1e3a5f">IB</text>';
+        _barSvg += '<text x="' + (32 + _IB / _barMax * _barW).toFixed(0) + '" y="23" font-size="10" fill="#3b82f6">' + _IB.toFixed(1) + ' A</text>';
+        _barSvg += '<rect x="30" y="34" width="' + (_In / _barMax * _barW).toFixed(0) + '" height="18" rx="3" fill="#059669"/>';
+        _barSvg += '<text x="28" y="47" text-anchor="end" font-size="10" fill="#065f46">In</text>';
+        _barSvg += '<text x="' + (32 + _In / _barMax * _barW).toFixed(0) + '" y="47" font-size="10" fill="#059669">' + _In + ' A</text>';
+        _barSvg += '<rect x="30" y="58" width="' + (_izCorr / _barMax * _barW).toFixed(0) + '" height="18" rx="3" fill="#7c3aed"/>';
+        _barSvg += '<text x="28" y="71" text-anchor="end" font-size="10" fill="#5b21b6">Iz</text>';
+        _barSvg += '<text x="' + (32 + _izCorr / _barMax * _barW).toFixed(0) + '" y="71" font-size="10" fill="#7c3aed">' + _izCorr.toFixed(0) + ' A</text>';
+        _barSvg += '<text x="200" y="88" text-anchor="middle" font-size="10" fill="#475467">IB \u2264 In \u2264 Iz ' + (_chainOk ? '\u2713' : '\u2717') + '</text>';
+        _barSvg += '</svg>';
+
+        // --- WHY panel: engineering reasoning steps ---
+        var _whySteps = [
+          { type: 'standard', clauses: ['DS/HD 60364-4-43', 'DS/HD 60364-5-52'], content: tx('Beskyttelse mod overstr\u00f8m + kabeldimensionering.', 'Overcurrent protection + cable sizing.') },
+          { type: 'assumption', content: tx('Last: ', 'Load: ') + loadState.power + ' kW, cos\u03c6=' + loadState.cosPhi + ', ' + loadState.voltage + ' V' },
+          { type: 'variables', vars: [
+            { sym: 'IB', da: 'Belastningsstr\u00f8m', en: 'Design current', val: _IB.toFixed(1), unit: 'A' },
+            { sym: 'In', da: 'M\u00e6rkestr\u00f8m', en: 'Rated current', val: _In, unit: 'A' },
+            { sym: 'Iz', da: 'Str\u00f8mv\u00e6rdi (korr.)', en: 'Ampacity (corr.)', val: _izCorr.toFixed(0), unit: 'A' }
+          ] },
+          { type: 'formula', content: 'I<sub>B</sub> \u2264 I<sub>n</sub> \u2264 I<sub>z</sub>' },
+          { type: 'alternatives', alts: [
+            { option: tx('Kurve B', 'Curve B'), chosen: _curve === 'B', reason: 'curve-selection', reason_da: _curve === 'B' ? 'Resistiv last (cos\u03c6 \u2265 0,85) og moderat str\u00f8m \u2014 kurve B er tilstr\u00e6kkelig.' : (_IB > 50 ? 'Ikke valgt: h\u00f8j str\u00f8m (>50 A) kr\u00e6ver kurve C.' : 'Ikke valgt: induktiv last (cos\u03c6 < 0,85) kr\u00e6ver kurve C.'), reason_en: _curve === 'B' ? 'Resistive load (cos\u03c6 \u2265 0.85) and moderate current \u2014 curve B is sufficient.' : (_IB > 50 ? 'Not chosen: high current (>50 A) requires curve C.' : 'Not chosen: inductive load (cos\u03c6 < 0.85) requires curve C.') },
+            { option: tx('Kurve C', 'Curve C'), chosen: _curve === 'C', reason: 'curve-selection', reason_da: _curve === 'C' ? (_IB > 50 ? 'H\u00f8j belastningsstr\u00f8m (>50 A) \u2014 kurve C t\u00e5ler startstr\u00f8mme.' : 'Induktiv last (cos\u03c6 < 0,85) \u2014 kurve C absorberer startstr\u00f8m.') : 'Ikke n\u00f8dvendig for resistiv last med moderat str\u00f8m.', reason_en: _curve === 'C' ? (_IB > 50 ? 'High load current (>50 A) \u2014 curve C tolerates inrush.' : 'Inductive load (cos\u03c6 < 0.85) \u2014 curve C absorbs inrush.') : 'Not needed for resistive load with moderate current.' }
+          ] },
+          { type: 'conclusion', content: _allOk ? tx('Alle krav opfyldt \u2014 koordineret dimensionering godkendt.', 'All requirements met \u2014 coordinated sizing approved.') : tx('En eller flere kontroller fejlede \u2014 gennemg\u00e5 resultater.', 'One or more checks failed \u2014 review results.'), status: _allOk ? 'pass' : 'fail' }
+        ];
+
+        // --- WHY panel: assemble the full collapsible panel ---
+        var _whyPanel = '<div style="margin-top:12px">' +
+          uxPanel(tx('\uD83D\uDD0D Vis hvorfor disse komponenter er valgt', '\uD83D\uDD0D Show why these components were chosen'),
+            '<div style="margin-bottom:12px"><strong>' + tx('Koordineringsk\u00e6de', 'Coordination chain') + ':</strong>' + _barSvg + '</div>' +
+            '<div style="margin-bottom:12px"><strong>' + tx('Udl\u00f8sekurve for valgt MCB', 'Trip curve for selected MCB') + ' (' + _curve + _In + '):</strong><div style="max-width:500px">' + mcbRenderCurves([_curve], _In) + '</div></div>' +
+            engPresentation(tx('Dimensioneringslogik', 'Sizing logic'), _whySteps, { id: 'eng_load_why', open: false })
+          , { id: 'load_why_panel', open: false }) +
+          '</div>';
+
         return '<div class="result-box" style="margin-top:12px;border-color:' + (_allOk ? 'var(--success)' : 'var(--danger)') + '">' +
           '<div class="result-title">' + tx('\u26A1 Automatisk dimensionering', '\u26A1 Automatic dimensioning') + ' \u2014 ' +
             (_allOk ? '<span style="color:var(--success);font-weight:700">' + tx('GODKENDT', 'APPROVED') + ' \u2713</span>' :
@@ -9829,7 +9888,7 @@ function renderLoad() {
           '<div class="result-row"><span class="label">5. I<sub>k,max</sub> / I<sub>cu</sub></span><span class="value">' + _IkkA.toFixed(1) + ' kA \u2014 ' + tx('afbryder skal have I\u1D04\u1D64 \u2265 ', 'breaker needs I\u1D04\u1D64 \u2265 ') + _IkkA.toFixed(1) + ' kA</span></div>' +
           '<div class="result-row"><span class="label">6. k\u00B2S\u00B2 \u2265 I\u00B2t</span><span class="value">' + _k + '\u00B2\u00d7' + _csa + '\u00B2 = ' + Math.round(_k*_k*_csa*_csa/1e6) + '\u00d710\u2076 ' + (_adiaOk ? '\u2265' : '<') + ' S<sub>min</sub>=' + _Smin.toFixed(1) + ' mm\u00B2 ' + (_adiaOk ? '\u2713' : '\u2717') + '</span></div>' +
           '<div class="result-row" style="margin-top:6px;font-size:0.78em;opacity:0.7"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-4-43 \u00a7433.1, -5-52 \u00a7523, -4-41 \u00a7411</span></div>' +
-        '</div>';
+        '</div>' + _whyPanel;
       })() : ''}
 
       <div class="select-group">
@@ -10049,6 +10108,17 @@ function renderFuse() {
         result: { value: fuseState.size, unit: 'A', status: 'ok' },
         reference: 'IEC 60269-2; DS/HD 60364-4-43 cl.433'
       })}
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
+        <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>Eaton / Bussmann</strong></span></div>
+        <div class="result-row"><span class="label">${tx('System', 'System')}</span><span class="value">${fuseState.holder}</span></div>
+        <div class="result-row"><span class="label">${tx('St\u00F8rrelse', 'Size')}</span><span class="value">${fuseState.size} A</span></div>
+        <div class="result-row"><span class="label">${tx('Brydeevne', 'Breaking capacity')}</span><span class="value">${holder.ikMax} kA</span></div>
+        <div class="result-row"><span class="label">${tx('5s str\u00F8m', '5s current')}</span><span class="value">${FUSE_5S[fuseState.size] || '\u2014'} A</span></div>
+        <div class="result-row"><span class="label">${tx('Standard', 'Standard')}</span><span class="value">IEC 60269-2</span></div>
+        <div class="result-row"><span class="label">${tx('Produktkatalog', 'Product catalog')}</span><span class="value"><a href="https://www.eaton.com/gb/en-gb/catalog/fuses.html" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">eaton.com/fuses \u2197</a></span></div>
+        <div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.7">${tx('Produktdata hentet fra Eaton/Bussmann katalog. Verific\u00E9r altid mod den aktuelle udgave af produktets datablad f\u00F8r bestilling.', 'Product data from the Eaton/Bussmann catalog. Always verify against the current edition of the product datasheet before ordering.')}</div>
+      </div>
     </div>
 
     ${uxPanel(tx('Sikringsklasser og kurver', 'Fuse Classes & Curves'), `
@@ -10178,6 +10248,17 @@ function renderMCB() {
         result: { value: mcbState.rating, unit: 'A', status: 'ok' },
         reference: mcb.standard + '; DS/HD 60364-4-43 cl.433'
       })}
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
+        <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>Schneider Electric</strong></span></div>
+        <div class="result-row"><span class="label">${tx('Serie', 'Series')}</span><span class="value">${mcbState.type}</span></div>
+        <div class="result-row"><span class="label">${tx('Kurve', 'Curve')}</span><span class="value">${mcbState.curve} (${MCB_TYPE_INFO[mcbState.curve].iecMin}\u2013${MCB_TYPE_INFO[mcbState.curve].iecMax}\u00d7I\u2099)</span></div>
+        <div class="result-row"><span class="label">${tx('M\u00E6rkestr\u00F8m', 'Rated current')}</span><span class="value">${mcbState.rating} A</span></div>
+        <div class="result-row"><span class="label">${tx('Brydeevne', 'Breaking capacity')}</span><span class="value">${icu} kA</span></div>
+        <div class="result-row"><span class="label">${tx('Standard', 'Standard')}</span><span class="value">${mcb.standard}</span></div>
+        <div class="result-row"><span class="label">${tx('Produktkatalog', 'Product catalog')}</span><span class="value"><a href="https://www.se.com/ww/en/product-range/2125-acti-9-ic60/" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">se.com/Acti9-iC60 \u2197</a></span></div>
+        <div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.7">${tx('Produktdata hentet fra Schneider Electric katalog. Verific\u00E9r altid mod den aktuelle udgave af produktets datablad f\u00F8r bestilling.', 'Product data from the Schneider Electric catalog. Always verify against the current edition of the product datasheet before ordering.')}</div>
+      </div>
     </div>
     ` : ''}
   `;
@@ -10278,7 +10359,7 @@ function renderMCCB() {
       ` : ''}
       <div class="result-box" style="margin-top:12px">
         <div class="result-title">${tx('Beskyttelseskonvolut', 'Protection envelope')} \u2014 ${mccbState.tripUnit}</div>
-        ${lsigRenderCurve({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
+        ${(function(){ var _ikForPlot = (scState.zNet + scState.zTrafo > 0) ? (1.05 * 400) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000) : 0; return lsigRenderCurve({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit, ikPlot: (_ikForPlot > 0 && _ikForPlot < 200000) ? _ikForPlot : undefined }); })()}
       </div>
       <div class="result-box" style="margin-top:12px">
         <div class="result-title">${tx('Indstillinger', 'Settings')}</div>
@@ -10500,6 +10581,17 @@ function renderCable() {
         <div class="result-row"><span class="label">${t('cableIz')} (${tx('korrigeret', 'corrected')})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
       </div>
       ${calcDetailIz(baseIz, kInstall, kTemp, kGroup, correctedIz, cableState.type + ' ' + cableState.cores + ' ' + cableState.crossSection + ' mm\u00B2', cableState.installMethod, cableState.temp, cableState.grouping)}
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
+        <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>${tx('Nexans / nkt / Daka', 'Nexans / nkt / Daka')}</strong></span></div>
+        <div class="result-row"><span class="label">${tx('Type', 'Type')}</span><span class="value">${cableState.type}</span></div>
+        <div class="result-row"><span class="label">${tx('Ledere', 'Cores')}</span><span class="value">${cableState.cores}</span></div>
+        <div class="result-row"><span class="label">${tx('Tv\u00E6rsnit', 'Cross-section')}</span><span class="value">${cableState.crossSection} mm\u00B2</span></div>
+        <div class="result-row"><span class="label">${tx('Materiale', 'Material')}</span><span class="value">${cableState.material === 'copper' ? tx('Kobber', 'Copper') : tx('Aluminium', 'Aluminium')}</span></div>
+        <div class="result-row"><span class="label">Iz (${tx('basis', 'base')})</span><span class="value">${baseIz} A</span></div>
+        <div class="result-row"><span class="label">${tx('Standard', 'Standard')}</span><span class="value">DS/HD 60364-5-52</span></div>
+        <div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.7">${tx('Kabeldata baseret p\u00E5 standardtabeller iht. DS/HD 60364-5-52. Verific\u00E9r altid mod den aktuelle udgave af fabrikantens datablad f\u00F8r bestilling.', 'Cable data based on standard tables per DS/HD 60364-5-52. Always verify against the current edition of the manufacturer datasheet before ordering.')}</div>
+      </div>
     </div>
     ` : ''}
   `;
@@ -12117,7 +12209,7 @@ function renderStandards() {
         <div class="select-label">${tx('Vælg kurvetyper (flere mulige)', 'Select curve types (multiple)')}</div>
         <div class="select-grid">
           ${Object.keys(MCB_TYPE_INFO).map(ct =>
-            `<button class="sel-btn ${mcbCurveSel.indexOf(ct) >= 0 ? 'selected' : ''}" onclick="mcbToggleCurveType('${ct}')">${tx('Kurve', 'Curve')} ${ct}</button>`
+            `<button class="sel-btn ${mcbCurveSel.indexOf(ct) >= 0 ? 'selected' : ''}" onclick="mcbToggleCurveType('${ct}')">${tx('Kurve', 'Curve')} ${ct} <span style="font-size:0.72em;opacity:0.8">(${MCB_TYPE_INFO[ct].iecMin}\u2013${MCB_TYPE_INFO[ct].iecMax}\u00d7)</span></button>`
           ).join('')}
         </div>
       </div>
