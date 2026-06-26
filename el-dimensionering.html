@@ -12577,7 +12577,7 @@ function renderStandards() {
 
       <div class="result-box" style="margin-top:12px">
         <div class="result-title">${tx('Moment-/hastighedskurve (T/Tn)', 'Torque/Speed Curve (T/Tn)')}</div>
-        <div class="info-row">${tx('Motorens momentkurve skal ligge over lastkurven i hele opl\u00f8bet, ellers stejler motoren. Y-\u0394 halverer startmomentet (\u22481/3), s\u00e5 kontroll\u00e9r at restmomentet stadig overstiger lasten ved omkoblingspunktet.', 'The motor torque curve must stay above the load curve throughout run-up, otherwise the motor stalls. Y-\u0394 reduces starting torque to \u22481/3, so verify the residual torque still exceeds the load at the changeover point.')}</div>
+        <div class="info-row">${tx('Motorens momentkurve skal ligge over lastkurven i hele opl\u00f8bet, ellers stejler motoren. Y-\u0394 reducerer startmomentet til ca. 1/3 (samme faktor som startstr\u00f8mmen, da momentet er proportionalt med spændingen i anden potens), s\u00e5 kontroll\u00e9r at restmomentet stadig overstiger lasten ved omkoblingspunktet.', 'The motor torque curve must stay above the load curve throughout run-up, otherwise the motor stalls. Y-\u0394 reduces starting torque to \u22481/3 (same factor as the starting current, since torque is proportional to voltage squared), so verify the residual torque still exceeds the load at the changeover point.')}</div>
         ${motorRenderTorqueCurve(motorCurveState)}
       </div>
 

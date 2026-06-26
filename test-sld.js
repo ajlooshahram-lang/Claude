@@ -16038,6 +16038,34 @@ test('harmonicCalcNeutral remains conservative: neutral factor never below sqrt(
 });
 
 
+// === Star-Delta starting torque (P1 audit) ===
+console.log('\n=== Star-Delta Torque Tests ===\n');
+
+test('Y-delta reduces starting torque to ~1/3 of DOL (T proportional to V^2)', function() {
+  // Phase voltage in star = U_line/sqrt(3); torque ~ V^2 => factor (1/sqrt(3))^2 = 1/3.
+  var dol = MOTOR_START_METHODS['DOL'].torqueStart;
+  var sd = MOTOR_START_METHODS['SD'].torqueStart;
+  var ratio = sd / dol;
+  assert.ok(Math.abs(ratio - (1 / 3)) < 0.05,
+    'SD/DOL start-torque ratio must be ~1/3, got ' + ratio.toFixed(3));
+  // And the current reduction uses the same 1/3 factor:
+  var iSD = motorteoriCalcIstartStarDelta(100, 6); // 6x In DOL
+  var iDOL = motorteoriCalcIstart(100, 6);
+  assert.ok(Math.abs((iSD / iDOL) - (1 / 3)) < 1e-9, 'SD start current must be 1/3 of DOL');
+});
+
+test('Torque/speed curve text says Y-delta reduces torque to ~1/3 (not "halves")', function() {
+  var prevMod = (typeof activeModule !== 'undefined') ? activeModule : null;
+  var html = (typeof renderStandards === 'function') ? '' : '';
+  // The corrected wording lives in the standards/motor-curve view; assert the source
+  // string no longer claims "halverer" and references 1/3 in both languages.
+  var src = require('fs').readFileSync(__dirname + '/el-dimensionering.html', 'utf8');
+  assert.ok(src.indexOf('halverer startmomentet') < 0, 'must not claim Y-delta "halves" the torque');
+  assert.ok(src.indexOf('reducerer startmomentet til ca. 1/3') >= 0, 'DA text must state reduction to ~1/3');
+  assert.ok(/reduces starting torque to \S*1\/3/.test(src), 'EN text must state reduction to ~1/3');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
