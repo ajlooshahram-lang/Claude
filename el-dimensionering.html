@@ -34152,9 +34152,23 @@ function analyzerExtract(text) {
 
   // === FORSYNING / HV NETWORK DATA (Bind 5) ===
   // Short-circuit power Skh at the HV busbar: "kortslutningseffekt ... 120 MVA", "Skh = 150 MVA"
+  // Short-circuit power at the HV busbar. Capture Sk,max and Sk,min separately
+  // (real exams: "Sk,max = 225 MVA ved cos phi=0,11", "Sk,min = 175 MVA ved cos phi=0,20").
+  var skMaxM = text.match(/(?:S_?k|k)\s*,?\s*max[^.\n]{0,18}?(\d+[.,]?\d*)\s*MVA/i);
+  var skMinM = text.match(/(?:S_?k|k)\s*,?\s*min[^.\n]{0,18}?(\d+[.,]?\d*)\s*MVA/i);
+  if (skMaxM) data.Skh_max_MVA = parseFloat(skMaxM[1].replace(',', '.'));
+  if (skMinM) data.Skh_min_MVA = parseFloat(skMinM[1].replace(',', '.'));
   var skhMatch = text.match(/(?:kortslutningseffekt\w*|S_?kh?)[^.\n]{0,40}?(\d+[.,]?\d*)\s*MVA/i);
   if (!skhMatch) skhMatch = text.match(/(\d+[.,]?\d*)\s*MVA/i);
-  if (skhMatch) { data.Skh_MVA = parseFloat(skhMatch[1].replace(',', '.')); data.confidence.Skh_MVA = 'high'; }
+  // Primary Skh = the max value (for Ik,max); fall back to the first MVA found.
+  if (data.Skh_max_MVA) { data.Skh_MVA = data.Skh_max_MVA; data.confidence.Skh_MVA = 'high'; }
+  else if (skhMatch) { data.Skh_MVA = parseFloat(skhMatch[1].replace(',', '.')); data.confidence.Skh_MVA = 'high'; }
+  // Network angle for min: a second, larger cos(phi_k) (e.g. 0,20) if present.
+  var allLowCos = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*\)?\s*[:=]?\s*0[.,][0-4]\d*/ig);
+  if (allLowCos && allLowCos.length >= 2) {
+    var vals = allLowCos.map(function (x) { return parseFloat((x.match(/0[.,]\d+/) || ['0'])[0].replace(',', '.')); }).sort(function (a, b) { return a - b; });
+    data.cosPhiK = vals[0]; data.cosPhiK_min = vals[vals.length - 1]; // smallest angle uses largest cos? max fault uses lowest cos -> keep min cos as primary
+  }
   // Network short-circuit angle: "cos phi_k = 0,1" / "cos Fk 0,15" or R/X via "arccot 0,30"
   // Network short-circuit angle cos(phi_k): explicit "cos phi_k = .." OR (fallback)
   // any "cos phi = X" with X < 0.5 (a short-circuit angle, never a load PF).
@@ -34471,9 +34485,17 @@ function analyzerSolve(data) {
       var h = '<div class="result-box"><div class="result-title">\u26A1 Kortslutningseffekt / Ik (' + nf(UnHV / 1000, 0) + ' kV)</div>'
         + row('Z\u2099\u2091\u209c = c\u00b7U\u00b2/S\u2096', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/(' + nf(data.Skh_MVA, 0) + '\u00b710\u2076) = ' + fmtZ(zNetHV.r, zNetHV.x))
         + row('S\u2096 = c\u00b7U\u00b2/|Z|', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/' + nf(zNetHV.mag, 3) + ' = ' + nf(sk.Sk / 1e6, 1) + ' MVA')
-        + row('I\u2096\u2083max = c\u00b7U/(\u221a3\u00b7|Z|)', nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zNetHV.mag, 3) + ') = ' + nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0')
-        + '<div class="info-row" style="font-size:0.76rem">S\u2096 = c\u00b7U\u00b2/|Z|, I\u2096 = c\u00b7U/(\u221a3\u00b7|Z|); IEC 60909 / DS/EN 50522. Kabelimpedanser frem til en nedstr\u00f8ms station skal l\u00e6gges til Z\u2099\u2091\u209c.</div></div>';
-      results.push({ type: 'sk_net', label: 'Kortslutningseffekt S\u2096', value: nf(sk.Sk / 1e6, 1) + ' MVA / ' + nf(sk.Ik / 1000, 2) + ' kA', html: h, asked: true });
+        + row('I\u2096\u2083max = c\u00b7U/(\u221a3\u00b7|Z|)', nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zNetHV.mag, 3) + ') = ' + nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0');
+      var valStr = nf(sk.Sk / 1e6, 1) + ' MVA / ' + nf(sk.Ik / 1000, 2) + ' kA';
+      if (data.Skh_min_MVA) {
+        var cosMin = data.cosPhiK_min || cosk;
+        var zMin = forsyningNetZfromSk(data.Skh_min_MVA * 1e6, UnHV, cosMin, 0.95);
+        var skMin = forsyningNetworkSk(zMin.r, zMin.x, UnHV, 0.95);
+        h += row('I\u2096\u2083min = c\u2098\u1d62\u2099\u00b7U/(\u221a3\u00b7|Z_min|)', '0,95\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zMin.mag, 3) + ') = ' + nf(skMin.Ik / 1000, 2) + ' kA');
+        valStr += ' \u00b7 Ik,min ' + nf(skMin.Ik / 1000, 2) + ' kA';
+      }
+      h += '<div class="info-row" style="font-size:0.76rem">S\u2096 = c\u00b7U\u00b2/|Z|, I\u2096 = c\u00b7U/(\u221a3\u00b7|Z|); IEC 60909 / DS/EN 50522. Ik,max: c=1,0 og S\u2096,max; Ik,min: c=0,95 og S\u2096,min. Kabelimpedanser til en nedstr\u00f8ms station l\u00e6gges til Z\u2099\u2091\u209c.</div></div>';
+      results.push({ type: 'sk_net', label: 'Kortslutningseffekt S\u2096', value: valStr, html: h, asked: true });
       solved++;
     } else if (hasQuestion(data, 'sk_net')) { flagged.push('Sk: mangler kortslutningseffekt (MVA) p\u00e5 HV-skinnen'); }
     if (hasQuestion(data, 'sk_net')) total++;
