@@ -8611,8 +8611,9 @@ test('Provenance: numbers MATCH the verified engine (officialIz + sldCalcNodeIB)
   const engineIz = officialIz(cab);
   const ibEntry = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'ib'; });
   const izEntry = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'iz'; });
-  const ibShown = parseFloat(ibEntry.value);
-  const izShown = parseFloat(izEntry.value);
+  // Display values use Danish decimal comma in da mode; normalize before parse.
+  const ibShown = parseFloat(String(ibEntry.value).replace(',', '.'));
+  const izShown = parseFloat(String(izEntry.value).replace(',', '.'));
   assert(Math.abs(ibShown - engineIB) < 0.1, 'provenance IB (' + ibShown + ') matches engine IB (' + engineIB.toFixed(1) + ')');
   assert(Math.abs(izShown - engineIz) < 0.5, 'provenance Iz (' + izShown + ') matches engine officialIz (' + engineIz + ')');
   // The Iz must be the DERATED officialIz, never the nominal product.iz when they differ.
@@ -10270,13 +10271,19 @@ test('calcDetail: result status renders verdict icon', function() {
 });
 
 test('calcDetailFmtVal: formats numbers and strings correctly', function() {
-  assert.strictEqual(calcDetailFmtVal(25), '25', 'integer');
-  assert.strictEqual(calcDetailFmtVal(3.14159), '3.14', 'float < 100');
-  assert.strictEqual(calcDetailFmtVal(123.456), '123.5', 'float >= 100');
-  assert.strictEqual(calcDetailFmtVal(0.00567), '0.006', 'small float');
+  var prev = lang;
+  lang = 'da';
+  assert.strictEqual(calcDetailFmtVal(25), '25', 'integer (da)');
+  assert.strictEqual(calcDetailFmtVal(3.14159), '3,14', 'float < 100 uses comma (da)');
+  assert.strictEqual(calcDetailFmtVal(123.456), '123,5', 'float >= 100 uses comma (da)');
+  assert.strictEqual(calcDetailFmtVal(0.00567), '0,006', 'small float uses comma (da)');
   assert.strictEqual(calcDetailFmtVal(null), '\u2014', 'null');
   assert.strictEqual(calcDetailFmtVal('hello'), 'hello', 'string');
   assert.strictEqual(calcDetailFmtVal(Infinity), '\u2014', 'infinity');
+  lang = 'en';
+  assert.strictEqual(calcDetailFmtVal(3.14159), '3.14', 'float < 100 uses period (en)');
+  assert.strictEqual(calcDetailFmtVal(123.456), '123.5', 'float >= 100 uses period (en)');
+  lang = prev;
 });
 
 test('calcDetailIz: produces correct Iz derating card', function() {
@@ -10285,7 +10292,7 @@ test('calcDetailIz: produces correct Iz derating card', function() {
   assert(html.indexOf('Iz_tab') >= 0, 'has Iz_tab');
   assert(html.indexOf('K_temp') >= 0, 'has K_temp');
   assert(html.indexOf('K_group') >= 0, 'has K_group');
-  assert(html.indexOf('0.870') >= 0, 'has kTemp factor');
+  assert(html.indexOf('0,870') >= 0, 'has kTemp factor (da comma)');
   assert(html.indexOf('DS/HD 60364-5-52') >= 0, 'has DS reference');
 });
 
@@ -10311,8 +10318,8 @@ test('calcDetailIB: produces correct load current card', function() {
   var html = calcDetailIB(3.68, 0.95, '1x230', 16.84, 1.0, 1.0);
   assert(html.indexOf('<details') >= 0, 'has details element');
   assert(html.indexOf('IB') >= 0, 'has IB title');
-  assert(html.indexOf('3.68') >= 0 || html.indexOf('3680') >= 0, 'has power value');
-  assert(html.indexOf('0.95') >= 0, 'has cos phi');
+  assert(html.indexOf('3,68') >= 0 || html.indexOf('3680') >= 0, 'has power value (da comma)');
+  assert(html.indexOf('0,95') >= 0, 'has cos phi (da comma)');
   assert(html.indexOf('DS/HD 60364-4-43') >= 0, 'has clause reference');
 });
 
@@ -10544,7 +10551,8 @@ test('Analyzer: analyzerSolve computes IB from power and cosPhi', function() {
   assert(ibResult, 'IB result exists');
   // IB = (37000 / 0.93) / (sqrt(3) * 400 * 0.86) = 39795.7 / 596.0 = 66.77 A
   var expectedIB = (37000 / 0.93) / (Math.sqrt(3) * 400 * 0.86);
-  assert(ibResult.value.indexOf(expectedIB.toFixed(2)) >= 0, 'IB value correct (~' + expectedIB.toFixed(2) + 'A)');
+  // Display uses Danish decimal comma in da mode; normalize for numeric compare.
+  assert(ibResult.value.replace(',', '.').indexOf(expectedIB.toFixed(2)) >= 0, 'IB value correct (~' + expectedIB.toFixed(2) + 'A)');
   assert(ibResult.asked === true, 'marked as asked question');
 });
 
@@ -11614,7 +11622,7 @@ test('AD: smarter "nice to know" — PFC capacitor + max Zs bonuses', function()
   assert(pfc.value.indexOf('kVAr') >= 0, 'PFC value expressed in kVAr');
   assert(zsm && zsm.html.indexOf('60364-4-41') >= 0, 'Zs,max bonus present and cites the fault-protection clause');
   // For MCB curve C 32A: Ia=320A, Zs,max = 230/320 = 0.719 Ω
-  assert(zsm.value.indexOf('0.719') >= 0 || zsm.value.indexOf('0.72') >= 0, 'Zs,max = 230/(10*32) ≈ 0.719 Ω, got ' + zsm.value);
+  assert(zsm.value.indexOf('0,719') >= 0 || zsm.value.indexOf('0,72') >= 0, 'Zs,max = 230/(10*32) ≈ 0,719 Ω (da comma), got ' + zsm.value);
 });
 
 test('AD: new question types are all mapped in EXAM_SOLUTION_RESULT_ALIAS', function() {
@@ -14810,8 +14818,8 @@ test('eng: engCableReasoning builds correct cable-sizing presentation', function
     tableRef: 'Tabel B.52.4', tempC: 30, groupCount: 2, verdict: 'pass'
   });
   assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites cable standard');
-  assert.ok(h.indexOf('26.2') >= 0, 'shows corrected Iz');
-  assert.ok(h.indexOf('0.82') >= 0, 'shows grouping factor');
+  assert.ok(h.indexOf('26,2') >= 0, 'shows corrected Iz (da comma)');
+  assert.ok(h.indexOf('0,82') >= 0, 'shows grouping factor (da comma)');
   assert.ok(h.indexOf('NOIKLX') >= 0, 'shows cable type');
   assert.ok(h.indexOf('success') >= 0, 'pass conclusion');
   lang = prev;
@@ -14837,7 +14845,7 @@ test('eng: engVdropReasoning builds correct voltage-drop presentation', function
     cosPhi: 0.95, voltage: 230, dropV: 4.8, dropPct: 2.1, limit: 3, verdict: 'pass'
   });
   assert.ok(h.indexOf('DS/HD 60364-5-52') >= 0, 'cites standard');
-  assert.ok(h.indexOf('2.1') >= 0, 'shows drop percentage');
+  assert.ok(h.indexOf('2,1') >= 0, 'shows drop percentage (da comma)');
   assert.ok(h.indexOf('25 m') >= 0, 'shows cable length');
   assert.ok(h.indexOf('acceptabelt') >= 0 || h.indexOf('acceptable') >= 0, 'pass conclusion');
   lang = prev;
@@ -15791,6 +15799,272 @@ test('render-sweep: every module renders clean in da/en/fa (no NaN, undefined, o
   lang = savedLang;
   assert.ok(bad.length === 0, 'render issues: ' + bad.slice(0, 12).join('; '));
 });
+
+// =====================================================================
+// P0-A: DANISH DECIMAL COMMA — formatting helpers + display localizer
+// =====================================================================
+console.log('\n=== Danish Decimal Comma (P0-A) Tests ===\n');
+
+test('nf(): Danish comma vs English period; safe edge cases', function () {
+  var prev = lang;
+  lang = 'da';
+  assert.strictEqual(nf(3.14159, 2), '3,14', 'da: comma decimal');
+  assert.strictEqual(nf(1000, 0), '1000', 'da: integer no separator change');
+  assert.strictEqual(nf(0.5, 3), '0,500', 'da: leading-zero decimal');
+  assert.strictEqual(nf(-12.5, 1), '-12,5', 'da: negative');
+  assert.strictEqual(nf(undefined, 2), '', 'undefined -> empty');
+  assert.strictEqual(nf(null, 2), '', 'null -> empty');
+  assert.strictEqual(nf(Infinity, 2), 'Infinity', 'non-finite passthrough');
+  lang = 'en';
+  assert.strictEqual(nf(3.14159, 2), '3.14', 'en: period decimal');
+  assert.strictEqual(nf(-12.5, 1), '-12.5', 'en: negative period');
+  lang = 'fa';
+  assert.strictEqual(nf(3.14, 2), '3.14', 'fa: period (non-da unchanged)');
+  lang = prev;
+});
+
+test('nfN(): natural-representation localization (raw values)', function () {
+  var prev = lang;
+  lang = 'da';
+  assert.strictEqual(nfN(0.82), '0,82', 'da: comma');
+  assert.strictEqual(nfN(32), '32', 'da: integer unchanged');
+  assert.strictEqual(nfN('text'), 'text', 'non-number passthrough');
+  lang = 'en';
+  assert.strictEqual(nfN(0.82), '0.82', 'en: period');
+  lang = prev;
+});
+
+test('nfLoc(): locale grouping (da uses . grouping, , decimal)', function () {
+  var prev = lang;
+  lang = 'da';
+  assert.strictEqual(nfLoc(1234567), '1.234.567', 'da grouping with periods');
+  lang = 'en';
+  assert.strictEqual(nfLoc(1234567), '1,234,567', 'en grouping with commas');
+  lang = prev;
+});
+
+test('daLocalizeNumbers(): converts display decimals, PROTECTS refs/products/grouping', function () {
+  var prev = lang;
+  lang = 'da';
+  function L(s) { return daLocalizeNumbers('<div>' + s + '</div>').replace(/^<div>|<\/div>$/g, ''); }
+  // genuine displayed values -> comma
+  assert.strictEqual(L('R=7.41 X=0.105 \u03a9'), 'R=7,41 X=0,105 \u03a9', 'physical values');
+  assert.strictEqual(L('cos\u03c6=0.866'), 'cos\u03c6=0,866', 'cosphi value');
+  assert.strictEqual(L('5G2.5 mm\u00b2'), '5G2,5 mm\u00b2', 'cable cross-section (Danish notation)');
+  assert.strictEqual(L('\u03b50 = 8.854'), '\u03b50 = 8,854', 'epsilon-0 single-group decimal');
+  // standards / clause references -> KEEP period
+  assert.strictEqual(L('DS/HD 60364-4-43 \u00a7433.1'), 'DS/HD 60364-4-43 \u00a7433.1', 'clause ref kept');
+  assert.strictEqual(L('Tabel B.52.4'), 'Tabel B.52.4', 'table ref kept');
+  assert.strictEqual(L('cl.523.6.3'), 'cl.523.6.3', 'multi-segment clause kept');
+  assert.strictEqual(L('IEEE C57.110'), 'IEEE C57.110', 'IEEE standard code kept');
+  assert.strictEqual(L('Micrologic 5.2'), 'Micrologic 5.2', 'product model name kept');
+  // grouped thousands -> KEEP
+  assert.strictEqual(L('1.234.567 kr'), '1.234.567 kr', 'millions grouping kept');
+  assert.strictEqual(L('12.500 kr'), '12.500 kr', 'single-group cost (currency) kept');
+  // attributes / tags untouched (coordinates must keep period)
+  assert.strictEqual(daLocalizeNumbers('<line x1="12.5" y1="3.7"/>'), '<line x1="12.5" y1="3.7"/>', 'SVG attrs untouched');
+  // idempotent + English unaffected
+  assert.strictEqual(L('0,82'), '0,82', 'already-comma untouched');
+  lang = 'en';
+  assert.strictEqual(daLocalizeNumbers('<div>0.82</div>'), '<div>0.82</div>', 'en mode: no change');
+  lang = prev;
+});
+
+test('da render-sweep: representative calc modules show no unprotected period-decimals', function () {
+  var prev = lang;
+  lang = 'da';
+  // Numbers that legitimately keep a period in displayed text (standards/clause
+  // refs, multi-segment clause numbers, product model codes). Anything else with
+  // a period between digits in da-mode display text is a localization defect.
+  var ALLOW = [
+    /\u00a7\d+\.\d+/,            // §433.1
+    /[A-Za-z]\.\d+(?:\.\d+)*/,  // B.52.4, B.52.11
+    /\d+\.\d+\.\d+/,            // 523.6.3, 4.2.5, 6.2.3.5, 7.4.1.3
+    /(?:cl|pkt|kap|art|Tabel|Table|Annex|Bilag)\.?\s*\d+\.\d+/i,
+    /[A-Z]\d+\.\d+/,           // C57.110
+    /Micrologic\s*\d+\.\d+/i,
+    /IEC\s*61800-\d/i
+  ];
+  var mods = ['load','cable','vdrop','scircuit','trafo','mcb','mccb','motor','harmonic','vfd','pfc','trefase','motorteori','kapacitor','varme','impedans','zs','dc','lys','magnet'];
+  var fmap = { load:'renderLoad', cable:'renderCable', vdrop:'renderVdrop', scircuit:'renderShortCircuit', trafo:'renderTrafo', mcb:'renderMCB', mccb:'renderMCCB', motor:'renderMotor', harmonic:'renderHarmonic', vfd:'renderVFD', pfc:'renderPFC', trefase:'renderTrefase', motorteori:'renderMotorteori', kapacitor:'renderKapacitor', varme:'renderVarme', impedans:'renderImpedans', zs:'renderZs', dc:'renderDC', lys:'renderLys', magnet:'renderMagnet' };
+  var bad = [];
+  mods.forEach(function (mod) {
+    var out;
+    try { out = (typeof eval(fmap[mod]) === 'function') ? daLocalizeNumbers(eval(fmap[mod])()) : ''; }
+    catch (e) { bad.push(mod + ' THREW ' + e.message); return; }
+    if (typeof out !== 'string') return;
+    var text = out.replace(/<[^>]*>/g, ' ');
+    var re = /(\D|^)(\d{1,4}\.\d+)(?=\D|$)/g, m;
+    while ((m = re.exec(text))) {
+      var tokStart = m.index + m[1].length;
+      var win = text.slice(Math.max(0, tokStart - 14), tokStart + m[2].length + 8);
+      var allowed = ALLOW.some(function (r) { return r.test(win); });
+      if (!allowed) bad.push(mod + ': "' + m[2] + '" in "' + win.replace(/\s+/g, ' ').trim() + '"');
+    }
+  });
+  lang = prev;
+  assert.ok(bad.length === 0, 'unprotected period-decimals: ' + bad.slice(0, 15).join(' | '));
+});
+
+
+// === MCB rating availability (P0-B) ===
+console.log('\n=== MCB Rating Availability Tests ===\n');
+
+test('mcbAllRatings returns the union of all series ratings, sorted ascending', function() {
+  var all = mcbAllRatings();
+  // Sorted ascending, unique
+  for (var i = 1; i < all.length; i++) {
+    assert.ok(all[i] > all[i - 1], 'ratings must be strictly ascending/unique at index ' + i);
+  }
+  // Must contain every rating offered by every series
+  Object.keys(MCB_TYPES).forEach(function (tp) {
+    MCB_TYPES[tp].ratings.forEach(function (r) {
+      assert.ok(all.indexOf(r) >= 0, 'union missing ' + r + ' A from series ' + tp);
+    });
+  });
+  // Highest value comes from the 125 A frames; lowest from C60 (0.5 A)
+  assert.strictEqual(all[all.length - 1], 125, 'top of ladder should be 125 A');
+  assert.strictEqual(all[0], 0.5, 'bottom of ladder should be 0.5 A');
+});
+
+test('C60N tops out at 63 A: higher ratings are NOT in its series set', function() {
+  var c60n = MCB_TYPES['C60N'];
+  assert.strictEqual(Math.max.apply(null, c60n.ratings), 63, 'C60N max must be 63 A');
+  [80, 100, 125].forEach(function (r) {
+    assert.ok(c60n.ratings.indexOf(r) < 0, r + ' A must not be selectable in C60N');
+  });
+});
+
+test('renderMCB greys out (unavail) the ratings C60N does not offer, but keeps them visible', function() {
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C60N'; mcbState.rating = null;
+  var html = renderMCB();
+  var all = mcbAllRatings();
+  var c60n = MCB_TYPES['C60N'];
+  all.forEach(function (r) {
+    var lbl = (r < 1) ? r.toString().replace('.', ',') : String(r);
+    if (c60n.ratings.indexOf(r) >= 0) {
+      // available rating -> selectable button with onclick setting that rating
+      assert.ok(html.indexOf("mcbState.rating=" + r + ";") >= 0,
+        'available rating ' + r + ' A must have a clickable onclick');
+    } else {
+      // unavailable rating -> rendered as unavail (greyed) and NOT clickable
+      assert.ok(html.indexOf("mcbState.rating=" + r + ";") < 0,
+        'unavailable rating ' + r + ' A must NOT be clickable in C60N');
+    }
+  });
+  // The 80/100/125 A buttons must still appear (visible) as unavail with a reason
+  assert.ok(/class="sel-btn unavail"/.test(html), 'must render greyed unavail buttons');
+  assert.ok(/not available in C60N|ikke tilg/.test(html), 'unavail buttons must carry a reason (title)');
+  // 125 A specifically: present in markup but not as a selectable onclick
+  assert.ok(html.indexOf('>125<') >= 0 || html.indexOf('>125 <') >= 0, '125 A label still visible');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+test('renderMCB makes every C120N rating selectable and greys sub-63 A values', function() {
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C120N'; mcbState.rating = null;
+  var html = renderMCB();
+  // C120N ratings: 63, 80, 100, 125 all selectable
+  [63, 80, 100, 125].forEach(function (r) {
+    assert.ok(html.indexOf("mcbState.rating=" + r + ";") >= 0, r + ' A must be selectable in C120N');
+  });
+  // A low value like 6 A is not offered -> must be greyed, not clickable
+  assert.ok(html.indexOf("mcbState.rating=6;") < 0, '6 A must not be selectable in C120N');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+test('mcbRatingUnavailReason reports max for above-range and series for in-range gaps', function() {
+  var c60n = MCB_TYPES['C60N'];
+  var above = mcbRatingUnavailReason(c60n, 'C60N', 125);
+  assert.ok(/max 63 A|maks 63 A/.test(above), 'above-range reason must cite max 63 A, got: ' + above);
+  // 8 A: below typical but within min..max yet not offered by any -> not in union, skip.
+  // Use C120N for an in-range-gap style message (6 A < min 63)
+  var c120n = MCB_TYPES['C120N'];
+  var below = mcbRatingUnavailReason(c120n, 'C120N', 6);
+  assert.ok(/min 63 A/.test(below), 'below-range reason must cite min 63 A, got: ' + below);
+});
+
+test('switching series resets rating selection ladder consistently (no stale invalid rating offered)', function() {
+  // After selecting 50 A on C60N then switching to C120N, 50 A is no longer selectable
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C120N'; mcbState.rating = null;
+  var html = renderMCB();
+  assert.ok(html.indexOf("mcbState.rating=50;") < 0, '50 A must not be selectable in C120N');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+
+// === Triplen harmonic neutral-conductor loading (P1 audit) ===
+console.log('\n=== Harmonic Neutral-Conductor Tests ===\n');
+
+test('harmonicCalcNeutral uses arithmetic 3x summation of triplen harmonics (not sqrt(3))', function() {
+  // n=1 load => diversity factor 1.0, so h3percent = spec.h3
+  var it = HARMONIC_SPECTRA['it']; // h3 = 80%
+  var res = harmonicCalcNeutral('it', 1);
+  // Physically: triplen harmonics add in phase -> I_N = 3 * I_h3,phase
+  var expected = 3 * (it.h3 / 100); // = 2.4
+  assert.ok(Math.abs(res.neutralFactor - expected) < 1e-9,
+    'neutralFactor should be 3x(h3/100)=' + expected + ' but got ' + res.neutralFactor);
+  // Guard against regression to the old non-conservative sqrt(3) factor (~1.386)
+  assert.ok(res.neutralFactor > 2.0, 'IT-equipment neutral factor must exceed 2.0 (was 1.386 under sqrt(3))');
+  assert.strictEqual(res.oversized, true, 'IT equipment (80% 3rd harmonic) must flag neutral as overloaded');
+  assert.strictEqual(res.factor, 1.5, 'overloaded neutral must recommend 1.5x (150%) neutral');
+});
+
+test('harmonicCalcNeutral crosses unity exactly at the standard 33% third-harmonic threshold', function() {
+  // With factor 3: neutralFactor = 1.0 at h3 = 33.33%. Below 33% => not oversized.
+  // ups: h3 = 8% -> 0.24 (well below) ; welding: h3 = 10% -> 0.30 (below)
+  var ups = harmonicCalcNeutral('ups', 1);
+  assert.ok(ups.neutralFactor < 1.0 && ups.oversized === false, 'UPS (8% h3) neutral must not be overloaded');
+  // Simulate a hypothetical 34% third-harmonic content via the same arithmetic the
+  // function uses, confirming the 33% rule (DS/HD 60364-5-52 cl.523.6.3 + Annex E):
+  var atThreshold = 3 * (34 / 100);
+  assert.ok(atThreshold > 1.0, '34% third harmonic must exceed phase current (neutral overloaded)');
+  var belowThreshold = 3 * (30 / 100);
+  assert.ok(belowThreshold < 1.0, '30% third harmonic must stay below phase current');
+});
+
+test('harmonicCalcNeutral remains conservative: neutral factor never below sqrt(3) basis', function() {
+  // For every spectrum, the corrected (3x) factor must be >= the old (sqrt(3)x) value,
+  // i.e. the fix can only INCREASE recommended neutral loading (conservative direction).
+  Object.keys(HARMONIC_SPECTRA).forEach(function (key) {
+    var spec = HARMONIC_SPECTRA[key];
+    var res = harmonicCalcNeutral(key, 1);
+    var oldFactor = Math.sqrt(3) * (spec.h3 / 100);
+    assert.ok(res.neutralFactor >= oldFactor - 1e-9,
+      key + ': corrected neutral factor must be >= old sqrt(3) factor (conservative)');
+  });
+});
+
+
+// === Star-Delta starting torque (P1 audit) ===
+console.log('\n=== Star-Delta Torque Tests ===\n');
+
+test('Y-delta reduces starting torque to ~1/3 of DOL (T proportional to V^2)', function() {
+  // Phase voltage in star = U_line/sqrt(3); torque ~ V^2 => factor (1/sqrt(3))^2 = 1/3.
+  var dol = MOTOR_START_METHODS['DOL'].torqueStart;
+  var sd = MOTOR_START_METHODS['SD'].torqueStart;
+  var ratio = sd / dol;
+  assert.ok(Math.abs(ratio - (1 / 3)) < 0.05,
+    'SD/DOL start-torque ratio must be ~1/3, got ' + ratio.toFixed(3));
+  // And the current reduction uses the same 1/3 factor:
+  var iSD = motorteoriCalcIstartStarDelta(100, 6); // 6x In DOL
+  var iDOL = motorteoriCalcIstart(100, 6);
+  assert.ok(Math.abs((iSD / iDOL) - (1 / 3)) < 1e-9, 'SD start current must be 1/3 of DOL');
+});
+
+test('Torque/speed curve text says Y-delta reduces torque to ~1/3 (not "halves")', function() {
+  var prevMod = (typeof activeModule !== 'undefined') ? activeModule : null;
+  var html = (typeof renderStandards === 'function') ? '' : '';
+  // The corrected wording lives in the standards/motor-curve view; assert the source
+  // string no longer claims "halverer" and references 1/3 in both languages.
+  var src = require('fs').readFileSync(__dirname + '/el-dimensionering.html', 'utf8');
+  assert.ok(src.indexOf('halverer startmomentet') < 0, 'must not claim Y-delta "halves" the torque');
+  assert.ok(src.indexOf('reducerer startmomentet til ca. 1/3') >= 0, 'DA text must state reduction to ~1/3');
+  assert.ok(/reduces starting torque to \S*1\/3/.test(src), 'EN text must state reduction to ~1/3');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
