@@ -9774,6 +9774,64 @@ function renderLoad() {
 
       ${uxSummary(summaryItems)}
 
+      ${ib > 0 ? (function() {
+        // === AUTO-DIMENSIONING CHAIN (fires automatically when IB is known) ===
+        var _is3 = loadState.voltage === '3x400';
+        var _Un = _is3 ? 400 : 230;
+        var _IB = ib;
+        // 1. Protection device (In >= IB)
+        var _In = 0; var _stdR = [6,10,13,16,20,25,32,40,50,63,80,100,125];
+        for (var _i=0;_i<_stdR.length;_i++){if(_stdR[_i]>=_IB){_In=_stdR[_i];break;}}
+        if(!_In) _In = _stdR[_stdR.length-1];
+        var _curve = (_IB > 50 || loadState.cosPhi < 0.85) ? 'C' : 'B';
+        var _mcbCurves = {B:'3\u20135\u00d7I\u2099',C:'5\u201310\u00d7I\u2099',D:'10\u201320\u00d7I\u2099'};
+        // 2. Cable (Iz_corr >= In)
+        var _kT = tempFactorFor(30); var _kG = groupFactorFor('C', 1);
+        var _xlpe = true;
+        var _izTbl = _xlpe ? IZ_COPPER_XLPE : IZ_COPPER;
+        var _csa = 0; var _izCorr = 0;
+        var _csas = Object.keys(_izTbl).map(Number).sort(function(a,b){return a-b;});
+        for (var _j=0;_j<_csas.length;_j++){
+          var _izBase = _izTbl[_csas[_j]];
+          _izCorr = _izBase * _kT * _kG;
+          if (_izCorr >= _In) { _csa = _csas[_j]; break; }
+        }
+        if (!_csa) { _csa = _csas[_csas.length-1]; _izCorr = _izTbl[_csa]*_kT*_kG; }
+        // 3. Voltage drop
+        var _r = AX_R_CU[_csa] || 0.5; var _x = AX_X_LV[_csa] || 0.08;
+        var _L = vdropState.length || 20;
+        var _sinP = Math.sqrt(1 - loadState.cosPhi*loadState.cosPhi);
+        var _dU = (_is3 ? Math.sqrt(3) : 2) * _IB * (_L/1000) * (_r*loadState.cosPhi + _x*_sinP);
+        var _dUpct = (_dU / _Un) * 100;
+        var _dUlim = (loadState._preset === 'light') ? 3 : 4;
+        // 4. Short-circuit check (simplified at busbar)
+        var _Ik = (scState.zNet + scState.zTrafo > 0) ? (1.05*_Un) / (Math.sqrt(3)*(scState.zNet+scState.zTrafo)/1000) : 10000;
+        var _IkkA = _Ik / 1000;
+        // 5. Adiabatic
+        var _k = _xlpe ? 143 : 115;
+        var _Smin = (_Ik * Math.sqrt(0.1)) / _k;
+        var _adiaOk = _csa >= _Smin;
+        // 6. IB <= In <= Iz chain
+        var _chainOk = (_IB <= _In) && (_In <= _izCorr);
+        var _allOk = _chainOk && (_dUpct <= _dUlim) && _adiaOk;
+
+        return '<div class="result-box" style="margin-top:12px;border-color:' + (_allOk ? 'var(--success)' : 'var(--danger)') + '">' +
+          '<div class="result-title">' + tx('\u26A1 Automatisk dimensionering', '\u26A1 Automatic dimensioning') + ' \u2014 ' +
+            (_allOk ? '<span style="color:var(--success);font-weight:700">' + tx('GODKENDT', 'APPROVED') + ' \u2713</span>' :
+                      '<span style="color:var(--danger);font-weight:700">' + tx('KONTROLL\u00C9R', 'CHECK') + ' \u2717</span>') + '</div>' +
+          '<div class="result-row"><span class="label">1. I<sub>B</sub> (' + tx('belastningsstr\u00F8m', 'design current') + ')</span><span class="value"><strong>' + _IB.toFixed(1) + ' A</strong></span></div>' +
+          '<div class="result-row" style="opacity:0.8;font-size:0.82em;padding-left:18px"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">I<sub>B</sub> = P / (' + (_is3?'\u221A3\u00b7':'') + 'U\u00b7cos\u03c6) = ' + loadState.power + ' kW / (' + (_is3?'\u221A3\u00d7':'') + _Un + '\u00d7' + loadState.cosPhi + ') = ' + _IB.toFixed(1) + ' A</span></div>' +
+          '<div class="result-row"><span class="label">2. I<sub>n</sub> (' + tx('beskyttelse', 'protection') + ')</span><span class="value"><strong>' + _curve + _In + '</strong> \u2014 ' + _mcbCurves[_curve] + ' (' + tx('mindste standardv\u00E6rdi \u2265 I\u1D2E', 'smallest standard \u2265 I\u1D2E') + ')</span></div>' +
+          '<div class="result-row" style="opacity:0.8;font-size:0.82em;padding-left:18px"><span class="label">' + tx('Begrundelse', 'Reasoning') + '</span><span class="value">I<sub>B</sub> = ' + _IB.toFixed(1) + ' A \u2264 I<sub>n</sub> = ' + _In + ' A \u2713 | ' + tx('Kurve ' + _curve + ' (' + _mcbCurves[_curve] + ') pga. ', 'Curve ' + _curve + ' (' + _mcbCurves[_curve] + ') because ') + (loadState.cosPhi<0.85 ? tx('induktiv last','inductive load') : tx('alm. drift','normal operation')) + '</span></div>' +
+          '<div class="result-row"><span class="label">3. ' + tx('Kabel', 'Cable') + '</span><span class="value"><strong>' + (_is3?'5G':'3G') + _csa + ' mm\u00B2 Cu/XLPE</strong> (Iz,korr = ' + _izCorr.toFixed(0) + ' A \u2265 ' + _In + ' A)</span></div>' +
+          '<div class="result-row" style="opacity:0.8;font-size:0.82em;padding-left:18px"><span class="label">' + tx('K\u00E6de', 'Chain') + '</span><span class="value">I<sub>B</sub> ' + _IB.toFixed(1) + ' \u2264 I<sub>n</sub> ' + _In + ' \u2264 I<sub>z</sub> ' + _izCorr.toFixed(0) + ' A ' + (_chainOk ? '\u2713' : '\u2717') + ' (DS/HD 60364-4-43 \u00a7433.1)</span></div>' +
+          '<div class="result-row"><span class="label">4. \u0394U (' + _L + ' m)</span><span class="value">' + _dUpct.toFixed(2) + ' % ' + (_dUpct <= _dUlim ? '\u2264 ' + _dUlim + '% \u2713' : '> ' + _dUlim + '% \u2717') + '</span></div>' +
+          '<div class="result-row"><span class="label">5. I<sub>k,max</sub> / I<sub>cu</sub></span><span class="value">' + _IkkA.toFixed(1) + ' kA \u2014 ' + tx('afbryder skal have I\u1D04\u1D64 \u2265 ', 'breaker needs I\u1D04\u1D64 \u2265 ') + _IkkA.toFixed(1) + ' kA</span></div>' +
+          '<div class="result-row"><span class="label">6. k\u00B2S\u00B2 \u2265 I\u00B2t</span><span class="value">' + _k + '\u00B2\u00d7' + _csa + '\u00B2 = ' + Math.round(_k*_k*_csa*_csa/1e6) + '\u00d710\u2076 ' + (_adiaOk ? '\u2265' : '<') + ' S<sub>min</sub>=' + _Smin.toFixed(1) + ' mm\u00B2 ' + (_adiaOk ? '\u2713' : '\u2717') + '</span></div>' +
+          '<div class="result-row" style="margin-top:6px;font-size:0.78em;opacity:0.7"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-4-43 \u00a7433.1, -5-52 \u00a7523, -4-41 \u00a7411</span></div>' +
+        '</div>';
+      })() : ''}
+
       <div class="select-group">
         <div class="select-label">${tx('Hurtigvalg — typiske belastninger', 'Quick select — typical loads')}</div>
         ${uxSmartCards(presetCards, loadState._preset || '', 'applyLoadPreset')}
