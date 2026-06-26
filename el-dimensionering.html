@@ -10440,6 +10440,46 @@ function redekamMinCsa(sumIL, x, cosphi, Un, maxPct, rho) {
 }
 var redekamState = { n: 8, spacing: 1, kvaPer: 400, cosphi: 0.8, r: 0.32, x: 0.088, Un: 10000, maxPct: 7 };
 
+// ===== PARALLEL LINES — complex current divider (Elektroteknik Bind 6, §7.4, Ex 7.4.1.2) =====
+// Two feeders A,B in parallel between the same two busbars. Each has complex impedance
+// Z = (r + jx)·l. Because phi_A != phi_B the branch currents are NOT in phase, so the
+// current must be split with the COMPLEX current-divider:
+//   Z_p = Z_A·Z_B/(Z_A+Z_B);  I_A = I·Z_B/(Z_A+Z_B);  I_B = I·Z_A/(Z_A+Z_B).
+// Viggo in-phase voltage drop: dUf = I·(R_p·cosphi + X_p·sinphi).
+// Returns rectangular+polar parts and a path-independence check (I_A·Z_A = I_B·Z_B = I·Z_p).
+function parallelLineSplit(rA, xA, lA, rB, xB, lB, S_kVA, cosphi, Un) {
+  function cMul(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+  function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+  function cDiv(a, b) { var d = b.re * b.re + b.im * b.im; return { re: (a.re * b.re + a.im * b.im) / d, im: (a.im * b.re - a.re * b.im) / d }; }
+  function cAbs(a) { return Math.sqrt(a.re * a.re + a.im * a.im); }
+  function cAng(a) { return Math.atan2(a.im, a.re) * 180 / Math.PI; }
+  var ZA = { re: rA * lA, im: xA * lA };
+  var ZB = { re: rB * lB, im: xB * lB };
+  var sum = cAdd(ZA, ZB);
+  var Zp = cDiv(cMul(ZA, ZB), sum);
+  var I = (S_kVA * 1000) / (Math.sqrt(3) * Un);   // total line current [A]
+  var Ivec = { re: I, im: 0 };                     // reference phase
+  var fracA = cDiv(ZB, sum), fracB = cDiv(ZA, sum);
+  var IA = cMul(Ivec, fracA), IB = cMul(Ivec, fracB);
+  var sinphi = Math.sin(Math.acos(Math.min(1, Math.max(0, cosphi))));
+  var dUf = I * (Zp.re * cosphi + Zp.im * sinphi);
+  // path-independent complex voltage across the parallel section
+  var Vp = cMul(Ivec, Zp), VA = cMul(IA, ZA), VB = cMul(IB, ZB);
+  var pathErr = Math.max(cAbs({ re: Vp.re - VA.re, im: Vp.im - VA.im }), cAbs({ re: Vp.re - VB.re, im: Vp.im - VB.im }));
+  var rnd = function (v) { return Math.round(v * 1000) / 1000; };
+  return {
+    ZA: { re: rnd(ZA.re), im: rnd(ZA.im), mag: rnd(cAbs(ZA)), ang: rnd(cAng(ZA)) },
+    ZB: { re: rnd(ZB.re), im: rnd(ZB.im), mag: rnd(cAbs(ZB)), ang: rnd(cAng(ZB)) },
+    Zp: { re: rnd(Zp.re), im: rnd(Zp.im), mag: rnd(cAbs(Zp)), ang: rnd(cAng(Zp)) },
+    I: rnd(I), IA: rnd(cAbs(IA)), IAang: rnd(cAng(IA)), IB: rnd(cAbs(IB)), IBang: rnd(cAng(IB)),
+    fracSum: rnd(cAbs(cAdd(fracA, fracB))),       // must be 1.000
+    dUf: rnd(dUf), dUline: rnd(Math.sqrt(3) * dUf), pct: Math.round((Math.sqrt(3) * dUf / Un) * 10000) / 100,
+    pathErr: pathErr,
+    clause: 'Elektroteknik Bind 6 §7.4 (strømdelerformlen) · IEC 60909'
+  };
+}
+var parLineState = { rA: 0.5, xA: 0.4, lA: 4, rB: 0.32, xB: 0.099, lB: 6, kva: 1200, cosphi: 0.8, Un: 10000 };
+
 // ===== VOLTAGE DROP MODULE =====
 function renderVdrop() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -10550,6 +10590,40 @@ function renderVdrop() {
         '<div class="result-row"><span class="label">\u0394U %</span><span class="value" style="font-weight:700;color:' + (ok ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)') + '">' + rk.pct.toFixed(2).replace('.', ',') + ' %</span></div>' +
         '<div class="result-row"><span class="label">' + tx('Mindste tv\u00E6rsnit for ', 'Minimum cross-section for ') + rs.maxPct + '%</span><span class="value">' + (isFinite(sMin) ? '\u2248 ' + sMin.toFixed(0) + ' mm\u00B2 (' + (cableState.material === 'copper' ? 'Cu' : 'Al') + ')' : tx('reaktans alene > gr\u00E6nse', 'reactance alone > limit')) + '</span></div>' +
         '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + rk.clause + '</span></div>' +
+        '</div></div>';
+    })()}
+
+    ${(function () {
+      // Parallel lines — complex current divider (Eksempel 7.4.1.2)
+      var ps = parLineState;
+      var pr = parallelLineSplit(ps.rA, ps.xA, ps.lA, ps.rB, ps.xB, ps.lB, ps.kva, ps.cosphi, ps.Un);
+      function pgrid(label, arr, field, unitFmt) {
+        return '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">' +
+          arr.map(function (v) { return '<button class="sel-btn ' + (ps[field] === v ? 'selected' : '') + '" onclick="parLineState.' + field + '=' + v + ';renderModule(\'vdrop\')">' + (unitFmt ? unitFmt(v) : v) + '</button>'; }).join('') +
+          '</div></div>';
+      }
+      function pol(z) { return z.re.toFixed(2).replace('.', ',') + (z.im >= 0 ? '+j' : '\u2212j') + Math.abs(z.im).toFixed(2).replace('.', ',') + ' = ' + z.mag.toFixed(2).replace('.', ',') + ' \u2220 ' + z.ang.toFixed(1).replace('.', ',') + '\u00B0'; }
+      return '<div class="card fade-in"><div class="card-title">' + tx('Parallelle linjer (kompleks str\u00F8mdeler)', 'Parallel lines (complex current divider)') + '</div>' +
+        '<div class="info-row">' + tx('To linjer mellem samme skinner med forskellig vinkel (\u03C6\u2090 \u2260 \u03C6\u1d47). Str\u00F8mmen deles komplekst: I\u2090 = I\u00b7Z\u1d47/(Z\u2090+Z\u1d47). Autorisations-emne (Eksempel 7.4.1.2).', 'Two lines between the same busbars with different angles (\u03C6\u2090 \u2260 \u03C6\u1d47). The current splits complexly: I\u2090 = I\u00b7Z\u1d47/(Z\u2090+Z\u1d47). Authorization topic (Example 7.4.1.2).') + '</div>' +
+        '<div class="info-row" style="font-weight:600;margin-top:6px">' + tx('Linje A (luftledning)', 'Line A (overhead)') + '</div>' +
+        pgrid('r\u2090 [\u03A9/km]', [0.5, 0.87, 1.38], 'rA', function (v) { return String(v).replace('.', ','); }) +
+        pgrid('x\u2090 [\u03A9/km]', [0.3, 0.35, 0.4], 'xA', function (v) { return String(v).replace('.', ','); }) +
+        pgrid(tx('L\u00E6ngde A [km]', 'Length A [km]'), [2, 4, 6, 8], 'lA') +
+        '<div class="info-row" style="font-weight:600;margin-top:6px">' + tx('Linje B (kabel)', 'Line B (cable)') + '</div>' +
+        pgrid('r\u1d47 [\u03A9/km]', [0.193, 0.32, 0.524], 'rB', function (v) { return String(v).replace('.', ','); }) +
+        pgrid('x\u1d47 [\u03A9/km]', [0.075, 0.088, 0.099], 'xB', function (v) { return String(v).replace('.', ','); }) +
+        pgrid(tx('L\u00E6ngde B [km]', 'Length B [km]'), [4, 6, 8, 10], 'lB') +
+        pgrid(tx('Samlet belastning [kVA]', 'Total load [kVA]'), [800, 1000, 1200, 1500], 'kva') +
+        '<div class="result-box"><div class="result-title">' + tx('Resultat (rektangul\u00E6r + pol\u00E6r)', 'Result (rectangular + polar)') + '</div>' +
+        '<div class="result-row"><span class="label">Z\u0305\u2090</span><span class="value">' + pol(pr.ZA) + ' \u03A9</span></div>' +
+        '<div class="result-row"><span class="label">Z\u0305\u1d47</span><span class="value">' + pol(pr.ZB) + ' \u03A9</span></div>' +
+        '<div class="result-row"><span class="label">Z\u0305\u209a (parallel)</span><span class="value">' + pol(pr.Zp) + ' \u03A9</span></div>' +
+        '<div class="result-row"><span class="label">I (total)</span><span class="value">' + pr.I.toFixed(1).replace('.', ',') + ' A</span></div>' +
+        '<div class="result-row"><span class="label">I\u2090 (luftledning)</span><span class="value">' + pr.IA.toFixed(1).replace('.', ',') + ' A \u2220 ' + pr.IAang.toFixed(1).replace('.', ',') + '\u00B0</span></div>' +
+        '<div class="result-row"><span class="label">I\u1d47 (kabel)</span><span class="value">' + pr.IB.toFixed(1).replace('.', ',') + ' A \u2220 ' + pr.IBang.toFixed(1).replace('.', ',') + '\u00B0</span></div>' +
+        '<div class="result-row"><span class="label">\u0394U<sub>f</sub> / \u0394U%</span><span class="value">' + pr.dUf.toFixed(1).replace('.', ',') + ' V / ' + pr.pct.toFixed(2).replace('.', ',') + ' %</span></div>' +
+        '<div class="result-row" style="opacity:0.75;font-size:0.82em"><span class="label">' + tx('Kontrol: I\u2090+I\u1d47 (vektor) = I; sp\u00E6nding sti-uafh\u00E6ngig', 'Check: I\u2090+I\u1d47 (vector) = I; voltage path-independent') + '</span><span class="value">\u03A3frac = ' + pr.fracSum.toFixed(3).replace('.', ',') + ' \u2713</span></div>' +
+        '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + pr.clause + '</span></div>' +
         '</div></div>';
     })()}
   `;

@@ -15410,11 +15410,37 @@ test('vdrop: redekamMinCsa ~ textbook 53 mm2 minimum for the 7% limit (Al)', fun
   assert.ok(sMin >= 48 && sMin <= 58, 'min CSA in textbook range ~53 mm2. Got ' + sMin);
 });
 
+// ===== PARALLEL LINES — complex current divider validation (Eksempel 7.4.1.2) =====
 test('vdrop: redekam Sum(I*l) is a true moment — farther loads weigh more', function () {
   var near = redekamVoltageDrop([{ I: 100, l: 1 }], 0.3, 0.08, 0.9, 400);
   var far = redekamVoltageDrop([{ I: 100, l: 5 }], 0.3, 0.08, 0.9, 400);
   assert.ok(far.dUf > near.dUf, 'a load 5x farther produces a larger drop (moment Sum(I*l))');
   assert.ok(Math.abs(far.dUf - 5 * near.dUf) < 0.05, 'drop scales linearly with distance');
+});
+
+test('vdrop: parallelLineSplit reproduces Eksempel 7.4.1.2 (4km 35Cu || 6km 95Al, 1.2MVA)', function () {
+  var p = parallelLineSplit(0.5, 0.4, 4, 0.32, 0.099, 6, 1200, 0.8, 10000);
+  assert.ok(Math.abs(p.ZA.mag - 2.561) < 0.01, '|ZA| = |(0.5+j0.4)*4| = 2.56 ohm. Got ' + p.ZA.mag);
+  assert.ok(Math.abs(p.ZB.mag - 2.010) < 0.01, '|ZB| = |(0.32+j0.099)*6| = 2.01 ohm. Got ' + p.ZB.mag);
+  assert.ok(Math.abs(p.Zp.re - 1.024) < 0.01 && Math.abs(p.Zp.im - 0.513) < 0.01, 'Zp = 1.024 + j0.513 ohm');
+  assert.ok(Math.abs(p.I - 69.28) < 0.1, 'I = 1.2MVA/(sqrt3*10kV) = 69.28 A');
+  assert.ok(Math.abs(p.IA - 31.0) < 0.2, 'IA ~ 31.0 A (overhead). Got ' + p.IA);
+  assert.ok(Math.abs(p.IB - 39.5) < 0.2, 'IB ~ 39.5 A (cable). Got ' + p.IB);
+});
+
+test('vdrop: parallel current divider is exact — fractions sum to 1, voltage path-independent', function () {
+  var p = parallelLineSplit(0.5, 0.4, 4, 0.32, 0.099, 6, 1200, 0.8, 10000);
+  assert.ok(Math.abs(p.fracSum - 1) < 1e-6, 'IA/(I) + IB/(I) = 1 exactly (complex divider). Got ' + p.fracSum);
+  assert.ok(p.pathErr < 1e-9, 'IA*ZA = IB*ZB = I*Zp (voltage path-independent). Err ' + p.pathErr);
+  // branch currents are NOT in phase (different line angles) -> arithmetic sum exceeds I
+  assert.ok(p.IA + p.IB > p.I, 'arithmetic |IA|+|IB| > I because the branch currents differ in angle');
+});
+
+test('vdrop: parallel of equal-angle lines -> branch currents in phase (sum = total)', function () {
+  // Same r/x ratio on both -> same angle -> IA+IB (arithmetic) == I
+  var p = parallelLineSplit(0.4, 0.2, 5, 0.4, 0.2, 5, 1000, 0.9, 400);
+  assert.ok(Math.abs((p.IA + p.IB) - p.I) < 0.05, 'equal identical lines split the current evenly in phase');
+  assert.ok(Math.abs(p.IA - p.IB) < 0.05, 'identical parallel lines carry equal current');
 });
 
 // ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====
