@@ -7709,7 +7709,7 @@ function cable3dCalcFillRate(type, cableIndices) {
   } else {
     containmentArea = cable3dState.trayWidth * 50;
   }
-  const rawRate = totalCableArea / containmentArea;
+  const rawRate = (containmentArea > 0) ? totalCableArea / containmentArea : 0;
   const fillRate = Math.ceil(rawRate * 1000) / 1000;
   const maxFill = CABLE3D_CONTAINMENT[type] ? CABLE3D_CONTAINMENT[type].maxFill : 0.45;
   const exceeded = fillRate > maxFill;
