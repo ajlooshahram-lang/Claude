@@ -15429,6 +15429,35 @@ test('cable: groupFactorFor matches Viggo 2018 august (method E, 3 circuits = 0.
   assert.ok(Math.abs(GROUP_FACTORS_BUNCHED[3] - 0.70) < 1e-9, 'bunched table gives 0.70 (over-conservative for E)');
 });
 
+test('exam: axGenInstallation includes installMethod and uses method-aware grouping', function () {
+  var rng = axRngMake(999);
+  var d = axGenInstallation(rng, axBuilding('fabrik'), axTier('kandidat'));
+  assert.ok(d.installMethod === 'C' || d.installMethod === 'E', 'installMethod is C or E. Got ' + d.installMethod);
+  // Generate the tasks and check the cable task uses the correct grouping
+  var tasks = axTasksInstallation(d, axTier('kandidat'), 20);
+  var cabTask = tasks.filter(function (t) { return t.kind === 'cable'; })[0];
+  if (cabTask) {
+    var kExpected = groupFactorFor(d.installMethod, d.grouping);
+    assert.ok(Math.abs(cabTask.given.kGroup - kExpected) < 0.01,
+      'cable task kGroup matches groupFactorFor(' + d.installMethod + ',' + d.grouping + ') = ' + kExpected + '. Got ' + cabTask.given.kGroup);
+  }
+});
+
+test('exam: 2023 Auto exam — Z_T formula (630kVA, ek=4%, Pcu=4600W, 420V) = 11.2 mOhm ∠ 79.5°', function () {
+  var cx = axIkComplexTrafo(630, 4, 4600, 420, 1.0, 500, 0.1);
+  assert.ok(Math.abs(cx.Zt - 11.2) < 0.1, 'Z_T = 11.2 mOhm. Got ' + cx.Zt);
+  assert.ok(Math.abs(cx.phiTdeg - 79.5) < 0.2, 'phi_T = 79.5 deg. Got ' + cx.phiTdeg);
+});
+
+test('exam: 2023 Auto exam — network Z from Ik uses atan(1/(R/X)) = 84.3° for R/X=0.1', function () {
+  var Zn = 10000 / (Math.sqrt(3) * 7120);
+  var phi = Math.atan(1 / 0.1) * 180 / Math.PI;
+  assert.ok(Math.abs(Zn - 0.811) < 0.01, '|Z_net| = 0.81 ohm. Got ' + Zn.toFixed(3));
+  assert.ok(Math.abs(phi - 84.3) < 0.1, 'phi_net = 84.3 deg. Got ' + phi.toFixed(1));
+  var p = scComplexParts(Zn * 1000, 0.1);
+  assert.ok(Math.abs(p.phiDeg - 84.3) < 0.1, 'scComplexParts matches 2023 exam');
+});
+
 // ===== PARALLEL LINES — complex current divider validation (Eksempel 7.4.1.2) =====
 test('vdrop: redekam Sum(I*l) is a true moment — farther loads weigh more', function () {
   var near = redekamVoltageDrop([{ I: 100, l: 1 }], 0.3, 0.08, 0.9, 400);

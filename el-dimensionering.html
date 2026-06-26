@@ -10315,7 +10315,7 @@ function renderCable() {
   // Correction factors
   const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
   const kTemp = tempFactorFor(cableState.temp);
-  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+  const kGroup = groupFactorFor(cableState.installMethod, cableState.grouping);
   const kTotal = kInstall * kTemp * kGroup;
 
   const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
@@ -15106,6 +15106,7 @@ function axGenInstallation(rng, b, tier) {
     earthing: b.earthing, trafo: { SN: SN, ek: ek, Un1: 10, Un2: 400, In: trafo.In, Ik: trafo.Ik, IkkA: trafo.IkkA, vector: 'Dyn1', PCu: Math.round(SN * 10) },
     ambient: ambient, grouping: grouping,
     stik: { material: stikMat, insulation: stikIns, length: stikLen, cos: 0.9 },
+    installMethod: axRngPick(rng, ['C', 'E', 'E', 'C']),  // cable tray (E) common in industrial/commercial
     loads: loads, IBtotal: IBtotal
   };
 }
@@ -15113,7 +15114,7 @@ function axGenInstallation(rng, b, tier) {
 function axTasksInstallation(d, tier, maxTasks) {
   var tasks = [];
   var kTemp = tempFactorFor(d.ambient, d.stik.insulation === 'XLPE');
-  var kGroup = GROUP_FACTORS[d.grouping] || 1;
+  var kGroup = groupFactorFor(d.installMethod, d.grouping);
   var ibT = d.IBtotal;
   var ibNoSf = 0; d.loads.forEach(function (l) { ibNoSf += l.IB; }); ibNoSf = Math.round(ibNoSf * 10) / 10;
   var nIb = axNumOpts(ibT, [ibNoSf, Math.round(ibT * 0.7 * 10) / 10, Math.round(ibT * 1.25 * 10) / 10]);
