@@ -14768,8 +14768,15 @@ var AX_K = { 'Cu/PVC': 115, 'Cu/XLPE': 143, 'Al/PVC': 76, 'Al/XLPE': 94 };
 // Conductor AC resistance at operating temp (\u03a9/km) by cross-section \u2014 Cu (IEC 60228,
 // consistent with the app's NKT product r-values). Al \u2248 Cu \u00d7 1.64.
 var AX_R_CU = { 1.5: 12.1, 2.5: 7.41, 4: 4.61, 6: 3.08, 10: 1.83, 16: 1.15, 25: 0.727, 35: 0.524, 50: 0.387, 70: 0.268, 95: 0.193, 120: 0.153, 150: 0.124, 185: 0.0991, 240: 0.0754 };
+// Al resistances from NKT catalog (NOIK-AL-M datasheet, Ω/km at 20°C). Using actual
+// manufacturer values rather than Cu×1.64 approximation avoids 1–2% discrepancy that
+// would give wrong exam answers when compared against the NKT catalog.
+var AX_R_AL = { 10: 3.08, 16: 1.91, 25: 1.20, 35: 0.868, 50: 0.641, 70: 0.443, 95: 0.320, 120: 0.253, 150: 0.206, 185: 0.164, 240: 0.125 };
 var AX_X_LV = { 1.5: 0.090, 2.5: 0.085, 4: 0.082, 6: 0.080, 10: 0.078, 16: 0.076, 25: 0.075, 35: 0.074, 50: 0.073, 70: 0.072, 95: 0.072, 120: 0.071, 150: 0.071, 185: 0.070, 240: 0.070 };
-function axCableR(csa, material) { var r = AX_R_CU[csa]; if (r == null) return null; return (material === 'Al') ? Math.round(r * 1.64 * 1e4) / 1e4 : r; }
+function axCableR(csa, material) {
+  if (material === 'Al') { return AX_R_AL[csa] != null ? AX_R_AL[csa] : null; }
+  return AX_R_CU[csa] != null ? AX_R_CU[csa] : null;
+}
 function axCableX(csa) { return AX_X_LV[csa] != null ? AX_X_LV[csa] : 0.08; }
 // Return the single-source Iz table for a material/insulation combination.
 function axIzTable(material, insulation) {
@@ -15281,11 +15288,11 @@ function axSolveTask(task, opgave) {
     var kT = g.kTemp, kG = g.kGroup, kI = g.kInstall || 1; var k = kT * kG * kI;
     var sel = axSelectCable(g.In, g.material, g.insulation, kT, kG, kI);
     var tab = axIzTable(g.material, g.insulation); var baseIz = sel ? sel.baseIz : null;
-    sol.assumptions = [S('Reference-Iz fra DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Korrektion for temperatur og gruppering ganges p\u00e5.', 'Reference Iz from DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Temperature & grouping corrections multiply.'), S('Konservativt: Iz rundes ned, og mindste tv\u00e6rsnit der opfylder Iz_korr \u2265 In v\u00e6lges.', 'Conservative: round Iz down, choose the smallest cross-section meeting Iz_corr \u2265 In.')];
+    sol.assumptions = [S('Reference-Iz fra DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Korrektion for temperatur (Tabel B.52.14) og gruppering (' + ((/^[EeFf]/.test(g.installMethod || '')) ? 'Tabel B.52.18, kabelstige' : 'Tabel B.52.17, samlede') + ') ganges p\u00e5.', 'Reference Iz from DS/HD 60364-5-52 (' + g.material + '/' + g.insulation + '). Correction for temperature (Table B.52.14) and grouping (' + ((/^[EeFf]/.test(g.installMethod || '')) ? 'Table B.52.18, perforated tray' : 'Table B.52.17, bunched') + ') multiply.'), S('Konservativt: Iz rundes ned, og mindste tv\u00e6rsnit der opfylder Iz_korr \u2265 In v\u00e6lges.', 'Conservative: round Iz down, choose the smallest cross-section meeting Iz_corr \u2265 In.')];
     sol.formula = 'Iz_korr = Iz_tab \u00b7 K_temp \u00b7 K_group ;  krav: Iz_korr \u2265 In';
     sol.substitution = 'K = ' + axFmt(kT, 2) + ' \u00d7 ' + axFmt(kG, 2) + ' = ' + axFmt(Math.round(k * 1000) / 1000, 3) + ' ;  Iz_korr(' + (sel ? sel.csa : '?') + ' mm\u00b2) = ' + (baseIz || '?') + ' \u00d7 ' + axFmt(Math.round(k * 1000) / 1000, 3) + ' = ' + (sel ? axFmt(sel.izCorr, 1) : '?') + ' A';
     sol.steps = [
-      { da: 'Korrektionsfaktor', en: 'Correction factor', expr: 'K_temp \u00d7 K_group = ' + axFmt(kT, 2) + ' \u00d7 ' + axFmt(kG, 2), result: axFmt(Math.round(k * 1000) / 1000, 3) },
+      { da: 'Korrektionsfaktor (B.52.14 \u00d7 ' + ((/^[EeFf]/.test(g.installMethod || '')) ? 'B.52.18' : 'B.52.17') + ')', en: 'Correction factor (B.52.14 \u00d7 ' + ((/^[EeFf]/.test(g.installMethod || '')) ? 'B.52.18' : 'B.52.17') + ')', expr: 'K_temp \u00d7 K_group = ' + axFmt(kT, 2) + ' \u00d7 ' + axFmt(kG, 2), result: axFmt(Math.round(k * 1000) / 1000, 3) },
       { da: 'Mindste tv\u00e6rsnit med Iz_korr \u2265 ' + g.In + ' A', en: 'Smallest cross-section with Iz_corr \u2265 ' + g.In + ' A', expr: (sel ? (baseIz + ' \u00d7 ' + axFmt(Math.round(k * 1000) / 1000, 3)) : '\u2014'), result: (sel ? axFmt(sel.izCorr, 1) + ' A \u2192 ' + sel.csa + ' mm\u00b2' : '\u2014') }
     ];
     sol.result = { value: sel ? sel.csa : null, unit: 'mm\u00b2', da: 'Valgt tv\u00e6rsnit', en: 'Selected cross-section' };

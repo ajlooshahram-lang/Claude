@@ -15458,6 +15458,15 @@ test('exam: 2023 Auto exam — network Z from Ik uses atan(1/(R/X)) = 84.3° for
   assert.ok(Math.abs(p.phiDeg - 84.3) < 0.1, 'scComplexParts matches 2023 exam');
 });
 
+test('exam: axCableR Al uses NKT catalog values (matches 2023 exam r150=0.206)', function () {
+  // 2023 exam uses r150 = 0.206 Ω/km for 3x150+25 PEX-M-AL
+  assert.ok(Math.abs(axCableR(150, 'Al') - 0.206) < 0.001, 'Al 150mm2: 0.206 Ohm/km. Got ' + axCableR(150, 'Al'));
+  assert.ok(Math.abs(axCableR(95, 'Al') - 0.320) < 0.001, 'Al 95mm2: 0.320 Ohm/km. Got ' + axCableR(95, 'Al'));
+  // Cu values unchanged
+  assert.ok(Math.abs(axCableR(150, 'Cu') - 0.124) < 0.001, 'Cu 150mm2: 0.124 Ohm/km');
+  assert.ok(axCableR(2.5, 'Al') === null || axCableR(2.5, 'Al') > 0, 'Al small sizes return null or positive');
+});
+
 // ===== PARALLEL LINES — complex current divider validation (Eksempel 7.4.1.2) =====
 test('vdrop: redekam Sum(I*l) is a true moment — farther loads weigh more', function () {
   var near = redekamVoltageDrop([{ I: 100, l: 1 }], 0.3, 0.08, 0.9, 400);
