@@ -33939,6 +33939,18 @@ function analyzerExtract(text) {
     var pwMatch = text.match(/(?:P[n]?|effekt|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*W\b/i);
     if (pwMatch) { var pVal = parseFloat(pwMatch[1].replace(',', '.')); if (pVal >= 100) { data.power_kW = pVal / 1000; data.confidence.power_kW = 'medium'; } }
   }
+  // Load schedule row: "<voltage> <kVA> <cos phi>" e.g. "3x400/230 325 kVA 0,8".
+  // Gives apparent power S [kVA] and cos phi for a circuit -> IB = S/(sqrt3*U).
+  var loadRow = text.match(/(3\s*x\s*400(?:\/230)?|1\s*x\s*230|400\/230|400|230)\D{0,14}?(\d{2,4})\s*kVA\D{0,8}?(0[.,]\d+|1[.,]0+|1\b)/i);
+  if (loadRow) {
+    var lkva = parseFloat(loadRow[2]); var lcos = parseFloat(loadRow[3].replace(',', '.'));
+    if (lkva > 0 && lcos > 0 && lcos <= 1) {
+      data.loadKVA = lkva;
+      if (!data.cosPhi) { data.cosPhi = lcos; data.confidence.cosPhi = 'medium'; }
+      if (!data.power_kW) { data.power_kW = lkva * lcos; data.confidence.power_kW = 'medium'; } // active kW (IB = S/(sqrt3*U))
+      if (!/3\s*x|400\/230/.test(loadRow[1])) { /* single phase 230 */ }
+    }
+  }
 
   // Voltage: "400 V", "3-faset 400V", "230V", "3x400", "690V", "10 kV"
   var vMatch = text.match(/(\d+)\s*V(?:\s|,|\.|\b)/);
