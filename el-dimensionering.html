@@ -33783,10 +33783,12 @@ function analyzerExtract(text) {
   if (/3[\s-]*fas|3x400|trefase/i.test(text)) { data.phases = 3; data.confidence.phases = 'high'; }
   else if (/1[\s-]*fas|1x230|enfase/i.test(text)) { data.phases = 1; data.confidence.phases = 'high'; }
 
-  // cos phi: "cos(phi) = 0,86", "cosφ = 0.86", "cos phi = 0,86", "effektfaktor 0,86"
-  var cosMatch = text.match(/cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?\s*)?[:=]\s*(\d+[.,]\d+)/i);
-  if (!cosMatch) cosMatch = text.match(/effektfaktor\s*[:=]?\s*(\d+[.,]\d+)/i);
-  if (cosMatch) { data.cosPhi = parseFloat(cosMatch[1].replace(',', '.')); data.confidence.cosPhi = 'high'; }
+  // cos phi: "cos(phi) = 0,86", "cos\u03C6 = 0.86", "cos phi 0,86", "effektfaktor 0,86", "PF 0,9"
+  // The separator is OPTIONAL so natural phrasings without "=" are recognised;
+  // a 0<value<=1 sanity clamp prevents false matches (e.g. an angle "cos 30").
+  var cosMatch = text.match(/cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?)?\s*[:=]?\s*(\d+[.,]\d+)/i);
+  if (!cosMatch) cosMatch = text.match(/(?:effektfaktor|power\s*factor|\bPF)\s*[:=]?\s*(\d+[.,]\d+)/i);
+  if (cosMatch) { var cosV = parseFloat(cosMatch[1].replace(',', '.')); if (cosV > 0 && cosV <= 1) { data.cosPhi = cosV; data.confidence.cosPhi = 'high'; } }
 
   // Efficiency eta: "eta = 0,93", "η = 0.93", "virkningsgrad 0,93"
   var etaMatch = text.match(/(?:eta|\u03B7|virkningsgrad)\s*[:=]\s*(\d+[.,]\d+)/i);
@@ -33832,9 +33834,13 @@ function analyzerExtract(text) {
   var trafoMatch = text.match(/(?:transform(?:er|ator))?\s*[:=]?\s*(\d+)\s*kVA/i);
   if (trafoMatch) { data.trafoKVA = parseInt(trafoMatch[1]); data.confidence.trafoKVA = 'high'; }
 
-  // Transformer uk%: "uk = 4%", "uk% = 6", "kortslutningsspaending 4%"
-  var ukMatch = text.match(/(?:uk|kortslutningssp.nding)\s*[%=:]\s*(\d+[.,]?\d*)\s*%?/i);
-  if (ukMatch) { data.trafoUk = parseFloat(ukMatch[1].replace(',', '.')); data.confidence.trafoUk = 'high'; }
+  // Transformer uk%: "uk = 4%", "uk 4%", "uk% = 6", "ek 4%", "uz 6 %", "kortslutningssp\u00e6nding 4%"
+  // Stage 1 anchors on a trailing % so the separator can be optional ("uk 4%");
+  // stage 2 accepts an explicit separator without % ("uk = 6"). 0<uk<30 clamp
+  // guards against a stray mid-word "uk/ek" grabbing an unrelated number.
+  var ukMatch = text.match(/\b(?:uk|uz|ek|kortslutningssp.nding)\s*%?\s*[:=]?\s*(\d+[.,]?\d*)\s*%/i);
+  if (!ukMatch) ukMatch = text.match(/\b(?:uk|uz|ek|kortslutningssp.nding)\s*%?\s*[:=]\s*(\d+[.,]?\d*)/i);
+  if (ukMatch) { var ukV = parseFloat(ukMatch[1].replace(',', '.')); if (ukV > 0 && ukV < 30) { data.trafoUk = ukV; data.confidence.trafoUk = 'high'; } }
 
   // Transformer Pcu: "Pcu = 6500 W", "kobber tab 6500", "Pk = 6500"
   var pcuMatch = text.match(/(?:Pcu|Pk|kobbertab|belastningstab|copper\s*loss|load\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
@@ -35265,9 +35271,89 @@ function renderAnalyzer() {
 
   return html;
 }
+// Parse the original sub-question label (e.g. "1.1", "2.3", "a", "12") from the
+// start of a question string, as written in the exam. Returns '' if none.
+function analyzerSubLabel(s) {
+  var m = String(s || '').match(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)/i);
+  if (!m) return '';
+  return m[1].replace(/^\(/, '').replace(/[.)]+\s*$/, '');
+}
+
+// Render the numbered Q&A panel grouped by Opgave: every question is shown
+// TOGETHER with its answer + status badge so the user can see exactly which
+// questions are answered and what each answer is. Driven by the tested
+// examBuildSolution() (per-segment solving) and annotated with the exam's own
+// numbering (1.1, 2.1, a, ...). Click-only, da/en/fa.
+function analyzerRenderQuestionOutline() {
+  var sol;
+  try { sol = examBuildSolution(analyzerState); } catch (e) { sol = null; }
+  if (!sol || !sol.opgaver || !sol.opgaver.length) return '';
+  var total = 0, answered = 0, failed = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) answered++; if (q.status === 'fail') failed++; }); });
+  if (total === 0) return '';
+  var html = '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Sp\u00f8rgsm\u00e5l & svar', 'Questions & answers') + ' (' + answered + '/' + total + ' ' + tx('besvaret', 'answered') + (failed ? (' \u00b7 ' + failed + ' \u26d4') : '') + '):</strong>';
+  html += '<div style="margin-top:6px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  sol.opgaver.forEach(function (o) {
+    html += '<div style="padding:5px 10px;background:var(--primary-glow);font-weight:700;font-size:0.82rem">' + (o.id ? ('Opgave ' + o.id) : (o.title || tx('Generelt', 'General'))) + '</div>';
+    if (!o.questions.length) {
+      html += '<div style="padding:5px 10px;font-size:0.78rem;color:var(--text-muted)">' + tx('Ingen detekterede sp\u00f8rgsm\u00e5l.', 'No detected questions.') + '</div>';
+      return;
+    }
+    o.questions.forEach(function (q) {
+      var badge, badgeColor;
+      if (q.status === 'fail') { badge = '\u26d4 ' + tx('Fejler', 'Fails'); badgeColor = 'var(--danger)'; }
+      else if (q.solved) { badge = '\u2705 ' + tx('Besvaret', 'Answered'); badgeColor = 'var(--success)'; }
+      else { badge = '\u26a0\ufe0f ' + tx('Mangler input', 'Needs input'); badgeColor = 'var(--warning)'; }
+      html += '<div style="padding:6px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
+      html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
+      html += '<div style="flex:1">';
+      if (q.num) html += '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc(q.num) + '</strong> ';
+      html += mmlEsc(q.questionText || q.label);
+      html += '</div>';
+      html += '<span style="white-space:nowrap;color:' + badgeColor + ';font-size:0.74rem;font-weight:700">' + badge + '</span>';
+      html += '</div>';
+      if (q.solved) {
+        html += '<div style="margin-top:4px;padding:4px 8px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:4px">';
+        html += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Svar', 'Answer') + (q.calcLabel ? ' \u00b7 ' + q.calcLabel : '') + ':</span> ';
+        html += '<span style="font-family:monospace;font-weight:700;color:var(--primary)">' + (q.value != null ? mmlEsc(String(q.value)) : '\u2014') + '</span>';
+        html += '</div>';
+      } else {
+        html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
+      }
+      html += '</div>';
+    });
+  });
+  html += '</div></div>';
+  return html;
+}
+
 // Render analyzer results - ENHANCED with dependency graph and module flow
 function renderAnalyzerResults() {
   var html = '';
+
+  // === ANSWERS FIRST AND FOREMOST ===
+  // Pressing Project Analyzer must present the SOLUTION to ALL opgaver in the
+  // uploaded authorization exam before anything else. This numbered Q&A panel
+  // (every Opgave + sub-question bound to its answer + status) is therefore the
+  // very first card shown, ahead of scores/diagnostics.
+  var qaPanel = analyzerRenderQuestionOutline();
+  if (qaPanel) {
+    html += '<div class="card fade-in">';
+    html += '<div class="card-title">\uD83C\uDFAF ' + tx('Svar p\u00e5 alle opgaver', 'Answers to all tasks') + '</div>';
+    html += '<div class="info-row">' + tx('Hver opgave og delsp\u00f8rgsm\u00e5l vises med sit svar og status. \u00c5bn den komplette l\u00f8sning l\u00e6ngere nede for fuld udregning trin for trin.', 'Every task and sub-question is shown with its answer and status. Open the complete solution further down for the full step-by-step working.') + '</div>';
+    html += qaPanel;
+    html += '</div>';
+  } else if (analyzerState.extracted && analyzerState.extracted.questions.length > 0) {
+    // Fallback when the text has no Opgave/sub-question structure: at least show
+    // the detected calculation types so the user still sees what was recognised.
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ' + tx('Detekterede sp\u00f8rgsm\u00e5l', 'Detected questions') + ' (' + analyzerState.extracted.questions.length + ')</div>';
+    html += '<div class="select-grid" style="margin-top:6px">';
+    for (var qq = 0; qq < analyzerState.extracted.questions.length; qq++) {
+      var qqItem = analyzerState.extracted.questions[qq];
+      html += '<span class="sel-btn selected" style="cursor:default;pointer-events:none">' + qqItem.label + (qqItem.module ? ' <small>(' + qqItem.module + ')</small>' : '') + '</span>';
+    }
+    html += '</div></div>';
+  }
 
   // Completeness score
   var comp = analyzerState.completeness;
@@ -35327,17 +35413,6 @@ function renderAnalyzerResults() {
     html += '<div style="padding:10px;font-size:0.82rem">';
     html += renderAnalyzerExtracted(analyzerState.extracted);
     html += '</div></details></div>';
-  }
-
-  // Detected questions
-  if (analyzerState.extracted && analyzerState.extracted.questions.length > 0) {
-    html += '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Detekterede sp\u00f8rgsm\u00e5l', 'Detected questions') + ' (' + analyzerState.extracted.questions.length + '):</strong>';
-    html += '<div class="select-grid" style="margin-top:6px">';
-    for (var q = 0; q < analyzerState.extracted.questions.length; q++) {
-      var qItem = analyzerState.extracted.questions[q];
-      html += '<span class="sel-btn selected" style="cursor:default;pointer-events:none">' + qItem.label + (qItem.module ? ' <small>(' + qItem.module + ')</small>' : '') + '</span>';
-    }
-    html += '</div></div>';
   }
 
   html += '</div>';
@@ -35482,19 +35557,33 @@ var EXAM_SOLUTION_RESULT_ALIAS = {
 
 // Find the most relevant question-text excerpt for a detected type inside a segment.
 function examFindQuestionText(seg, type) {
-  if (!seg) return '';
+  return examFindQuestionMeta(seg, type).text;
+}
+
+// Like examFindQuestionText but also returns the exam's own numbering (1.1, a, ...)
+// for the sub-question that matched, so the solution can show correct numbers.
+// Prefers an EXPLICITLY-detected sub-question (which carries the real number)
+// over a data/header line that only matched via fallback inference.
+function examFindQuestionMeta(seg, type) {
+  if (!seg) return { num: '', text: '' };
   var subs = (seg.subQuestions && seg.subQuestions.length) ? seg.subQuestions : [seg.text || ''];
+  var fallbackMeta = null;
   for (var i = 0; i < subs.length; i++) {
     var qs = analyzerDetectQuestions(subs[i] || '');
     for (var j = 0; j < qs.length; j++) {
       if (qs[j].type === type) {
-        var t = (subs[i] || '').replace(/\s+/g, ' ').trim();
-        return t.length > 260 ? t.slice(0, 260) + '\u2026' : t;
+        var raw = (subs[i] || '').replace(/\s+/g, ' ').trim();
+        var num = (typeof analyzerSubLabel === 'function') ? analyzerSubLabel(raw) : '';
+        var t = num ? raw.replace(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)\s*/i, '') : raw;
+        var meta = { num: num, text: t.length > 260 ? t.slice(0, 260) + '\u2026' : t };
+        if (qs[j].source === 'detected') return meta; // explicit question wins (carries the number)
+        if (!fallbackMeta) fallbackMeta = meta;        // remember inferred match as a fallback only
       }
     }
   }
+  if (fallbackMeta) return fallbackMeta;
   var ft = (seg.text || '').replace(/\s+/g, ' ').trim();
-  return ft.length > 200 ? ft.slice(0, 200) + '\u2026' : ft;
+  return { num: '', text: ft.length > 200 ? ft.slice(0, 200) + '\u2026' : ft };
 }
 
 // Per-segment extraction for multi-Opgave papers. Each Opgave gets its OWN
@@ -35563,13 +35652,15 @@ function examBuildSolution(state) {
       // value stated once for the whole paper is still shown (never lost).
       var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
       var solved = !!(res && res.html);
+      var qMeta = examFindQuestionMeta(seg, q.type);
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;
       qBlocks.push({
         type: q.type,
+        num: qMeta.num,
         label: q.label,
         module: q.module,
-        questionText: examFindQuestionText(seg, q.type),
+        questionText: qMeta.text,
         calcLabel: res ? res.label : null,
         calcHtml: res ? (res.html || '') : '',
         value: res ? res.value : null,
@@ -35715,7 +35806,7 @@ function examRenderSolution(sol) {
     op.questions.forEach(function (q) {
       h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
       // Question text
-      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ':</strong> ' + (q.questionText || q.label) + '</div>';
+      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + (q.num ? ' ' + mmlEsc(q.num) : '') + ':</strong> ' + (q.questionText || q.label) + '</div>';
       // Mapped calculation
       h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
       if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
