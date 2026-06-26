@@ -11234,6 +11234,24 @@ function forsyningNetZfromSk(Skh_va, Un_volt, cosPhiK, c) {
   return { r: mag * Math.cos(phi), x: mag * Math.sin(phi), mag: mag };
 }
 
+// Forsyning: is an HV cable protected by its (constant-time) relay?
+// OVERLOAD: the corrected ampacity must carry the protected/relay current.
+function forsyningCableOverload(IzCorrected, Iprotection) {
+  return { Iz: IzCorrected, Iprot: Iprotection, ok: IzCorrected >= Iprotection };
+}
+// SHORT-CIRCUIT (adiabatic, DS/HD 60364-4-43 / IEC 60949): the conductor must
+// withstand the fault current for the relay clearing time t. Checked for BOTH the
+// phase conductor (3-phase fault) and the screen/skaerm conductor (earth fault):
+//   I_perm = k*S/sqrt(t)   must be >= the prospective fault current.
+function forsyningCableScProtection(Sphase, kPhase, IkPhase, Sscreen, kScreen, IkScreen, t) {
+  function chk(S, k, Ik) {
+    if (!S || !k || t <= 0) return null;
+    var Iperm = k * S / Math.sqrt(t);
+    return { Iperm: Iperm, Ik: Ik, ok: (Ik == null) ? null : (Iperm >= Ik) };
+  }
+  return { t: t, phase: chk(Sphase, kPhase, IkPhase), screen: chk(Sscreen, kScreen, IkScreen) };
+}
+
 // Forsyning: maximum allowable earth-electrode resistance R_E so the potential
 // rise during an earth fault stays within the permissible touch voltage U_Tp.
 //   R_E <= U_Tp / I_E    (DS/EN 50522 cl.5)

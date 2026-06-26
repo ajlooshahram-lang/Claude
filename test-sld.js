@@ -16274,6 +16274,24 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
+// === Forsyning: cable protection by relay (Viggo 2018-08, ref. Elektroteknik bog 5) ===
+test('Cable overload protection: corrected Iz vs protection current (Viggo: 371 A > 300 A)', function () {
+  var Izc = 515 * 0.90 * 0.80; // 240 mm2 -> 515 A; 35C -> 0.90; 2 circuits -> 0.80
+  assert(Math.abs(Izc - 371) < 0.5, 'corrected Iz = 371 A (got ' + Izc.toFixed(1) + ')');
+  assert.strictEqual(forsyningCableOverload(Izc, 300).ok, true, '371 A > 300 A -> overload protected');
+  assert.strictEqual(forsyningCableOverload(290, 300).ok, false, 'Iz < I_prot -> NOT protected');
+});
+
+test('Cable short-circuit protection adiabatic I_perm = k*S/sqrt(t); k from datasheet, not assumed', function () {
+  // Viggo uses k ~ 111 for the HV PEX-Al phase conductor (NOT the LV IEC value 94):
+  // 240 mm2, t = t>+t_breaker = 0.5+0.1 = 0.6 s -> ~34.3 kA withstand
+  var r = forsyningCableScProtection(240, 111, 6930, 35, 143, 6000, 0.6);
+  assert(Math.abs(r.phase.Iperm / 1000 - 34.3) < 0.3, 'phase withstand ~34.3 kA (got ' + (r.phase.Iperm / 1000).toFixed(1) + ')');
+  assert.strictEqual(r.phase.ok, true, 'phase withstands the 6.93 kA fault for 0.6 s');
+  assert(Math.abs(r.phase.Iperm - 111 * 240 / Math.sqrt(0.6)) < 1, 'I_perm = k*S/sqrt(t)');
+  assert.strictEqual(r.screen.ok, true, 'screen withstands its earth-fault current');
+});
+
 test('Potentialestigning: R_E <= U_Tp/I_E and the touch-voltage verdict (DS/EN 50522)', function () {
   var re = forsyningEarthResistanceMax(56, 75);
   assert(Math.abs(re.REmax - 75 / 56) < 1e-9, 'R_E,max = U_Tp/I_E (got ' + re.REmax.toFixed(3) + ')');
