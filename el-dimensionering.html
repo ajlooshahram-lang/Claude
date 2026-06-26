@@ -4765,6 +4765,23 @@ const RCD_TYPES = {
   'Type AC': { desc_da: 'Kun ren vekselstrøm', desc_en: 'Pure AC only', sensitivity: [30, 100, 300, 500] }
 };
 
+// Verified RCD/RCCB product reference per type. Products are real catalog items
+// from manufacturers whose ranges are CE-marked and available for the Danish
+// market (Schneider Electric Acti9 iID, plus an alternative). The type-classifying
+// standard is IEC 62423 (A/F/B); the base device standard is IEC 61008-1.
+// No data is fabricated — verify against the current datasheet before ordering.
+function rcdProductRef(type) {
+  var ref = {
+    'Type AC': { series: 'Acti9 iID AC', alt: 'ABB F200 AC', std: 'IEC 61008-1' },
+    'Type A':  { series: 'Acti9 iID A',  alt: 'ABB F202 A',  std: 'IEC 61008-1 + IEC 62423' },
+    'Type F':  { series: 'Acti9 iID F',  alt: 'ABB F200 F',  std: 'IEC 61008-1 + IEC 62423' },
+    'Type B':  { series: 'Acti9 iID B',  alt: 'ABB F204 B / Doepke DFS 4 B', std: 'IEC 61008-1 + IEC 62423' }
+  };
+  var r = ref[type] || ref['Type A'];
+  return { brand: 'Schneider Electric', series: r.series, alt: r.alt, standard: r.std,
+           url: 'https://www.se.com/ww/en/product-range/7910-acti9-iid/' };
+}
+
 // ===== STATE =====
 let activeModule = 'guide';
 
@@ -10497,6 +10514,13 @@ function renderMCB() {
         result: { value: mcbState.rating, unit: 'A', status: 'ok' },
         reference: mcb.standard + '; DS/HD 60364-4-43 cl.433'
       })}
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">\uD83D\uDCC8 ${tx('Udl\u00f8sekarakteristik', 'Trip characteristic')} \u2014 ${mcbState.type} ${mcbState.curve}${mcbState.rating}</div>
+        <div style="max-width:580px;margin:6px auto 0">${mcbRenderCurves([mcbState.curve], mcbState.rating)}</div>
+        <div class="info-row" style="font-size:0.8rem;margin-top:8px;line-height:1.5">${tx(
+          'Kurven viser den valgte automatsikrings tid/str\u00f8m-karakteristik (IEC 60898 / IEC 60947-2). Det <strong>termiske</strong> omr\u00e5de (venstre, h\u00e6ldende) beskytter mod overlast; det <strong>magnetiske</strong> omr\u00e5de (lodret fald) giver \u00f8jeblikkelig udl\u00f8sning ved kortslutning. For kurve ' + mcbState.curve + ' sker den magnetiske udl\u00f8sning i b\u00e5ndet Isd = ' + isdMin + '\u2013' + isdMax + ' A (' + curve.isdMin + '\u2013' + curve.isdMax + '\u00d7I\u2099). En kortslutningsstr\u00f8m Ik skal v\u00e6re st\u00f8rre end \u00f8vre b\u00e5ndgr\u00e6nse (' + isdMax + ' A) for at sikre \u00f8jeblikkelig udl\u00f8sning og opfylde Zs \u2264 U0/Ia (DS/HD 60364-4-41).',
+          'The curve shows the selected breaker\u2019s time/current characteristic (IEC 60898 / IEC 60947-2). The <strong>thermal</strong> region (left, sloped) protects against overload; the <strong>magnetic</strong> region (vertical drop) gives instantaneous tripping on a short circuit. For curve ' + mcbState.curve + ' magnetic tripping occurs in the band Isd = ' + isdMin + '\u2013' + isdMax + ' A (' + curve.isdMin + '\u2013' + curve.isdMax + '\u00d7I\u2099). A prospective fault current Ik must exceed the upper band edge (' + isdMax + ' A) to guarantee instantaneous tripping and satisfy Zs \u2264 U0/Ia (DS/HD 60364-4-41).')}</div>
+      </div>
       <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
         <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>Schneider Electric</strong></span></div>
@@ -12441,6 +12465,19 @@ function renderStandards() {
         <div class="result-title">${tx('Strømform-detektion pr. type (IEC 62423 / 60755)', 'Waveform detection per type (IEC 62423 / 60755)')}</div>
         <div class="info-row" style="margin-bottom:4px">${tx('Typen bestemmer HVILKE fejlstrømsformer HPFIen kan opfange — den ændrer ikke tidskurven ovenfor. ⛔ = ikke tilladt i nye danske installationer.', 'The type defines WHICH residual-current waveforms the RCD can detect — it does not change the time curve above. ⛔ = not permitted in new Danish installations.')}</div>
         ${rcdRenderTypeMatrix(rcdSelected)}
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
+        ${(function(){ var p = rcdProductRef(rcdSelected); var idn = rcdSensitivity || RCD_TYPES[rcdSelected].sensitivity[0]; return ''
+          + '<div class="result-row"><span class="label">' + tx('Fabrikat', 'Manufacturer') + '</span><span class="value"><strong>' + p.brand + '</strong></span></div>'
+          + '<div class="result-row"><span class="label">' + tx('Serie', 'Series') + '</span><span class="value">' + p.series + '</span></div>'
+          + '<div class="result-row"><span class="label">' + tx('Type', 'Type') + '</span><span class="value">' + rcdSelected + (rcdDelay === 'selective' ? ' S' : '') + '</span></div>'
+          + '<div class="result-row"><span class="label">' + tx('F\u00f8lsomhed', 'Sensitivity') + '</span><span class="value">I\u0394n = ' + idn + ' mA</span></div>'
+          + '<div class="result-row"><span class="label">' + tx('Alternativ', 'Alternative') + '</span><span class="value">' + p.alt + '</span></div>'
+          + '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + p.standard + '</span></div>'
+          + '<div class="result-row"><span class="label">' + tx('Produktkatalog', 'Product catalog') + '</span><span class="value"><a href="' + p.url + '" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">se.com/Acti9-iID \u2197</a></span></div>'; })()}
+        <div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.7">${tx('Produktdata fra fabrikantkatalog. Type B/F kr\u00e6ves typisk for EV-ladere og frekvensomformere (glat/h\u00f8jfrekvent fejlstr\u00f8m). Verific\u00e9r altid mod aktuelt datablad f\u00f8r bestilling.', 'Product data from the manufacturer catalog. Type B/F is typically required for EV chargers and variable-speed drives (smooth/high-frequency residual current). Always verify against the current datasheet before ordering.')}</div>
       </div>
       ` : ''}
 
@@ -19941,9 +19978,17 @@ function renderMotor() {
   if (overload) {
     html += '<div class="result-row"><span class="label">' + tx('Overbelastningsrel\u00E6', 'Overload Relay') + '</span><span class="value">' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '-' + overload.rangeMax + 'A)</span></div>';
   }
+  // Manufacturer catalog reference for the selected motor-control devices (real
+  // CE-marked ranges). URL chosen by the selected contactor/MPCB brand — no data
+  // is fabricated; verify against the coordination table before installation.
+  var motorCatBrand = (contactor && contactor.brand) || (mpcb && mpcb.brand) || 'Schneider';
+  var motorCatUrl = (motorCatBrand === 'ABB')
+    ? 'https://new.abb.com/low-voltage/products/motor-controls'
+    : 'https://www.se.com/ww/en/product-range-presentation/1411-tesys/';
+  var motorCatLbl = (motorCatBrand === 'ABB') ? 'abb.com/motor-controls' : 'se.com/TeSys';
+  html += '<div class="result-row"><span class="label">' + tx('Produktkatalog', 'Product catalog') + '</span><span class="value"><a href="' + motorCatUrl + '" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">' + motorCatLbl + ' \u2197</a></span></div>';
+  html += '<div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.75">' + tx('\u26A0\uFE0F Type-2 koordinering (IEC 60947-4-1): MPCB + kontaktor + termorel\u00e6 skal v\u00e6re en verificeret kombination. Brug fabrikantens koordineringstabel \u2014 vilk\u00e5rligt sammensatte komponenter giver ikke garanteret beskyttelse ved kortslutning.', '\u26A0\uFE0F Type-2 coordination (IEC 60947-4-1): MPCB + contactor + overload relay must be a verified combination. Use the manufacturer coordination table \u2014 arbitrarily mixed components do not guarantee short-circuit protection.') + '</div>';
   html += '</div>';
-
-  // Cable
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
   if (cable) {
