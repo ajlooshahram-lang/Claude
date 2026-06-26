@@ -15347,6 +15347,29 @@ test('exam: lower tiers do NOT get the complex task (kept exam-appropriate)', fu
   assert.ok(gen.tasks.filter(function (t) { return t.kind === 'iktrafo_complex'; }).length === 0, 'apprentice has no complex SC task');
 });
 
+// ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====
+test('render-sweep: every module renders clean in da/en/fa (no NaN, undefined, or throw)', function () {
+  var savedLang = lang;
+  var map = { guide:'renderGuide', load:'renderLoad', fuse:'renderFuse', mcb:'renderMCB', mccb:'renderMCCB', cable:'renderCable', vdrop:'renderVdrop', scircuit:'renderShortCircuit', trafo:'renderTrafo', standards:'renderStandards', bank:'renderBank', ai:'renderAiElectrician', bid:'renderBid', projekt:'renderProjekt', verify:'renderVerify', draw:'renderDrawing', sld:'renderSLD', exam:'renderExam', autoexam:'renderAutoExam', brain:'renderBrain', pdf:'renderPDF', thermal:'renderThermal', cable3d:'renderCable3D', energy:'renderEnergy', tcc:'renderCascadeTCC', panel:'renderPanel', ev:'renderEV', solar:'renderSolar', noed:'renderNoed', motor:'renderMotor', harmonic:'renderHarmonic', vfd:'renderVFD', lighting:'renderLighting', heatpump:'renderHeatPump', busbar:'renderBusbar', bathroom:'renderBathroom', firealarm:'renderFireAlarm', data:'renderData', spd:'renderSPD', ups:'renderUPS', pfc:'renderPFC', trayfill:'renderTrayFill', zs:'renderZs', commission:'renderCommission', commissioning:'cvRender', shev:'renderShev', access:'renderAccess', generator:'renderGenerator', discrim:'renderDiscrim', earthsys:'renderEarthsys', pool:'renderPool', construction:'renderConstruction', agri:'renderAgri', arcflash:'renderArcFlash', cablelife:'renderCableLife', bess:'renderBESS', emc:'renderEMC', metering:'renderMetering', atex:'renderATEX', smartgrid:'renderSmartGrid', kls:'renderKLS', kritisk:'renderKritisk', impedans:'renderImpedans', trefase:'renderTrefase', motorteori:'renderMotorteori', relay:'renderRelay', fault:'renderFault', dc:'renderDC', lys:'renderLys', magnet:'renderMagnet', kapacitor:'renderKapacitor', varme:'renderVarme', dcmaskine:'renderDcmaskine', analyzer:'renderAnalyzer' };
+  var bad = [];
+  ['da', 'en', 'fa'].forEach(function (lg) {
+    lang = lg;
+    Object.keys(map).forEach(function (mod) {
+      var fn = map[mod];
+      try {
+        var out = (typeof eval(fn) === 'function') ? eval(fn)() : null;
+        if (typeof out !== 'string') { bad.push(lg + '/' + mod + ' (non-string)'); return; }
+        if (out.indexOf('undefined') !== -1) bad.push(lg + '/' + mod + ' (undefined)');
+        if (out.indexOf('NaN') !== -1) bad.push(lg + '/' + mod + ' (NaN)');
+      } catch (e) {
+        bad.push(lg + '/' + mod + ' THREW: ' + e.message);
+      }
+    });
+  });
+  lang = savedLang;
+  assert.ok(bad.length === 0, 'render issues: ' + bad.slice(0, 12).join('; '));
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
