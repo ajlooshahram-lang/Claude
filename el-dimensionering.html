@@ -34167,13 +34167,13 @@ function analyzerExtract(text) {
 
   // === FORSYNING / HV NETWORK DATA (Bind 5) ===
   // Short-circuit power Skh at the HV busbar: "kortslutningseffekt ... 120 MVA", "Skh = 150 MVA"
-  // Short-circuit power at the HV busbar. Capture Sk,max and Sk,min separately
-  // (real exams: "Sk,max = 225 MVA ved cos phi=0,11", "Sk,min = 175 MVA ved cos phi=0,20").
-  var skMaxM = text.match(/(?:S_?k|k)\s*,?\s*max[^.\n]{0,18}?(\d+[.,]?\d*)\s*MVA/i);
-  var skMinM = text.match(/(?:S_?k|k)\s*,?\s*min[^.\n]{0,18}?(\d+[.,]?\d*)\s*MVA/i);
+  // Capture Sk,max and Sk,min separately. Tolerant of the PDF splitting the
+  // subscript ("S k,max", "S\nk,max") and an orphan "= value" on the next line.
+  var skMaxM = text.match(/S\s*\n?\s*k\s*,?\s*max[\s\S]{0,15}?(\d+[.,]?\d*)\s*MVA/i);
+  var skMinM = text.match(/S\s*\n?\s*k\s*,?\s*min[\s\S]{0,15}?(\d+[.,]?\d*)\s*MVA/i);
   if (skMaxM) data.Skh_max_MVA = parseFloat(skMaxM[1].replace(',', '.'));
   if (skMinM) data.Skh_min_MVA = parseFloat(skMinM[1].replace(',', '.'));
-  var skhMatch = text.match(/(?:kortslutningseffekt\w*|S_?kh?)[^.\n]{0,40}?(\d+[.,]?\d*)\s*MVA/i);
+  var skhMatch = text.match(/(?:kortslutningseffekt\w*|S\s*\n?\s*k[nh]?)[\s\S]{0,40}?(\d+[.,]?\d*)\s*MVA/i);
   if (!skhMatch) skhMatch = text.match(/(\d+[.,]?\d*)\s*MVA/i);
   // Primary Skh = the max value (for Ik,max); fall back to the first MVA found.
   if (data.Skh_max_MVA) { data.Skh_MVA = data.Skh_max_MVA; data.confidence.Skh_MVA = 'high'; }
