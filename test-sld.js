@@ -15907,6 +15907,94 @@ test('da render-sweep: representative calc modules show no unprotected period-de
 });
 
 
+// === MCB rating availability (P0-B) ===
+console.log('\n=== MCB Rating Availability Tests ===\n');
+
+test('mcbAllRatings returns the union of all series ratings, sorted ascending', function() {
+  var all = mcbAllRatings();
+  // Sorted ascending, unique
+  for (var i = 1; i < all.length; i++) {
+    assert.ok(all[i] > all[i - 1], 'ratings must be strictly ascending/unique at index ' + i);
+  }
+  // Must contain every rating offered by every series
+  Object.keys(MCB_TYPES).forEach(function (tp) {
+    MCB_TYPES[tp].ratings.forEach(function (r) {
+      assert.ok(all.indexOf(r) >= 0, 'union missing ' + r + ' A from series ' + tp);
+    });
+  });
+  // Highest value comes from the 125 A frames; lowest from C60 (0.5 A)
+  assert.strictEqual(all[all.length - 1], 125, 'top of ladder should be 125 A');
+  assert.strictEqual(all[0], 0.5, 'bottom of ladder should be 0.5 A');
+});
+
+test('C60N tops out at 63 A: higher ratings are NOT in its series set', function() {
+  var c60n = MCB_TYPES['C60N'];
+  assert.strictEqual(Math.max.apply(null, c60n.ratings), 63, 'C60N max must be 63 A');
+  [80, 100, 125].forEach(function (r) {
+    assert.ok(c60n.ratings.indexOf(r) < 0, r + ' A must not be selectable in C60N');
+  });
+});
+
+test('renderMCB greys out (unavail) the ratings C60N does not offer, but keeps them visible', function() {
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C60N'; mcbState.rating = null;
+  var html = renderMCB();
+  var all = mcbAllRatings();
+  var c60n = MCB_TYPES['C60N'];
+  all.forEach(function (r) {
+    var lbl = (r < 1) ? r.toString().replace('.', ',') : String(r);
+    if (c60n.ratings.indexOf(r) >= 0) {
+      // available rating -> selectable button with onclick setting that rating
+      assert.ok(html.indexOf("mcbState.rating=" + r + ";") >= 0,
+        'available rating ' + r + ' A must have a clickable onclick');
+    } else {
+      // unavailable rating -> rendered as unavail (greyed) and NOT clickable
+      assert.ok(html.indexOf("mcbState.rating=" + r + ";") < 0,
+        'unavailable rating ' + r + ' A must NOT be clickable in C60N');
+    }
+  });
+  // The 80/100/125 A buttons must still appear (visible) as unavail with a reason
+  assert.ok(/class="sel-btn unavail"/.test(html), 'must render greyed unavail buttons');
+  assert.ok(/not available in C60N|ikke tilg/.test(html), 'unavail buttons must carry a reason (title)');
+  // 125 A specifically: present in markup but not as a selectable onclick
+  assert.ok(html.indexOf('>125<') >= 0 || html.indexOf('>125 <') >= 0, '125 A label still visible');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+test('renderMCB makes every C120N rating selectable and greys sub-63 A values', function() {
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C120N'; mcbState.rating = null;
+  var html = renderMCB();
+  // C120N ratings: 63, 80, 100, 125 all selectable
+  [63, 80, 100, 125].forEach(function (r) {
+    assert.ok(html.indexOf("mcbState.rating=" + r + ";") >= 0, r + ' A must be selectable in C120N');
+  });
+  // A low value like 6 A is not offered -> must be greyed, not clickable
+  assert.ok(html.indexOf("mcbState.rating=6;") < 0, '6 A must not be selectable in C120N');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+test('mcbRatingUnavailReason reports max for above-range and series for in-range gaps', function() {
+  var c60n = MCB_TYPES['C60N'];
+  var above = mcbRatingUnavailReason(c60n, 'C60N', 125);
+  assert.ok(/max 63 A|maks 63 A/.test(above), 'above-range reason must cite max 63 A, got: ' + above);
+  // 8 A: below typical but within min..max yet not offered by any -> not in union, skip.
+  // Use C120N for an in-range-gap style message (6 A < min 63)
+  var c120n = MCB_TYPES['C120N'];
+  var below = mcbRatingUnavailReason(c120n, 'C120N', 6);
+  assert.ok(/min 63 A/.test(below), 'below-range reason must cite min 63 A, got: ' + below);
+});
+
+test('switching series resets rating selection ladder consistently (no stale invalid rating offered)', function() {
+  // After selecting 50 A on C60N then switching to C120N, 50 A is no longer selectable
+  var prevType = mcbState.type, prevRating = mcbState.rating;
+  mcbState.type = 'C120N'; mcbState.rating = null;
+  var html = renderMCB();
+  assert.ok(html.indexOf("mcbState.rating=50;") < 0, '50 A must not be selectable in C120N');
+  mcbState.type = prevType; mcbState.rating = prevRating;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

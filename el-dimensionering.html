@@ -400,6 +400,9 @@ body.dark .nav-panel-desc b { color: #00e5ff; }
 
 .sel-btn.selected::after { display: none; }
 .sel-btn.disabled { opacity: 0.35; pointer-events: none; filter: grayscale(0.5); }
+.sel-btn.unavail { opacity: 0.4; filter: grayscale(0.7); cursor: not-allowed; background: var(--bg); color: var(--text-muted); border-style: dashed; }
+.sel-btn.unavail:hover { transform: none; box-shadow: none; border-color: var(--border); background: var(--bg); }
+.sel-btn.unavail:hover::after { opacity: 0; }
 
 /* Results */
 .result-box {
@@ -10367,6 +10370,32 @@ function renderFuse() {
 }
 
 // ===== MCB MODULE =====
+// Master display set for MCB ratings = union of every series' rating set in
+// MCB_TYPES (Schneider Multi9 data, sheet 6). Ratings a selected series does NOT
+// offer are shown greyed/disabled rather than hidden, so the user sees the full
+// preferred-rating ladder and exactly which values each series provides. The
+// per-series rating arrays in MCB_TYPES are the single source of availability;
+// no manufacturer-specific limit is invented here.
+function mcbAllRatings() {
+  var set = {};
+  Object.keys(MCB_TYPES).forEach(function (tp) {
+    MCB_TYPES[tp].ratings.forEach(function (r) { set[r] = true; });
+  });
+  return Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
+}
+
+// Localized reason why a rating is not selectable for the chosen series.
+function mcbRatingUnavailReason(mcb, type, r) {
+  var max = Math.max.apply(null, mcb.ratings);
+  var min = Math.min.apply(null, mcb.ratings);
+  if (r > max) return tx('ikke tilg\u00e6ngelig i ' + type + ' \u2013 maks ' + nf(max, max < 1 ? 1 : 0) + ' A',
+                         'not available in ' + type + ' \u2013 max ' + nf(max, max < 1 ? 1 : 0) + ' A');
+  if (r < min) return tx('ikke tilg\u00e6ngelig i ' + type + ' \u2013 min ' + nf(min, min < 1 ? 1 : 0) + ' A',
+                         'not available in ' + type + ' \u2013 min ' + nf(min, min < 1 ? 1 : 0) + ' A');
+  return tx(type + ' tilbyder ikke ' + nf(r, r < 1 ? 1 : 0) + ' A',
+            type + ' does not offer ' + nf(r, r < 1 ? 1 : 0) + ' A');
+}
+
 function renderMCB() {
   const mcb = MCB_TYPES[mcbState.type];
   const curve = MCB_CURVES[mcbState.curve];
@@ -10414,10 +10443,17 @@ function renderMCB() {
       <div class="select-group">
         <div class="select-label">${t('mcbRating')}</div>
         <div class="select-grid">
-          ${mcb.ratings.map(r =>
-            `<button class="sel-btn ${mcbState.rating === r ? 'selected' : ''}" onclick="mcbState.rating=${r};renderModule('mcb')">${r}</button>`
-          ).join('')}
+          ${mcbAllRatings().map(r => {
+            var avail = mcb.ratings.indexOf(r) >= 0;
+            var lbl = nf(r, r < 1 ? 1 : 0);
+            if (avail) {
+              return `<button class="sel-btn ${mcbState.rating === r ? 'selected' : ''}" onclick="mcbState.rating=${r};renderModule('mcb')">${lbl}</button>`;
+            }
+            var reason = mcbRatingUnavailReason(mcb, mcbState.type, r);
+            return `<button class="sel-btn unavail" title="${reason}" aria-disabled="true">${lbl}</button>`;
+          }).join('')}
         </div>
+        <div class="info-row" style="font-size:0.75rem;margin-top:6px;opacity:0.85">${tx('Gr\u00e5 (stiplet) m\u00e6rkestr\u00f8mme tilbydes ikke af ' + mcbState.type + ' \u2013 hold musen over for begrundelse. Kilde: serie-data (sheet 6).', 'Greyed (dashed) ratings are not offered by ' + mcbState.type + ' \u2013 hover for the reason. Source: series data (sheet 6).')}</div>
       </div>
 
       ${uxPanel(tx('Polkonfiguration', 'Pole Configuration'), `
