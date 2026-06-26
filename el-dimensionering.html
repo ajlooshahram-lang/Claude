@@ -33750,8 +33750,14 @@ function analyzerNormalize(text) {
 // Segment text by Opgave/sub-task structure
 function analyzerSegment(text) {
   var segments = [];
-  // Split by Opgave headers: "Opgave 1", "Opgave 2", etc.
-  var parts = text.split(/(?=Opgave\s+\d+)/i);
+  // Split by Opgave headers ("Opgave 1", "Opgave 2", ...) but NOT the weighting
+  // table ("Opgave 1 = 20 %"), which would otherwise create bogus offset sections.
+  var parts = text.split(/(?=Opgave\s+\d+\b(?!\s*=))/i);
+  // Sub-question splitter: a real question number is N.M with 1-2 digits each
+  // (e.g. 1.1, 3.18, 5.2) at a token boundary, OR a list marker a)..f). It must
+  // NOT fire on Danish thousand/decimal values like "3.500 W" or "1.580" — hence
+  // the (?!\d) guard and the 1-2 digit limit on the fractional part.
+  var SUBQ = /(?=(?:^|\s)\d{1,2}\.\d{1,2}(?!\d)[\s:).]|(?:^|\s)[a-f]\)\s)/i;
   var seenIds = {};
   for (var i = 0; i < parts.length; i++) {
     var part = parts[i].trim();
@@ -33763,7 +33769,7 @@ function analyzerSegment(text) {
     // (handles cases where assignment + answer key are pasted together)
     if (seenIds[segId] !== undefined) {
       segments[seenIds[segId]].text += '\n' + part;
-      var subParts2 = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+      var subParts2 = part.split(SUBQ);
       for (var k = 0; k < subParts2.length; k++) {
         var s2 = subParts2[k].trim();
         if (s2 && s2 !== title) segments[seenIds[segId]].subQuestions.push(s2);
@@ -33771,7 +33777,7 @@ function analyzerSegment(text) {
       continue;
     }
     // Split sub-questions within each Opgave
-    var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+    var subParts = part.split(SUBQ);
     var subQuestions = [];
     for (var j = 0; j < subParts.length; j++) {
       var sub = subParts[j].trim();
@@ -35323,37 +35329,67 @@ function renderAnalyzer() {
 
   return html;
 }
-// Parse the original sub-question label (e.g. "1.1", "2.3", "a", "12") from the
-// start of a question string, as written in the exam. Returns '' if none.
+// Parse the original sub-question label (e.g. "1.1", "3.18", "a", "(3)") from the
+// start of a question string, as written in the exam. A question number is N.M
+// with 1-2 digits each; the (?!\d) guard rejects Danish thousand/decimal values
+// such as "3.500" or "1.580". Returns '' if none.
 function analyzerSubLabel(s) {
-  var m = String(s || '').match(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)/i);
+  var m = String(s || '').match(/^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))/i);
   if (!m) return '';
   return m[1].replace(/^\(/, '').replace(/[.)]+\s*$/, '');
 }
+// Shared strip pattern: removes a leading question-number label from display text.
+var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
+
+// Collapse questions that share the same text (the detector often maps one
+// sub-question to several calc types -> identical rows). Merge them into a
+// single question carrying ALL its answers, preserving order.
+function analyzerDedupeQuestions(questions) {
+  var map = {}, order = [];
+  (questions || []).forEach(function (q) {
+    var key = (q.num ? (q.num + '|') : '') + String(q.questionText || q.label || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (!map[key]) { map[key] = { num: q.num, questionText: q.questionText, label: q.label, module: q.module, answers: [], solved: false, anyFail: false }; order.push(key); }
+    var g = map[key];
+    if (!g.module && q.module) g.module = q.module;
+    if (q.solved) {
+      g.solved = true;
+      if (q.status === 'fail') g.anyFail = true;
+      // avoid duplicate identical answer chips
+      var sig = (q.calcLabel || '') + '=' + (q.value != null ? q.value : '');
+      if (!g.answers.some(function (a) { return (a.calcLabel || '') + '=' + (a.value != null ? a.value : '') === sig; })) {
+        g.answers.push({ calcLabel: q.calcLabel, value: q.value, status: q.status });
+      }
+    }
+  });
+  return order.map(function (k) { return map[k]; });
+}
 
 // Render the numbered Q&A panel grouped by Opgave: every question is shown
-// TOGETHER with its answer + status badge so the user can see exactly which
+// TOGETHER with its answer(s) + status badge so the user can see exactly which
 // questions are answered and what each answer is. Driven by the tested
 // examBuildSolution() (per-segment solving) and annotated with the exam's own
-// numbering (1.1, 2.1, a, ...). Click-only, da/en/fa.
+// numbering (1.1, 2.1, a, ...). Identical-text rows are merged; empty sections
+// are hidden. Click-only, da/en/fa.
 function analyzerRenderQuestionOutline() {
   var sol;
   try { sol = examBuildSolution(analyzerState); } catch (e) { sol = null; }
   if (!sol || !sol.opgaver || !sol.opgaver.length) return '';
+  // Dedupe per Opgave and drop empty sections.
+  var groups = [];
+  sol.opgaver.forEach(function (o) {
+    var qs = analyzerDedupeQuestions(o.questions);
+    if (qs.length) groups.push({ id: o.id, title: o.title, questions: qs });
+  });
   var total = 0, answered = 0, failed = 0;
-  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) answered++; if (q.status === 'fail') failed++; }); });
+  groups.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) answered++; if (q.anyFail) failed++; }); });
   if (total === 0) return '';
   var html = '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Sp\u00f8rgsm\u00e5l & svar', 'Questions & answers') + ' (' + answered + '/' + total + ' ' + tx('besvaret', 'answered') + (failed ? (' \u00b7 ' + failed + ' \u26d4') : '') + '):</strong>';
   html += '<div style="margin-top:6px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
-  sol.opgaver.forEach(function (o) {
+  groups.forEach(function (o) {
     html += '<div style="padding:5px 10px;background:var(--primary-glow);font-weight:700;font-size:0.82rem">' + (o.id ? ('Opgave ' + o.id) : (o.title || tx('Generelt', 'General'))) + '</div>';
-    if (!o.questions.length) {
-      html += '<div style="padding:5px 10px;font-size:0.78rem;color:var(--text-muted)">' + tx('Ingen detekterede sp\u00f8rgsm\u00e5l.', 'No detected questions.') + '</div>';
-      return;
-    }
     o.questions.forEach(function (q) {
       var badge, badgeColor;
-      if (q.status === 'fail') { badge = '\u26d4 ' + tx('Fejler', 'Fails'); badgeColor = 'var(--danger)'; }
+      if (q.anyFail) { badge = '\u26d4 ' + tx('Fejler', 'Fails'); badgeColor = 'var(--danger)'; }
       else if (q.solved) { badge = '\u2705 ' + tx('Besvaret', 'Answered'); badgeColor = 'var(--success)'; }
       else { badge = '\u26a0\ufe0f ' + tx('Mangler input', 'Needs input'); badgeColor = 'var(--warning)'; }
       html += '<div style="padding:6px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
@@ -35364,11 +35400,13 @@ function analyzerRenderQuestionOutline() {
       html += '</div>';
       html += '<span style="white-space:nowrap;color:' + badgeColor + ';font-size:0.74rem;font-weight:700">' + badge + '</span>';
       html += '</div>';
-      if (q.solved) {
-        html += '<div style="margin-top:4px;padding:4px 8px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:4px">';
-        html += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Svar', 'Answer') + (q.calcLabel ? ' \u00b7 ' + q.calcLabel : '') + ':</span> ';
-        html += '<span style="font-family:monospace;font-weight:700;color:var(--primary)">' + (q.value != null ? mmlEsc(String(q.value)) : '\u2014') + '</span>';
-        html += '</div>';
+      if (q.solved && q.answers.length) {
+        q.answers.forEach(function (a) {
+          html += '<div style="margin-top:4px;padding:4px 8px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:4px">';
+          html += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Svar', 'Answer') + (a.calcLabel ? ' \u00b7 ' + a.calcLabel : '') + ':</span> ';
+          html += '<span style="font-family:monospace;font-weight:700;color:var(--primary)">' + (a.value != null ? mmlEsc(String(a.value)) : '\u2014') + '</span>';
+          html += '</div>';
+        });
       } else {
         html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
       }
@@ -35626,7 +35664,7 @@ function examFindQuestionMeta(seg, type) {
       if (qs[j].type === type) {
         var raw = (subs[i] || '').replace(/\s+/g, ' ').trim();
         var num = (typeof analyzerSubLabel === 'function') ? analyzerSubLabel(raw) : '';
-        var t = num ? raw.replace(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)\s*/i, '') : raw;
+        var t = num ? raw.replace(ANALYZER_NUM_STRIP, '') : raw;
         var meta = { num: num, text: t.length > 260 ? t.slice(0, 260) + '\u2026' : t };
         if (qs[j].source === 'detected') return meta; // explicit question wins (carries the number)
         if (!fallbackMeta) fallbackMeta = meta;        // remember inferred match as a fallback only

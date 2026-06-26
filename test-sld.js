@@ -16157,6 +16157,45 @@ test('analyzerRenderQuestionOutline binds questions to answers (numbers + Svar +
   lang = savedLang;
 });
 
+// === Real-exam robustness: values must not be mistaken for question numbers,
+// duplicate rows must be merged, weighting tables must not become sections ===
+test('analyzerSubLabel: Danish thousand/decimal values are NOT treated as question numbers', function () {
+  assert.strictEqual(analyzerSubLabel('1.4 Beregn'), '1.4');
+  assert.strictEqual(analyzerSubLabel('3.18 noget'), '3.18');
+  assert.strictEqual(analyzerSubLabel('a) test'), 'a');
+  assert.strictEqual(analyzerSubLabel('3.500 W kobbertab'), '', '"3.500 W" is a value, not a number');
+  assert.strictEqual(analyzerSubLabel('1.580 W'), '', '"1.580" is a value');
+  assert.strictEqual(analyzerSubLabel('0.000 V'), '', '"0.000" is a value');
+});
+
+test('analyzerSegment: "Opgave N = 20 %" weighting table is NOT treated as a section header', function () {
+  var txt = 'V\u00e6gtning:\nOpgave 1 = 20 %\nOpgave 2 = 60 %\nOpgave 3 = 20 %\n\nOpgave 1\n1.1 Beregn IB for 10 kW, 400 V, cos phi 0,9.\nOpgave 2\n2.1 Beregn Ik.';
+  var segs = analyzerSegment(txt);
+  var op1 = segs.filter(function (s) { return s.id === 1; });
+  assert(op1.length === 1, 'exactly one Opgave 1 section (got ' + op1.length + ')');
+  assert(op1[0].text.indexOf('Beregn IB') >= 0, 'Opgave 1 section holds the real question, not just "= 20 %"');
+});
+
+test('analyzerSegment: does not split sub-questions on Danish thousand-separated values', function () {
+  var txt = 'Opgave 1\n1.4 Beregn tabet. Kobbertab er 3.500 W og jerntab 1.580 W ved 0.000 belastning.';
+  var segs = analyzerSegment(txt);
+  var subs = segs[0].subQuestions;
+  var frags = subs.filter(function (s) { return /^\s*(3\.500|1\.580|0\.000)/.test(s); });
+  assert.strictEqual(frags.length, 0, 'no sub-question fragment starts at a value');
+});
+
+test('analyzerDedupeQuestions: identical-text rows are merged into one with all answers', function () {
+  var qs = [
+    { num: '3.6', type: 'star_delta', questionText: 'Samme tekst om motor', module: 'motor', solved: true, status: 'ok', calcLabel: 'A', value: '10 A' },
+    { num: '3.6', type: 'lys_cd', questionText: 'Samme tekst om motor', module: 'lys', solved: false, status: null, calcLabel: null, value: null },
+    { num: '3.6', type: 'thermal', questionText: 'Samme tekst om motor', module: 'thermal', solved: true, status: 'ok', calcLabel: 'B', value: '20 A' }
+  ];
+  var merged = analyzerDedupeQuestions(qs);
+  assert.strictEqual(merged.length, 1, 'three identical-text rows collapse to one');
+  assert.strictEqual(merged[0].answers.length, 2, 'keeps both distinct answers');
+  assert.strictEqual(merged[0].solved, true, 'merged row is solved if any part solved');
+});
+
 // === thermalCalcTemp physics correction (audit) ===
 // A conductor loaded to its DERATED ampacity must reach exactly the insulation's
 // max temperature at ANY ambient -- this is what the Table B.52.14/15 derating
