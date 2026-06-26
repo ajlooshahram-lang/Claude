@@ -34329,9 +34329,9 @@ function analyzerDetectQuestions(text) {
     { re: /U-?v.{1,2}rdi|varmetab|transmissionstab|varmebehov|isoleringskrav/i, type: 'varme', label: 'U-v\u00e6rdi/varmetab', module: 'varme' },
     { re: /(?:j.{1,2}vnstr.{1,2}ms?)(?:maskine|motor|generator)|ankerstr.{1,2}m|mod-?EMK|tv.{1,2}rmagnetisering/i, type: 'dcmaskine', label: 'DC-maskine', module: 'dcmaskine' },
     // === REAL EXAM PHRASINGS (verbs: Dimensioner/Valg af/Foretag valg/Afklar/Kontrol om/Hvad er) ===
-    { re: /(?:beregn|bestem|find)[^.\n]{0,35}(?:st.rste|mindste|maks\w*|min\w*\b)?[^.\n]{0,15}kortslutningsstr/i, type: 'sk_net', label: 'Kortslutningsstr\u00f8m (net)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find)[^.\n]{0,35}(?:st.rste|mindste|maks\w*|min\w*\b)?[^.\n]{0,15}kortslutnings\s?str/i, type: 'sk_net', label: 'Kortslutningsstr\u00f8m (net)', module: 'scircuit' },
     { re: /(?:foretag\s+)?valg\s+af[^.\n]{0,60}(?:smeltesikring|automatsikring|kombiafbryder|sikring|MCCB|MCB|maksimalafbryder|str.mtransformer|konstanttidsrel.|rel.|lastadskiller)/i, type: 'device', label: 'Valg af beskyttelse', module: 'mcb' },
-    { re: /dimensioner[^.\n]{0,45}(?:hovedkabel|forsyningskred|gruppeledning|stikledning|tilledning|kabel|ledning)/i, type: 'cable', label: 'Dimensioner kabel/ledning', module: 'cable' },
+    { re: /d\s?imensioner[^.\n]{0,45}(?:hovedkabel|forsyningskred|gruppeledning|stikledning|tilledning|kabel|ledning)/i, type: 'cable', label: 'Dimensioner kabel/ledning', module: 'cable' },
     { re: /(?:dimensioner|kontrol\w*)[^.\n]{0,30}kanalskinne|kanalskinne[^.\n]{0,30}(?:belastnings|kortslutnings|st.dstr.m)/i, type: 'busbar', label: 'Kanalskinne', module: 'busbar' },
     { re: /(?:afklar|kontrol\w*|unders.g)[^.\n]{0,75}(?:kortslutningsbeskyt|overbelastningsbeskyt)/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
     { re: /(?:hvad\s+er|bestem|find|beregn)[^.\n]{0,30}(?:maksimale?\s+)?ber.ringssp.nding/i, type: 'potential', label: 'Ber\u00f8ringssp\u00e6nding / R_E', module: 'scircuit' },
