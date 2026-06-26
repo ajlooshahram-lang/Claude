@@ -15147,6 +15147,47 @@ test('load: diversityRangeNote enforces Formel 246 validity ranges (area 9-20, e
   diversityState.method = pm; diversityState.homes = ph;
 });
 
+// ===== XLPE vs PVC TEMPERATURE CORRECTION FACTOR (DS/HD 60364-5-52 Table B.52.14) =====
+test('cable: PVC vs XLPE temperature factors differ correctly (k=sqrt((thMax-amb)/(thMax-30)))', function () {
+  // PVC 70C: 0.71 @50C, 1.22 @10C ; XLPE 90C: 0.82 @50C, 1.15 @10C
+  assert.ok(Math.abs(TEMP_FACTORS[50] - 0.71) < 1e-9, 'PVC@50 = 0.71');
+  assert.ok(Math.abs(TEMP_FACTORS_XLPE[50] - 0.82) < 1e-9, 'XLPE@50 = 0.82');
+  assert.ok(Math.abs(TEMP_FACTORS[10] - 1.22) < 1e-9, 'PVC@10 = 1.22');
+  assert.ok(Math.abs(TEMP_FACTORS_XLPE[10] - 1.15) < 1e-9, 'XLPE@10 = 1.15');
+  // Above 30C the XLPE factor is LARGER (less derating); below 30C it is SMALLER.
+  assert.ok(TEMP_FACTORS_XLPE[50] > TEMP_FACTORS[50], 'XLPE less sensitive at high ambient');
+  assert.ok(TEMP_FACTORS_XLPE[10] < TEMP_FACTORS[10], 'using PVC factor for XLPE below 30C would over-estimate capacity (unsafe) -> must differ');
+});
+
+test('cable: tempFactorFor follows insulation; isXlpeCable detects NOIKLX', function () {
+  assert.ok(isXlpeCable('NOIKLX 90 Dca') === true, 'NOIKLX = XLPE');
+  assert.ok(isXlpeCable('PVC kabel') === false, 'PVC not XLPE');
+  assert.ok(Math.abs(tempFactorFor(50, true) - 0.82) < 1e-9, 'tempFactorFor XLPE@50 = 0.82');
+  assert.ok(Math.abs(tempFactorFor(50, false) - 0.71) < 1e-9, 'tempFactorFor PVC@50 = 0.71');
+  assert.ok(Math.abs(tempFactorFor(999, false) - 1.0) < 1e-9, 'unknown temp -> 1.0 fallback');
+});
+
+test('cable: upTempFactor interpolation respects insulation table', function () {
+  // 45C is tabulated: PVC 0.79, XLPE 0.87
+  assert.ok(Math.abs(upTempFactor(45, false) - 0.79) < 1e-9, 'PVC@45 = 0.79');
+  assert.ok(Math.abs(upTempFactor(45, true) - 0.87) < 1e-9, 'XLPE@45 = 0.87');
+  // 42C interpolates between 40 and 45
+  var pvc42 = upTempFactor(42, false), xlpe42 = upTempFactor(42, true);
+  assert.ok(pvc42 > 0.79 && pvc42 < 0.87, 'PVC@42 interpolated in range');
+  assert.ok(xlpe42 > pvc42, 'XLPE@42 > PVC@42');
+});
+
+test('exam: axSelectCable answer key uses XLPE temp factor for XLPE insulation', function () {
+  // At 50C ambient, In=100A. With XLPE factor 0.82 the required base Iz = 100/0.82 = 122A.
+  // With the (wrong) PVC factor 0.71 it would be 141A -> a larger cable -> wrong answer key.
+  var selX = axSelectCable(100, 'Cu', 'XLPE', tempFactorFor(50, true), 1, 1);
+  var selP = axSelectCable(100, 'Cu', 'XLPE', tempFactorFor(50, false), 1, 1);
+  assert.ok(selX !== null && selP !== null, 'both selections resolve');
+  // The XLPE-correct factor (0.82) is less severe -> selects an equal or smaller CSA than PVC factor.
+  assert.ok(selX.csa <= selP.csa, 'correct XLPE factor never oversizes vs PVC factor (' + selX.csa + ' <= ' + selP.csa + ')');
+  assert.ok(Math.abs(selX.k - 0.82) < 1e-9, 'k reflects XLPE factor 0.82');
+});
+
 // ===== COMPLEX SHORT-CIRCUIT (IEC 60909 / El-7 vector method) =====
 test('scircuit: scComplexParts matches El-7 textbook (R/X=0.4 => phi=68.2deg, cos=0.371, sin=0.928)', function () {
   var p = scComplexParts(10, 0.4);

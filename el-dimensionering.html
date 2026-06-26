@@ -3137,15 +3137,36 @@ const INSTALL_METHODS = {
   'C': 1.0, 'D': 1.0, 'D1': 1.0, 'D2': 1.0, 'E': 1.04, 'F': 1.09, 'G': 1.17
 };
 
-// Temperature correction
+// Temperature correction - PVC 70°C conductor (DS/HD 60364-5-52 Table B.52.14, ref. 30°C in air)
+// Derived from k = sqrt((θmax - θamb)/(θmax - 30)) with θmax = 70°C.
 const TEMP_FACTORS = {
   10: 1.22, 15: 1.17, 20: 1.12, 25: 1.06, 30: 1.0, 35: 0.94, 40: 0.87, 45: 0.79, 50: 0.71
+};
+// Temperature correction - XLPE/EPR 90°C conductor (same table, θmax = 90°C).
+// XLPE runs hotter, so it is LESS sensitive to ambient: at 10°C k=1.15 (not 1.22),
+// at 50°C k=0.82 (not 0.71). Using the PVC column for an XLPE cable OVER-estimates
+// capacity below 30°C ambient (unsafe) — so the table must follow the insulation.
+const TEMP_FACTORS_XLPE = {
+  10: 1.15, 15: 1.12, 20: 1.08, 25: 1.04, 30: 1.0, 35: 0.96, 40: 0.91, 45: 0.87, 50: 0.82
 };
 
 // Grouping correction
 const GROUP_FACTORS = {
   1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
 };
+
+// True when the active cable uses XLPE/EPR (90°C) insulation, mirroring izTableFor().
+function isXlpeCable(typeStr) {
+  var ts = (typeStr != null) ? typeStr : ((typeof cableState !== 'undefined' && cableState.type) || '');
+  return /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(ts);
+}
+// Ambient-temperature correction factor that follows the conductor insulation
+// (PVC 70°C vs XLPE/EPR 90°C). Falls back to 1.0 for unknown temperatures.
+function tempFactorFor(temp, xlpe) {
+  var useXlpe = (xlpe != null) ? xlpe : isXlpeCable();
+  var tbl = useXlpe ? TEMP_FACTORS_XLPE : TEMP_FACTORS;
+  return tbl[temp] != null ? tbl[temp] : 1.0;
+}
 
 // ===== PRODUCT DATABASE =====
 // Real products from major manufacturers used in Danish electrical installations
@@ -3647,7 +3668,7 @@ function renderRecommendations(title, products, type) {
     if (type === 'cable' && products.length > 0 && ib > 0) {
       var topCable = products[0];
       var kI = INSTALL_METHODS[cableState.installMethod] || 1.0;
-      var kT = TEMP_FACTORS[cableState.temp] || 1.0;
+      var kT = tempFactorFor(cableState.temp);
       var kG = GROUP_FACTORS[cableState.grouping] || 1.0;
       var baseIzVal = officialIz(topCable);
       var _csaLad = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
@@ -3766,7 +3787,7 @@ function getAiAssistant(module) {
         const izTable = izTableFor();
         const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
         const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
-        const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+        const kTemp = tempFactorFor(cableState.temp);
         const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
         const correctedIz = baseIz * kInstall * kTemp * kGroup;
 
@@ -3888,7 +3909,7 @@ function runQiValidation() {
   if (mcbState.rating && cableState.crossSection) {
     const izTable = izTableFor();
     const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
-    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * (TEMP_FACTORS[cableState.temp] || 1) * (GROUP_FACTORS[cableState.grouping] || 1);
+    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * tempFactorFor(cableState.temp) * (GROUP_FACTORS[cableState.grouping] || 1);
     const corrIz = baseIz * kTotal;
     if (mcbState.rating <= corrIz) {
       passed.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A \u2264 ' + corrIz.toFixed(1) + ' A' });
@@ -3923,7 +3944,7 @@ function runQiValidation() {
     const izTable = izTableFor();
     const corrIz = (izTable[parseFloat(cableState.crossSection)] || 0) *
       (INSTALL_METHODS[cableState.installMethod] || 1) *
-      (TEMP_FACTORS[cableState.temp] || 1) *
+      tempFactorFor(cableState.temp) *
       (GROUP_FACTORS[cableState.grouping] || 1);
     if (ib <= mcbState.rating && mcbState.rating <= corrIz) {
       passed.push({ rule: 'IB \u2264 In \u2264 Iz (koordination)', detail: ib.toFixed(1) + ' \u2264 ' + mcbState.rating + ' \u2264 ' + corrIz.toFixed(1) + ' A' });
@@ -6875,7 +6896,7 @@ function sldVerifyNode(tree, nodeId) {
   // Apply installation method, temperature, and grouping derating factors to Iz
   // per DS/HD 60364-5-52 (correction factors for current-carrying capacity)
   const kInstall = INSTALL_METHODS[node.installMethod] || 1.0;
-  const kTemp = TEMP_FACTORS[node.temp] || 1.0;
+  const kTemp = tempFactorFor(node.temp, isXlpeCable(node.cable && node.cable.model));
   const kGroup = GROUP_FACTORS[node.grouping] || 1.0;
   const iz = rawIz * kInstall * kTemp * kGroup;
   const protIn = node.protectionIn || (node.protection ? node.protection.rating : 0);
@@ -8176,7 +8197,7 @@ function pdfBuildCableSchedule(tree) {
     var node = tree.nodes[nodeIds[i]];
     if (node.cable && node.type !== 'transformer') {
       var rawIz = node.cable.iz || 0;
-      var kTemp = TEMP_FACTORS[node.temp] || 1.0;
+      var kTemp = tempFactorFor(node.temp, isXlpeCable(node.cable && node.cable.model));
       var kGroup = GROUP_FACTORS[node.grouping] || 1.0;
       items.push({ name: sldNodeName(node), cable: node.cable.material + ' ' + node.cable.mm2 + 'mm2', mm2: node.cable.mm2, length: node.length_m || 0, iz: rawIz, corrTemp: kTemp, corrGroup: kGroup, clause: 'DS/HD 60364-5-52 Table B.52' });
     }
@@ -10268,7 +10289,7 @@ function renderCable() {
 
   // Correction factors
   const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
-  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+  const kTemp = tempFactorFor(cableState.temp);
   const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
   const kTotal = kInstall * kTemp * kGroup;
 
@@ -14809,7 +14830,7 @@ function axGenInstallation(rng, b, tier) {
 
 function axTasksInstallation(d, tier, maxTasks) {
   var tasks = [];
-  var kTemp = TEMP_FACTORS[d.ambient] || 1;
+  var kTemp = tempFactorFor(d.ambient, d.stik.insulation === 'XLPE');
   var kGroup = GROUP_FACTORS[d.grouping] || 1;
   var ibT = d.IBtotal;
   var ibNoSf = 0; d.loads.forEach(function (l) { ibNoSf += l.IB; }); ibNoSf = Math.round(ibNoSf * 10) / 10;
@@ -26821,19 +26842,20 @@ function upCableMaxTempC(cable) {
 // Ambient -> Ca, using the published TEMP_FACTORS table; linear interpolation
 // between tabulated points and a clamped linear extrapolation just above the
 // last point (50 C) so the bisection has a continuous, monotonic function.
-function upTempFactor(t) {
+function upTempFactor(t, xlpe) {
   if (t == null) return 1.0;
-  if (TEMP_FACTORS[t] != null) return TEMP_FACTORS[t];
-  const keys = Object.keys(TEMP_FACTORS).map(Number).sort(function(a, b) { return a - b; });
-  if (t <= keys[0]) return TEMP_FACTORS[keys[0]];
+  var TBL = xlpe ? TEMP_FACTORS_XLPE : TEMP_FACTORS;
+  if (TBL[t] != null) return TBL[t];
+  const keys = Object.keys(TBL).map(Number).sort(function(a, b) { return a - b; });
+  if (t <= keys[0]) return TBL[keys[0]];
   if (t >= keys[keys.length - 1]) {
     const a = keys[keys.length - 2], b = keys[keys.length - 1];
-    const slope = (TEMP_FACTORS[b] - TEMP_FACTORS[a]) / (b - a);
-    return Math.max(0.3, TEMP_FACTORS[b] + slope * (t - b));
+    const slope = (TBL[b] - TBL[a]) / (b - a);
+    return Math.max(0.3, TBL[b] + slope * (t - b));
   }
   for (let i = 0; i < keys.length - 1; i++) {
     if (t >= keys[i] && t <= keys[i + 1]) {
-      const fa = TEMP_FACTORS[keys[i]], fb = TEMP_FACTORS[keys[i + 1]];
+      const fa = TBL[keys[i]], fb = TBL[keys[i + 1]];
       return fa + (fb - fa) * (t - keys[i]) / (keys[i + 1] - keys[i]);
     }
   }
@@ -26871,7 +26893,7 @@ function upCloneProject(p) {
 function upResolveOverlay(overlay) {
   overlay = overlay || {};
   const ov = upNeutralOverlay();
-  if (overlay.ambientC != null) ov.Ca = upTempFactor(overlay.ambientC);
+  if (overlay.ambientC != null) ov.Ca = upTempFactor(overlay.ambientC, !!overlay.xlpe);
   if (overlay.groupingN != null) ov.Cg = upGroupFactor(overlay.groupingN);
   if (typeof overlay.voltageFactor === 'number') ov.voltageFactor = overlay.voltageFactor;
   if (typeof overlay.conductorTempC === 'number') ov.conductorTempC = overlay.conductorTempC;
@@ -33064,7 +33086,7 @@ function analyzerSolve(data) {
   var izCorrected = null;
   var kInstall = 1.0, kTemp = 1.0, kGroup = 1.0;
   if (data.installMethod) kInstall = INSTALL_METHODS[data.installMethod] || 1.0;
-  if (data.temperature) kTemp = TEMP_FACTORS[data.temperature] || TEMP_FACTORS[30] || 1.0;
+  if (data.temperature) kTemp = tempFactorFor(data.temperature, true);
   if (data.grouping) kGroup = GROUP_FACTORS[data.grouping] || 1.0;
 
   if (data.cableMm2) {
