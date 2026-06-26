@@ -141,8 +141,8 @@ test('sldCalcNodeZs accumulates impedance correctly', function() {
   const mainBoard = tree.nodes[mainBoardId];
   const fcId = mainBoard.childIds[0]; // First final circuit (lighting, 1.5mm2, 20m)
 
-  // Ztrafo = (uk/100) * U^2 / Sn = (6/100) * 160000 / 630000 = 0.01524 ohm
-  const zsTrafo = (6 / 100) * (400 * 400) / (630 * 1000);
+  // Ztrafo = (uk/100) * U^2 / Sn = (5/100) * 160000 / 630000 = 0.01270 ohm
+  const zsTrafo = (5 / 100) * (400 * 400) / (630 * 1000);
   // Main board cable: 50mm2, r=0.388, x=0.084, L=10m -> 2*10*(0.388+0.084)/1000 = 0.00944
   const zsMain = 2 * 10 * (0.388 + 0.084) / 1000;
   // Final circuit cable: 1.5mm2, r=12.1, x=0.113, L=20m -> 2*20*(12.1+0.113)/1000 = 0.48852
