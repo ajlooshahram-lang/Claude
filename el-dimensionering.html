@@ -30324,7 +30324,11 @@ var relayState = {
   Igg: 20,
   tGg: 0.1,
   egentid: 0.04,
-  fuseType: 'gg63'
+  fuseType: 'gg63',
+  // Line/feeder relay (Eksempel 7.4.5.1)
+  lineIload: 310,
+  lineIk2fMin: 1500,
+  lineBusTime: 1000
 };
 
 var RELAY_TRAFO_PRESETS = [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
@@ -30378,6 +30382,41 @@ function relayCheckFuseCoordination(fuseKey, I1N) {
   var fuse = RELAY_HV_FUSES[fuseKey];
   if (!fuse) return { ok: false, reason: 'Unknown fuse' };
   return { ok: fuse.rating >= I1N, fuseRating: fuse.rating, I1N: I1N, Imin: fuse.Imin, Imax: fuse.Imax };
+}
+
+// Standard CT primary ratings (X/5 A), IEC 61869-2 preferred values.
+var RELAY_CT_PRIMARIES = [50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 800, 1000, 1250, 1500, 2000];
+// Line/feeder definite-time (constant-time) relay setting per Elektroteknik Bind 6,
+// Eksempel 7.4.5.1 (Viggo Bisch linjerelæ method):
+//   - CT primary chosen as the smallest standard rating >= Iload*overload.
+//   - Overload pickup  I>  = (Iload*overload)/CT_primary  [per-unit of CT primary].
+//   - Fast trip        I>> = (safety*Ik2f_min)/CT_primary [must trip BELOW the minimum
+//                            fault, so a safety factor 0.75 is applied to Ik,min].
+//   - t>  grades one step (default 500 ms) below the upstream busbar time.
+//   - t>> short definite time (screen/phase thermal limited; default 200 ms).
+// IloadA = continuous line current (e.g. cable rating I_jord); ik2fMinA = minimum
+// 2-phase far-end fault [A]; busTimeMs = upstream busbar relay time [ms].
+function relayLineSettings(IloadA, ik2fMinA, busTimeMs, overload, safety) {
+  var ovl = (overload && overload > 0) ? overload : 1.2;
+  var saf = (safety && safety > 0) ? safety : 0.75;
+  var i1min = IloadA * ovl;
+  var ctPrimary = RELAY_CT_PRIMARIES[RELAY_CT_PRIMARIES.length - 1];
+  for (var i = 0; i < RELAY_CT_PRIMARIES.length; i++) {
+    if (RELAY_CT_PRIMARIES[i] >= i1min) { ctPrimary = RELAY_CT_PRIMARIES[i]; break; }
+  }
+  var iGt = Math.round((i1min / ctPrimary) * 100) / 100;        // I>  per-unit
+  var iGgPrimary = saf * ik2fMinA;
+  var iGg = Math.round((iGgPrimary / ctPrimary) * 100) / 100;   // I>> per-unit
+  var bt = (busTimeMs != null) ? busTimeMs : 1000;
+  var tGt = Math.max(0, Math.round(bt - 500));                  // one grading step below busbar
+  return {
+    ctPrimary: ctPrimary, ctRatio: ctPrimary + '/5',
+    overloadFactor: Math.round((ctPrimary / IloadA) * 100) / 100, // achieved margin vs load
+    iGt: iGt, iGtPrimary: Math.round(i1min),
+    iGg: iGg, iGgPrimary: Math.round(iGgPrimary),
+    tGt: tGt, tGg: 200,
+    clause: 'Elektroteknik Bind 6 Eksempel 7.4.5.1 \u00b7 IEC 60255 \u00b7 IEC 61869-2'
+  };
 }
 
 function renderRelay() {
@@ -30525,6 +30564,39 @@ function renderRelay() {
   html += tx('Ref: IEC 60255 (rele), IEC 60282-1 (HV-sikringer), DS/HD 60076 (trafo). Egentid = releets ibønde mekaniske/elektroniske forsinkelse.', 'Ref: IEC 60255 (relay), IEC 60282-1 (HV fuses), DS/HD 60076 (transformer). Inherent time = relay own mechanical/electronic delay.');
   html += '</div>';
   html += '</div>';
+
+  // ===== LINE / FEEDER RELAY (linjerelæ) — Eksempel 7.4.5.1 method =====
+  var ls = relayLineSettings(relayState.lineIload, relayState.lineIk2fMin, relayState.lineBusTime);
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Linjerele-indstilling (konstanttid)', 'Line / feeder relay setting (definite-time)') + '</div>';
+  html += '<div class="info-row">' + tx('CT-valg + I>/I>> efter Viggo-metoden (Elektroteknik Bind 6, Eksempel 7.4.5.1): CT &ge; I_last&times;1,2; I> = overlast/CT; I>> = 0,75&times;Ik2F,min/CT (skal udl&oslash;se UNDER mindste fejl).', 'CT selection + I>/I>> per the Viggo method (Elektroteknik Bind 6, Ex. 7.4.5.1): CT &ge; I_load&times;1.2; I> = overload/CT; I>> = 0.75&times;Ik2F,min/CT (must trip BELOW the minimum fault).') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Linjens kontinuerlige str&oslash;m I_last (kabel I_jord) [A]', 'Line continuous current I_load (cable rating) [A]') + '</div><div class="select-grid">';
+  [120, 200, 250, 280, 310, 350, 400, 500, 600].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.lineIload === v ? ' selected' : '') + '" onclick="relayState.lineIload=' + v + ';renderModule(\'relay\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Mindste kortslutning Ik2F,min (kabelende) [A]', 'Minimum fault Ik2F,min (cable far end) [A]') + '</div><div class="select-grid">';
+  [800, 1000, 1200, 1500, 1800, 2000, 2500, 3000].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.lineIk2fMin === v ? ' selected' : '') + '" onclick="relayState.lineIk2fMin=' + v + ';renderModule(\'relay\')">' + (v / 1000).toFixed(1).replace('.', ',') + ' kA</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Opstr&oslash;ms samleskinnetid [ms]', 'Upstream busbar time [ms]') + '</div><div class="select-grid">';
+  [600, 800, 1000, 1200, 1500].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.lineBusTime === v ? ' selected' : '') + '" onclick="relayState.lineBusTime=' + v + ';renderModule(\'relay\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Linjerele-resultat', 'Line relay result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Str&oslash;mtransformer (CT)', 'Current transformer (CT)') + '</span><span class="value">' + ls.ctRatio + ' A</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('CT-valg', 'CT selection') + '</span><span class="value">I&#8321; &ge; ' + relayState.lineIload + '&times;1,2 = ' + Math.round(relayState.lineIload * 1.2) + ' A &rArr; ' + ls.ctRatio + '</span></div>';
+  html += '<div class="result-row"><span class="label">I&gt; (' + tx('overlast', 'overload') + ')</span><span class="value">' + ls.iGt.toFixed(2).replace('.', ',') + ' &times; I<sub>n</sub> (' + ls.iGtPrimary + ' A)</span></div>';
+  html += '<div class="result-row"><span class="label">t&gt;</span><span class="value">' + ls.tGt + ' ms</span></div>';
+  html += '<div class="result-row"><span class="label">I&gt;&gt; (' + tx('hurtigudl&oslash;ser', 'fast trip') + ')</span><span class="value">' + ls.iGg.toFixed(2).replace('.', ',') + ' &times; I<sub>n</sub> (' + ls.iGgPrimary + ' A)</span></div>';
+  html += '<div class="result-row"><span class="label">t&gt;&gt;</span><span class="value">' + ls.tGg + ' ms</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + ls.clause + '</span></div>';
+  html += '</div></div>';
   return html;
 }
 

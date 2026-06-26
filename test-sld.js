@@ -15347,6 +15347,28 @@ test('exam: lower tiers do NOT get the complex task (kept exam-appropriate)', fu
   assert.ok(gen.tasks.filter(function (t) { return t.kind === 'iktrafo_complex'; }).length === 0, 'apprentice has no complex SC task');
 });
 
+// ===== LINE/FEEDER RELAY (linjerelæ) — textbook validation =====
+test('relay: relayLineSettings reproduces Elektroteknik Bind 6 Eksempel 7.4.5.1 exactly', function () {
+  // Given: cable rating 310 A, Ik2F,min = 1.5 kA, upstream busbar relay 1000 ms.
+  // Textbook answer: CT 400/5, I> = 0.93, I>> = 2.8, t> = 500 ms.
+  var r = relayLineSettings(310, 1500, 1000);
+  assert.ok(r.ctRatio === '400/5', 'CT primary = 400/5 (I1 >= 310*1.2 = 372 A). Got ' + r.ctRatio);
+  assert.ok(Math.abs(r.iGt - 0.93) < 0.01, 'I> = 372/400 = 0.93. Got ' + r.iGt);
+  assert.ok(Math.abs(r.iGg - 2.8) < 0.02, 'I>> = 0.75*1500/400 = 2.81 ~ 2.8. Got ' + r.iGg);
+  assert.ok(r.tGt === 500, 't> = busbar 1000ms - 500ms grading = 500ms. Got ' + r.tGt);
+  assert.ok(r.tGg === 200, 't>> default 200 ms. Got ' + r.tGg);
+  assert.ok(r.iGgPrimary === 1125, 'I>> primary pickup = 0.75*1500 = 1125 A');
+});
+
+test('relay: relayLineSettings is conservative — fast trip set below the minimum fault', function () {
+  var r = relayLineSettings(400, 2000, 800);
+  // The fast-trip primary pickup must be strictly below Ik2F,min so it reliably operates.
+  assert.ok(r.iGgPrimary < 2000, 'I>> primary (' + r.iGgPrimary + ') < Ik2F,min (2000) — reliable tripping');
+  // CT must carry at least 1.2x the load.
+  var ctPrimaryNum = parseInt(r.ctRatio, 10);
+  assert.ok(ctPrimaryNum >= 400 * 1.2, 'CT primary >= 1.2*Iload');
+});
+
 // ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====
 test('render-sweep: every module renders clean in da/en/fa (no NaN, undefined, or throw)', function () {
   var savedLang = lang;
