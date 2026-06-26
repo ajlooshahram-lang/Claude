@@ -15389,6 +15389,34 @@ test('relay: cableShortTimeWithstand flags an under-rated screen', function () {
   assert.ok(cw.screenOk === false, 'weak screen (1.5 kA) < required (7.07 kA) -> fail');
 });
 
+// ===== REDEKAMLINJE / DISTRIBUTION FEEDER VOLTAGE DROP — textbook validation =====
+test('vdrop: redekamVoltageDrop reproduces Eksempel 7.4.1.3 (8x400kVA, 10kV, 95mm2 -> 4.45%)', function () {
+  // 8 stations, 1 km apart (1..8 km), 400 kVA each, cosphi 0.8, 95 mm2 PEX-S-Al r=0.32 x=0.088.
+  var Iper = 400000 / (Math.sqrt(3) * 10000);  // 23.09 A
+  var st = [];
+  for (var k = 1; k <= 8; k++) st.push({ I: Iper, l: k });
+  var r = redekamVoltageDrop(st, 0.32, 0.088, 0.8, 10000);
+  assert.ok(Math.abs(r.sumIL - Iper * 36) < 0.1, 'Sum(I*l) = I*(1+..+8) = 36*I = 831.4 A*km. Got ' + r.sumIL);
+  assert.ok(Math.abs(r.dUf - 256.7) < 0.5, 'phase drop dUf ~256.7 V. Got ' + r.dUf);
+  assert.ok(Math.abs(r.pct - 4.45) < 0.05, 'line drop ~4.45% (< 7% limit). Got ' + r.pct);
+  assert.ok(r.pct < 7, 'satisfies the 7% network limit');
+});
+
+test('vdrop: redekamMinCsa ~ textbook 53 mm2 minimum for the 7% limit (Al)', function () {
+  var Iper = 400000 / (Math.sqrt(3) * 10000);
+  var sumIL = Iper * 36;
+  // Textbook gives 53 mm2 minimum; rho_Al ~28-30 Ω·mm²/km gives ~52-56.
+  var sMin = redekamMinCsa(sumIL, 0.09, 0.8, 10000, 7, 28.6);
+  assert.ok(sMin >= 48 && sMin <= 58, 'min CSA in textbook range ~53 mm2. Got ' + sMin);
+});
+
+test('vdrop: redekam Sum(I*l) is a true moment — farther loads weigh more', function () {
+  var near = redekamVoltageDrop([{ I: 100, l: 1 }], 0.3, 0.08, 0.9, 400);
+  var far = redekamVoltageDrop([{ I: 100, l: 5 }], 0.3, 0.08, 0.9, 400);
+  assert.ok(far.dUf > near.dUf, 'a load 5x farther produces a larger drop (moment Sum(I*l))');
+  assert.ok(Math.abs(far.dUf - 5 * near.dUf) < 0.05, 'drop scales linearly with distance');
+});
+
 // ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====
 test('render-sweep: every module renders clean in da/en/fa (no NaN, undefined, or throw)', function () {
   var savedLang = lang;

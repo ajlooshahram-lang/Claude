@@ -10411,6 +10411,35 @@ function renderCable() {
   `;
 }
 
+// ===== REDEKAMLINJE / DISTRIBUTION FEEDER VOLTAGE DROP (Elektroteknik Bind 6, §7.4) =====
+// Tapered feeder with several loads of the same cos(phi) on one conductor type.
+// Per-phase drop ΔUf = (r·cosφ + x·sinφ)·Σ(I·l); 3-phase line drop ΔU = √3·ΔUf.
+// stations: [{I (A), l (km-from-source)}]; r,x in Ω/km; Un = line voltage [V].
+function redekamVoltageDrop(stations, r, x, cosphi, Un) {
+  var sinphi = Math.sin(Math.acos(Math.min(1, Math.max(0, cosphi))));
+  var sumIL = 0;
+  for (var i = 0; i < stations.length; i++) sumIL += stations[i].I * stations[i].l;
+  var dUf = (r * cosphi + x * sinphi) * sumIL;   // per-phase volts
+  var dUline = Math.sqrt(3) * dUf;
+  return {
+    sumIL: Math.round(sumIL * 100) / 100,
+    dUf: Math.round(dUf * 100) / 100,
+    dUline: Math.round(dUline * 100) / 100,
+    pct: Math.round((dUline / Un) * 10000) / 100,
+    clause: 'Elektroteknik Bind 6 §7.4 (redekamligning) · DS/HD 60364-5-52'
+  };
+}
+// Minimum conductor cross-section [mm²] so the redekam feeder stays within maxPct.
+// rho = conductor resistivity [Ω·mm²/km] (Cu ≈ 22.5 hot, Al ≈ 36 hot per HD 60364).
+function redekamMinCsa(sumIL, x, cosphi, Un, maxPct, rho) {
+  var sinphi = Math.sin(Math.acos(Math.min(1, Math.max(0, cosphi))));
+  var dUfMax = (maxPct / 100) * Un / Math.sqrt(3);
+  var rMax = (dUfMax / sumIL - x * sinphi) / cosphi;   // Ω/km
+  if (rMax <= 0) return Infinity;                       // reactance alone exceeds limit
+  return Math.round((rho / rMax) * 10) / 10;
+}
+var redekamState = { n: 8, spacing: 1, kvaPer: 400, cosphi: 0.8, r: 0.32, x: 0.088, Un: 10000, maxPct: 7 };
+
 // ===== VOLTAGE DROP MODULE =====
 function renderVdrop() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -10489,6 +10518,40 @@ function renderVdrop() {
       ${calcDetailVdrop(calcIB(), vdropState.length, selectedCable.r, selectedCable.x, loadState.cosPhi, loadState.voltage, vdrop, vdropPercent, cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m')}
     </div>
     ` : ''}
+
+    ${(function () {
+      // Redekamlinje / distribution feeder (HV) — Elektroteknik Bind 6 §7.4
+      var rs = redekamState;
+      var Iper = (rs.kvaPer * 1000) / (Math.sqrt(3) * rs.Un);
+      var stations = [];
+      for (var k = 1; k <= rs.n; k++) stations.push({ I: Iper, l: k * rs.spacing });
+      var rk = redekamVoltageDrop(stations, rs.r, rs.x, rs.cosphi, rs.Un);
+      var rho = (cableState.material === 'copper') ? 22.5 : 36; // Ω·mm²/km, hot
+      var sMin = redekamMinCsa(rk.sumIL, rs.x, rs.cosphi, rs.Un, rs.maxPct, rho);
+      var ok = rk.pct <= rs.maxPct;
+      function grid(label, arr, field, unitFmt) {
+        return '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">' +
+          arr.map(function (v) { return '<button class="sel-btn ' + (rs[field] === v ? 'selected' : '') + '" onclick="redekamState.' + field + '=' + v + ';renderModule(\'vdrop\')">' + (unitFmt ? unitFmt(v) : v) + '</button>'; }).join('') +
+          '</div></div>';
+      }
+      return '<div class="card fade-in"><div class="card-title">' + tx('Redekamlinje / distributionsnet (HV)', 'Tapered distribution feeder (HV)') + '</div>' +
+        '<div class="info-row">' + tx('Flere lige store belastninger p\u00E5 \u00E9n linje (samme cos\u03C6). \u0394U<sub>f</sub> = (r\u00b7cos\u03C6 + x\u00b7sin\u03C6)\u00b7\u03A3(I\u00b7l). Autorisations-emne (Eksempel 7.4.1.3).', 'Several equal loads on one feeder (same cos\u03C6). \u0394U<sub>f</sub> = (r\u00b7cos\u03C6 + x\u00b7sin\u03C6)\u00b7\u03A3(I\u00b7l). Authorization topic (Example 7.4.1.3).') + '</div>' +
+        grid(tx('Antal stationer', 'Number of stations'), [4, 6, 8, 10, 12], 'n') +
+        grid(tx('Afstand mellem stationer [km]', 'Spacing between stations [km]'), [0.5, 1, 1.5, 2], 'spacing', function (v) { return String(v).replace('.', ',') + ' km'; }) +
+        grid(tx('kVA pr. station', 'kVA per station'), [200, 315, 400, 630], 'kvaPer') +
+        grid(tx('cos\u03C6', 'cos\u03C6'), [0.8, 0.85, 0.9, 0.95], 'cosphi', function (v) { return String(v).replace('.', ','); }) +
+        grid('r [\u03A9/km]', [0.125, 0.193, 0.32, 0.524], 'r', function (v) { return String(v).replace('.', ','); }) +
+        grid('x [\u03A9/km]', [0.075, 0.088, 0.09, 0.1], 'x', function (v) { return String(v).replace('.', ','); }) +
+        '<div class="result-box ' + (ok ? '' : 'error') + '"><div class="result-title">' + tx('Resultat', 'Result') + ' ' + (ok ? '<span class="verify-badge ok">\u2713 \u2264 ' + rs.maxPct + '%</span>' : '<span class="verify-badge fail">\u2717 > ' + rs.maxPct + '%</span>') + '</div>' +
+        '<div class="result-row"><span class="label">I ' + tx('pr. station', 'per station') + '</span><span class="value">' + Iper.toFixed(1).replace('.', ',') + ' A</span></div>' +
+        '<div class="result-row"><span class="label">\u03A3(I\u00b7l)</span><span class="value">' + rk.sumIL.toFixed(1).replace('.', ',') + ' A\u00b7km</span></div>' +
+        '<div class="result-row"><span class="label">\u0394U<sub>f</sub> (' + tx('fase', 'phase') + ')</span><span class="value">' + rk.dUf.toFixed(1).replace('.', ',') + ' V</span></div>' +
+        '<div class="result-row"><span class="label">\u0394U (' + tx('linje', 'line') + ' = \u221a3\u00b7\u0394U<sub>f</sub>)</span><span class="value">' + rk.dUline.toFixed(1).replace('.', ',') + ' V</span></div>' +
+        '<div class="result-row"><span class="label">\u0394U %</span><span class="value" style="font-weight:700;color:' + (ok ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)') + '">' + rk.pct.toFixed(2).replace('.', ',') + ' %</span></div>' +
+        '<div class="result-row"><span class="label">' + tx('Mindste tv\u00E6rsnit for ', 'Minimum cross-section for ') + rs.maxPct + '%</span><span class="value">' + (isFinite(sMin) ? '\u2248 ' + sMin.toFixed(0) + ' mm\u00B2 (' + (cableState.material === 'copper' ? 'Cu' : 'Al') + ')' : tx('reaktans alene > gr\u00E6nse', 'reactance alone > limit')) + '</span></div>' +
+        '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + rk.clause + '</span></div>' +
+        '</div></div>';
+    })()}
   `;
 }
 
