@@ -4679,7 +4679,11 @@ let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection
 // Voltage drop state
 let vdropState = { length: 50 };
 // Short circuit state
-let scState = { zNet: 1, zTrafo: 5 };
+let scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1 };
+// scMethod: 'scalar' = magnitude addition (default, |Zn|+|Zt|);
+//           'complex' = IEC 60909 vector addition. R/X ratios MUST be supplied by
+//           the user via click-selectors (never fabricated) — textbook El-7 method:
+//           phi = arccot(R/X) = atan(X/R) = atan(1/(R/X)); R=|Z|·cos(phi); X=|Z|·sin(phi).
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -9587,8 +9591,32 @@ function calcDetailVdrop(ib, length_m, r, x, cosPhi, voltage, vdrop, vdropPercen
 }
 
 // Convenience: build a calcDetail object for short-circuit calculations
-function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, cableDesc) {
+function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, cableDesc, cx) {
   var is3 = (Un === 400);
+  if (cx) {
+    // Complex (IEC 60909 / El-7) vector method detail.
+    return calcDetail({
+      name: tx('Kortslutningsstr\u00F8m Ik (kompleks vektormetode)', 'Short-circuit current Ik (complex vector method)'),
+      formula: '\u03C6 = arccot(R/X)\nR = |Z| \u00B7 cos\u03C6 ,  X = |Z| \u00B7 sin\u03C6\nZ\u0305_tot = \u03A3R + j\u03A3X\nIk3max = c \u00B7 Un / (\u221A3 \u00B7 |Z\u0305_tavle|)\nIk2min = 0.95 \u00B7 Un / (2 \u00B7 |Z\u0305_ende|)',
+      variables: [
+        { name: tx('Net |Z|, R/X', 'Network |Z|, R/X'), symbol: 'Z\u0305n', value: cx.net.mag.toFixed(2) + ' m\u03A9, ' + cx.net.rx, unit: '', source: tx('bruger-angivet R/X', 'user-supplied R/X') },
+        { name: tx('Trafo |Z|, R/X', 'Transformer |Z|, R/X'), symbol: 'Z\u0305t', value: cx.tr.mag.toFixed(2) + ' m\u03A9, ' + cx.tr.rx, unit: '', source: tx('bruger-angivet R/X', 'user-supplied R/X') },
+        { name: tx('Sp\u00E6ndingsfaktor c', 'Voltage factor c'), symbol: 'c', value: cFactor, unit: '', source: 'IEC 60909-0' },
+        { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'U\u2099', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
+      ],
+      substitution: 'Z\u0305_tavle = (' + cx.net.R.toFixed(2) + '+' + cx.tr.R.toFixed(2) + ') + j(' + cx.net.X.toFixed(2) + '+' + cx.tr.X.toFixed(2) + ') = ' + cx.Rbus.toFixed(2) + ' + j' + cx.Xbus.toFixed(2) + ' m\u03A9',
+      steps: [
+        { desc: tx('Net: vinkel + rektangul\u00E6r', 'Network: angle + rectangular'), expr: '\u03C6n = arccot(' + cx.net.rx + ') = ' + cx.net.phiDeg.toFixed(1) + '\u00B0 \u21D2 ' + cx.net.R.toFixed(2) + ' + j' + cx.net.X.toFixed(2), result: cx.net.mag.toFixed(2) + ' \u2220 ' + cx.net.phiDeg.toFixed(1) + '\u00B0' },
+        { desc: tx('Trafo: vinkel + rektangul\u00E6r', 'Transformer: angle + rectangular'), expr: '\u03C6t = arccot(' + cx.tr.rx + ') = ' + cx.tr.phiDeg.toFixed(1) + '\u00B0 \u21D2 ' + cx.tr.R.toFixed(2) + ' + j' + cx.tr.X.toFixed(2), result: cx.tr.mag.toFixed(2) + ' \u2220 ' + cx.tr.phiDeg.toFixed(1) + '\u00B0' },
+        { desc: tx('Vektorsum (tavle)', 'Vector sum (busbar)'), expr: cx.Rbus.toFixed(2) + ' + j' + cx.Xbus.toFixed(2) + ' \u21D2 |Z\u0305| = \u221A(' + cx.Rbus.toFixed(2) + '\u00B2+' + cx.Xbus.toFixed(2) + '\u00B2)', result: cx.Zbus.toFixed(2) + ' m\u03A9 \u2220 ' + cx.phiBus.toFixed(1) + '\u00B0' },
+        { desc: tx('Vektorsum (ende, inkl. kabel)', 'Vector sum (far end, incl. cable)'), expr: cx.Rend.toFixed(2) + ' + j' + cx.Xend.toFixed(2), result: cx.Zend.toFixed(2) + ' m\u03A9 \u2220 ' + cx.phiEnd.toFixed(1) + '\u00B0' },
+        { desc: 'Ik3max (3-' + tx('faset', 'phase') + ', tavle)', expr: cFactor + ' \u00D7 ' + Un + ' / (\u221A3 \u00D7 ' + (cx.Zbus / 1000).toFixed(4) + ')', result: (ikMax3ph / 1000).toFixed(2) + ' kA' },
+        { desc: 'Ik2min (2-' + tx('faset', 'phase') + ', ' + tx('ende', 'far end') + ')', expr: '0.95 \u00D7 ' + Un + ' / (2 \u00D7 ' + (cx.Zend / 1000).toFixed(4) + ')', result: ikMin2ph.toFixed(0) + ' A' }
+      ],
+      result: { value: 'Ik3max=' + (ikMax3ph / 1000).toFixed(2) + ' kA, Ik2min=' + ikMin2ph.toFixed(0) + ' A', unit: '' },
+      reference: 'IEC 60909-0 \u00B7 Elektroteknik El-7 \u00B7 DS/HD 60364-4-43 cl. 434 \u00B7 ' + (cableDesc || '')
+    });
+  }
   return calcDetail({
     name: tx('Kortslutningsstr\u00F8m Ik', 'Short-circuit current Ik'),
     formula: 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)\nIk2min = 0.95 \u00B7 Un / (2 \u00B7 Zt)',
@@ -10421,9 +10449,46 @@ function renderVdrop() {
 }
 
 // ===== SHORT CIRCUIT MODULE =====
+// ===== COMPLEX SHORT-CIRCUIT (IEC 60909 / El-7 vector method) =====
+// All impedances in mOhm. R/X ratios supplied by user (never fabricated).
+// phi = atan(X/R) = atan(1/(R/X)); R = |Z|·cos(phi); X = |Z|·sin(phi).
+// Returns rectangular (R,X) + polar (|Z|,angle) decomposition for net & trafo,
+// vector-summed busbar and far-end impedances, and the resulting Ik values.
+function scComplexParts(zMag, rx) {
+  // rx = R/X ratio. Guard against rx<=0.
+  var ratio = (rx > 0) ? rx : 0.0001;
+  var phi = Math.atan(1 / ratio);          // impedance angle (rad)
+  var R = zMag * Math.cos(phi);
+  var X = zMag * Math.sin(phi);
+  return { mag: zMag, rx: ratio, phiDeg: phi * 180 / Math.PI, R: R, X: X };
+}
+function scComplexCalc(scSt, rCableMohm, xCableMohm, Un, cFactor) {
+  var net = scComplexParts(scSt.zNet, scState.rxNet);
+  var tr = scComplexParts(scSt.zTrafo, scState.rxTrafo);
+  // Busbar (3-phase max): net + trafo only
+  var Rbus = net.R + tr.R;
+  var Xbus = net.X + tr.X;
+  var Zbus = Math.sqrt(Rbus * Rbus + Xbus * Xbus);
+  var phiBus = Math.atan2(Xbus, Rbus) * 180 / Math.PI;
+  // Far end (2-phase min): + cable R,X (kept separate, true vector sum)
+  var Rend = Rbus + (rCableMohm || 0);
+  var Xend = Xbus + (xCableMohm || 0);
+  var Zend = Math.sqrt(Rend * Rend + Xend * Xend);
+  var phiEnd = Math.atan2(Xend, Rend) * 180 / Math.PI;
+  var ikMax3ph = (cFactor * Un) / (Math.sqrt(3) * Zbus / 1000);
+  var ikMin2ph = (0.95 * Un) / (2 * Zend / 1000);
+  return {
+    net: net, tr: tr,
+    Rbus: Rbus, Xbus: Xbus, Zbus: Zbus, phiBus: phiBus,
+    Rend: Rend, Xend: Xend, Zend: Zend, phiEnd: phiEnd,
+    ikMax3ph: ikMax3ph, ikMin2ph: ikMin2ph
+  };
+}
+
 function renderShortCircuit() {
   const zNetSteps = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20];
   const zTrafoSteps = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50];
+  const rxSteps = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.7, 1.0];
 
   // Cable impedance
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -10432,21 +10497,34 @@ function renderShortCircuit() {
   const selectedCable = currentCores[cableState.crossSection];
 
   let zCable = 0;
+  let rCableMohm = 0, xCableMohm = 0;
   if (selectedCable) {
     const L = vdropState.length / 1000; // km
     const rCable = selectedCable.r * L;
     const xCable = selectedCable.x * L;
     zCable = Math.sqrt(rCable * rCable + xCable * xCable) * 1000; // mOhm
+    rCableMohm = rCable * 1000;
+    xCableMohm = xCable * 1000;
   }
 
   const zTotal = scState.zNet + scState.zTrafo + zCable;
   const Un = loadState.voltage === '3x400' ? 400 : 230;
   const cFactor = 1.05; // voltage factor per IEC 60909
 
+  const isComplex = scState.scMethod === 'complex';
+  // Complex (IEC 60909 vector) decomposition — only when user selects it.
+  const cx = scComplexCalc(scState, rCableMohm, xCableMohm, Un, cFactor);
+
   // Ik max (3-phase, at busbar)
-  const ikMax3ph = (cFactor * Un) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
+  const ikMax3ph = isComplex
+    ? cx.ikMax3ph
+    : (cFactor * Un) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
   // Ik min (2-phase at end of cable, factor 0.95)
-  const ikMin2ph = (0.95 * Un) / (2 * zTotal / 1000);
+  const ikMin2ph = isComplex
+    ? cx.ikMin2ph
+    : (0.95 * Un) / (2 * zTotal / 1000);
+  // Effective total impedance shown to the user (vector magnitude in complex mode).
+  const zTotalShown = isComplex ? cx.Zend : zTotal;
 
   // Get protection device Icu and Isd for check
   let deviceIcu = 0, deviceIsd = 0;
@@ -10483,9 +10561,20 @@ function renderShortCircuit() {
       ${uxSummary([
         {label: 'Ik max (3\u03C6)', value: (ikMax3ph/1000).toFixed(2) + ' kA', status: deviceIcu > 0 ? (check1 ? 'pass' : 'fail') : ''},
         {label: 'Ik min (2\u03C6)', value: ikMin2ph.toFixed(0) + ' A', status: deviceIsd > 0 ? (check2 ? 'pass' : 'fail') : ''},
-        {label: 'Z total', value: zTotal.toFixed(2) + ' m\u03A9', status: ''},
+        {label: 'Z total', value: zTotalShown.toFixed(2) + ' m\u03A9', status: ''},
         {label: tx('Frakobling', 'Disconnection'), value: discOk ? '\u22640.4s' : '> 0.4s', status: discOk ? 'pass' : 'fail'}
       ])}
+
+      <div class="select-group">
+        <div class="select-label">${tx('Beregningsmetode', 'Calculation method')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${!isComplex ? 'selected' : ''}" onclick="scState.scMethod='scalar';renderModule('scircuit')">${tx('Skalar (|Z|-sum)', 'Scalar (|Z| sum)')}</button>
+          <button class="sel-btn ${isComplex ? 'selected' : ''}" onclick="scState.scMethod='complex';renderModule('scircuit')">${tx('Kompleks (vektor, IEC 60909)', 'Complex (vector, IEC 60909)')}</button>
+        </div>
+        <div class="info-row" style="margin-top:6px">${isComplex
+          ? tx('Kompleks metode (El-7): impedanser adderes som vektorer R + jX. Du skal selv angive R/X-forholdet for net og trafo (aldrig gættet). |Z_total| ≤ skalar sum ⇒ Iₖ bliver højere = mere konservativ for brydeevne.', 'Complex method (El-7): impedances are added as vectors R + jX. You must supply the R/X ratio for network and transformer (never guessed). |Z_total| ≤ scalar sum ⇒ Iₖ becomes higher = more conservative for breaking capacity.')
+          : tx('Skalar metode: |Z| adderes direkte (|Z_net| + |Z_trafo|). Hurtig overslagsmetode — giver lidt lavere Iₖ end den eksakte vektormetode.', 'Scalar method: magnitudes added directly (|Z_net| + |Z_trafo|). Quick estimate — gives slightly lower Iₖ than the exact vector method.')}</div>
+      </div>
 
       <div class="select-group">
         <div class="select-label">${t('scZnet')}</div>
@@ -10505,6 +10594,37 @@ function renderShortCircuit() {
         </div>
       </div>
 
+      ${isComplex ? `
+      <div class="select-group">
+        <div class="select-label">${tx('R/X-forhold — net (du angiver)', 'R/X ratio — network (you supply)')}</div>
+        <div class="select-grid">
+          ${rxSteps.map(r =>
+            `<button class="sel-btn ${scState.rxNet === r ? 'selected' : ''}" onclick="scState.rxNet=${r};renderModule('scircuit')">${String(r).replace('.', ',')}</button>`
+          ).join('')}
+        </div>
+        <div class="info-row" style="margin-top:4px">φ_net = arccot(R/X) = ${cx.net.phiDeg.toFixed(1)}° \u00B7 R = ${cx.net.R.toFixed(2)} m\u03A9, X = ${cx.net.X.toFixed(2)} m\u03A9</div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${tx('R/X-forhold — trafo (du angiver)', 'R/X ratio — transformer (you supply)')}</div>
+        <div class="select-grid">
+          ${rxSteps.map(r =>
+            `<button class="sel-btn ${scState.rxTrafo === r ? 'selected' : ''}" onclick="scState.rxTrafo=${r};renderModule('scircuit')">${String(r).replace('.', ',')}</button>`
+          ).join('')}
+        </div>
+        <div class="info-row" style="margin-top:4px">φ_trafo = arccot(R/X) = ${cx.tr.phiDeg.toFixed(1)}° \u00B7 R = ${cx.tr.R.toFixed(2)} m\u03A9, X = ${cx.tr.X.toFixed(2)} m\u03A9</div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">${tx('Kompleks vektorsum (rektangulær + polær)', 'Complex vector sum (rectangular + polar)')}</div>
+        <div class="result-row"><span class="label">Z\u0305_net</span><span class="value">${cx.net.R.toFixed(2)} + j${cx.net.X.toFixed(2)} m\u03A9 = ${cx.net.mag.toFixed(2)} \u2220 ${cx.net.phiDeg.toFixed(1)}°</span></div>
+        <div class="result-row"><span class="label">Z\u0305_trafo</span><span class="value">${cx.tr.R.toFixed(2)} + j${cx.tr.X.toFixed(2)} m\u03A9 = ${cx.tr.mag.toFixed(2)} \u2220 ${cx.tr.phiDeg.toFixed(1)}°</span></div>
+        <div class="result-row"><span class="label">Z\u0305_tavle (${tx('busbar', 'busbar')})</span><span class="value">${cx.Rbus.toFixed(2)} + j${cx.Xbus.toFixed(2)} m\u03A9 = ${cx.Zbus.toFixed(2)} \u2220 ${cx.phiBus.toFixed(1)}°</span></div>
+        ${selectedCable ? `<div class="result-row"><span class="label">Z\u0305_ende (${tx('inkl. kabel', 'incl. cable')})</span><span class="value">${cx.Rend.toFixed(2)} + j${cx.Xend.toFixed(2)} m\u03A9 = ${cx.Zend.toFixed(2)} \u2220 ${cx.phiEnd.toFixed(1)}°</span></div>` : ''}
+        <div class="result-row"><span class="label">${tx('Skalar |Z|-sum (tavle, sammenlign)', 'Scalar |Z| sum (busbar, compare)')}</span><span class="value">${(scState.zNet + scState.zTrafo).toFixed(2)} m\u03A9 \u2265 ${cx.Zbus.toFixed(2)} m\u03A9 \u2713</span></div>
+      </div>
+      ` : ''}
+
       ${selectedCable ? `
         <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
           <div class="result-row"><span class="label">${tx('Kabelimpedans', 'Cable impedance')}</span><span class="value">${zCable.toFixed(2)} m\u03A9</span></div>
@@ -10523,7 +10643,7 @@ function renderShortCircuit() {
         <div class="result-title">${t('result')}</div>
         <div class="result-row"><span class="label">${t('scIkmax')} (3-${tx('faset', 'phase')})</span><span class="value">${(ikMax3ph/1000).toFixed(2)} kA</span></div>
         <div class="result-row"><span class="label">${t('scIkmin')} (2-${tx('faset', 'phase')})</span><span class="value">${ikMin2ph.toFixed(0)} A</span></div>
-        <div class="result-row"><span class="label">Z total</span><span class="value">${zTotal.toFixed(2)} m\u03A9</span></div>
+        <div class="result-row"><span class="label">Z total</span><span class="value">${zTotalShown.toFixed(2)} m\u03A9${isComplex ? ' (|Z\u0305|, ' + tx('vektor', 'vector') + ')' : ''}</span></div>
       </div>
 
       ${deviceIcu > 0 ? `
@@ -10556,7 +10676,7 @@ function renderShortCircuit() {
         <div class="result-row"><span class="label">${tx('V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning', 'Select protection device (MCB/MCCB) for verification')}</span></div>
       </div>
       `}
-      ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '')}
+      ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotalShown, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '', isComplex ? cx : null)}
     </div>
   `;
 }// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====

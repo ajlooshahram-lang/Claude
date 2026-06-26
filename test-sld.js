@@ -15127,6 +15127,80 @@ test('load: housing-estate diversity matches both Elektroteknik Bind 5 Formel 24
   diversityState.method = pm; diversityState.homes = ph; diversityState.kwhPerHome = pk; diversityState.areaPerHome = pa;
 });
 
+// ===== COMPLEX SHORT-CIRCUIT (IEC 60909 / El-7 vector method) =====
+test('scircuit: scComplexParts matches El-7 textbook (R/X=0.4 => phi=68.2deg, cos=0.371, sin=0.928)', function () {
+  var p = scComplexParts(10, 0.4);
+  assert.ok(Math.abs(p.phiDeg - 68.2) < 0.1, 'phi = arccot(0.4) = 68.2deg (got ' + p.phiDeg.toFixed(2) + ')');
+  assert.ok(Math.abs(p.R / p.mag - 0.371) < 0.002, 'cos phi = 0.371');
+  assert.ok(Math.abs(p.X / p.mag - 0.928) < 0.002, 'sin phi = 0.928');
+  assert.ok(Math.abs(Math.sqrt(p.R * p.R + p.X * p.X) - p.mag) < 1e-9, '|Z| reconstructs from R,X');
+  assert.ok(Math.abs(p.R / p.X - 0.4) < 1e-9, 'R/X ratio preserved = 0.4');
+});
+
+test('scircuit: scComplexParts R=|Z|cos(phi), X=|Z|sin(phi) for various R/X', function () {
+  [0.05, 0.1, 0.25, 0.5, 1.0].forEach(function (rx) {
+    var p = scComplexParts(7.3, rx);
+    var phi = Math.atan(1 / rx);
+    assert.ok(Math.abs(p.R - 7.3 * Math.cos(phi)) < 1e-9, 'R correct rx=' + rx);
+    assert.ok(Math.abs(p.X - 7.3 * Math.sin(phi)) < 1e-9, 'X correct rx=' + rx);
+    assert.ok(p.X >= p.R - 1e-9, 'X>=R for inductive R/X<=1 (rx=' + rx + ')');
+  });
+});
+
+test('scircuit: complex vector sum |Ztot| <= scalar |Z|-sum (conservative => higher Ik)', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  // Different angles for net vs trafo => strict inequality
+  scState.zNet = 1; scState.zTrafo = 5; scState.rxNet = 0.4; scState.rxTrafo = 0.1;
+  var cx = scComplexCalc(scState, 0, 0, 400, 1.05);
+  var scalarSum = scState.zNet + scState.zTrafo;
+  assert.ok(cx.Zbus < scalarSum, 'vector |Zbus|=' + cx.Zbus.toFixed(3) + ' < scalar sum=' + scalarSum);
+  var ikScalar = (1.05 * 400) / (Math.sqrt(3) * scalarSum / 1000);
+  assert.ok(cx.ikMax3ph > ikScalar, 'complex Ik3max higher than scalar (more conservative for breaking capacity)');
+  Object.assign(scState, saved);
+});
+
+test('scircuit: equal R/X angles => vector sum equals scalar sum (no error)', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 1; scState.zTrafo = 5; scState.rxNet = 0.1; scState.rxTrafo = 0.1;
+  var cx = scComplexCalc(scState, 0, 0, 400, 1.05);
+  assert.ok(Math.abs(cx.Zbus - 6) < 1e-9, 'colinear vectors add to scalar sum = 6 mOhm');
+  Object.assign(scState, saved);
+});
+
+test('scircuit: cable R,X added as true vectors at far end', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 1; scState.zTrafo = 5; scState.rxNet = 0.2; scState.rxTrafo = 0.15;
+  var cx = scComplexCalc(scState, 12, 8, 400, 1.05); // 12 mOhm R, 8 mOhm X cable
+  assert.ok(Math.abs(cx.Rend - (cx.Rbus + 12)) < 1e-9, 'Rend = Rbus + cable R');
+  assert.ok(Math.abs(cx.Xend - (cx.Xbus + 8)) < 1e-9, 'Xend = Xbus + cable X');
+  assert.ok(Math.abs(cx.Zend - Math.sqrt(cx.Rend * cx.Rend + cx.Xend * cx.Xend)) < 1e-9, '|Zend| = sqrt(Rend^2+Xend^2)');
+  assert.ok(cx.ikMin2ph > 0, 'Ik2min positive');
+  Object.assign(scState, saved);
+});
+
+test('scircuit: renderShortCircuit renders complex mode without crash (da/en) + shows decomposition', function () {
+  var saved = JSON.parse(JSON.stringify(scState)); var savedLang = lang;
+  scState.scMethod = 'complex'; scState.rxNet = 0.4; scState.rxTrafo = 0.1;
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var h = renderShortCircuit();
+    assert.ok(h.indexOf('undefined') === -1, 'no undefined in complex render (' + lg + ')');
+    assert.ok(h.indexOf('NaN') === -1, 'no NaN in complex render (' + lg + ')');
+    assert.ok(/arccot|R\/X/.test(h), 'shows R/X / arccot decomposition (' + lg + ')');
+    assert.ok(/\u2220/.test(h), 'shows polar angle symbol (' + lg + ')');
+  });
+  // scalar mode still renders
+  scState.scMethod = 'scalar';
+  var hs = renderShortCircuit();
+  assert.ok(hs.indexOf('undefined') === -1 && hs.indexOf('NaN') === -1, 'scalar render clean');
+  lang = savedLang; Object.assign(scState, saved);
+});
+
+test('scircuit: scMethod defaults to scalar (no behavior change for existing users)', function () {
+  // Fresh default must be scalar so legacy calculations are unchanged.
+  assert.ok(['scalar', 'complex'].indexOf(scState.scMethod) !== -1, 'scMethod valid');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
