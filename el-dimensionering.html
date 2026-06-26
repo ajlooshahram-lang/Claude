@@ -34339,7 +34339,10 @@ function analyzerDetectQuestions(text) {
     { re: /(?:bestem|find|beregn)[^.\n]{0,30}(?:antallet\s+af\s+)?fasekompens|fasekompensatorbatteri/i, type: 'pfc', label: 'Fasekompensering', module: 'trefase' },
     { re: /tegn[^.\n]{0,30}(?:en-?stregs?skema|kredsskema|enstreg|diagram)/i, type: 'diagram', label: 'Tegn diagram (kredsskema)', module: 'draw' },
     { re: /(?:dimensioner|bestem)[^.\n]{0,40}(?:potentialudligning|udligningsforbindelse|beskyttelsesleder|PE-?leder)/i, type: 'pe_sizing', label: 'PE/udligning tv\u00e6rsnit', module: 'cable' },
-    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
+    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' },
+    // Regulatory question (no calculation) -- recognise so it is not 'Mangler input'.
+    // Kept LAST so any calc pattern wins first.
+    { re: /\b(?:m\u00e5\s+(?:der|en|man|installationen|hovedstr)|skal\s+(?:der|en|man|ledere|belysning)|hvilke[nt]?\b|hvor\s+(?:mange|stor|lang|h\u00f8j)|hvordan\b|hvorn\u00e5r\b|redeg\u00f8r|er\s+hovedstr\w*kredse|hvad\s+er\s+den\s+maksimale\s+ber)/i, type: 'rule', label: 'Regelsp\u00f8rgsm\u00e5l', module: 'standards' }
   ];
   // Detection runs against the raw text AND a "despaced" copy that repairs PDF
   // word-splitting ("D imensioner" -> "Dimensioner", "kortslutnings stroem" ->
@@ -35970,7 +35973,8 @@ var EXAM_METHOD_HINTS = {
   device:    { f: 'I_B \u2264 I_n \u2264 I_z  og  I_cu \u2265 I_k,max', n: 'I_B, kablets I_z, I_k,max' },
   adiabatic: { f: 'k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t  (DS/HD 60364-4-43 \u00a7434.5)', n: 'tv\u00e6rsnit S, I_k, udkoblingstid t' },
   trafo:     { f: 'I_N = S_n / (\u221a3 \u00b7 U_N)', n: 'transformer S_n [kVA] og U_N' },
-  energy:    { f: 'W = P \u00b7 t  (\u00e5rlig overf\u00f8ring)', n: 'effekt/belastningsforl\u00f8b og driftstimer' }
+  energy:    { f: 'W = P \u00b7 t  (\u00e5rlig overf\u00f8ring)', n: 'effekt/belastningsforl\u00f8b og driftstimer' },
+  rule:      { f: 'Regelsp\u00f8rgsm\u00e5l \u2014 ikke en beregning', n: 'opslag i DS/HD 60364 / St\u00e6rkstr\u00f8msbekendtg\u00f8relsen / Installationsbekendtg\u00f8relsen' }
 };
 function examRenderMethodHint(type) {
   var hint = EXAM_METHOD_HINTS[type];
@@ -36048,7 +36052,11 @@ function analyzerRenderQuestionOutline() {
         });
       } else {
         html += examRenderMethodHint(q.type);
-        html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
+        if (q.type === 'rule') {
+          html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--text-muted)">' + tx('Regelsp\u00f8rgsm\u00e5l \u2014 sl\u00e5 op i DS/HD 60364 / bekendtg\u00f8relsen (ikke en beregning).', 'Regulatory question \u2014 look up DS/HD 60364 / the regulation (not a calculation).') + '</div>';
+        } else {
+          html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
+        }
       }
       html += '</div>';
     });
