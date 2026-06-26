@@ -15517,6 +15517,21 @@ test('exam: axGenInstallation exposes IBvector (Viggo vector sum) <= scalar IBto
   assert.ok(d.IBvector.mag <= d.IBtotal + 0.5, 'vector sum <= scalar IBtotal (conservative sizing preserved). vec=' + d.IBvector.mag + ' scalar=' + d.IBtotal);
 });
 
+test('exam: ib_total worked solution explains scalar-vs-vector distinction', function () {
+  var rng = axRngMake(55);
+  var d = axGenInstallation(rng, axBuilding('fabrik'), axTier('kandidat'));
+  var tasks = axTasksInstallation(d, axTier('kandidat'), 20);
+  var ibTask = tasks.filter(function (t) { return t.kind === 'ib_total'; })[0];
+  assert.ok(ibTask, 'ib_total task present');
+  var sol = axSolveTask(ibTask, d);
+  // The scalar sum is the answer (conservative sizing basis)...
+  assert.ok(Math.abs(sol.result.value - ibTask.answer) < 0.1, 'scalar sum is the dimensioning answer');
+  // ...and the verification must mention the vector sum + that it is NOT used to reduce the line.
+  var vtext = JSON.stringify(sol.verification) + JSON.stringify(sol.steps);
+  assert.ok(/ektor|ector/.test(vtext), 'solution references the vector sum');
+  assert.ok(/\u2220/.test(vtext), 'shows the polar angle of the vector sum');
+});
+
 test('scircuit: netAngleMode cosphi uses arccos (Viggo 2019: cos=0.11 -> 83.7°)', function () {
   var saved = JSON.parse(JSON.stringify(scState));
   scState.scMethod = 'complex'; scState.netAngleMode = 'cosphi'; scState.cosPhiNet = 0.11; scState.zNet = 444;
