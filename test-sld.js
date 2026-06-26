@@ -451,6 +451,84 @@ test('sldCalcNodeIk uses Z1 for three-phase Ikmax', function() {
   assert(ik.ikmax > oldIkmax, 'Ikmax with Z1 (' + ik.ikmax.toFixed(0) + ') should be higher than with Zs (' + oldIkmax.toFixed(0) + ')');
 });
 
+// Test 19b: sldCalcNodeIk returns zeros when Zs is zero (edge case, no division by zero)
+test('sldCalcNodeIk returns zeros safely when Zs=0 (no cable/trafo)', function() {
+  sldNextId = 350;
+  var tree = { nodes: {}, rootId: null };
+  // A bare main board with no transformer, no cable, and zero length => Zs = 0
+  var mb = sldCreateNode('main_board', null, { phases: '3x400', voltage: 400, cable: null, length_m: 0 });
+  tree.nodes[mb.id] = mb;
+  tree.rootId = mb.id;
+  var ik = sldCalcNodeIk(tree, mb.id);
+  assert(ik.ikmax === 0, 'Ikmax should be 0 when Zs=0 (not Infinity). Got: ' + ik.ikmax);
+  assert(ik.ikmin === 0, 'Ikmin should be 0 when Zs=0 (not Infinity). Got: ' + ik.ikmin);
+  assert(ik.zs === 0, 'Zs should be 0');
+  assert(ik.z1 === 0, 'Z1 should be 0');
+});
+
+// Test 19c: Three-phase Ikmin uses Zs (loop) with 1.5 temperature factor (DS/HD 60364-4-41)
+test('sldCalcNodeIk three-phase Ikmin uses Zs*1.5 (conservative disconnection check)', function() {
+  sldNextId = 360;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id, { phases: '3x400', voltage: 400 });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var fc = sldCreateNode('final_circuit', mb.id, {
+    phases: '3x400', voltage: 400, power_kW: 10, length_m: 50, cable: cable10
+  });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+  var ik = sldCalcNodeIk(tree, fc.id);
+  var zs = sldCalcNodeZs(tree, fc.id);
+  // Formula: Ikmin = 0.95 * 400 / (sqrt(3) * Zs * 1.5)
+  var expectedIkmin = 0.95 * 400 / (Math.sqrt(3) * zs * 1.5);
+  assert(Math.abs(ik.ikmin - expectedIkmin) < 0.01,
+    'Three-phase Ikmin should be ' + expectedIkmin.toFixed(1) + 'A, got ' + ik.ikmin.toFixed(1) + 'A');
+  // Ikmin must always be less than Ikmax (conservative: lower is safer for disconnection check)
+  assert(ik.ikmin < ik.ikmax,
+    'Ikmin (' + ik.ikmin.toFixed(0) + ') must be < Ikmax (' + ik.ikmax.toFixed(0) + ') for safety');
+});
+
+// Test 19d: Ik2min formula in scComplexCalc matches IEC 60909-0 clause 4.3.2
+test('scComplexCalc Ik2min = 0.95*Un/(2*|Zend|) per IEC 60909-0 clause 4.3.2', function() {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 2; scState.zTrafo = 8; scState.rxNet = 0.2; scState.rxTrafo = 0.15;
+  var rCable = 15; var xCable = 3; // mOhm
+  var Un = 400;
+  var cx = scComplexCalc(scState, rCable, xCable, Un, 1.05);
+  // Zend is the vector magnitude of total R,X at far end
+  var Rend = cx.Rbus + rCable;
+  var Xend = cx.Xbus + xCable;
+  var Zend = Math.sqrt(Rend * Rend + Xend * Xend);
+  var expectedIk2min = 0.95 * Un / (2 * Zend / 1000);
+  assert(Math.abs(cx.ikMin2ph - expectedIk2min) < 0.01,
+    'Ik2min should be ' + expectedIk2min.toFixed(1) + 'A, got ' + cx.ikMin2ph.toFixed(1) + 'A');
+  // Ik2min must be less than Ik3max (fewer phases, more impedance, lower voltage factor)
+  assert(cx.ikMin2ph < cx.ikMax3ph,
+    'Ik2min (' + cx.ikMin2ph.toFixed(0) + ') < Ik3max (' + cx.ikMax3ph.toFixed(0) + ')');
+  Object.assign(scState, saved);
+});
+
+// Test 19e: scComplexCalc with zero cable impedance (fault at busbar: Ik2min = Ik at bus with c_min)
+test('scComplexCalc with no cable: Ik2min at busbar uses same Z as Ik3max but different formula', function() {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.zNet = 1; scState.zTrafo = 5; scState.rxNet = 0.1; scState.rxTrafo = 0.1;
+  var cx = scComplexCalc(scState, 0, 0, 400, 1.05);
+  // When no cable, Zend = Zbus (same impedance point)
+  assert(Math.abs(cx.Zend - cx.Zbus) < 1e-9, 'Zend should equal Zbus when no cable');
+  // Ik2min = 0.95*400/(2*Zbus/1000), Ik3max = 1.05*400/(sqrt(3)*Zbus/1000)
+  // Ratio: Ik2min/Ik3max = (0.95/1.05) * (sqrt(3)/2) = 0.904 * 0.866 = 0.783
+  var ratio = cx.ikMin2ph / cx.ikMax3ph;
+  var expectedRatio = (0.95 / 1.05) * (Math.sqrt(3) / 2);
+  assert(Math.abs(ratio - expectedRatio) < 1e-6,
+    'Ik2min/Ik3max ratio should be ' + expectedRatio.toFixed(4) + ', got ' + ratio.toFixed(4));
+  Object.assign(scState, saved);
+});
+
 // Test 20: Installation derating applied to Iz in compliance check
 test('sldVerifyNode applies installation method derating to Iz', function() {
   sldNextId = 400;
