@@ -10284,6 +10284,17 @@ function renderMCCB() {
         <div class="result-title">${tx('Indstillinger', 'Settings')}</div>
         ${lsigRenderSettingsTable({ In: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult, trL: mccbState.trL, trS: mccbState.trS, iiMult: mccbState.iiMult, igMult: mccbState.igMult, tg: mccbState.tg, tripUnit: mccbState.tripUnit })}
         <div class="info-row" style="margin-top:6px">${tx('IEC 60947-2 Annex F; DS/HD 60364-4-43. Kurven repr\u00E6senterer den VALGTE indstilling \u2014 koordin\u00E9r mod nedstr\u00F8ms- og opstr\u00F8msenheder via TCC-modulet.', 'IEC 60947-2 Annex F; DS/HD 60364-4-43. The curve represents the SELECTED setting \u2014 coordinate against downstream and upstream devices via the TCC module.')}</div>
+      </div>
+      <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
+        <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>Schneider Electric</strong></span></div>
+        <div class="result-row"><span class="label">${tx('Serie', 'Series')}</span><span class="value">Compact NSX</span></div>
+        <div class="result-row"><span class="label">${tx('Ramme', 'Frame')}</span><span class="value">${mccbState.frame}</span></div>
+        <div class="result-row"><span class="label">${tx('Udl\u00F8serkurve', 'Trip curve')}</span><span class="value">${mccbState.trip} (I<sub>cu</sub> = ${MCCB_TRIPS[mccbState.trip] || '?'} kA)</span></div>
+        <div class="result-row"><span class="label">${tx('Udl\u00F8serenhed', 'Trip unit')}</span><span class="value">${mccbState.tripUnit}</span></div>
+        <div class="result-row"><span class="label">${tx('Standard', 'Standard')}</span><span class="value">IEC 60947-2 / EN 60947-2</span></div>
+        <div class="result-row"><span class="label">${tx('Produktkatalog', 'Product catalog')}</span><span class="value"><a href="https://www.se.com/sg/en/product-range/1887-compact-nsx/" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">se.com/Compact-NSX \u2197</a></span></div>
+        <div class="info-row" style="margin-top:6px;font-size:0.78em;opacity:0.7">${tx('Produktdata hentet fra Schneider Electric katalog. Verific\u00E9r altid mod den aktuelle udgave af produktets datablad f\u00F8r bestilling.', 'Product data from the Schneider Electric catalog. Always verify against the current edition of the product datasheet before ordering.')}</div>
       </div>`;
 
   return `
