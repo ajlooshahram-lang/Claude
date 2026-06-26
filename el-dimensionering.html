@@ -11565,7 +11565,7 @@ function renderTrafoSizing() {
   html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + Ploss.toFixed(0) + ' W</span></div>';
   html += '</div>';
   html += calcDetail({ name: tx('Fuldlaststr\u00F8m', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S\u2099', symbol: 'S\u2099', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U\u2082', symbol: 'U\u2082', value: 400, unit: 'V', source: tx('Sekund\u00E6r', 'Secondary') }], substitution: S + '\u00b71000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
-  html += calcDetail({ name: tx('Kortslutningsstrøm', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
+  html += calcDetail({ name: tx('Kortslutningsstrøm', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '\u00b71000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
   html += '</div>';
   return html;
 }
@@ -32485,7 +32485,7 @@ function renderMagnetFlux() {
   html += '<div class="result-row"><span class="label">B</span><span class="value" style="font-weight:700">' + B.toFixed(3) + ' T</span></div>';
   html += '<div class="result-row"><span class="label">H</span><span class="value">' + H.toFixed(1) + ' A/m</span></div></div>';
   html += calcDetail({ name: tx('Fluxdensitet', 'Flux density'), formula: 'B = \u03A6 / A', variables: [{ name: '\u03A6', symbol: '\u03A6', value: magnetState.fluxPhi*1000, unit: 'mWb' }, { name: 'A', symbol: 'A', value: magnetState.fluxArea*10000, unit: 'cm2' }], substitution: magnetState.fluxPhi + ' / ' + magnetState.fluxArea, result: { value: B, unit: 'T' }, reference: 'Opgavesamling Kap. 5' });
-  html += calcDetail({ name: tx('Feltstyrke', 'Field strength'), formula: 'H = B/(\u03bc_0*\u03bc_r)', variables: [{ name: 'B', symbol: 'B', value: B, unit: 'T' }, { name: 'ur', symbol: 'ur', value: muR }], substitution: B.toFixed(3) + ' / (4pi*1e-7*' + muR + ')', result: { value: H, unit: 'A/m' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Feltstyrke', 'Field strength'), formula: 'H = B/(\u03bc_0*\u03bc_r)', variables: [{ name: 'B', symbol: 'B', value: B, unit: 'T' }, { name: 'ur', symbol: 'ur', value: muR }], substitution: B.toFixed(3) + ' / (4\u03C0\u00b710\u207b\u2077 \u00b7 ' + muR + ')', result: { value: H, unit: 'A/m' }, reference: 'Opgavesamling Kap. 5' });
   html += '</div>';
   return html;
 }
@@ -32523,7 +32523,7 @@ function renderMagnetReluctance() {
   if (magnetState.relGap > 0) html += '<div class="result-row"><span class="label">Rm_gap</span><span class="value">' + impedansFmtEng(Rm_gap, "A/Wb") + ' A/Wb</span></div>';
   html += '<div class="result-row"><span class="label">Rm_total</span><span class="value" style="font-weight:700">' + impedansFmtEng(Rm_total, "A/Wb") + ' A/Wb</span></div>';
   html += '<div class="result-row"><span class="label">\u03A6</span><span class="value">' + (Phi*1000).toFixed(4) + ' mWb</span></div></div>';
-  html += calcDetail({ name: tx('Kernereluktans', 'Core reluctance'), formula: 'R_m = l/(\u03bc_0*\u03bc_r*A)', variables: [{ name: 'l', symbol: 'l', value: magnetState.relLength, unit: 'm' }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.relArea, unit: 'm2' }], substitution: magnetState.relLength + '/(4pi*1e-7*' + muR + '*' + magnetState.relArea + ')', result: { value: Rm_core, unit: 'A/Wb' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Kernereluktans', 'Core reluctance'), formula: 'R_m = l/(\u03bc_0*\u03bc_r*A)', variables: [{ name: 'l', symbol: 'l', value: magnetState.relLength, unit: 'm' }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.relArea, unit: 'm2' }], substitution: magnetState.relLength + ' / (4\u03C0\u00b710\u207b\u2077 \u00b7 ' + muR + ' \u00b7 ' + magnetState.relArea + ')', result: { value: Rm_core, unit: 'A/Wb' }, reference: 'Opgavesamling Kap. 5' });
   html += '</div>';
   return html;
 }
@@ -32566,8 +32566,8 @@ function renderMagnetInduction() {
   html += valStep(magnetState, 'indV', 'magnet', { step: 0.5, fmt: function(v){ return v + ' m/s'; }, clamp: { min: 0 } });
   html += '</div>';
   html += '<div class="result-row"><span class="label">e</span><span class="value" style="font-weight:700">' + eMotional.toFixed(3) + ' V</span></div></div>';
-  html += calcDetail({ name: 'Faraday', formula: 'e = N*d\u03A6/dt', variables: [{ name: 'N', symbol: 'N', value: magnetState.indN }, { name: 'd\u03A6/dt', symbol: 'd\u03A6/dt', value: magnetState.indDphiDt, unit: 'Wb/s' }], substitution: magnetState.indN + '*' + magnetState.indDphiDt, result: { value: eFaraday, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
-  html += calcDetail({ name: tx('Bevægelses-EMF', 'Motional EMF'), formula: 'e = B*l*v', variables: [{ name: 'B', symbol: 'B', value: magnetState.indB, unit: 'T' }, { name: 'l', symbol: 'l', value: magnetState.indL, unit: 'm' }, { name: 'v', symbol: 'v', value: magnetState.indV, unit: 'm/s' }], substitution: magnetState.indB + '*' + magnetState.indL + '*' + magnetState.indV, result: { value: eMotional, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: 'Faraday', formula: 'e = N*d\u03A6/dt', variables: [{ name: 'N', symbol: 'N', value: magnetState.indN }, { name: 'd\u03A6/dt', symbol: 'd\u03A6/dt', value: magnetState.indDphiDt, unit: 'Wb/s' }], substitution: magnetState.indN + ' \u00b7 ' + magnetState.indDphiDt, result: { value: eFaraday, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Bevægelses-EMF', 'Motional EMF'), formula: 'e = B*l*v', variables: [{ name: 'B', symbol: 'B', value: magnetState.indB, unit: 'T' }, { name: 'l', symbol: 'l', value: magnetState.indL, unit: 'm' }, { name: 'v', symbol: 'v', value: magnetState.indV, unit: 'm/s' }], substitution: magnetState.indB + ' \u00b7 ' + magnetState.indL + ' \u00b7 ' + magnetState.indV, result: { value: eMotional, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
   html += '</div>';
   return html;
 }
@@ -32600,7 +32600,7 @@ function renderMagnetInductance() {
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
   html += '<div class="result-row"><span class="label">X<sub>L</sub> (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
-  html += calcDetail({ name: tx('Selvinduktans', 'Self-inductance'), formula: 'L = N^2*\u03bc_0*\u03bc_r*A/l', variables: [{ name: 'N', symbol: 'N', value: magnetState.inductN }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.inductArea, unit: 'm2' }, { name: 'l', symbol: 'l', value: magnetState.inductLength, unit: 'm' }], substitution: magnetState.inductN + '2*4pi*1e-7*' + muR + '*' + magnetState.inductArea + '/' + magnetState.inductLength, result: { value: L, unit: 'H' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Selvinduktans', 'Self-inductance'), formula: 'L = N^2*\u03bc_0*\u03bc_r*A/l', variables: [{ name: 'N', symbol: 'N', value: magnetState.inductN }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.inductArea, unit: 'm2' }, { name: 'l', symbol: 'l', value: magnetState.inductLength, unit: 'm' }], substitution: magnetState.inductN + '\u00b2 \u00b7 4\u03C0\u00b710\u207b\u2077 \u00b7 ' + muR + ' \u00b7 ' + magnetState.inductArea + ' / ' + magnetState.inductLength, result: { value: L, unit: 'H' }, reference: 'Opgavesamling Kap. 5' });
   html += calcDetail({ name: 'X<sub>L</sub> ' + tx('(reaktans)', '(reactance)'), formula: 'X_L = 2\u00b7\u03c0\u00b7f\u00b7L', variables: [{ name: 'f', symbol: 'f', value: 50, unit: 'Hz' }, { name: 'L', symbol: 'L', value: L, unit: 'H' }], substitution: '2\u00b7\u03c0\u00b750\u00b7' + impedansFmtL(L), result: { value: XL, unit: '\u03A9' }, reference: 'Kap. 4' });
   html += '</div>';
   return html;
@@ -32629,7 +32629,7 @@ function renderMagnetForce() {
   html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + F.toFixed(3) + ' N</span></div></div>';
-  html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + '*' + magnetState.forceI + '*' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + ' \u00b7 ' + magnetState.forceI + ' \u00b7 ' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
   html += '</div>';
   return html;
 }
@@ -32651,7 +32651,7 @@ function renderMagnetEnergy() {
   html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
-  html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I^2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I^2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0,5 \u00b7 ' + magnetState.energyL + ' \u00b7 ' + magnetState.energyI + '\u00b2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
   html += '</div>';
   return html;
 }
@@ -34167,7 +34167,7 @@ function analyzerSolve(data) {
         { name: tx('Mærkeydelse', 'Rated power'), symbol: 'SN', value: trafoSN, unit: 'kVA', source: tx('opgivet', 'specified') },
         { name: tx('Kortslutningssp.', 'Short-circuit voltage'), symbol: 'uk%', value: trafoUk, unit: '%', source: tx('opgivet/standard', 'specified/standard') }
       ],
-      substitution: 'IN = ' + trafoSN + '*1000 / (\u221A3*400) = ' + trafoIN.toFixed(1) + ' A',
+      substitution: 'I\u2099 = ' + trafoSN + '\u00b71000 / (\u221A3\u00b7400) = ' + trafoIN.toFixed(1) + ' A',
       steps: trafoResults,
       result: { value: 'IN=' + trafoIN.toFixed(1) + 'A, Ik=' + (trafoIk/1000).toFixed(2) + 'kA', unit: '' },
       reference: 'Bind 5 Kap. 3-4'
