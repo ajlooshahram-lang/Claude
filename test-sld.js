@@ -16196,6 +16196,32 @@ test('analyzerDedupeQuestions: identical-text rows are merged into one with all 
   assert.strictEqual(merged[0].solved, true, 'merged row is solved if any part solved');
 });
 
+test('examFullLabel names questions EXACTLY like the original exam ("Opgave 1.1")', function () {
+  assert.strictEqual(examFullLabel(1, '1.1'), 'Opgave 1.1');
+  assert.strictEqual(examFullLabel(3, '3.6'), 'Opgave 3.6');
+  assert.strictEqual(examFullLabel(2, ''), 'Opgave 2', 'no sub-number -> just the Opgave');
+  assert.strictEqual(examFullLabel(1, 'a'), 'Opgave 1.a', 'letter sub-question attaches to its Opgave');
+});
+
+test('Q&A panel labels every question as "Opgave N.M"', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var html = analyzerRenderQuestionOutline();
+  assert(html.indexOf('Opgave 1.1') >= 0, 'shows "Opgave 1.1"');
+  assert(html.indexOf('Opgave 1.2') >= 0, 'shows "Opgave 1.2"');
+  assert(html.indexOf('Opgave 2.1') >= 0, 'shows "Opgave 2.1"');
+  lang = savedLang;
+});
+
+test('examRenderMethodHint gives the governing formula + needed inputs for a recognised type', function () {
+  var savedLang = lang; lang = 'da';
+  var h = examRenderMethodHint('ik');
+  assert(h.indexOf('I_k') >= 0 && h.indexOf('u_k') >= 0, 'Ik hint shows the formula');
+  assert(h.indexOf('Mangler') >= 0 || h.indexOf('Needs') >= 0, 'states what input is missing');
+  assert.strictEqual(examRenderMethodHint('nonexistent_type'), '', 'unknown type -> no hint (no fabrication)');
+  lang = savedLang;
+});
+
 // === thermalCalcTemp physics correction (audit) ===
 // A conductor loaded to its DERATED ampacity must reach exactly the insulation's
 // max temperature at ANY ambient -- this is what the Table B.52.14/15 derating

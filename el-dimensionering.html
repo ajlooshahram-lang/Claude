@@ -35341,6 +35341,36 @@ function analyzerSubLabel(s) {
 // Shared strip pattern: removes a leading question-number label from display text.
 var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
 
+// Build the question label EXACTLY as in the original exam: "Opgave 1.1",
+// "Opgave 3.6", etc. A sub-number that already encodes the opgave (1.1) just
+// gets the "Opgave " prefix; a bare letter/number is attached to the section id.
+function examFullLabel(opId, num) {
+  if (!num) return opId ? ('Opgave ' + opId) : tx('Generelt', 'General');
+  if (/^\d+\.\d/.test(num) || /^\d+$/.test(num)) return 'Opgave ' + num;
+  return opId ? ('Opgave ' + opId + '.' + num) : ('Opgave ' + num);
+}
+
+// Governing formula + the inputs still needed, shown when a recognised question
+// cannot be auto-solved (so the user gets the method, never a fabricated number).
+var EXAM_METHOD_HINTS = {
+  ib:        { f: 'I_B = P / (\u221a3 \u00b7 U \u00b7 cos\u03c6)', n: 'effekt P, sp\u00e6nding U, cos\u03c6' },
+  iz:        { f: 'I_z = I_z,tabel \u00b7 k_temp \u00b7 k_gruppe', n: 'kabeltype, tv\u00e6rsnit, installationsmetode, omgivelsestemperatur' },
+  vdrop:     { f: '\u0394U = \u221a3 \u00b7 I_B \u00b7 L \u00b7 (R\u00b7cos\u03c6 + X\u00b7sin\u03c6)', n: 'I_B, kabell\u00e6ngde L, tv\u00e6rsnit' },
+  ik:        { f: 'I_k = c\u00b7U / (\u221a3 \u00b7 Z),  Z = u_k\u00b7U\u00b2/S_n', n: 'transformer S_n [kVA], u_k [%] (og evt. netimpedans / antal parallelle transformere)' },
+  zs:        { f: 'Z_s \u2264 U_0 / I_a  (DS/HD 60364-4-41)', n: 'fejlsl\u00f8jfeimpedans Z_s og udl\u00f8sestr\u00f8m I_a' },
+  device:    { f: 'I_B \u2264 I_n \u2264 I_z  og  I_cu \u2265 I_k,max', n: 'I_B, kablets I_z, I_k,max' },
+  adiabatic: { f: 'k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t  (DS/HD 60364-4-43 \u00a7434.5)', n: 'tv\u00e6rsnit S, I_k, udkoblingstid t' },
+  trafo:     { f: 'I_N = S_n / (\u221a3 \u00b7 U_N)', n: 'transformer S_n [kVA] og U_N' },
+  energy:    { f: 'W = P \u00b7 t  (\u00e5rlig overf\u00f8ring)', n: 'effekt/belastningsforl\u00f8b og driftstimer' }
+};
+function examRenderMethodHint(type) {
+  var hint = EXAM_METHOD_HINTS[type];
+  if (!hint) return '';
+  return '<div style="margin-top:6px;padding:6px 10px;background:var(--primary-glow);border-left:3px solid var(--primary-light);border-radius:4px;font-size:0.78rem">'
+    + '<div><strong>' + tx('Metode', 'Method') + ':</strong> <span style="font-family:monospace">' + mmlEsc(hint.f) + '</span></div>'
+    + '<div style="margin-top:2px;color:var(--text-muted)"><strong>' + tx('Mangler', 'Needs') + ':</strong> ' + mmlEsc(hint.n) + '</div></div>';
+}
+
 // Collapse questions that share the same text (the detector often maps one
 // sub-question to several calc types -> identical rows). Merge them into a
 // single question carrying ALL its answers, preserving order.
@@ -35395,7 +35425,7 @@ function analyzerRenderQuestionOutline() {
       html += '<div style="padding:6px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
       html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
       html += '<div style="flex:1">';
-      if (q.num) html += '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc(q.num) + '</strong> ';
+      html += '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc(examFullLabel(o.id, q.num)) + '</strong> ';
       html += mmlEsc(q.questionText || q.label);
       html += '</div>';
       html += '<span style="white-space:nowrap;color:' + badgeColor + ';font-size:0.74rem;font-weight:700">' + badge + '</span>';
@@ -35408,6 +35438,7 @@ function analyzerRenderQuestionOutline() {
           html += '</div>';
         });
       } else {
+        html += examRenderMethodHint(q.type);
         html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
       }
       html += '</div>';
@@ -35895,18 +35926,19 @@ function examRenderSolution(sol) {
     }
     op.questions.forEach(function (q) {
       h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
-      // Question text
-      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + (q.num ? ' ' + mmlEsc(q.num) : '') + ':</strong> ' + (q.questionText || q.label) + '</div>';
+      // Question text — named exactly like the original exam: "Opgave 1.1: ..."
+      h += '<div style="font-size:0.82rem"><strong>' + mmlEsc(examFullLabel(op.id, q.num)) + ':</strong> ' + (q.questionText || q.label) + '</div>';
       // Mapped calculation
       h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
       if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
       if (q.status === 'ok') h += ' \u2705'; else if (q.status === 'fail') h += ' \u26D4';
       h += '</div>';
-      // FULL worked solution (calcDetail HTML) OR a click-only gap chip
+      // FULL worked solution (calcDetail HTML) OR a method hint + click-only gap chip
       if (q.solved && q.calcHtml) {
         h += q.calcHtml;
       } else {
-        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen udregning tilg\u00E6ngelig \u2014 bekr\u00E6ft de manglende input via det tilknyttede modul (kun klik).', 'No working available \u2014 confirm the missing inputs via the linked module (click-only).') + '</div>';
+        h += examRenderMethodHint(q.type);
+        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen automatisk udregning \u2014 indtast de manglende v\u00E6rdier via det tilknyttede modul (kun klik).', 'No automatic working \u2014 enter the missing values via the linked module (click-only).') + '</div>';
         if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
       }
       h += '</div>';
