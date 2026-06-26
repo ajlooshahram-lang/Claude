@@ -33843,6 +33843,18 @@ function analyzerNormalize(text) {
   // Strip common exam headers
   s = s.replace(/Autorisationspr.ve\s*\d{4}/gi, '');
   s = s.replace(/Sikkerhedsstyrelsen/gi, '');
+  // === PDF-artifact repair (this is what unlocks real exam extraction) ===
+  // (a) Subscript split: a lone S/U/I/P/Z at a line end glued to its subscript on
+  //     the next line. "S\nk,max = 225 MVA" -> "Sk,max = 225 MVA"; "U\nN = ..." -> "UN = ...".
+  s = s.replace(/\b([SUIPZ])\s*\n\s*([a-zN\u00e6\u00f8\u00e5][\w,.]*\s*[=:])/g, '$1$2');
+  // (b) Unit "mm" split from its exponent, and normalise "mm 2"/"mm²" -> "mm2".
+  s = s.replace(/mm\s*\n\s*2\b/g, 'mm2').replace(/mm\s*\u00b2/g, 'mm2').replace(/mm\s+2\b/g, 'mm2');
+  // (c) A value split from its unit across a line break: "225\nMVA" -> "225 MVA".
+  s = s.replace(/(\d)\s*\n\s*(MVA|kVA|kV|kW|mm2|A|km|m|V|\u00b0C|H|Hz)\b/g, '$1 $2');
+  // (d) Spaced relational operators in relay settings: "I > =" -> "I> =", "I >> =" -> "I>> =".
+  s = s.replace(/\bI\s*(>{1,3})\s*=/g, 'I$1 =');
+  // (e) Collapse table whitespace (multiple spaces/tabs) to single spaces.
+  s = s.replace(/[ \t]{2,}/g, ' ');
   // Collapse multiple blank lines
   s = s.replace(/\n{3,}/g, '\n\n');
   return s.trim();
@@ -35279,9 +35291,82 @@ function analyzerReadZipEntries(bytes) {
 // Scans content streams, inflates FlateDecode, pulls text from PDF string
 // operators. LIMITATIONS: scanned/image PDFs yield no text (handled by the
 // low-text notice); CID/Identity-H fonts may yield unmapped glyphs.
+// --- ToUnicode CMap support (decodes CID / Identity-H subset fonts) ----------
+// Many real exam PDFs embed Type0/CID fonts whose content-stream "glyph codes"
+// are meaningless without the font's /ToUnicode CMap. Without this, extraction
+// yields garbage ("0 01 12 23...") and the quality gate rejects the whole PDF.
+// We parse every ToUnicode CMap and map each font resource name (/F1, /F2, ...)
+// to its CMap so the content decoder can recover real Unicode text.
+function analyzerHexToUni(h) {
+  var s = '';
+  for (var i = 0; i + 4 <= h.length; i += 4) s += String.fromCharCode(parseInt(h.substr(i, 4), 16));
+  return s;
+}
+function analyzerParseCMap(t) {
+  var map = {}, width = 1, m;
+  var bc = /beginbfchar([\s\S]*?)endbfchar/g;
+  while ((m = bc.exec(t)) !== null) {
+    var pr = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g, p;
+    while ((p = pr.exec(m[1])) !== null) { if (p[1].length >= 4) width = 2; map[parseInt(p[1], 16)] = analyzerHexToUni(p[2]); }
+  }
+  var br = /beginbfrange([\s\S]*?)endbfrange/g;
+  while ((m = br.exec(t)) !== null) {
+    var rng = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:<([0-9A-Fa-f]+)>|\[([\s\S]*?)\])/g, r;
+    while ((r = rng.exec(m[1])) !== null) {
+      var lo = parseInt(r[1], 16), hi = parseInt(r[2], 16);
+      if (r[1].length >= 4) width = 2;
+      if (hi - lo > 65535) hi = lo + 65535;
+      if (r[3] != null) { var base = parseInt(r[3], 16); for (var c = lo; c <= hi; c++) map[c] = String.fromCharCode(base + (c - lo)); }
+      else if (r[4] != null) { var arr = r[4].match(/<([0-9A-Fa-f]+)>/g) || []; for (var k = 0; k < arr.length; k++) map[lo + k] = analyzerHexToUni(arr[k].replace(/[<>]/g, '')); }
+    }
+  }
+  return { map: map, width: width };
+}
+// Build { fontResourceName -> {map,width} } for the whole document.
+function analyzerBuildFontCMaps(s, inflate) {
+  var fontToUni = {};   // object number of font -> object number of its ToUnicode
+  var objStream = {};   // object number -> raw stream bytes (latin1 string)
+  // (1) object number -> ToUnicode reference, for /Type/Font objects
+  var fobj = /(\d+)\s+0\s+obj([\s\S]*?)(?:endobj|stream)/g, fm;
+  while ((fm = fobj.exec(s)) !== null) {
+    var num = fm[1], dict = fm[2];
+    var tu = dict.match(/\/ToUnicode\s+(\d+)\s+0\s+R/);
+    if (tu) fontToUni[num] = tu[1];
+  }
+  // (2) cache stream bytes per object (for the ToUnicode CMap objects)
+  var sobj = /(\d+)\s+0\s+obj([\s\S]*?)stream\r?\n?/g, sm;
+  while ((sm = sobj.exec(s)) !== null) {
+    var onum = sm[1], odict = sm[2];
+    var dataStart = sm.index + sm[0].length;
+    var endIdx = s.indexOf('endstream', dataStart);
+    if (endIdx < 0) continue;
+    var chunk = s.substring(dataStart, endIdx);
+    var txt = null;
+    if (/\/FlateDecode/.test(odict)) {
+      try { var raw = new Uint8Array(chunk.length); for (var i = 0; i < chunk.length; i++) raw[i] = chunk.charCodeAt(i) & 0xff; txt = analyzerBytesToLatin1(inflate(raw)); } catch (e) { txt = null; }
+    } else if (!/\/Filter/.test(odict)) { txt = chunk; }
+    if (txt && (txt.indexOf('beginbfchar') >= 0 || txt.indexOf('beginbfrange') >= 0)) objStream[onum] = txt;
+  }
+  // (3) parse each ToUnicode CMap once
+  var cmapByObj = {};
+  Object.keys(objStream).forEach(function (onum) { cmapByObj[onum] = analyzerParseCMap(objStream[onum]); });
+  // (4) resource name (/F1) -> font object -> CMap, via "/F1 12 0 R" in resources
+  var nameToCMap = {};
+  var resRe = /\/(F\w+|TT\d+|C\d+_\d+|R\d+)\s+(\d+)\s+0\s+R/g, rmm;
+  while ((rmm = resRe.exec(s)) !== null) {
+    var resName = rmm[1], fontObj = rmm[2];
+    var tuObj = fontToUni[fontObj];
+    if (tuObj && cmapByObj[tuObj]) nameToCMap[resName] = cmapByObj[tuObj];
+  }
+  return nameToCMap;
+}
+
 function analyzerExtractPdf(bytes) {
   if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
   var s = analyzerBytesToLatin1(bytes);
+  // Build font-resource -> ToUnicode CMap map so CID/Identity-H text decodes.
+  var fontCMaps = {};
+  try { fontCMaps = analyzerBuildFontCMaps(s, analyzerInflate); } catch (e) { fontCMaps = {}; }
   var collected = [];
   var MAX_STREAM_BYTES = 256 * 1024; // 256 KB: real content streams are small; fonts/images are huge
   var MAX_INFLATED = 512 * 1024; // 512 KB: cap inflated output (real page content ≈ 2-20 KB)
@@ -35321,7 +35406,9 @@ function analyzerExtractPdf(bytes) {
       content = chunk; // plain (uncompressed) content stream, no unknown filter
     }
     if (content) {
-      var txt = analyzerPdfContentToText(content);
+      // Skip CMap / CID definition streams (they are font metadata, not page text).
+      if (/begincmap|CIDInit|\/CMapType|usecmap|beginbfchar|beginbfrange|begincidrange/.test(content.substr(0, 600))) { continue; }
+      var txt = analyzerPdfContentToText(content, fontCMaps);
       if (txt) collected.push(txt);
     }
   }
@@ -35369,10 +35456,23 @@ function analyzerPdfReadableRatio(text) {
 // text-showing operators (Tj, TJ, ', "). TJ-array string fragments are joined
 // without inserting spaces (kerning is usually intra-word); a space is added
 // only for large negative kerning, and positioning operators add line breaks.
-function analyzerPdfContentToText(content) {
+function analyzerPdfContentToText(content, fontCMaps) {
   // Guard: skip absurdly large content (real page content streams are 2-30 KB text).
   if (!content || content.length > 512 * 1024) return '';
   var i = 0, n = content.length, result = '';
+  fontCMaps = fontCMaps || {};
+  var curCMap = null, pendingName = null;
+  // Decode a raw operand string through the active font's ToUnicode CMap (if any).
+  function decode(str) {
+    if (!curCMap) return str;
+    var w = curCMap.width, map = curCMap.map, out = '', k;
+    if (w === 2) {
+      for (k = 0; k + 1 < str.length; k += 2) { var code = (str.charCodeAt(k) << 8) | str.charCodeAt(k + 1); out += (map[code] != null ? map[code] : ''); }
+    } else {
+      for (k = 0; k < str.length; k++) { var c = str.charCodeAt(k); out += (map[c] != null ? map[c] : str.charAt(k)); }
+    }
+    return out;
+  }
   function readLiteral(start) {
     var depth = 1, j = start, str = '';
     while (j < n && depth > 0) {
@@ -35407,15 +35507,16 @@ function analyzerPdfContentToText(content) {
   function isNumChar(c) { return (c >= '0' && c <= '9') || c === '-' || c === '.' || c === '+'; }
   while (i < n) {
     var ch = content[i];
-    if (ch === '(') { var r = readLiteral(i + 1); result += r.str; i = r.next; continue; }
-    if (ch === '<' && content[i + 1] !== '<') { var rh = readHex(i + 1); result += rh.str; i = rh.next; continue; }
+    if (ch === '/') { var nm = ''; var jj = i + 1; while (jj < n && /[^\s\/\[\]<>()]/.test(content[jj])) { nm += content[jj]; jj++; } pendingName = nm; i = jj; continue; }
+    if (ch === '(') { var r = readLiteral(i + 1); result += decode(r.str); i = r.next; continue; }
+    if (ch === '<' && content[i + 1] !== '<') { var rh = readHex(i + 1); result += decode(rh.str); i = rh.next; continue; }
     if (ch === '[') {
       // TJ array: concatenate string fragments; big negative kerning => space.
       var j = i + 1;
       while (j < n && content[j] !== ']') {
         var c2 = content[j];
-        if (c2 === '(') { var rr = readLiteral(j + 1); result += rr.str; j = rr.next; continue; }
-        if (c2 === '<' && content[j + 1] !== '<') { var rrh = readHex(j + 1); result += rrh.str; j = rrh.next; continue; }
+        if (c2 === '(') { var rr = readLiteral(j + 1); result += decode(rr.str); j = rr.next; continue; }
+        if (c2 === '<' && content[j + 1] !== '<') { var rrh = readHex(j + 1); result += decode(rrh.str); j = rrh.next; continue; }
         if (isNumChar(c2)) { var num = ''; while (j < n && isNumChar(content[j])) { num += content[j]; j++; } if (parseFloat(num) <= -100) result += ' '; continue; }
         j++;
       }
@@ -35423,6 +35524,7 @@ function analyzerPdfContentToText(content) {
     }
     if (ch === 'T') {
       var op = content.substr(i, 2);
+      if (op === 'Tf') { curCMap = (pendingName && fontCMaps[pendingName]) ? fontCMaps[pendingName] : null; i += 2; continue; }
       if (op === 'Td' || op === 'TD' || op === 'Tm' || op === 'T*') { result += '\n'; i += 2; continue; }
       if (op === 'Tj' || op === 'TJ') { result += ' '; i += 2; continue; }
     }

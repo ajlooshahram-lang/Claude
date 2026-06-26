@@ -16274,7 +16274,32 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
-// === Product recommendation: the CHOSEN product is highlighted ===
+// === PDF extraction: real exam PDFs (incl. CID/ToUnicode fonts) ===
+test('analyzerExtractPdf reads real exam PDFs into readable Danish text', function () {
+  var cases = [
+    { f: '2023_01_El-autorisation_Godkendt.pdf', needle: /autorisation/i },
+    { f: 'Autorisationsproven dec  2012 Endelig opgave.pdf', needle: /december\s+2012/i }
+  ];
+  cases.forEach(function (c) {
+    if (!fs.existsSync(__dirname + '/' + c.f)) return; // skip if fixture absent
+    var bytes = new Uint8Array(fs.readFileSync(__dirname + '/' + c.f));
+    var out = analyzerExtractPdf(bytes);
+    assert(out && out.length > 2000, c.f + ': extracts substantial text (got ' + (out ? out.length : 0) + ')');
+    assert(analyzerPdfReadableRatio(out) > 0.9, c.f + ': text is readable (ratio ' + analyzerPdfReadableRatio(out).toFixed(2) + ')');
+    assert(c.needle.test(out), c.f + ': contains expected content ' + c.needle);
+    assert(out.indexOf('beginbfchar') < 0 && out.indexOf('CIDInit') < 0, c.f + ': no CMap/CID metadata leaked into the text');
+  });
+});
+
+test('analyzerParseCMap maps bfchar and bfrange entries to Unicode', function () {
+  var cm = analyzerParseCMap('1 beginbfchar <0003> <0041> endbfchar 1 beginbfrange <0004> <0006> <0042> endbfrange');
+  assert.strictEqual(cm.width, 2, 'two-byte CID codes');
+  assert.strictEqual(cm.map[0x0003], 'A', 'bfchar 0003 -> A');
+  assert.strictEqual(cm.map[0x0004], 'B', 'bfrange start -> B');
+  assert.strictEqual(cm.map[0x0006], 'D', 'bfrange end -> D');
+});
+
+
 test('renderRecommendations highlights the chosen product and labels the alternatives', function () {
   var savedLang = lang; lang = 'da';
   var fuses = recommendFuses(50);
