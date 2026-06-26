@@ -16157,6 +16157,31 @@ test('analyzerRenderQuestionOutline binds questions to answers (numbers + Svar +
   lang = savedLang;
 });
 
+// === thermalCalcTemp physics correction (audit) ===
+// A conductor loaded to its DERATED ampacity must reach exactly the insulation's
+// max temperature at ANY ambient -- this is what the Table B.52.14/15 derating
+// factors are defined to guarantee. The previous code used a fixed
+// (maxTemp - 30) coefficient with the derated Iz, which produced 80 C at 40 C
+// ambient (false overload) and under-reported temperature at cold ambient.
+test('thermalCalcTemp: cable at derated ampacity reaches exactly maxTemp at any ambient', function () {
+  [10, 20, 30, 40, 50].forEach(function (amb) {
+    var k = thermalCalcDerating(amb, 1, 'tray').ambientFactor; // PVC ambient factor
+    var izRef = 100;
+    var izDerated = izRef * k;
+    // Load the cable exactly at its derated ampacity: I = izDerated => theta = thetaMax
+    var r = thermalCalcTemp('PVC', izDerated, izRef, amb, k);
+    assert.ok(Math.abs(r.currentTemp - 70) <= 0.6,
+      'At ' + amb + 'C, I=izDerated should give ~70C, got ' + r.currentTemp + 'C');
+  });
+});
+
+test('thermalCalcTemp: no longer over-states temperature at 40C (regression vs old 80C bug)', function () {
+  // 40C ambient, PVC factor 0.87, load at the derated limit
+  var r = thermalCalcTemp('PVC', 87, 100, 40, 0.87);
+  assert.ok(r.currentTemp < 72, 'must be ~70C, not the old ~80C; got ' + r.currentTemp);
+  assert.strictEqual(r.overloaded, false, 'cable at its own derated limit is not overloaded');
+});
+
 // === Inline trip curve + catalog references (presentation P0) ===
 console.log('\n=== Device Curve & Catalog Reference Tests ===\n');
 
