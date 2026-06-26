@@ -16247,6 +16247,33 @@ test('scParallelTrafoIk exposes BOTH complex forms: rectangular (R,X) and polar 
   assert(Math.abs(Math.atan2(r.X, r.R) * 180 / Math.PI - r.angleDeg) < 1e-9, 'argument = atan2(X,R)');
 });
 
+// === Forsyning: capacitive earth fault + Petersen coil (slukkespole) ===
+test('Petersen coil compensates the capacitive earth-fault current (resonance L = 1/(3*w^2*C0))', function () {
+  var Un = 10000, f = 50, C0 = 1e-6;
+  var omega = 2 * Math.PI * f;
+  var Ij = forsyningEarthFaultCurrent(C0, Un, f);
+  assert(Math.abs(Ij - Math.sqrt(3) * omega * C0 * Un) < 1e-9, 'earth-fault current formula');
+  var coil = forsyningPetersenCoil(Ij, Un, f);
+  assert.strictEqual(coil.IL, Ij, 'I_L = I_j (full compensation)');
+  var Lres = 1 / (3 * omega * omega * C0);
+  assert(Math.abs(coil.L - Lres) / Lres < 1e-6, 'L matches the resonance identity (got ' + coil.L.toFixed(4) + ' H, expect ' + Lres.toFixed(4) + ')');
+});
+
+test('Petersen coil for a stated earth-fault current (10 kV, I_j = 56 A -> ~0.328 H)', function () {
+  var coil = forsyningPetersenCoil(56, 10000, 50);
+  assert(Math.abs(coil.XL - 103.1) < 0.5, 'X_L ~ 103.1 ohm (got ' + coil.XL.toFixed(1) + ')');
+  assert(Math.abs(coil.L - 0.328) < 0.005, 'L ~ 0.328 H (got ' + coil.L.toFixed(3) + ')');
+});
+
+test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z -> Sk)', function () {
+  var Un = 10000, Skh = 150e6, cosk = 0.1;
+  var Z = forsyningNetZfromSk(Skh, Un, cosk, 1.0);
+  var sk = forsyningNetworkSk(Z.r, Z.x, Un, 1.0);
+  assert(Math.abs(sk.Sk - Skh) / Skh < 1e-6, 'round-trips to the original Sk (150 MVA)');
+  assert(Math.abs(sk.Ik - Skh / (Math.sqrt(3) * Un)) < 1, 'Ik = Sk/(sqrt3*Un)');
+  assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
+});
+
 test('examBuildSolution is SUB-QUESTION driven: answers 1.1, 1.2, 1.3 in document order', function () {
   var savedLang = lang; lang = 'da';
   var txt = 'Opgave 1\nData: 11 kW, 400 V, cos phi 0,9.\n1.1 Beregn IB.\n1.2 Beregn spaendingsfaldet for 20 m, 4 mm2.\n1.3 Vaelg sikring. In 20 A.';

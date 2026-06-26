@@ -11190,6 +11190,50 @@ function scTrafoParts(zMag, scSt) {
   return scComplexParts(zMag, scState.rxTrafo);
 }
 // Complex short-circuit calculation per IEC 60909-0 (vector method).
+// Forsyning: capacitive earth-fault current of a (cable) distribution network.
+//   I_j = sqrt(3) * omega * C0 * U_n     (C0 = total per-phase earth capacitance, F)
+// Often the exam states C0 per km, or states I_j directly. Returns I_j in amperes.
+function forsyningEarthFaultCurrent(C0_farad, Un_volt, f) {
+  f = f || 50;
+  var omega = 2 * Math.PI * f;
+  return Math.sqrt(3) * omega * C0_farad * Un_volt;
+}
+
+// Forsyning: ideal Petersen coil (slukkespole) that exactly compensates the
+// capacitive earth-fault current I_j (resonance / "slukket" net).
+//   I_L = I_j ,  X_L = U_phase / I_j ,  L = X_L / omega
+// (Equivalently L = 1/(3*omega^2*C0) -- the resonance identity, used as the test.)
+function forsyningPetersenCoil(Ij_amp, Un_volt, f) {
+  f = f || 50;
+  var omega = 2 * Math.PI * f;
+  var Uphase = Un_volt / Math.sqrt(3);
+  if (Ij_amp <= 0) return { IL: 0, XL: 0, L: 0 };
+  var XL = Uphase / Ij_amp;
+  return { IL: Ij_amp, XL: XL, L: XL / omega, Uphase: Uphase };
+}
+
+// Forsyning: short-circuit power and 3-phase fault current at a busbar from the
+// network impedance (Viggo / IEC 60909). Z is the complex network impedance {r,x}
+// in ohms at voltage Un (line). Returns Sk [VA], Ik [A] and both complex forms.
+//   |Z| = sqrt(R^2+X^2) ,  Sk = c*Un^2/|Z| ,  Ik = c*Un/(sqrt3*|Z|) = Sk/(sqrt3*Un)
+function forsyningNetworkSk(zR, zX, Un_volt, c) {
+  c = (c == null) ? 1.0 : c;
+  var Zmag = Math.sqrt(zR * zR + zX * zX);
+  if (Zmag <= 0 || !isFinite(Zmag)) return { Sk: 0, Ik: 0, Zmag: 0, angleDeg: 0, R: zR, X: zX };
+  var Sk = c * Un_volt * Un_volt / Zmag;
+  var Ik = (c * Un_volt) / (Math.sqrt(3) * Zmag);
+  return { Sk: Sk, Ik: Ik, Zmag: Zmag, angleDeg: Math.atan2(zX, zR) * 180 / Math.PI, R: zR, X: zX };
+}
+// Network impedance referred from a short-circuit power Skh and angle (cos phi_k):
+//   |Z_net| = c*Un^2/Skh ,  R = |Z|*cos(phi_k) ,  X = |Z|*sin(phi_k)
+function forsyningNetZfromSk(Skh_va, Un_volt, cosPhiK, c) {
+  c = (c == null) ? 1.0 : c;
+  if (Skh_va <= 0) return { r: 0, x: 0, mag: 0 };
+  var mag = c * Un_volt * Un_volt / Skh_va;
+  var phi = Math.acos(Math.max(-1, Math.min(1, cosPhiK)));
+  return { r: mag * Math.cos(phi), x: mag * Math.sin(phi), mag: mag };
+}
+
 // Forsyning: 3-phase MAX short-circuit current on the LV side of N identical
 // distribution transformers in PARALLEL, fed through a common upstream network
 // (+HV) impedance. Computed on the HV side then referred to the LV side by the
