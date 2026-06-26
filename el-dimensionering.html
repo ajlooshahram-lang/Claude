@@ -33830,8 +33830,7 @@ var analyzerState = {
   moduleFlow: [],    // Which modules were used and how values flowed
   busPopulated: false, // Whether reactive bus was auto-populated
   solutionShown: false, // Whether the capstone "Complete exam solution" is rendered
-  mode: 'upload', // 'upload' or 'paste'
-  notice: null,   // trilingual user message (e.g. scanned PDF / unsupported file)
+  mode: 'upload', // 'upload' or 'paste'  notice: null,   // trilingual user message (e.g. scanned PDF / unsupported file)
   extracting: false // true while PDF/DOCX text extraction is in progress
 };
 // Normalize input text: strip page numbers, headers, fix encoding
@@ -35648,6 +35647,63 @@ function analyzerSetMode(m) {
   renderModule('analyzer');
 }
 // Render the analyzer module - ENHANCED with dependency graph and module flow
+// === ONLINE AI: solve the whole exam, Calcia/Sigma-style projektering + live law ===
+// Builds the expert prompt (pure + testable). Used when the local deterministic
+// engine lacks data, and to keep pricing/legislation current.
+function analyzerBuildOnlinePrompt(examText) {
+  var sys = 'Du er Danmarks mest erfarne autoriserede elinstallat\u00f8r og censor ved el-autorisationspr\u00f8ven (maskinmester). '
+    + 'Du mestrer DS/HD 60364, IEC 60909, DS/EN 50522, St\u00e6rkstr\u00f8msbekendtg\u00f8relsen, Installationsbekendtg\u00f8relsen, '
+    + 'F\u00e6llesregulativet og Viggo Bitsch-metoden (komplekse impedanser, arccot for nettet, arccos(e\u1d63/u\u2096) for transformeren, '
+    + 'dobbelt rektangul\u00e6r+pol\u00e6r visning, vektoriel str\u00f8msummering, dansk decimalkomma, NKT-kabeltabeller). '
+    + 'L\u00d8S HELE opgaves\u00e6ttet: gennemg\u00e5 hver opgave og hvert delsp\u00f8rgsm\u00e5l (1.1, 1.2, ...) i r\u00e6kkef\u00f8lge. '
+    + 'For hvert delsp\u00f8rgsm\u00e5l: angiv formlen, inds\u00e6t tallene eksplicit, og giv resultatet med korrekt enhed og SI-notation. '
+    + 'Vis komplekse tal i B\u00c5DE rektangul\u00e6r (R + jX) og pol\u00e6r (|Z| \u2220 \u03c6) form. '
+    + 'Kontroll\u00e9r altid IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max, k\u00b2S\u00b2 \u2265 I\u00b2t og Zs \u2264 U0/Ia. V\u00e6r konservativ (livssikkerhed). '
+    + 'Anbefal konkrete, CE-m\u00e6rkede produkter (Schneider/ABB/Siemens/Hager/nkt) og FREMH\u00c6V det valgte; '
+    + 'angiv dansk grossist-prisniveau (Solar/Lemvigh-M\u00fcller/Sanist\u00e5l) i Calcia/Sigma-stil hvor relevant. '
+    + 'Henvis til den relevante DS/HD 60364-paragraf. N\u00e6vn hvis en regel kan v\u00e6re opdateret og b\u00f8r verificeres hos Sikkerhedsstyrelsen (sikkerhedsstyrelsen.dk). '
+    + 'Svar struktureret i markdown, p\u00e5 dansk.';
+  return { system: sys, user: 'L\u00f8s f\u00f8lgende autorisationspr\u00f8ve fuldst\u00e6ndigt, opgave for opgave med fulde udregninger:\n\n' + (examText || '') };
+}
+
+// Read a small ai-config.json {endpoint, key, model} (click-only, no typing).
+function analyzerLoadAiConfig(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  var r = new FileReader();
+  r.onload = function (e) {
+    try {
+      var c = JSON.parse(e.target.result);
+      if (c && c.endpoint && c.key) {
+        localStorage.setItem('aiElectricianCfg', JSON.stringify({ endpoint: c.endpoint, key: c.key, model: c.model || 'gpt-4o' }));
+        analyzerState.notice = tx('Online AI tilsluttet \u2705', 'Online AI connected \u2705');
+      } else { analyzerState.notice = tx('Ugyldig config (mangler endpoint/key).', 'Invalid config (missing endpoint/key).'); }
+    } catch (err) { analyzerState.notice = tx('Kunne ikke l\u00e6se config-filen.', 'Could not read the config file.'); }
+    if (typeof renderModule === 'function') renderModule('analyzer');
+  };
+  r.readAsText(input.files[0]);
+}
+
+// Solve the loaded exam with the online AI (OpenAI-compatible endpoint).
+function analyzerSolveOnline() {
+  var cfg = {}; try { cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  if (!cfg.endpoint || !cfg.key) { analyzerState.notice = tx('Online AI er ikke tilsluttet. Upload en ai-config.json via "Tilslut AI".', 'Online AI is not connected. Upload an ai-config.json via "Connect AI".'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  if (!analyzerState.rawText) { analyzerState.notice = tx('Inds\u00e6t eller upload f\u00f8rst en opgave.', 'Paste or upload an exam first.'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  analyzerState.onlineBusy = true; analyzerState.onlineAnswer = null; analyzerState.notice = null;
+  if (typeof renderModule === 'function') renderModule('analyzer');
+  var p = analyzerBuildOnlinePrompt(analyzerState.rawText);
+  fetch(cfg.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model: cfg.model || 'gpt-4o', messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }], temperature: 0.1 })
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    analyzerState.onlineAnswer = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    analyzerState.onlineBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  }).catch(function (e) {
+    analyzerState.onlineAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
+    analyzerState.onlineBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  });
+}
+
 function renderAnalyzer() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('\uD83D\uDD0D Projektanalysator (Intelligent)', '\uD83D\uDD0D Project Analyzer (Intelligent)') + '</div>';
@@ -35694,7 +35750,24 @@ function renderAnalyzer() {
     html += '<div style="margin:8px 0"><button class="sel-btn" onclick="analyzerReset()">' + tx('\u21BA Nulstil', '\u21BA Reset') + '</button></div>';
   }
 
+  // Online AI (Calcia/Sigma-style projektering + lovopdatering). Click-only:
+  // configured by uploading a small ai-config.json (no typing -> guard unchanged).
+  var aiCfg = {}; try { aiCfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  var aiConnected = !!(aiCfg.endpoint && aiCfg.key);
+  html += '<div class="select-group" style="margin-top:10px"><div class="select-label">' + tx('Online AI \u2014 l\u00f8s hele s\u00e6ttet, projektering & lovopdatering', 'Online AI \u2014 solve whole set, projecting & law updates') + '</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  html += '<label class="sel-btn" style="cursor:pointer">' + (aiConnected ? '\u2705 ' : '\uD83D\uDD0C ') + tx('Tilslut AI', 'Connect AI') + '<input type="file" accept=".json,application/json" style="display:none" onchange="analyzerLoadAiConfig(this)"></label>';
+  html += '<button class="sel-btn' + (aiConnected ? ' selected' : '') + '"' + ((aiConnected && analyzerState.rawText && !analyzerState.onlineBusy) ? '' : ' disabled style="opacity:.5;pointer-events:none"') + ' onclick="analyzerSolveOnline()">' + (analyzerState.onlineBusy ? tx('\u23F3 L\u00f8ser online\u2026', '\u23F3 Solving online\u2026') : tx('\uD83C\uDF10 L\u00f8s med Online AI', '\uD83C\uDF10 Solve with Online AI')) + '</button>';
   html += '</div>';
+  html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">' + tx('Tilslut en OpenAI-kompatibel tjeneste via en lille ai-config.json (endpoint, key, model). Bruges n\u00e5r den lokale motor mangler data \u2014 og holder pris/lovgivning opdateret.', 'Connect an OpenAI-compatible service via a small ai-config.json (endpoint, key, model). Used when the local engine lacks data \u2014 and keeps pricing/legislation current.') + '</div></div>';
+
+  html += '</div>';
+
+  // Online AI answer (complete solution)
+  if (analyzerState.onlineAnswer) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning', 'Online AI \u2014 complete solution') + '</div>';
+    html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.onlineAnswer) + '</div></div>';
+  }
 
   // Results section
   if (analyzerState.results.length > 0) {

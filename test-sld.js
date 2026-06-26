@@ -16274,7 +16274,23 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
-// === PDF extraction: real exam PDFs (incl. CID/ToUnicode fonts) ===
+// === Online AI analyzer path (Calcia/Sigma-style, law updates) ===
+test('analyzerBuildOnlinePrompt builds an expert Danish solver prompt incl. the exam text', function () {
+  var p = analyzerBuildOnlinePrompt('Opgave 1\n1.1 Beregn IB for 10 kW.');
+  assert(p.system.indexOf('DS/HD 60364') >= 0, 'cites the standard');
+  assert(/rektangul/.test(p.system) && /pol\u00e6r|pol/.test(p.system), 'requires both complex forms');
+  assert(/HELE/.test(p.system), 'instructs to solve the WHOLE set');
+  assert(/IB \u2264 In \u2264 Iz/.test(p.system), 'enforces the coordination safety check');
+  assert(/Sikkerhedsstyrelsen/.test(p.system), 'flags law verification (updates)');
+  assert(p.user.indexOf('1.1 Beregn IB for 10 kW') >= 0, 'user prompt carries the exam text');
+});
+
+test('analyzerLoadAiConfig + analyzerSolveOnline exist (online path wired)', function () {
+  assert.strictEqual(typeof analyzerLoadAiConfig, 'function', 'config loader present');
+  assert.strictEqual(typeof analyzerSolveOnline, 'function', 'online solver present');
+});
+
+
 test('analyzerExtractPdf reads real exam PDFs into readable Danish text', function () {
   var cases = [
     { f: '2023_01_El-autorisation_Godkendt.pdf', needle: /autorisation/i },
