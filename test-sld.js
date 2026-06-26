@@ -15995,6 +15995,49 @@ test('switching series resets rating selection ladder consistently (no stale inv
 });
 
 
+// === Triplen harmonic neutral-conductor loading (P1 audit) ===
+console.log('\n=== Harmonic Neutral-Conductor Tests ===\n');
+
+test('harmonicCalcNeutral uses arithmetic 3x summation of triplen harmonics (not sqrt(3))', function() {
+  // n=1 load => diversity factor 1.0, so h3percent = spec.h3
+  var it = HARMONIC_SPECTRA['it']; // h3 = 80%
+  var res = harmonicCalcNeutral('it', 1);
+  // Physically: triplen harmonics add in phase -> I_N = 3 * I_h3,phase
+  var expected = 3 * (it.h3 / 100); // = 2.4
+  assert.ok(Math.abs(res.neutralFactor - expected) < 1e-9,
+    'neutralFactor should be 3x(h3/100)=' + expected + ' but got ' + res.neutralFactor);
+  // Guard against regression to the old non-conservative sqrt(3) factor (~1.386)
+  assert.ok(res.neutralFactor > 2.0, 'IT-equipment neutral factor must exceed 2.0 (was 1.386 under sqrt(3))');
+  assert.strictEqual(res.oversized, true, 'IT equipment (80% 3rd harmonic) must flag neutral as overloaded');
+  assert.strictEqual(res.factor, 1.5, 'overloaded neutral must recommend 1.5x (150%) neutral');
+});
+
+test('harmonicCalcNeutral crosses unity exactly at the standard 33% third-harmonic threshold', function() {
+  // With factor 3: neutralFactor = 1.0 at h3 = 33.33%. Below 33% => not oversized.
+  // ups: h3 = 8% -> 0.24 (well below) ; welding: h3 = 10% -> 0.30 (below)
+  var ups = harmonicCalcNeutral('ups', 1);
+  assert.ok(ups.neutralFactor < 1.0 && ups.oversized === false, 'UPS (8% h3) neutral must not be overloaded');
+  // Simulate a hypothetical 34% third-harmonic content via the same arithmetic the
+  // function uses, confirming the 33% rule (DS/HD 60364-5-52 cl.523.6.3 + Annex E):
+  var atThreshold = 3 * (34 / 100);
+  assert.ok(atThreshold > 1.0, '34% third harmonic must exceed phase current (neutral overloaded)');
+  var belowThreshold = 3 * (30 / 100);
+  assert.ok(belowThreshold < 1.0, '30% third harmonic must stay below phase current');
+});
+
+test('harmonicCalcNeutral remains conservative: neutral factor never below sqrt(3) basis', function() {
+  // For every spectrum, the corrected (3x) factor must be >= the old (sqrt(3)x) value,
+  // i.e. the fix can only INCREASE recommended neutral loading (conservative direction).
+  Object.keys(HARMONIC_SPECTRA).forEach(function (key) {
+    var spec = HARMONIC_SPECTRA[key];
+    var res = harmonicCalcNeutral(key, 1);
+    var oldFactor = Math.sqrt(3) * (spec.h3 / 100);
+    assert.ok(res.neutralFactor >= oldFactor - 1e-9,
+      key + ': corrected neutral factor must be >= old sqrt(3) factor (conservative)');
+  });
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

@@ -20061,11 +20061,19 @@ function harmonicCalcNeutral(loadType, numLoads) {
   var spec = HARMONIC_SPECTRA[loadType];
   if (!spec) return { factor: 1.0, oversized: false, clause: 'DS/HD 60364-5-52 cl.523.6.3' };
   var df = harmonicDiversityFactor(numLoads);
-  // 3rd harmonic in 3-phase adds in neutral (triplen harmonics)
+  // Triplen harmonics (3rd, 9th, 15th...) are zero-sequence: they are in phase in
+  // all three line conductors and ADD ARITHMETICALLY in the neutral. For a balanced
+  // 3-phase load the neutral therefore carries I_N = 3 x I_h3,phase. Expressed
+  // relative to the fundamental phase current, neutralFactor = 3 x (h3/100).
+  // This is the physical basis of the DS/HD 60364-5-52 cl.523.6.3 / Annex E rule
+  // that the neutral exceeds the phase current once the 3rd-harmonic content
+  // exceeds 33 % (3 x 0,333 = 1,0). The previous sqrt(3) factor only crossed unity
+  // at 57,7 %, which under-stated the neutral loading (non-conservative) and
+  // contradicted the standard's 33 % threshold. Source: ELEKTROTEKNIK bog 8
+  // "tredje harmoniske strommer, der summeres i nullederen" (chunk lines
+  // 12350-12352, 13214-13215); DS/HD 60364-5-52 cl.523.6.3 + Annex E.
   var h3percent = spec.h3 * df;
-  // Neutral current factor: sqrt(3) * (h3/100) relative to phase current for balanced 3-phase
-  // If h3 > 33%, neutral carries more than phase current
-  var neutralFactor = Math.sqrt(3) * (h3percent / 100);
+  var neutralFactor = 3 * (h3percent / 100);
   // But minimum is 1.0 (neutral cannot be smaller than phase)
   var factor = Math.max(1.0, Math.ceil(neutralFactor * 100) / 100);
   // If factor > 1.0, recommend 150% neutral (next standard size up)
@@ -20076,7 +20084,7 @@ function harmonicCalcNeutral(loadType, numLoads) {
     h3percent: h3percent,
     neutralFactor: neutralFactor,
     oversized: oversized,
-    clause: 'DS/HD 60364-5-52 cl.523.6.3'
+    clause: 'DS/HD 60364-5-52 cl.523.6.3 + Annex E'
   };
 }
 
