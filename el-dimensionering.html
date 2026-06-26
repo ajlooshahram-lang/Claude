@@ -34995,6 +34995,8 @@ function analyzerRun(text) {
     if (d.deviceIn && d.deviceCurve) { mcbState.curve = d.deviceCurve; mcbState.rating = d.deviceIn; }
     if (d.trafoKVA) trafoState.size = d.trafoKVA;
     if (d.trafoUk) trafoState.scUkPct = d.trafoUk;
+    if (d.trafoUk) scState.trafoUk = d.trafoUk;            // link analyzer -> short-circuit module
+    if (d.cosPhiK) scState.cosPhiNet = d.cosPhiK;          // network angle (cos phi_k)
     if (d.frequency) { impedansState.f = d.frequency; trefaseState.f = d.frequency; motorteoriState.f = d.frequency; }
     if (d.earthSystem) {
       var eMap = {'TN-S':'tns','TN-C':'tnc','TN-C-S':'tncs','TT':'tt','IT':'it1'};
