@@ -16274,7 +16274,24 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
-// === Forsyning: cable protection by relay (Viggo 2018-08, ref. Elektroteknik bog 5) ===
+// === Product recommendation: the CHOSEN product is highlighted ===
+test('renderRecommendations highlights the chosen product and labels the alternatives', function () {
+  var savedLang = lang; lang = 'da';
+  var fuses = recommendFuses(50);
+  assert(fuses.length >= 2, 'has a chosen + alternatives');
+  var out = renderRecommendations('Sikringer', fuses, 'fuse');
+  assert(out.indexOf('VALGT') >= 0, 'chosen product carries a VALGT/CHOSEN badge');
+  assert(out.indexOf('border:2px solid var(--success)') >= 0, 'chosen row has the highlight border');
+  assert(out.indexOf('alternativ') >= 0, 'the other products are labelled as alternatives');
+  // exactly one chosen badge
+  assert.strictEqual(out.split('VALGT').length - 1, 1, 'exactly one product is marked chosen');
+  // cables too
+  var cab = renderRecommendations('Kabler', recommendCables(30, 'copper'), 'cable');
+  assert(cab.indexOf('VALGT') >= 0, 'cable recommendation also highlights the chosen one');
+  lang = savedLang;
+});
+
+
 test('Cable overload protection: corrected Iz vs protection current (Viggo: 371 A > 300 A)', function () {
   var Izc = 515 * 0.90 * 0.80; // 240 mm2 -> 515 A; 35C -> 0.90; 2 circuits -> 0.80
   assert(Math.abs(Izc - 371) < 0.5, 'corrected Iz = 371 A (got ' + Izc.toFixed(1) + ')');

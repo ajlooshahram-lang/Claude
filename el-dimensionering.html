@@ -3791,12 +3791,14 @@ function renderRecommendations(title, products, type) {
   const typeToCat = { cable:'cables', mcb:'mcbs', mccb:'mccbs', fuse:'fuses', contactor:'contactors', rcd:'rcds', mpcb:'mpcbs', relay:'overloadRelays' };
   const cat = typeToCat[type] || type;
 
-  const rowWrap = (p, mainLabel, valueText, sub) => `
-    <div class="result-row" style="align-items:center;gap:12px">
+  const rowWrap = (p, mainLabel, valueText, sub, isChosen) => `
+    <div class="result-row" style="align-items:center;gap:12px;${isChosen ? 'background:var(--success-bg);border:2px solid var(--success);border-radius:8px;padding:8px;margin:4px 0' : 'opacity:0.7'}">
       ${getComponentVisual(cat, p)}
       <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-        <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
-          <span class="label">${mainLabel}</span>
+        <div style="display:flex;justify-content:space-between;width:100%;gap:8px;align-items:center">
+          <span class="label">${isChosen
+            ? '<span style="display:inline-block;background:var(--success);color:#fff;font-size:0.64rem;font-weight:800;letter-spacing:.04em;padding:1px 7px;border-radius:10px;margin-right:7px">\u2705 ' + tx('VALGT', 'CHOSEN') + '</span>'
+            : '<span style="display:inline-block;font-size:0.66rem;color:var(--text-muted);border:1px solid var(--border);padding:0 6px;border-radius:10px;margin-right:7px">' + tx('alternativ', 'alternative') + '</span>'}${mainLabel}</span>
           <span class="value">${valueText}</span>
         </div>
         ${sub ? `<span style="font-size:0.75rem;color:var(--text-muted)">${sub}</span>` : ''}
@@ -3805,21 +3807,21 @@ function renderRecommendations(title, products, type) {
 
   let rows = '';
   if (type === 'cable') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${tl(p, 'use')} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${tl(p, 'use')} | R=${p.r} X=${p.x} \u03A9/km`, i === 0)).join('');
   } else if (type === 'mcb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `I<sub>cu</sub> = ${p.icu} kA`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `I<sub>cu</sub> = ${p.icu} kA`, '', i === 0)).join('');
   } else if (type === 'mccb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `I<sub>cu</sub> = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `I<sub>cu</sub> = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`, i === 0)).join('');
   } else if (type === 'fuse') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`, i === 0)).join('');
   } else if (type === 'contactor') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `AC-3: ${p.ac3_A} A`, `${p.ac3_kW} kW`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `AC-3: ${p.ac3_A} A`, `${p.ac3_kW} kW`, i === 0)).join('');
   } else if (type === 'rcd') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A`, `${p.sensitivity} mA`, `Type ${p.rcdType}`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A`, `${p.sensitivity} mA`, `Type ${p.rcdType}`, i === 0)).join('');
   } else if (type === 'mpcb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, `${p.kW} kW`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, `${p.kW} kW`, i === 0)).join('');
   } else if (type === 'relay') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, '', i === 0)).join('');
   }
 
   // Engineering reasoning panel (VB methodology) — shows WHY these are recommended
