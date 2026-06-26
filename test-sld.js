@@ -15362,11 +15362,31 @@ test('relay: relayLineSettings reproduces Elektroteknik Bind 6 Eksempel 7.4.5.1 
 
 test('relay: relayLineSettings is conservative — fast trip set below the minimum fault', function () {
   var r = relayLineSettings(400, 2000, 800);
-  // The fast-trip primary pickup must be strictly below Ik2F,min so it reliably operates.
   assert.ok(r.iGgPrimary < 2000, 'I>> primary (' + r.iGgPrimary + ') < Ik2F,min (2000) — reliable tripping');
-  // CT must carry at least 1.2x the load.
   var ctPrimaryNum = parseInt(r.ctRatio, 10);
   assert.ok(ctPrimaryNum >= 400 * 1.2, 'CT primary >= 1.2*Iload');
+});
+
+test('relay: cableShortTimeWithstand reproduces Eksempel 7.4.3.1 (4.7 kA, t=0.5s -> 6.65 kA)', function () {
+  // 50 mm2 PEX-M-AL: IK1s_phase = 4.7 kA, t = 0.5 s. Withstand = 4.7/sqrt(0.5) = 6.65 kA.
+  // Textbook rounds to 6.7 kA; actual fault Ik3F = 5.8 kA < withstand -> OK.
+  var cw = cableShortTimeWithstand(4.7, 3.0, 5.8, 2.0, 0.5, false);
+  assert.ok(Math.abs(cw.phaseWithstand - 4.7 / Math.sqrt(0.5)) < 0.01, 'phase withstand = IK1s/sqrt(t) = 6.65 kA. Got ' + cw.phaseWithstand);
+  assert.ok(cw.phaseOk === true, 'Ik3F 5.8 kA <= 6.65 kA -> phase OK');
+  assert.ok(Math.abs(cw.screenReq - 2.0 * Math.sqrt(0.5)) < 0.01, 'screen requirement = Ik2F*sqrt(t)');
+});
+
+test('relay: cable screen check uses DOUBLE time with fast auto-reclose (conservative)', function () {
+  var noRec = cableShortTimeWithstand(4.7, 3.0, 5.8, 2.0, 0.5, false);
+  var rec = cableShortTimeWithstand(4.7, 3.0, 5.8, 2.0, 0.5, true);
+  assert.ok(rec.tScreen === 2 * noRec.tScreen, 'reclose doubles the screen time basis');
+  assert.ok(rec.screenReq > noRec.screenReq, 'reclose increases the required screen 1s current (harder, conservative)');
+});
+
+test('relay: cableShortTimeWithstand flags an under-rated screen', function () {
+  // Big 2-phase fault, weak screen -> must fail the screen check.
+  var cw = cableShortTimeWithstand(10, 1.5, 6, 5, 1.0, true); // screen 1.5 kA, needs 5*sqrt(2)=7.07
+  assert.ok(cw.screenOk === false, 'weak screen (1.5 kA) < required (7.07 kA) -> fail');
 });
 
 // ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====

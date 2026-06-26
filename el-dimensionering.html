@@ -30328,7 +30328,14 @@ var relayState = {
   // Line/feeder relay (Eksempel 7.4.5.1)
   lineIload: 310,
   lineIk2fMin: 1500,
-  lineBusTime: 1000
+  lineBusTime: 1000,
+  // Cable short-time thermal withstand (Eksempel 7.4.3.1)
+  cblIk1sPhase: 4.7,
+  cblIk1sScreen: 3.0,
+  cblIk3f: 5.8,
+  cblIk2f: 2.0,
+  cblTime: 0.5,
+  cblReclose: false
 };
 
 var RELAY_TRAFO_PRESETS = [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
@@ -30382,6 +30389,30 @@ function relayCheckFuseCoordination(fuseKey, I1N) {
   var fuse = RELAY_HV_FUSES[fuseKey];
   if (!fuse) return { ok: false, reason: 'Unknown fuse' };
   return { ok: fuse.rating >= I1N, fuseRating: fuse.rating, I1N: I1N, Imin: fuse.Imin, Imax: fuse.Imax };
+}
+
+// HV PEX cable short-time thermal withstand — Elektroteknik Bind 6, Eksempel 7.4.3.1.
+// The manufacturer tabulates a 1-second short-circuit current IK1s (phase & screen).
+// Adiabatically I²·t = const, so the current the conductor tolerates for a clearing
+// time t is IK1s/√t. Checks:
+//   phase  : the worst 3-phase fault Ik3F must satisfy  Ik3F ≤ IK1s_phase/√t
+//   screen : the worst 2-phase fault Ik2F needs a 1-second screen rating
+//            IK1s_screen ≥ Ik2F·√t  (use 2·t when fast auto-reclose on earth fault).
+// All currents in kA, time in seconds.
+function cableShortTimeWithstand(ik1sPhase, ik1sScreen, ik3f, ik2f, t_s, reclose) {
+  var t = (t_s > 0) ? t_s : 0.0001;
+  var tScreen = reclose ? 2 * t : t;
+  var phaseWithstand = ik1sPhase / Math.sqrt(t);
+  var screenReq = ik2f * Math.sqrt(tScreen);
+  return {
+    t: t, tScreen: tScreen,
+    phaseWithstand: Math.round(phaseWithstand * 100) / 100,
+    phaseOk: (ik3f <= phaseWithstand + 1e-9),
+    screenReq: Math.round(screenReq * 100) / 100,
+    screenOk: (ik1sScreen >= screenReq - 1e-9),
+    reclose: !!reclose,
+    clause: 'Elektroteknik Bind 6 Eksempel 7.4.3.1 \u00b7 IEC 60949 \u00b7 DS/HD 60364-4-43'
+  };
 }
 
 // Standard CT primary ratings (X/5 A), IEC 61869-2 preferred values.
@@ -30596,6 +30627,54 @@ function renderRelay() {
   html += '<div class="result-row"><span class="label">I&gt;&gt; (' + tx('hurtigudl&oslash;ser', 'fast trip') + ')</span><span class="value">' + ls.iGg.toFixed(2).replace('.', ',') + ' &times; I<sub>n</sub> (' + ls.iGgPrimary + ' A)</span></div>';
   html += '<div class="result-row"><span class="label">t&gt;&gt;</span><span class="value">' + ls.tGg + ' ms</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + ls.clause + '</span></div>';
+  html += '</div></div>';
+
+  // ===== HV CABLE SHORT-TIME THERMAL WITHSTAND (PEX, IK1s) — Eksempel 7.4.3.1 =====
+  var cw = cableShortTimeWithstand(relayState.cblIk1sPhase, relayState.cblIk1sScreen, relayState.cblIk3f, relayState.cblIk2f, relayState.cblTime, relayState.cblReclose);
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Kabel-korttidsholdbarhed (PEX, I<sub>K1s</sub>)', 'Cable short-time withstand (XLPE, I<sub>K1s</sub>)') + '</div>';
+  html += '<div class="info-row">' + tx('Adiabatisk fra fabrikantens 1-sekund str&oslash;m: lederen t&aring;ler I<sub>K1s</sub>/&radic;t i tiden t. Faseleder: I<sub>k3F</sub> &le; I<sub>K1s</sub>/&radic;t. Sk&aelig;rm: I<sub>K1s,sk&aelig;rm</sub> &ge; I<sub>k2F</sub>&middot;&radic;t (dobbelt tid ved hurtig genindkobling).', 'Adiabatic from the manufacturer 1-second current: the conductor tolerates I<sub>K1s</sub>/&radic;t for time t. Phase: I<sub>k3F</sub> &le; I<sub>K1s</sub>/&radic;t. Screen: I<sub>K1s,screen</sub> &ge; I<sub>k2F</sub>&middot;&radic;t (double time with fast auto-reclose).') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Faseleder 1-sek str&oslash;m I<sub>K1s</sub> [kA]', 'Phase 1-second current I<sub>K1s</sub> [kA]') + '</div><div class="select-grid">';
+  [4.7, 7.1, 9.4, 14.2, 18.8, 23.5].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.cblIk1sPhase === v ? ' selected' : '') + '" onclick="relayState.cblIk1sPhase=' + v + ';renderModule(\'relay\')">' + String(v).replace('.', ',') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Sk&aelig;rm 1-sek str&oslash;m I<sub>K1s,sk&aelig;rm</sub> [kA]', 'Screen 1-second current I<sub>K1s,screen</sub> [kA]') + '</div><div class="select-grid">';
+  [1.5, 2.0, 3.0, 5.0, 7.0, 10.0].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.cblIk1sScreen === v ? ' selected' : '') + '" onclick="relayState.cblIk1sScreen=' + v + ';renderModule(\'relay\')">' + String(v).replace('.', ',') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Maks fejl I<sub>k3F</sub> [kA]', 'Max fault I<sub>k3F</sub> [kA]') + '</div><div class="select-grid">';
+  [3.0, 4.0, 5.8, 6.0, 8.0, 10.0].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.cblIk3f === v ? ' selected' : '') + '" onclick="relayState.cblIk3f=' + v + ';renderModule(\'relay\')">' + String(v).replace('.', ',') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Sk&aelig;rmfejl I<sub>k2F</sub> [kA]', 'Screen fault I<sub>k2F</sub> [kA]') + '</div><div class="select-grid">';
+  [1.0, 1.5, 2.0, 3.0, 4.0, 5.0].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.cblIk2f === v ? ' selected' : '') + '" onclick="relayState.cblIk2f=' + v + ';renderModule(\'relay\')">' + String(v).replace('.', ',') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Samlet udkoblingstid t [s]', 'Total clearing time t [s]') + '</div><div class="select-grid">';
+  [0.1, 0.2, 0.3, 0.4, 0.5, 1.0].forEach(function (v) {
+    html += '<button class="sel-btn' + (relayState.cblTime === v ? ' selected' : '') + '" onclick="relayState.cblTime=' + v + ';renderModule(\'relay\')">' + String(v).replace('.', ',') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Hurtig genindkobling ved jordfejl?', 'Fast auto-reclose on earth fault?') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (!relayState.cblReclose ? ' selected' : '') + '" onclick="relayState.cblReclose=false;renderModule(\'relay\')">' + tx('Nej', 'No') + '</button>';
+  html += '<button class="sel-btn' + (relayState.cblReclose ? ' selected' : '') + '" onclick="relayState.cblReclose=true;renderModule(\'relay\')">' + tx('Ja (2&times;t)', 'Yes (2&times;t)') + '</button>';
+  html += '</div></div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabel-resultat', 'Cable result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Faseleder t&aring;ler', 'Phase withstands') + '</span><span class="value">I<sub>K1s</sub>/&radic;t = ' + relayState.cblIk1sPhase.toFixed(1).replace('.', ',') + '/&radic;' + relayState.cblTime.toString().replace('.', ',') + ' = ' + cw.phaseWithstand.toFixed(2).replace('.', ',') + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>k3F</sub> &le; ' + cw.phaseWithstand.toFixed(2).replace('.', ',') + ' kA?</span><span class="value" style="color:' + (cw.phaseOk ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)') + ';font-weight:700">' + relayState.cblIk3f.toFixed(1).replace('.', ',') + ' kA &mdash; ' + (cw.phaseOk ? 'OK \u2713' : tx('FOR H&Oslash;J \u2717 (st&oslash;rre tv&aelig;rsnit/hurtigere udkobling)', 'TOO HIGH \u2717 (larger CSA / faster clearing)')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sk&aelig;rm kr&aelig;ver', 'Screen requires') + '</span><span class="value">I<sub>K1s,sk&aelig;rm</sub> &ge; I<sub>k2F</sub>&middot;&radic;' + (cw.tScreen).toString().replace('.', ',') + ' = ' + cw.screenReq.toFixed(2).replace('.', ',') + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sk&aelig;rm', 'Screen') + ' ' + relayState.cblIk1sScreen.toFixed(1).replace('.', ',') + ' kA &ge; ' + cw.screenReq.toFixed(2).replace('.', ',') + ' kA?</span><span class="value" style="color:' + (cw.screenOk ? 'var(--success,#16a34a)' : 'var(--danger,#dc2626)') + ';font-weight:700">' + (cw.screenOk ? 'OK \u2713' : tx('UTILSTR&AElig;KKELIG \u2717', 'INSUFFICIENT \u2717')) + '</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + cw.clause + '</span></div>';
   html += '</div></div>';
   return html;
 }
