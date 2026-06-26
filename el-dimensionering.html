@@ -29642,15 +29642,15 @@ function renderImpedans() {
   html += '<div class="result-title">' + tx('Reaktanser & Impedans', 'Reactances & Impedance') + '</div>';
   if (impedansState.components.indexOf('l') >= 0) {
     html += '<div class="result-row"><span class="label">' + mathml('X_L') + ' (' + tx('Induktiv reaktans', 'Inductive Reactance') + ')</span><span class="value">' + impedansFmtEng(res.XL, '\u03A9') + '</span></div>';
-    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('X_L = 2\u03C0fL = 2\u03C0\u00D7' + impedansState.f + '\u00D7' + impedansState.L + ' = ' + res.XL.toFixed(3) + ' \u03A9') + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('X_L = 2\u03C0fL = 2\u03C0\u00D7' + impedansFmtF(impedansState.f) + '\u00D7' + impedansFmtL(impedansState.L) + ' = ' + impedansFmtEng(res.XL, '\u03A9')) + '</span></div>';
   }
   if (impedansState.components.indexOf('c') >= 0) {
     html += '<div class="result-row"><span class="label">' + mathml('X_C') + ' (' + tx('Kapacitiv reaktans', 'Capacitive Reactance') + ')</span><span class="value">' + impedansFmtEng(res.XC, '\u03A9') + '</span></div>';
-    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('X_C = 1/(2\u03C0fC) = 1/(2\u03C0\u00D7' + impedansState.f + '\u00D7' + impedansState.C + ') = ' + res.XC.toFixed(3) + ' \u03A9') + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('X_C = 1/(2\u03C0fC) = 1/(2\u03C0\u00D7' + impedansFmtF(impedansState.f) + '\u00D7' + impedansFmtC(impedansState.C) + ') = ' + impedansFmtEng(res.XC, '\u03A9')) + '</span></div>';
   }
   html += '<div class="result-row"><span class="label">' + mathml('|Z|') + ' (' + tx('Total impedans', 'Total Impedance') + ')</span><span class="value" style="font-weight:700;font-size:1.1em">' + impedansFmtEng(res.Z, '\u03A9') + '</span></div>';
   if (impedansState.connection === 'series') {
-    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('|Z| = \u221A(R\u00B2 + (X_L\u2212X_C)\u00B2) = \u221A(' + (impedansState.components.indexOf('r') >= 0 ? impedansState.R : 0) + '\u00B2 + (' + res.XL.toFixed(2) + '\u2212' + res.XC.toFixed(2) + ')\u00B2) = ' + res.Z.toFixed(3) + ' \u03A9') + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('|Z| = \u221A(R\u00B2 + (X_L\u2212X_C)\u00B2) = \u221A(' + (impedansState.components.indexOf('r') >= 0 ? impedansState.R : 0) + '\u00B2 + (' + impedansFmtEng(res.XL, '') + '\u2212' + impedansFmtEng(res.XC, '') + ')\u00B2) = ' + impedansFmtEng(res.Z, '\u03A9')) + '</span></div>';
   } else {
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + mathml('Y = \u221A(G\u00B2 + (B_L\u2212B_C)\u00B2), Z = 1/Y = ' + res.Z.toFixed(3) + ' \u03A9') + '</span></div>';
   }
@@ -29681,13 +29681,13 @@ function renderImpedans() {
     html += '<div class="result-box">';
     html += '<div class="result-title">' + tx('Resonans & Q-faktor', 'Resonance & Quality Factor') + '</div>';
     html += '<div class="result-row"><span class="label">f<sub>0</sub> (' + tx('Resonansfrekvens', 'Resonance Frequency') + ')</span><span class="value">' + impedansFmtF(res.f0) + '</span></div>';
-    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">f<sub>0</sub> = 1/(2\u03C0\u221A(LC)) = 1/(2\u03C0\u221A(' + impedansState.L + '\u00D7' + impedansState.C + ')) = ' + res.f0.toFixed(2) + ' Hz</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">f<sub>0</sub> = 1/(2\u03C0\u221A(LC)) = 1/(2\u03C0\u221A(' + impedansFmtL(impedansState.L) + '\u00D7' + impedansFmtC(impedansState.C) + ')) = ' + impedansFmtF(res.f0) + '</span></div>';
     if (impedansState.components.indexOf('r') >= 0) {
       html += '<div class="result-row"><span class="label">Q (' + tx('Kvalitetsfaktor', 'Quality Factor') + ')</span><span class="value">' + res.Qfactor.toFixed(3) + '</span></div>';
       if (impedansState.connection === 'series') {
-        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = (1/R)\u221A(L/C) = (1/' + impedansState.R + ')\u221A(' + impedansState.L + '/' + impedansState.C + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
+        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = (1/R)\u221A(L/C) = (1/' + impedansState.R + ')\u221A(' + impedansFmtL(impedansState.L) + '/' + impedansFmtC(impedansState.C) + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
       } else {
-        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = R\u221A(C/L) = ' + impedansState.R + '\u221A(' + impedansState.C + '/' + impedansState.L + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
+        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = R\u221A(C/L) = ' + impedansState.R + '\u221A(' + impedansFmtC(impedansState.C) + '/' + impedansFmtL(impedansState.L) + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
       }
     }
     // Distance from resonance
@@ -29702,11 +29702,11 @@ function renderImpedans() {
     html += '<div class="result-title">' + tx('Tidskonstanter', 'Time Constants') + '</div>';
     if (res.tauL > 0) {
       html += '<div class="result-row"><span class="label">\u03C4<sub>L</sub> (' + tx('Induktiv tidskonstant', 'Inductive time constant') + ')</span><span class="value">' + impedansFmtEng(res.tauL, 's') + '</span></div>';
-      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = L/R = ' + impedansState.L + '/' + impedansState.R + ' = ' + res.tauL.toFixed(6) + ' s</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = L/R = ' + impedansFmtL(impedansState.L) + '/' + impedansState.R + ' \u03A9 = ' + impedansFmtEng(res.tauL, 's') + '</span></div>';
     }
     if (res.tauRC > 0) {
       html += '<div class="result-row"><span class="label">\u03C4<sub>RC</sub> (' + tx('Kapacitiv tidskonstant', 'Capacitive time constant') + ')</span><span class="value">' + impedansFmtEng(res.tauRC, 's') + '</span></div>';
-      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = R\u00D7C = ' + impedansState.R + '\u00D7' + impedansState.C + ' = ' + res.tauRC.toFixed(6) + ' s</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = R\u00D7C = ' + impedansState.R + ' \u03A9\u00D7' + impedansFmtC(impedansState.C) + ' = ' + impedansFmtEng(res.tauRC, 's') + '</span></div>';
     }
     html += '</div>';
   }
@@ -29724,7 +29724,7 @@ function renderImpedans() {
   var _sinPhi = Math.sin(res.phi);
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Enfaset AC-effekt & st\u00F8rrelser (Kap. 6)', 'Single-phase AC power & quantities (Ch. 6)') + '</div>';
-  html += calcDetail({ name: tx('Vinkelfrekvens', 'Angular frequency'), formula: '\u03C9 = 2\u00B7\u03C0\u00B7f', variables: [{ name: tx('Frekvens', 'Frequency'), symbol: 'f', value: impedansState.f, unit: 'Hz' }], substitution: '2\u00B7\u03C0\u00B7' + impedansState.f, result: { value: acOmega(impedansState.f), unit: 'rad/s' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Vinkelfrekvens', 'Angular frequency'), formula: '\u03C9 = 2\u00B7\u03C0\u00B7f', variables: [{ name: tx('Frekvens', 'Frequency'), symbol: 'f', value: impedansState.f, unit: 'Hz' }], substitution: '2\u00B7\u03C0\u00B7' + impedansFmtF(impedansState.f), result: { value: acOmega(impedansState.f), unit: 'rad/s' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
   html += calcDetail({ name: tx('RMS-sp\u00E6nding', 'RMS voltage'), formula: 'U_rms = U_max/\u221A2', variables: [{ name: tx('Spidssp\u00E6nding', 'Peak voltage'), symbol: 'U_max', value: _Umax, unit: 'V' }], substitution: _Umax.toFixed(2) + '/\u221A2', result: { value: impedansState.U, unit: 'V' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
   html += calcDetail({ name: tx('Middelsp\u00E6nding', 'Average voltage'), formula: 'U_avg = 2\u00B7U_max/\u03C0', variables: [{ name: tx('Spidssp\u00E6nding', 'Peak voltage'), symbol: 'U_max', value: _Umax, unit: 'V' }], substitution: '2\u00B7' + _Umax.toFixed(2) + '/\u03C0', result: { value: acAvgFromPeak(_Umax), unit: 'V' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
   html += calcDetail({ name: tx('Aktiv effekt', 'Active power'), formula: 'P = U\u00B7I\u00B7cos\u03C6', variables: [{ name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: impedansState.U, unit: 'V' }, { name: tx('Str\u00F8m', 'Current'), symbol: 'I', value: res.I, unit: 'A' }, { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: res.cosPhi, unit: '' }], substitution: impedansState.U + '\u00B7' + res.I.toFixed(4) + '\u00B7' + res.cosPhi.toFixed(4), result: { value: res.P, unit: 'W' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
