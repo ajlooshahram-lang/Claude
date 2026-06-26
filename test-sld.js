@@ -15453,6 +15453,38 @@ test('exam: 2023 Auto exam — Z_T formula (630kVA, ek=4%, Pcu=4600W, 420V) = 11
   assert.ok(Math.abs(cx.phiTdeg - 79.5) < 0.2, 'phi_T = 79.5 deg. Got ' + cx.phiTdeg);
 });
 
+// ===== END-TO-END FIXTURE: Viggo Auto 2023-01 forsyning chain =====
+// Validates the COMPLETE forsyning calculation chain against the published
+// solution: network Z (from Ik), HV cable referred to LV via /n², transformer
+// Z_T, vector sum, prospective Ik3F,min, and the HV-referred fault current.
+// Tolerances allow for the exam's rounded intermediate polar values (~1%).
+test('exam: 2023 Auto exam FULL CHAIN — Ik3F,min ≈ 17.7 kA, IK\u2032FN ≈ 410 A', function () {
+  var Un = 10000, Uf = 230, n = 25;
+  // 1) Network impedance for the MIN fault (max Z): Ik,min=6820 A, R/X=0.15.
+  var ZnetMag = Un / (Math.sqrt(3) * 6820);          // 0.847 Ω
+  var net = scComplexParts(ZnetMag * 1000, 0.15);    // mΩ, arccot(0.15)
+  assert.ok(Math.abs(ZnetMag - 0.847) < 0.01, '|Z_net,max| = 0.85 Ω (exam). Got ' + ZnetMag.toFixed(3));
+  assert.ok(Math.abs(net.phiDeg - 81.5) < 0.2, 'φ_net = arccot(0.15) = 81.5°. Got ' + net.phiDeg.toFixed(1));
+  // 2) HV cable 1.389 km of 3x150 PEX-M-AL: r=0.206, x=0.093 Ω/km.
+  var Zc_re = 1.389 * 0.206 * 1000, Zc_im = 1.389 * 0.093 * 1000; // mΩ on HV
+  // 3) Refer network+cable to LV by /n².
+  var lv_re = (net.R + Zc_re) / (n * n), lv_im = (net.X + Zc_im) / (n * n);
+  // 4) Transformer Z_T from the app helper (referred to the 420 V no-load secondary,
+  //    as the exam does → 11.2 mΩ; using 400 V nominal would give 10.16 mΩ).
+  var cx = axIkComplexTrafo(630, 4, 4600, 420, 1.0, 500, 0.1);
+  assert.ok(Math.abs(cx.Zt - 11.2) < 0.1, 'Z_T = 11.2 mΩ at 420 V. Got ' + cx.Zt);
+  var Zt_re = cx.Zt * Math.cos(cx.phiTdeg * Math.PI / 180);
+  var Zt_im = cx.Zt * Math.sin(cx.phiTdeg * Math.PI / 180);
+  // 5) Vector sum + prospective fault current.
+  var Rtot = lv_re + Zt_re, Xtot = lv_im + Zt_im;
+  var Ztot = Math.sqrt(Rtot * Rtot + Xtot * Xtot);
+  var Ik3Fmin = Uf / (Ztot / 1000);
+  assert.ok(Math.abs(Ik3Fmin / 1000 - 17.73) < 0.3, 'Ik3F,min ≈ 17.7 kA (exam 17.73). Got ' + (Ik3Fmin / 1000).toFixed(2));
+  // 6) HV-referred fault current IK′FN = Ik3F,min / (√3 · n).
+  var IKfn = Ik3Fmin / (Math.sqrt(3) * n);
+  assert.ok(Math.abs(IKfn - 409.5) < 8, 'IK′FN,min ≈ 410 A (exam 409.5). Got ' + IKfn.toFixed(1));
+});
+
 test('exam: 2023 Auto exam — network Z from Ik uses atan(1/(R/X)) = 84.3° for R/X=0.1', function () {
   var Zn = 10000 / (Math.sqrt(3) * 7120);
   var phi = Math.atan(1 / 0.1) * 180 / Math.PI;
