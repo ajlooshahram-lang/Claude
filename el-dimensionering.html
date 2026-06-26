@@ -34165,6 +34165,17 @@ function analyzerExtract(text) {
   // Earth-electrode resistance R_E if stated: "jordingsmodstand 2 ohm", "R_E = 1,5 ohm"
   var reMatch = text.match(/(?:jordingsmodstand|jordmodstand|R_?E)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:ohm|\u03a9)/i);
   if (reMatch) { data.RE_ohm = parseFloat(reMatch[1].replace(',', '.')); data.confidence.RE_ohm = 'medium'; }
+  // HV cable phase+screen cross-section: "3x240+35 mm2" -> phase 240, screen 35
+  var hvCableMatch = text.match(/(\d)\s*[x\u00d7]\s*(\d+)\s*\+\s*(\d+)\s*mm/i);
+  if (hvCableMatch) { data.cablePhaseMm2 = parseFloat(hvCableMatch[2]); data.cableScreenMm2 = parseFloat(hvCableMatch[3]); data.confidence.cablePhaseMm2 = 'high'; }
+  // Relay clearing time: t> setting + breaker time. "t> = 0,5 s" + "brydetid 0,1 s"
+  var tgtMatch = text.match(/t\s*>\s*[:=]?\s*(\d+[.,]?\d*)\s*s/i);
+  var tbrMatch = text.match(/(?:brydetid|bryde-?tid|afbrydertid)[^.\n]{0,15}?(\d+[.,]?\d*)\s*s/i);
+  if (tgtMatch) { data.relayTgt = parseFloat(tgtMatch[1].replace(',', '.')); data.confidence.relayTgt = 'high'; }
+  if (tbrMatch) { data.breakerTime = parseFloat(tbrMatch[1].replace(',', '.')); }
+  // Stated cable ampacity ("240 mm2 ~ 515 A" / "Iz = 515 A")
+  var izStated = text.match(/(?:Iz|str.mv.rdi|bel.stbarhed)[^.\n]{0,12}?(\d{2,4})\s*A/i);
+  if (izStated) { data.cableIzStated = parseFloat(izStated[1]); }
 
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
@@ -34193,6 +34204,7 @@ function analyzerDetectQuestions(text) {
     { re: /Ik(?:3|,?max)?.{0,40}(?:transformere?\s+parallelt|parallelt|lavsp.ndingssiden)|(?:to|tre|\d+)\s+transformere\s+parallelt/i, type: 'ik_par', label: 'Ik (parallelle transformere)', module: 'scircuit' },
     { re: /(?:beregn|bestem|find|dimensioner)[^.\n]{0,40}slukkespole|mindste\s+ideelle\s+slukkespole/i, type: 'petersen', label: 'Slukkespole (L)', module: 'scircuit' },
     { re: /(?:beregn|bestem|find)[^.\n]{0,40}(?:kapacitiv|jordfejlstr|jordslutningsstr|ladestr)/i, type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', module: 'scircuit' },
+    { re: /(?:kontroller|unders.g|er)[^.\n]{0,50}(?:kabl|leder|stikled)[^.\n]{0,40}(?:overbelastnings|kortslutnings)beskytt|fase-?\s*og\s*sk.rmleder/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
     { re: /(?:beregn|bestem|find|kontroller)[^.\n]{0,40}(?:potentialestigning|ber.ringssp|jordingsmodstand|jordmodstand)|potentialestigning/i, type: 'potential', label: 'Potentialestigning / R_E', module: 'scircuit' },
     // === TRANSFORMER (Bind 3 + 5) ===
     { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning', module: 'trafo' },
@@ -34493,6 +34505,32 @@ function analyzerSolve(data) {
       solved++;
     } else if (hasQuestion(data, 'potential')) { flagged.push('Potentialestigning: mangler I_E (jordfejlstr\u00f8m)'); }
     if (hasQuestion(data, 'potential')) total++;
+
+    // (f) Cable protection by relay: overload (Iz>=Iprot) + short-circuit adiabatic
+    //     (phase + screen). k from the cable datasheet (bog 5); when unknown we use
+    //     the conservative IEC 60364-4-43 Table 43A values (lower k => stricter check).
+    if (hasQuestion(data, 'cable_prot') && (data.cablePhaseMm2 || data.cableIzStated)) {
+      var tClear = (data.relayTgt || 0.5) + (data.breakerTime || 0.1);
+      var hcp = '<div class="result-box"><div class="result-title">\u26A1 Kabelbeskyttelse via rel\u00e6 (t = ' + nf(tClear, 2) + ' s)</div>';
+      // Overload
+      if (data.cableIzStated) {
+        var ov = forsyningCableOverload(data.cableIzStated, data.deviceIn || data.cableIzStated);
+        hcp += row('Overlast', 'Iz = ' + nf(data.cableIzStated, 0) + ' A ' + (ov.ok ? '\u2265' : '<') + ' I_beskyt \u2014 ' + (ov.ok ? '\u2705 beskyttet' : '\u26d4 ikke beskyttet'));
+      }
+      // Short-circuit (needs network Ik)
+      if (data.cablePhaseMm2 && zNetHV) {
+        var skc = forsyningNetworkSk(zNetHV.r, zNetHV.x, UnHV, cF);
+        var IkPh = skc.Ik, IkScr = skc.Ik * Math.sqrt(3) / 2; // screen sees the 2-phase fault
+        var kPh = 94, kScr = 143; // Al/XLPE phase, Cu screen (conservative IEC 60364 Table 43A)
+        var sc = forsyningCableScProtection(data.cablePhaseMm2, kPh, IkPh, data.cableScreenMm2, kScr, IkScr, tClear);
+        hcp += row('Fase (' + data.cablePhaseMm2 + ' mm\u00b2, k=' + kPh + ')', 'I_perm = ' + nf(sc.phase.Iperm / 1000, 1) + ' kA ' + (sc.phase.ok ? '\u2265' : '<') + ' I_k = ' + nf(IkPh / 1000, 2) + ' kA \u2014 ' + (sc.phase.ok ? '\u2705' : '\u26d4'));
+        if (sc.screen) hcp += row('Sk\u00e6rm (' + data.cableScreenMm2 + ' mm\u00b2, k=' + kScr + ')', 'I_perm = ' + nf(sc.screen.Iperm / 1000, 1) + ' kA ' + (sc.screen.ok ? '\u2265' : '<') + ' I_k2 = ' + nf(IkScr / 1000, 2) + ' kA \u2014 ' + (sc.screen.ok ? '\u2705' : '\u26d4'));
+      }
+      hcp += '<div class="info-row" style="font-size:0.76rem">Overlast: korrigeret Iz \u2265 beskyttelsesstr\u00f8m. Kortslutning (adiabatisk, DS/HD 60364-4-43): I_perm = k\u00b7S/\u221at \u2265 I_k for fase- OG sk\u00e6rmleder. k er konservativ (IEC 60364 tabel 43A) \u2014 brug kablets datablad (bog 5) for n\u00f8jagtig v\u00e6rdi.</div></div>';
+      results.push({ type: 'cable_prot', label: 'Kabelbeskyttelse', value: 'kontrolleret (t = ' + nf(tClear, 2) + ' s)', html: hcp, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'cable_prot')) { flagged.push('Kabelbeskyttelse: mangler kabeltv\u00e6rsnit / rel\u00e6tider / Skh'); }
+    if (hasQuestion(data, 'cable_prot')) total++;
   })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
