@@ -4716,7 +4716,13 @@ let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection
 // Voltage drop state
 let vdropState = { length: 50 };
 // Short circuit state
-let scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1 };
+let scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1, trafoAngleMode: 'rx', trafoUk: 4, trafoEr: 1 };
+// trafoAngleMode: 'rx'    = transformer angle from user-supplied R/X (arccot);
+//                 'viggo' = authorized Viggo Bisch method — derive the transformer
+//                 impedance angle from the nameplate short-circuit voltage u_k [%]
+//                 and resistive (copper-loss) voltage e_r [%]:
+//                   phi_trafo = arccos(e_r / u_k);  e_x = sqrt(u_k^2 - e_r^2)
+//                 (equivalent to R/X = e_r / e_x). u_k and e_r are nameplate data.
 // scMethod: 'scalar' = magnitude addition (default, |Zn|+|Zt|);
 //           'complex' = IEC 60909 vector addition. R/X ratios MUST be supplied by
 //           the user via click-selectors (never fabricated) — textbook El-7 method:
@@ -9634,7 +9640,7 @@ function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTo
     // Complex (IEC 60909 / El-7) vector method detail.
     return calcDetail({
       name: tx('Kortslutningsstr\u00F8m Ik (kompleks vektormetode)', 'Short-circuit current Ik (complex vector method)'),
-      formula: '\u03C6 = arccot(R/X)\nR = |Z| \u00B7 cos\u03C6 ,  X = |Z| \u00B7 sin\u03C6\nZ\u0305_tot = \u03A3R + j\u03A3X\nIk3max = c \u00B7 Un / (\u221A3 \u00B7 |Z\u0305_tavle|)\nIk2min = 0.95 \u00B7 Un / (2 \u00B7 |Z\u0305_ende|)',
+      formula: '\u03C6_net = arccot(R/X) ,  \u03C6_trafo = arccot(R/X) ' + tx('eller', 'or') + ' arccos(e\u1d63/u\u2096)\nR = |Z| \u00B7 cos\u03C6 ,  X = |Z| \u00B7 sin\u03C6\nZ\u0305_tot = \u03A3R + j\u03A3X\nIk3max = c \u00B7 Un / (\u221A3 \u00B7 |Z\u0305_tavle|)\nIk2min = 0.95 \u00B7 Un / (2 \u00B7 |Z\u0305_ende|)',
       variables: [
         { name: tx('Net |Z|, R/X', 'Network |Z|, R/X'), symbol: 'Z\u0305n', value: cx.net.mag.toFixed(2) + ' m\u03A9, ' + cx.net.rx, unit: '', source: tx('bruger-angivet R/X', 'user-supplied R/X') },
         { name: tx('Trafo |Z|, R/X', 'Transformer |Z|, R/X'), symbol: 'Z\u0305t', value: cx.tr.mag.toFixed(2) + ' m\u03A9, ' + cx.tr.rx, unit: '', source: tx('bruger-angivet R/X', 'user-supplied R/X') },
@@ -9644,7 +9650,7 @@ function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTo
       substitution: 'Z\u0305_tavle = (' + cx.net.R.toFixed(2) + '+' + cx.tr.R.toFixed(2) + ') + j(' + cx.net.X.toFixed(2) + '+' + cx.tr.X.toFixed(2) + ') = ' + cx.Rbus.toFixed(2) + ' + j' + cx.Xbus.toFixed(2) + ' m\u03A9',
       steps: [
         { desc: tx('Net: vinkel + rektangul\u00E6r', 'Network: angle + rectangular'), expr: '\u03C6n = arccot(' + cx.net.rx + ') = ' + cx.net.phiDeg.toFixed(1) + '\u00B0 \u21D2 ' + cx.net.R.toFixed(2) + ' + j' + cx.net.X.toFixed(2), result: cx.net.mag.toFixed(2) + ' \u2220 ' + cx.net.phiDeg.toFixed(1) + '\u00B0' },
-        { desc: tx('Trafo: vinkel + rektangul\u00E6r', 'Transformer: angle + rectangular'), expr: '\u03C6t = arccot(' + cx.tr.rx + ') = ' + cx.tr.phiDeg.toFixed(1) + '\u00B0 \u21D2 ' + cx.tr.R.toFixed(2) + ' + j' + cx.tr.X.toFixed(2), result: cx.tr.mag.toFixed(2) + ' \u2220 ' + cx.tr.phiDeg.toFixed(1) + '\u00B0' },
+        { desc: tx('Trafo: vinkel + rektangul\u00E6r', 'Transformer: angle + rectangular'), expr: (cx.tr.mode === 'viggo' ? '\u03C6t = arccos(e\u1d63/u\u2096) = arccos(' + cx.tr.er.toFixed(2) + '/' + cx.tr.uk.toFixed(2) + ') = ' + cx.tr.phiDeg.toFixed(1) + '\u00B0 \u21D2 ' : '\u03C6t = arccot(' + cx.tr.rx + ') = ' + cx.tr.phiDeg.toFixed(1) + '\u00B0 \u21D2 ') + cx.tr.R.toFixed(2) + ' + j' + cx.tr.X.toFixed(2), result: cx.tr.mag.toFixed(2) + ' \u2220 ' + cx.tr.phiDeg.toFixed(1) + '\u00B0' },
         { desc: tx('Vektorsum (tavle)', 'Vector sum (busbar)'), expr: cx.Rbus.toFixed(2) + ' + j' + cx.Xbus.toFixed(2) + ' \u21D2 |Z\u0305| = \u221A(' + cx.Rbus.toFixed(2) + '\u00B2+' + cx.Xbus.toFixed(2) + '\u00B2)', result: cx.Zbus.toFixed(2) + ' m\u03A9 \u2220 ' + cx.phiBus.toFixed(1) + '\u00B0' },
         { desc: tx('Vektorsum (ende, inkl. kabel)', 'Vector sum (far end, incl. cable)'), expr: cx.Rend.toFixed(2) + ' + j' + cx.Xend.toFixed(2), result: cx.Zend.toFixed(2) + ' m\u03A9 \u2220 ' + cx.phiEnd.toFixed(1) + '\u00B0' },
         { desc: 'Ik3max (3-' + tx('faset', 'phase') + ', tavle)', expr: cFactor + ' \u00D7 ' + Un + ' / (\u221A3 \u00D7 ' + (cx.Zbus / 1000).toFixed(4) + ')', result: (ikMax3ph / 1000).toFixed(2) + ' kA' },
@@ -10500,9 +10506,28 @@ function scComplexParts(zMag, rx) {
   var X = zMag * Math.sin(phi);
   return { mag: zMag, rx: ratio, phiDeg: phi * 180 / Math.PI, R: R, X: X };
 }
+// Transformer rectangular/polar decomposition with selectable angle source.
+// 'viggo' mode uses the authorized arccos(e_r/u_k) nameplate method; otherwise
+// it falls back to the user-supplied R/X ratio (arccot) like the network.
+function scTrafoParts(zMag, scSt) {
+  if (scSt.trafoAngleMode === 'viggo') {
+    var uk = (scSt.trafoUk > 0) ? scSt.trafoUk : 0.0001;
+    // e_r cannot exceed u_k (resistive part of a reactive-dominated impedance).
+    var er = Math.min(scSt.trafoEr, uk * 0.9999);
+    var ex = Math.sqrt(Math.max(0, uk * uk - er * er));
+    var phi = Math.acos(er / uk);          // = atan(e_x/e_r) = transformer impedance angle
+    return {
+      mag: zMag, mode: 'viggo', uk: uk, er: er, ex: ex,
+      rx: ex > 0 ? er / ex : Infinity,
+      phiDeg: phi * 180 / Math.PI,
+      R: zMag * Math.cos(phi), X: zMag * Math.sin(phi)
+    };
+  }
+  return scComplexParts(zMag, scState.rxTrafo);
+}
 function scComplexCalc(scSt, rCableMohm, xCableMohm, Un, cFactor) {
   var net = scComplexParts(scSt.zNet, scState.rxNet);
-  var tr = scComplexParts(scSt.zTrafo, scState.rxTrafo);
+  var tr = scTrafoParts(scSt.zTrafo, scSt);
   // Busbar (3-phase max): net + trafo only
   var Rbus = net.R + tr.R;
   var Xbus = net.X + tr.X;
@@ -10644,6 +10669,34 @@ function renderShortCircuit() {
       </div>
 
       <div class="select-group">
+        <div class="select-label">${tx('Trafo-vinkel: kilde', 'Transformer angle: source')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${scState.trafoAngleMode!=='viggo' ? 'selected' : ''}" onclick="scState.trafoAngleMode='rx';renderModule('scircuit')">${tx('R/X (arccot)', 'R/X (arccot)')}</button>
+          <button class="sel-btn ${scState.trafoAngleMode==='viggo' ? 'selected' : ''}" onclick="scState.trafoAngleMode='viggo';renderModule('scircuit')">${tx('u\u2096 & e\u1d63 (arccos \u2014 Viggo)', 'u\u2096 & e\u1d63 (arccos \u2014 Viggo)')}</button>
+        </div>
+      </div>
+
+      ${scState.trafoAngleMode === 'viggo' ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Kortslutningssp\u00E6nding u\u2096 [%] (m\u00E6rkeplade)', 'Short-circuit voltage u\u2096 [%] (nameplate)')}</div>
+        <div class="select-grid">
+          ${[3, 3.5, 4, 4.5, 5, 6, 7, 8].map(u =>
+            `<button class="sel-btn ${scState.trafoUk === u ? 'selected' : ''}" onclick="scState.trafoUk=${u};renderModule('scircuit')">${String(u).replace('.', ',')}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${tx('Resistiv sp\u00E6nding e\u1d63 [%] (= P_Cu/S\u2099)', 'Resistive voltage e\u1d63 [%] (= P_Cu/S\u2099)')}</div>
+        <div class="select-grid">
+          ${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5].filter(e => e < scState.trafoUk).map(e =>
+            `<button class="sel-btn ${scState.trafoEr === e ? 'selected' : ''}" onclick="scState.trafoEr=${e};renderModule('scircuit')">${String(e).replace('.', ',')}</button>`
+          ).join('')}
+        </div>
+        <div class="info-row" style="margin-top:4px">\u03C6_trafo = arccos(e\u1d63/u\u2096) = arccos(${cx.tr.er.toFixed(2)}/${cx.tr.uk.toFixed(2)}) = ${cx.tr.phiDeg.toFixed(1)}\u00B0 \u00B7 e\u02e3 = \u221A(u\u2096\u00B2\u2212e\u1d63\u00B2) = ${cx.tr.ex.toFixed(2)}% \u00B7 R/X = ${cx.tr.rx.toFixed(3)}</div>
+        <div class="info-row" style="margin-top:2px">R = ${cx.tr.R.toFixed(2)} m\u03A9, X = ${cx.tr.X.toFixed(2)} m\u03A9 \u00B7 ${tx('Viggo Bisch-metoden: trafo-vinklen kommer fra m\u00E6rkepladens u\u2096 og e\u1d63 (P_Cu), ikke fra et g\u00E6ttet R/X.', 'Viggo Bisch method: the transformer angle comes from the nameplate u\u2096 and e\u1d63 (P_Cu), not from a guessed R/X.')}</div>
+      </div>
+      ` : `
+      <div class="select-group">
         <div class="select-label">${tx('R/X-forhold — trafo (du angiver)', 'R/X ratio — transformer (you supply)')}</div>
         <div class="select-grid">
           ${rxSteps.map(r =>
@@ -10652,6 +10705,7 @@ function renderShortCircuit() {
         </div>
         <div class="info-row" style="margin-top:4px">φ_trafo = arccot(R/X) = ${cx.tr.phiDeg.toFixed(1)}° \u00B7 R = ${cx.tr.R.toFixed(2)} m\u03A9, X = ${cx.tr.X.toFixed(2)} m\u03A9</div>
       </div>
+      `}
 
       <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">${tx('Kompleks vektorsum (rektangulær + polær)', 'Complex vector sum (rectangular + polar)')}</div>

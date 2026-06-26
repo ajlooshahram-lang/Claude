@@ -15262,6 +15262,44 @@ test('scircuit: scMethod defaults to scalar (no behavior change for existing use
   assert.ok(['scalar', 'complex'].indexOf(scState.scMethod) !== -1, 'scMethod valid');
 });
 
+test('scircuit: Viggo transformer angle = arccos(e_r/u_k) (authorized nameplate method)', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.trafoAngleMode = 'viggo'; scState.trafoUk = 4; scState.trafoEr = 1;
+  var tr = scTrafoParts(10, scState); // |Z| = 10 mOhm
+  assert.ok(Math.abs(tr.phiDeg - 75.52) < 0.05, 'phi = arccos(1/4) = 75.52 deg (got ' + tr.phiDeg.toFixed(2) + ')');
+  assert.ok(Math.abs(tr.ex - Math.sqrt(16 - 1)) < 1e-9, 'e_x = sqrt(uk^2 - er^2) = 3.873%');
+  assert.ok(Math.abs(tr.rx - (1 / Math.sqrt(15))) < 1e-9, 'R/X = e_r/e_x consistent');
+  // arccos(er/uk) must equal arctan(ex/er)
+  assert.ok(Math.abs(tr.phiDeg - Math.atan(tr.ex / tr.er) * 180 / Math.PI) < 1e-9, 'arccos == arctan(X/R)');
+  // R,X reconstruct |Z|
+  assert.ok(Math.abs(Math.sqrt(tr.R * tr.R + tr.X * tr.X) - 10) < 1e-9, '|Z| reconstructs');
+  Object.assign(scState, saved);
+});
+
+test('scircuit: Viggo guards e_r > u_k (clamped, no NaN)', function () {
+  var saved = JSON.parse(JSON.stringify(scState));
+  scState.trafoAngleMode = 'viggo'; scState.trafoUk = 4; scState.trafoEr = 9; // invalid: er>uk
+  var tr = scTrafoParts(10, scState);
+  assert.ok(isFinite(tr.phiDeg) && !isNaN(tr.R) && !isNaN(tr.X), 'no NaN when er>uk');
+  assert.ok(tr.phiDeg >= 0, 'angle stays valid');
+  Object.assign(scState, saved);
+});
+
+test('scircuit: complex calc uses Viggo trafo angle when selected; renders without crash', function () {
+  var saved = JSON.parse(JSON.stringify(scState)); var savedLang = lang;
+  scState.scMethod = 'complex'; scState.trafoAngleMode = 'viggo'; scState.trafoUk = 6; scState.trafoEr = 1.5;
+  var cx = scComplexCalc(scState, 0, 0, 400, 1.05);
+  assert.ok(cx.tr.mode === 'viggo', 'trafo decomposition flagged viggo');
+  assert.ok(Math.abs(cx.tr.phiDeg - Math.acos(1.5 / 6) * 180 / Math.PI) < 1e-9, 'busbar uses arccos angle');
+  ['da', 'en'].forEach(function (lg) {
+    lang = lg;
+    var html = renderShortCircuit();
+    assert.ok(html.indexOf('undefined') === -1 && html.indexOf('NaN') === -1, 'no undefined/NaN (' + lg + ')');
+    assert.ok(/arccos/.test(html), 'shows arccos derivation (' + lg + ')');
+  });
+  lang = savedLang; Object.assign(scState, saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
