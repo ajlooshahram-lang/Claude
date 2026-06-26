@@ -15591,6 +15591,31 @@ test('vdrop: parallel of equal-angle lines -> branch currents in phase (sum = to
   assert.ok(Math.abs(p.IA - p.IB) < 0.05, 'identical parallel lines carry equal current');
 });
 
+// ===== RING NETWORK validation (Eksempel 7.4.1.4) =====
+test('vdrop: ringNetworkSolve reproduces Eksempel 7.4.1.4 (A-B=4,A-C=2,C-B=3; 500kVA@B,C; 10kV)', function () {
+  var Un = 10000, IB = 500000 / (Math.sqrt(3) * Un), IC = IB; // 28.87 A
+  var rn = ringNetworkSolve(4, 2, 3, IB, IC, 0.32, 0.088, 0.8, Un);
+  assert.ok(Math.abs(rn.IAB - 22.5) < 0.1, 'I_AB = 22.5 A (exam). Got ' + rn.IAB);
+  assert.ok(Math.abs(rn.ICB - 6.4) < 0.1, 'I_CB = 6.4 A (exam). Got ' + rn.ICB);
+  assert.ok(Math.abs(rn.IAC - 35.3) < 0.1, 'I_AC = 35.3 A (exam). Got ' + rn.IAC);
+});
+
+test('vdrop: ring network voltage is path-independent (A->B = A->C->B)', function () {
+  var rn = ringNetworkSolve(4, 2, 3, 28.87, 28.87, 0.32, 0.088, 0.8, 10000);
+  assert.ok(rn.pathErr < 1e-6, 'voltage at B equal both ways. Err ' + rn.pathErr);
+  assert.ok(Math.abs(rn.dU_AB - rn.dU_viaC) < 1e-6, 'dU(A->B) = dU(A->C->B)');
+  // Conservation: I_AB + I_AC = I_B + I_C (all load supplied from A)
+  assert.ok(Math.abs((rn.IAB + rn.IAC) - (28.87 + 28.87)) < 0.1, 'I_AB + I_AC = total load (Kirchhoff at A)');
+});
+
+test('vdrop: ring with all load at B side -> more current via direct A-B path', function () {
+  // Load only at B (IC=0): I_AB should carry the larger share
+  var rn = ringNetworkSolve(2, 4, 4, 100, 0, 0.3, 0.08, 0.9, 400);
+  // A-B is shorter (2) than A-C-B (4+4=8), so direct path carries more
+  assert.ok(rn.IAB > rn.IAC, 'shorter direct path A-B carries more current (' + rn.IAB + ' > ' + rn.IAC + ')');
+  assert.ok(Math.abs((rn.IAB + rn.IAC) - 100) < 0.1, 'total fed from A = load');
+});
+
 // ===== FULL RENDER-HARDENING SWEEP (all modules x da/en/fa: zero NaN/undefined/throw) =====
 test('render-sweep: every module renders clean in da/en/fa (no NaN, undefined, or throw)', function () {
   var savedLang = lang;

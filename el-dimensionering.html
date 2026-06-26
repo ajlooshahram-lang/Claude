@@ -10503,6 +10503,37 @@ function parallelLineSplit(rA, xA, lA, rB, xB, lB, S_kVA, cosphi, Un) {
 }
 var parLineState = { rA: 0.5, xA: 0.4, lA: 4, rB: 0.32, xB: 0.099, lB: 6, kva: 1200, cosphi: 0.8, Un: 10000 };
 
+// ===== RING NETWORK — closed loop fed at A, loads at C and B (Elektroteknik Bind 6, Ex 7.4.1.4) =====
+// Single feed at A; ring A —(lAC)— C —(lCB)— B —(lAB)— A. Same conductor (r,x) and
+// same cosφ on all sections. The voltage at B must be equal whether reached directly
+// (A→B) or the long way (A→C→B); with a uniform conductor the (r·cosφ+x·sinφ) factor
+// cancels, leaving a redekam (moment) balance:
+//   I_AB·l_AB = I_C·l_AC + I_CB·(l_AC+l_CB)   and   I_AB + I_CB = I_B,  I_AC = I_C + I_CB.
+//   ⇒ I_AB = [I_C·l_AC + I_B·(l_AC+l_CB)] / (l_AB+l_AC+l_CB).
+// IB, IC are load currents [A]; r,x in Ω/km; returns segment currents + drops (path-checked).
+function ringNetworkSolve(lAB, lAC, lCB, IB, IC, r, x, cosphi, Un) {
+  var Lring = lAB + lAC + lCB;
+  var IAB = (Lring > 0) ? (IC * lAC + IB * (lAC + lCB)) / Lring : 0;
+  var ICB = IB - IAB;          // may be negative (then flows B→C)
+  var IAC = IC + ICB;
+  var sinphi = Math.sin(Math.acos(Math.min(1, Math.max(0, cosphi))));
+  var k = r * cosphi + x * sinphi;                  // Ω/km, per-phase drop factor
+  var dU_AB = k * Math.abs(IAB) * lAB;              // phase volts, A→B direct
+  var dU_AC = k * IAC * lAC;
+  var dU_CB = k * ICB * lCB;
+  var dU_viaC = dU_AC + dU_CB;                       // A→C→B
+  var rnd = function (v) { return Math.round(v * 100) / 100; };
+  return {
+    Lring: Lring,
+    IAB: rnd(IAB), ICB: rnd(ICB), IAC: rnd(IAC),
+    dU_AB: rnd(dU_AB), dU_viaC: rnd(dU_viaC),
+    dU_AB_line: rnd(Math.sqrt(3) * dU_AB), pct: Math.round((Math.sqrt(3) * dU_AB / Un) * 10000) / 100,
+    pathErr: Math.abs(dU_AB - dU_viaC),              // must be ~0 (validation)
+    clause: 'Elektroteknik Bind 6 §7.4 (ringnet) · DS/HD 60364-5-52'
+  };
+}
+var ringState = { lAB: 4, lAC: 2, lCB: 3, kvaB: 500, kvaC: 500, cosphi: 0.8, r: 0.32, x: 0.088, Un: 10000 };
+
 // ===== VOLTAGE DROP MODULE =====
 function renderVdrop() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -10647,6 +10678,36 @@ function renderVdrop() {
         '<div class="result-row"><span class="label">\u0394U<sub>f</sub> / \u0394U%</span><span class="value">' + pr.dUf.toFixed(1).replace('.', ',') + ' V / ' + pr.pct.toFixed(2).replace('.', ',') + ' %</span></div>' +
         '<div class="result-row" style="opacity:0.75;font-size:0.82em"><span class="label">' + tx('Kontrol: I\u2090+I\u1d47 (vektor) = I; sp\u00E6nding sti-uafh\u00E6ngig', 'Check: I\u2090+I\u1d47 (vector) = I; voltage path-independent') + '</span><span class="value">\u03A3frac = ' + pr.fracSum.toFixed(3).replace('.', ',') + ' \u2713</span></div>' +
         '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + pr.clause + '</span></div>' +
+        '</div></div>';
+    })()}
+
+    ${(function () {
+      // Ring network — closed loop fed at A, loads at C and B (Eksempel 7.4.1.4)
+      var rs2 = ringState;
+      var IB = (rs2.kvaB * 1000) / (Math.sqrt(3) * rs2.Un);
+      var IC = (rs2.kvaC * 1000) / (Math.sqrt(3) * rs2.Un);
+      var rn = ringNetworkSolve(rs2.lAB, rs2.lAC, rs2.lCB, IB, IC, rs2.r, rs2.x, rs2.cosphi, rs2.Un);
+      function rgrid(label, arr, field, unitFmt) {
+        return '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">' +
+          arr.map(function (v) { return '<button class="sel-btn ' + (rs2[field] === v ? 'selected' : '') + '" onclick="ringState.' + field + '=' + v + ';renderModule(\'vdrop\')">' + (unitFmt ? unitFmt(v) : v) + '</button>'; }).join('') +
+          '</div></div>';
+      }
+      return '<div class="card fade-in"><div class="card-title">' + tx('Ringnet (lukket sl\u00F8jfe)', 'Ring network (closed loop)') + '</div>' +
+        '<div class="info-row">' + tx('Forsynet \u00E9t sted (A), laster ved C og B. Sp\u00E6ndingen i B skal v\u00E6re ens ad begge veje (A\u2192B og A\u2192C\u2192B) \u2014 momentbalance: I_AB = [I_C\u00b7l_AC + I_B\u00b7(l_AC+l_CB)] / L_ring. Autorisations-emne (Eksempel 7.4.1.4).', 'Fed at one point (A), loads at C and B. The voltage at B must be equal both ways (A\u2192B and A\u2192C\u2192B) \u2014 moment balance: I_AB = [I_C\u00b7l_AC + I_B\u00b7(l_AC+l_CB)] / L_ring. Authorization topic (Example 7.4.1.4).') + '</div>' +
+        rgrid(tx('Str\u00E6kning A\u2013B [km]', 'Section A\u2013B [km]'), [2, 3, 4, 5, 6], 'lAB') +
+        rgrid(tx('Str\u00E6kning A\u2013C [km]', 'Section A\u2013C [km]'), [1, 2, 3, 4], 'lAC') +
+        rgrid(tx('Str\u00E6kning C\u2013B [km]', 'Section C\u2013B [km]'), [2, 3, 4, 5], 'lCB') +
+        rgrid(tx('Last ved B [kVA]', 'Load at B [kVA]'), [315, 400, 500, 630], 'kvaB') +
+        rgrid(tx('Last ved C [kVA]', 'Load at C [kVA]'), [315, 400, 500, 630], 'kvaC') +
+        rgrid('cos\u03C6', [0.8, 0.85, 0.9, 0.95], 'cosphi', function (v) { return String(v).replace('.', ','); }) +
+        '<div class="result-box"><div class="result-title">' + tx('Str\u00F8mfordeling & sp\u00E6ndingsfald', 'Current distribution & voltage drop') + '</div>' +
+        '<div class="result-row"><span class="label">I ' + tx('pr. last', 'per load') + ' (B / C)</span><span class="value">' + IB.toFixed(1).replace('.', ',') + ' / ' + IC.toFixed(1).replace('.', ',') + ' A</span></div>' +
+        '<div class="result-row"><span class="label">I<sub>AB</sub> (A\u2192B)</span><span class="value">' + rn.IAB.toFixed(1).replace('.', ',') + ' A</span></div>' +
+        '<div class="result-row"><span class="label">I<sub>AC</sub> (A\u2192C)</span><span class="value">' + rn.IAC.toFixed(1).replace('.', ',') + ' A</span></div>' +
+        '<div class="result-row"><span class="label">I<sub>CB</sub> (C\u2192B)</span><span class="value">' + rn.ICB.toFixed(1).replace('.', ',') + ' A' + (rn.ICB < 0 ? ' (' + tx('mod B\u2192C', 'i.e. B\u2192C') + ')' : '') + '</span></div>' +
+        '<div class="result-row"><span class="label">\u0394U til B (' + tx('linje', 'line') + ') / \u0394U%</span><span class="value">' + rn.dU_AB_line.toFixed(1).replace('.', ',') + ' V / ' + rn.pct.toFixed(2).replace('.', ',') + ' %</span></div>' +
+        '<div class="result-row" style="opacity:0.75;font-size:0.82em"><span class="label">' + tx('Kontrol: sp\u00E6nding ens ad begge veje', 'Check: voltage equal both ways') + '</span><span class="value">' + tx('afvigelse', 'error') + ' ' + rn.pathErr.toFixed(3) + ' V \u2713</span></div>' +
+        '<div class="result-row" style="opacity:0.7;font-size:0.82em"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + rn.clause + '</span></div>' +
         '</div></div>';
     })()}
   `;
