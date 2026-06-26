@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { QueryIntent } from './intent-classifier';
 import { BaseAgent } from '../agents/base-agent';
 import { InvestmentAnalystAgent } from '../agents/investment-analyst.agent';
+import { TechnicalAnalystAgent } from '../agents/technical-analyst.agent';
+import { QuantitativeAgent } from '../agents/quantitative.agent';
+import { NewsIntelligenceAgent } from '../agents/news-intelligence.agent';
+import { MacroEconomicsAgent } from '../agents/macro-economics.agent';
+import { PortfolioAdvisorAgent } from '../agents/portfolio-advisor.agent';
+import { EducationAgent } from '../agents/education.agent';
 
 // Maps intents to the agent IDs that should handle them
 const INTENT_AGENT_MAP: Record<string, string[]> = {
@@ -36,11 +42,22 @@ const INTENT_AGENT_MAP: Record<string, string[]> = {
 export class AgentRouter {
   private readonly agentRegistry: Map<string, BaseAgent> = new Map();
 
-  constructor(private readonly investmentAnalyst: InvestmentAnalystAgent) {
-    // Register available agents. As more agents are implemented,
-    // they are added here. The router gracefully handles agents
-    // that are mapped but not yet registered.
+  constructor(
+    investmentAnalyst: InvestmentAnalystAgent,
+    technicalAnalyst: TechnicalAnalystAgent,
+    quantitative: QuantitativeAgent,
+    newsIntelligence: NewsIntelligenceAgent,
+    macroEconomics: MacroEconomicsAgent,
+    portfolioAdvisor: PortfolioAdvisorAgent,
+    education: EducationAgent,
+  ) {
     this.register(investmentAnalyst);
+    this.register(technicalAnalyst);
+    this.register(quantitative);
+    this.register(newsIntelligence);
+    this.register(macroEconomics);
+    this.register(portfolioAdvisor);
+    this.register(education);
   }
 
   private register(agent: BaseAgent): void {
@@ -50,7 +67,7 @@ export class AgentRouter {
   /**
    * Select agents to handle the given intents.
    * Deduplicates agents that appear for multiple intents.
-   * Only returns agents that are actually registered/implemented.
+   * Limits to max 4 agents per query (for latency/cost management).
    */
   selectAgents(intents: QueryIntent[]): BaseAgent[] {
     const agentIds = new Set<string>();
@@ -63,17 +80,24 @@ export class AgentRouter {
     const selected: BaseAgent[] = [];
     for (const id of agentIds) {
       const agent = this.agentRegistry.get(id);
-      if (agent) {
-        selected.push(agent);
-      }
+      if (agent) selected.push(agent);
     }
 
-    // Fallback: if no registered agents matched, use the investment analyst
+    // Cap at 4 agents max to control latency and cost
+    if (selected.length > 4) {
+      return selected.slice(0, 4);
+    }
+
+    // Fallback: if no agents matched, use education agent
     if (selected.length === 0) {
-      const fallback = this.agentRegistry.get('agent.investment_analyst');
+      const fallback = this.agentRegistry.get('agent.education');
       if (fallback) selected.push(fallback);
     }
 
     return selected;
+  }
+
+  getRegisteredAgents(): string[] {
+    return Array.from(this.agentRegistry.keys());
   }
 }
