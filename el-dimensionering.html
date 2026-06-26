@@ -9466,8 +9466,8 @@ const PHYS_CONST = {
   C_WATER:  { value: 4186, unit: 'J/(kg\u00B7K)', symbol: 'c_vand', source: 'Physics handbook (water ~4180\u20134190 J/(kg\u00B7K))' },
   RHO_CU:   { value: 0.0175, unit: '\u03A9\u00B7mm\u00B2/m', symbol: '\u03C1_Cu', source: 'Elektroteknik-l\u00E6rebog @20\u00B0C (IEC 60228: 0.017241)' },
   RHO_AL:   { value: 0.029, unit: '\u03A9\u00B7mm\u00B2/m', symbol: '\u03C1_Al', source: 'Elektroteknik-l\u00E6rebog @20\u00B0C (IEC 60228: 0.028264)' },
-  ALPHA_CU: { value: 0.004, unit: '1/K', symbol: '\u03B1_Cu', source: 'Physics handbook @20\u00B0C (\u22480.00393)' },
-  ALPHA_AL: { value: 0.0037, unit: '1/K', symbol: '\u03B1_Al', source: 'Physics handbook @20\u00B0C (\u22480.00390)' },
+  ALPHA_CU: { value: 0.00393, unit: '1/K', symbol: '\u03B1_Cu', source: 'Elektroteknik @20\u00B0C, 234,5-metoden: 1/(234,5+20)=0,00393 (IEC 60228)' },
+  ALPHA_AL: { value: 0.00403, unit: '1/K', symbol: '\u03B1_Al', source: 'Elektroteknik @20\u00B0C, 228-metoden: 1/(228+20)=0,00403 (IEC 60228)' },
   U_PHASE:  { value: 230, unit: 'V', symbol: 'U_f', source: 'HD 60038' },
   U_LINE:   { value: 400, unit: 'V', symbol: 'U_L', source: 'HD 60038' }
 };
@@ -31347,8 +31347,8 @@ function renderFaultCSA() {
 
 // Material resistivity constants (Bilag B) in Ohm*mm2/m
 var DC_MATERIALS = {
-  cu: { rho: 0.0175, alpha: 0.004, da: 'Kobber (Cu)', en: 'Copper (Cu)', fa: '\u0645\u0633 (Cu)' },
-  al: { rho: 0.029, alpha: 0.0037, da: 'Aluminium (Al)', en: 'Aluminium (Al)', fa: '\u0622\u0644\u0648\u0645\u06CC\u0646\u06CC\u0648\u0645 (Al)' },
+  cu: { rho: 0.0175, alpha: 0.00393, da: 'Kobber (Cu)', en: 'Copper (Cu)', fa: '\u0645\u0633 (Cu)' },
+  al: { rho: 0.029, alpha: 0.00403, da: 'Aluminium (Al)', en: 'Aluminium (Al)', fa: '\u0622\u0644\u0648\u0645\u06CC\u0646\u06CC\u0648\u0645 (Al)' },
   fe: { rho: 0.14, alpha: 0.005, da: 'Jern (Fe)', en: 'Iron (Fe)', fa: '\u0622\u0647\u0646 (Fe)' }
 };
 

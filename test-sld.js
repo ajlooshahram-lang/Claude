@@ -12487,8 +12487,12 @@ test('PHYS_CONST: exact values per spec + every entry has a non-empty source', f
   assert.strictEqual(PHYS_CONST.RHO_AL.value, 0.029, 'RHO_AL');
   assert.strictEqual(PHYS_CONST.TORQUE_K.value, 9.55, 'TORQUE_K');
   assert.strictEqual(PHYS_CONST.EMF_K.value, 4.44, 'EMF_K');
-  assert.strictEqual(PHYS_CONST.ALPHA_CU.value, 0.004, 'ALPHA_CU');
-  assert.strictEqual(PHYS_CONST.ALPHA_AL.value, 0.0037, 'ALPHA_AL');
+  assert.strictEqual(PHYS_CONST.ALPHA_CU.value, 0.00393, 'ALPHA_CU');
+  assert.strictEqual(PHYS_CONST.ALPHA_AL.value, 0.00403, 'ALPHA_AL');
+  // The linear coefficient must match the textbook's inferred-zero method exactly:
+  // Cu: alpha = 1/(234.5+20), Al: alpha = 1/(228+20).
+  assert.ok(Math.abs(PHYS_CONST.ALPHA_CU.value - 1 / (234.5 + 20)) < 5e-6, 'alpha_Cu = 1/(234.5+20) = 0.00393 (Elektroteknik 234.5-method)');
+  assert.ok(Math.abs(PHYS_CONST.ALPHA_AL.value - 1 / (228 + 20)) < 5e-5, 'alpha_Al = 1/(228+20) = 0.00403');
   assert.strictEqual(PHYS_CONST.U_PHASE.value, 230, 'U_PHASE');
   assert.strictEqual(PHYS_CONST.U_LINE.value, 400, 'U_LINE');
   Object.keys(PHYS_CONST).forEach(function(k) {
