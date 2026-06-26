@@ -14778,22 +14778,22 @@ function axSolveTask(task, opgave) {
   var sol = { id: task.id, kind: task.kind, title: task.prompt, clause: task.clause, cat: task.cat, assumptions: [], standard: task.clause, formula: '', substitution: '', steps: [], result: null, verification: null, compliance: [], conclusion: null, answer: task.answer };
   if (task.kind === 'ib_total') {
     sol.assumptions = [S('3-faset 400 V hvor ikke andet er angivet; cos\u03c6 og \u03b7 pr. last som opgivet.', '3-phase 400 V unless stated; cos\u03c6 and \u03b7 per load as given.'), S('Samtidighedsfaktorer (Sf) anvendes pr. last; ladning/kontinuerlig last regnes ved Sf = 1.', 'Diversity factors (Sf) applied per load; charging/continuous loads at Sf = 1.')];
-    sol.formula = 'I\u1d2e,i = P\u1d62 / (\u221a3 \u00b7 U \u00b7 cos\u03c6\u1d62 \u00b7 \u03b7\u1d62) ;  I\u1d2e = \u03a3 (Sf\u1d62 \u00b7 I\u1d2e,i)';
+    sol.formula = 'I<sub>B</sub>,i = P\u1d62 / (\u221a3 \u00b7 U \u00b7 cos\u03c6\u1d62 \u00b7 \u03b7\u1d62) ;  I<sub>B</sub> = \u03a3 (Sf\u1d62 \u00b7 I<sub>B</sub>,i)';
     var sum = 0;
     (g.loads || []).forEach(function (l) {
       var ib = axIB(l.P, l.ph === 3 ? 400 : 230, l.cos, l.eta, l.ph); var d = ib * l.sf; sum += d;
-      sol.steps.push({ da: l.da + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', en: l.en + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', expr: 'I\u1d2e = ' + axFmt(ib, 1) + ' A \u00d7 ' + axFmt(l.sf), result: axFmt(Math.round(d * 10) / 10, 1) + ' A' });
+      sol.steps.push({ da: l.da + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', en: l.en + ' (' + axFmt(l.P) + ' kW, ' + (l.ph === 3 ? '3~' : '1~') + ', cos\u03c6 ' + axFmt(l.cos) + ', Sf ' + axFmt(l.sf) + ')', expr: 'I<sub>B</sub> = ' + axFmt(ib, 1) + ' A \u00d7 ' + axFmt(l.sf), result: axFmt(Math.round(d * 10) / 10, 1) + ' A' });
     });
     sum = Math.round(sum * 10) / 10;
     sol.result = { value: sum, unit: 'A', da: 'Dimensionsgivende belastningsstr\u00f8m', en: 'Dimensioning load current' };
-    sol.verification = S('I\u1d2e = ' + axFmt(sum, 1) + ' A er udgangspunktet for IB \u2264 In \u2264 Iz. Uden samtidighed ville str\u00f8mmen v\u00e6re overvurderet og beskyttelsen un\u00f8digt stor; med korrekt Sf rammes den reelle dimensioneringsstr\u00f8m.', 'IB = ' + axFmt(sum, 1) + ' A is the basis for IB \u2264 In \u2264 Iz. Without diversity the current would be overestimated; with correct Sf it matches the real dimensioning current.');
+    sol.verification = S('I<sub>B</sub> = ' + axFmt(sum, 1) + ' A er udgangspunktet for IB \u2264 In \u2264 Iz. Uden samtidighed ville str\u00f8mmen v\u00e6re overvurderet og beskyttelsen un\u00f8digt stor; med korrekt Sf rammes den reelle dimensioneringsstr\u00f8m.', 'IB = ' + axFmt(sum, 1) + ' A is the basis for IB \u2264 In \u2264 Iz. Without diversity the current would be overestimated; with correct Sf it matches the real dimensioning current.');
     sol.compliance = [S('DS/HD 60364-4-43 \u00a7433.1: overbelastningsbeskyttelse skal koordineres efter IB.', 'DS/HD 60364-4-43 \u00a7433.1: overload protection coordinated to IB.')];
-    sol.conclusion = S('Den dimensionsgivende belastningsstr\u00f8m er I\u1d2e = ' + axFmt(sum, 1) + ' A.', 'The dimensioning load current is IB = ' + axFmt(sum, 1) + ' A.');
+    sol.conclusion = S('Den dimensionsgivende belastningsstr\u00f8m er I<sub>B</sub> = ' + axFmt(sum, 1) + ' A.', 'The dimensioning load current is IB = ' + axFmt(sum, 1) + ' A.');
   } else if (task.kind === 'device') {
     var In = axDeviceRating(g.IB);
     sol.assumptions = [S('Standard m\u00e6rkestr\u00f8mme iht. IEC (6\u20131600 A). Konservativt v\u00e6lges mindste In \u2265 IB.', 'Standard ratings per IEC (6\u20131600 A). Conservatively pick the smallest In \u2265 IB.')];
-    sol.formula = 'I\u1d2e \u2264 In  \u21d2  In = mindste standardv\u00e6rdi \u2265 I\u1d2e';
-    sol.substitution = 'I\u1d2e = ' + axFmt(g.IB, 1) + ' A  \u21d2  In = ' + In + ' A';
+    sol.formula = 'I<sub>B</sub> \u2264 I<sub>n</sub>  \u21d2  I<sub>n</sub> = mindste standardv\u00e6rdi \u2265 I<sub>B</sub>';
+    sol.substitution = 'I<sub>B</sub> = ' + axFmt(g.IB, 1) + ' A  \u21d2  In = ' + In + ' A';
     sol.steps = [{ da: 'N\u00e6rmeste standard \u2265 IB', en: 'Nearest standard \u2265 IB', expr: 'In \u2265 ' + axFmt(g.IB, 1) + ' A', result: In + ' A' }];
     sol.result = { value: In, unit: 'A', da: 'Overstr\u00f8msbeskyttelsens m\u00e6rkestr\u00f8m', en: 'Overcurrent protection rating' };
     sol.verification = S('In = ' + In + ' A \u2265 IB = ' + axFmt(g.IB, 1) + ' A \u2014 opfylder f\u00f8rste led i IB \u2264 In \u2264 Iz. En lavere In (' + (AX_STD_RATINGS[Math.max(0, AX_STD_RATINGS.indexOf(In) - 1)]) + ' A) ville udl\u00f8se p\u00e5 normal drift; det er ikke tilladt.', 'In = ' + In + ' A \u2265 IB = ' + axFmt(g.IB, 1) + ' A \u2014 satisfies the first part of IB \u2264 In \u2264 Iz. A lower In would trip in normal operation; not permitted.');
@@ -14823,7 +14823,7 @@ function axSolveTask(task, opgave) {
     var vd = axVdrop(g.IB, g.L, r, x, g.cos, g.ph, g.ph === 3 ? 400 : 230);
     var sinp = Math.sqrt(Math.max(0, 1 - g.cos * g.cos));
     sol.assumptions = [S('Leder-resistans r ved driftstemperatur og reaktans x fra kabeltabel; cos\u03c6 = ' + axFmt(g.cos) + '.', 'Conductor resistance r at operating temp and reactance x from cable table; cos\u03c6 = ' + axFmt(g.cos) + '.')];
-    sol.formula = (g.ph === 3 ? '\u0394U = \u221a3 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)' : '\u0394U = 2 \u00b7 IB \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)') + ' ;  \u0394U% = \u0394U / Un \u00b7 100';
+    sol.formula = (g.ph === 3 ? '\u0394U = \u221a3 \u00b7 I<sub>B</sub> \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)' : '\u0394U = 2 \u00b7 I<sub>B</sub> \u00b7 L \u00b7 (r\u00b7cos\u03c6 + x\u00b7sin\u03c6)') + ' ;  \u0394U% = \u0394U / U<sub>n</sub> \u00b7 100';
     sol.substitution = '\u0394U = ' + (g.ph === 3 ? '\u221a3' : '2') + ' \u00d7 ' + axFmt(g.IB, 1) + ' \u00d7 ' + axFmt(g.L / 1000, 3) + ' \u00d7 (' + r + '\u00d7' + axFmt(g.cos, 2) + ' + ' + x + '\u00d7' + axFmt(sinp, 3) + ')';
     sol.steps = [
       { da: 'sin\u03c6', en: 'sin\u03c6', expr: '\u221a(1 \u2212 ' + axFmt(g.cos, 2) + '\u00b2)', result: axFmt(sinp, 3) },
@@ -14841,7 +14841,7 @@ function axSolveTask(task, opgave) {
   } else if (task.kind === 'iktrafo') {
     var tr = axIkTrafoSecondary(g.SN, g.Un, g.ek);
     sol.assumptions = [S('Stift net (kun trafoimpedans medregnes) \u2192 h\u00f8jeste, konservative Ik for valg af brydeevne.', 'Stiff grid (transformer impedance only) \u2192 highest, conservative Ik for breaking-capacity selection.')];
-    sol.formula = 'In = SN / (\u221a3 \u00b7 U) ;  Ik = In / (ek/100)';
+    sol.formula = 'I<sub>n</sub> = S<sub>N</sub> / (\u221a3 \u00b7 U) ;  I<sub>k</sub> = I<sub>n</sub> / (e<sub>k</sub>/100)';
     sol.substitution = 'In = ' + (g.SN * 1000) + ' / (\u221a3 \u00d7 ' + g.Un + ') = ' + axFmt(tr.In, 1) + ' A ;  Ik = ' + axFmt(tr.In, 1) + ' / ' + axFmt(g.ek / 100, 3);
     sol.steps = [
       { da: 'Fuldlaststr\u00f8m', en: 'Full-load current', expr: g.SN + ' kVA / (\u221a3 \u00d7 ' + g.Un + ' V)', result: axFmt(tr.In, 1) + ' A' },
@@ -14854,7 +14854,7 @@ function axSolveTask(task, opgave) {
   } else if (task.kind === 'breaking') {
     var stdIcu = [10, 16, 25, 36, 50, 65, 100]; var need = stdIcu.filter(function (v) { return v >= g.IkkA - 1e-9; })[0] || 100;
     sol.assumptions = [S('Brydeevne Icu skal mindst d\u00e6kke den prospektive Ik,max; mindste standardv\u00e6rdi over Ik,max v\u00e6lges.', 'Breaking capacity Icu must at least cover prospective Ik,max; pick the smallest standard value above it.')];
-    sol.formula = 'Icu \u2265 Ik,max';
+    sol.formula = 'I<sub>cu</sub> \u2265 I<sub>k,max</sub>';
     sol.substitution = 'Ik,max = ' + axFmt(g.IkkA, 1) + ' kA \u21d2 Icu = ' + need + ' kA';
     sol.steps = [{ da: 'N\u00e6rmeste standard Icu \u2265 Ik,max', en: 'Nearest standard Icu \u2265 Ik,max', expr: 'Icu \u2265 ' + axFmt(g.IkkA, 1) + ' kA', result: need + ' kA' }];
     sol.result = { value: need, unit: 'kA', da: 'Brydeevne Icu', en: 'Breaking capacity Icu' };
@@ -14864,7 +14864,7 @@ function axSolveTask(task, opgave) {
   } else if (task.kind === 'adiabatic') {
     var ad = axAdiabatic(g.k, g.csa, g.Ik, g.t);
     sol.assumptions = [S('Adiabatisk model (ingen varmeafledning under fejlen); k iht. IEC 60364-4-43 Tabel 43A.', 'Adiabatic model (no heat dissipation during the fault); k per IEC 60364-4-43 Table 43A.')];
-    sol.formula = 'k\u00b2 \u00b7 S\u00b2 \u2265 I\u00b2 \u00b7 t   \u21d4   S \u2265 Smin = Ik \u00b7 \u221at / k';
+    sol.formula = 'k\u00b2 \u00b7 S\u00b2 \u2265 I\u00b2 \u00b7 t   \u21d4   S \u2265 S<sub>min</sub> = I<sub>k</sub> \u00b7 \u221at / k';
     sol.substitution = 'Smin = ' + axFmt(g.Ik, 0) + ' \u00d7 \u221a' + axFmt(g.t, 2) + ' / ' + g.k + ' = ' + axFmt(ad.Smin, 2) + ' mm\u00b2';
     sol.steps = [
       { da: 'Mindste tv\u00e6rsnit', en: 'Minimum cross-section', expr: axFmt(g.Ik, 0) + ' \u00d7 ' + axFmt(Math.sqrt(g.t), 3) + ' / ' + g.k, result: axFmt(ad.Smin, 2) + ' mm\u00b2' },
@@ -14879,7 +14879,7 @@ function axSolveTask(task, opgave) {
   } else if (task.kind === 'zs') {
     var zsMax = axZsMax(g.U0, g.Ia);
     sol.assumptions = [S('Automatisk frakobling i TN: Zs\u00b7Ia \u2264 U0. Ia for kurve C \u2248 10\u00b7In (\u00f8jeblikkelig udl\u00f8sning).', 'Automatic disconnection in TN: Zs\u00b7Ia \u2264 U0. Ia for curve C \u2248 10\u00b7In (instantaneous trip).')];
-    sol.formula = 'Zs \u2264 U0 / Ia';
+    sol.formula = 'Z<sub>s</sub> \u2264 U<sub>0</sub> / I<sub>a</sub>';
     sol.substitution = 'Zs_max = ' + g.U0 + ' / ' + g.Ia + ' = ' + axFmt(zsMax, 2) + ' \u03a9';
     sol.steps = [{ da: 'Maks. tilladt sl\u00f8jfeimpedans', en: 'Max permissible loop impedance', expr: g.U0 + ' V / ' + g.Ia + ' A', result: axFmt(zsMax, 2) + ' \u03a9' }];
     sol.result = { value: Math.round(zsMax * 100) / 100, unit: '\u03a9', da: 'Zs,max', en: 'Zs,max' };
