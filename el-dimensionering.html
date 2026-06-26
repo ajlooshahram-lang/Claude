@@ -1259,8 +1259,8 @@ const T = {
     scIkmax: 'Iₖ,ₘₐₓ [kA]',
     scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'Kortslutningskontrol',
-    scCheck1: 'Icu \u2265 Ik max',
-    scCheck2: 'Isd \u2264 Ik min',
+    scCheck1: 'I<sub>cu</sub> \u2265 I<sub>k,max</sub>',
+    scCheck2: 'I<sub>sd</sub> \u2264 I<sub>k,min</sub>',
     // General
     select: 'V\u00E6lg',
     result: 'Resultat',
@@ -1409,8 +1409,8 @@ const T = {
     scIkmax: 'Iₖ,ₘₐₓ [kA]',
     scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'Short Circuit Check',
-    scCheck1: 'Icu \u2265 Ik max',
-    scCheck2: 'Isd \u2264 Ik min',
+    scCheck1: 'I<sub>cu</sub> \u2265 I<sub>k,max</sub>',
+    scCheck2: 'I<sub>sd</sub> \u2264 I<sub>k,min</sub>',
     select: 'Select',
     result: 'Result',
     ok: 'OK',
@@ -1558,8 +1558,8 @@ const T = {
     scIkmax: 'Iₖ,ₘₐₓ [kA]',
     scIkmin: 'Iₖ,ₘᵢₙ [A]',
     scResult: 'کنترل اتصال کوتاه',
-    scCheck1: 'Icu ≥ Ik max',
-    scCheck2: 'Isd ≤ Ik min',
+    scCheck1: 'I<sub>cu</sub> ≥ I<sub>k,max</sub>',
+    scCheck2: 'I<sub>sd</sub> ≤ I<sub>k,min</sub>',
     select: 'انتخاب',
     result: 'نتیجه',
     ok: 'قبول',
@@ -4581,6 +4581,22 @@ function calcDiversityPb() {
   }
   const W = diversityState.kwhPerHome / 1000; // MWh per home
   return 0.834 * Math.pow(W * diversityState.homes, 0.89);
+}
+// Validity range per Elektroteknik Bind 5, Formel 246 (Side 360):
+//   area-based  0,12·(A·n)^0,74 : derived for 9–20 homes (acceptable as an
+//                                  approximation for n < 9).
+//   energy-based 0,834·(W·n)^0,89: derived for MORE THAN 20 homes.
+// Returns null when the selected method is used inside its validated domain,
+// otherwise a bilingual caution string. Conservative: we warn rather than
+// silently extrapolate an experience formula beyond its source data.
+function diversityRangeNote() {
+  var n = diversityState.homes;
+  if (diversityState.method === 'area') {
+    if (n > 20) return tx('\u26A0\uFE0F Arealformlen er udledt for 9\u201320 boliger. Med ' + n + ' boliger b\u00F8r energiformlen (>20 boliger) anvendes.', '\u26A0\uFE0F The area formula is derived for 9\u201320 homes. With ' + n + ' homes use the energy formula (>20 homes).');
+  } else {
+    if (n <= 20) return tx('\u26A0\uFE0F Energiformlen er udledt for >20 boliger. Med ' + n + ' boliger b\u00F8r arealformlen (9\u201320 boliger) anvendes.', '\u26A0\uFE0F The energy formula is derived for >20 homes. With ' + n + ' homes use the area formula (9\u201320 homes).');
+  }
+  return null;
 }
 
 // ===== UNLIMITED LOAD SCHEDULE (Belastningsskema) =====
@@ -9813,6 +9829,7 @@ function renderLoad() {
         <div class="result-row"><span class="label">P<sub>B</sub></span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
         <div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
         <div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">${tx('Formel','Formula')}</span><span class="value">${diversityState.method==='area' ? 'P<sub>B</sub> = 0,12\u00B7(A\u00B7n)^0,74' : 'P<sub>B</sub> = 0,834\u00B7(W\u00B7n)^0,89'}</span></div>
+        ${diversityRangeNote() ? `<div class="info-row" style="margin-top:6px;color:var(--warning,#b8860b);font-weight:600">${diversityRangeNote()}</div>` : ''}
       </div>
     `, { level: 'engineer', id: 'load_diversity' })}
   `;
@@ -10559,8 +10576,8 @@ function renderShortCircuit() {
       <div class="info-row">${tx('V\u00E6lg netimpedans og trafoimpedans. Kabelimpedans beregnes fra kabelmodulet.', 'Select network impedance and transformer impedance. Cable impedance is calculated from the cable module.')}</div>
 
       ${uxSummary([
-        {label: 'Ik max (3\u03C6)', value: (ikMax3ph/1000).toFixed(2) + ' kA', status: deviceIcu > 0 ? (check1 ? 'pass' : 'fail') : ''},
-        {label: 'Ik min (2\u03C6)', value: ikMin2ph.toFixed(0) + ' A', status: deviceIsd > 0 ? (check2 ? 'pass' : 'fail') : ''},
+        {label: 'I<sub>k,max</sub> (3\u03C6)', value: (ikMax3ph/1000).toFixed(2) + ' kA', status: deviceIcu > 0 ? (check1 ? 'pass' : 'fail') : ''},
+        {label: 'I<sub>k,min</sub> (2\u03C6)', value: ikMin2ph.toFixed(0) + ' A', status: deviceIsd > 0 ? (check2 ? 'pass' : 'fail') : ''},
         {label: 'Z total', value: zTotalShown.toFixed(2) + ' m\u03A9', status: ''},
         {label: tx('Frakobling', 'Disconnection'), value: discOk ? '\u22640.4s' : '> 0.4s', status: discOk ? 'pass' : 'fail'}
       ])}

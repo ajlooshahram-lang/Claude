@@ -15127,6 +15127,26 @@ test('load: housing-estate diversity matches both Elektroteknik Bind 5 Formel 24
   diversityState.method = pm; diversityState.homes = ph; diversityState.kwhPerHome = pk; diversityState.areaPerHome = pa;
 });
 
+test('load: diversity textbook example 20 homes x 130 m2 = 40.4 kW (Formel 246 Eksempel 9.1.1.1)', function () {
+  var pm = diversityState.method, ph = diversityState.homes, pa = diversityState.areaPerHome;
+  diversityState.method = 'area'; diversityState.homes = 20; diversityState.areaPerHome = 130;
+  assert.ok(Math.abs(calcDiversityPb() - 40.4) < 0.1, 'matches textbook 40.4 kW (got ' + calcDiversityPb().toFixed(2) + ')');
+  diversityState.method = pm; diversityState.homes = ph; diversityState.areaPerHome = pa;
+});
+
+test('load: diversityRangeNote enforces Formel 246 validity ranges (area 9-20, energy >20)', function () {
+  var pm = diversityState.method, ph = diversityState.homes;
+  diversityState.method = 'area'; diversityState.homes = 15;
+  assert.ok(diversityRangeNote() === null, 'area @15 homes: in range, no warning');
+  diversityState.homes = 50;
+  assert.ok(diversityRangeNote() !== null, 'area @50 homes: out of range -> warns');
+  diversityState.method = 'energy'; diversityState.homes = 100;
+  assert.ok(diversityRangeNote() === null, 'energy @100 homes: in range, no warning');
+  diversityState.homes = 10;
+  assert.ok(diversityRangeNote() !== null, 'energy @10 homes: out of range -> warns');
+  diversityState.method = pm; diversityState.homes = ph;
+});
+
 // ===== COMPLEX SHORT-CIRCUIT (IEC 60909 / El-7 vector method) =====
 test('scircuit: scComplexParts matches El-7 textbook (R/X=0.4 => phi=68.2deg, cos=0.371, sin=0.928)', function () {
   var p = scComplexParts(10, 0.4);
