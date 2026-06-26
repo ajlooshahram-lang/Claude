@@ -4570,10 +4570,15 @@ let activeModule = 'guide';
 
 // Load state
 let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
-// Housing-estate diversity (net-company experience formula, Fællesregulativet):
-// Pb = 0.834 * (W*n)^0.89  [kW], W = avg annual energy per home (MWh), n = homes
-let diversityState = { homes: 115, kwhPerHome: 8300, show: false };
+// Housing-estate diversity (net-company experience formulas, Fællesregulativet /
+// Elektroteknik Bind 5 Formel 246, Side 360):
+//   energy-based: Pb = 0.834·(W·n)^0.89  [kW]  (W = avg annual energy/home in MWh)
+//   area-based:   Pb = 0.12·(A·n)^0.74   [kW]  (A = avg home area m², 9-20 homes, no el-heating)
+let diversityState = { homes: 115, kwhPerHome: 8300, areaPerHome: 130, method: 'energy', show: false };
 function calcDiversityPb() {
+  if (diversityState.method === 'area') {
+    return 0.12 * Math.pow(diversityState.areaPerHome * diversityState.homes, 0.74);
+  }
   const W = diversityState.kwhPerHome / 1000; // MWh per home
   return 0.834 * Math.pow(W * diversityState.homes, 0.89);
 }
@@ -9746,23 +9751,40 @@ function renderLoad() {
     ${renderLoadSchedule()}
 
     ${uxPanel(tx('\uD83C\uDFD8\uFE0F Boligudstykning \u2013 diversitet', '\uD83C\uDFD8\uFE0F Housing estate \u2013 diversity'), `
-      <div class="info-row">${tx('Netselskabets erfaringsformel: Pb = 0,834 \u00B7 (W\u00B7n)^0,89', 'Net-company experience formula: Pb = 0.834 \u00B7 (W\u00B7n)^0.89')}</div>
+      <div class="info-row">${diversityState.method === 'area'
+        ? tx('Erfaringsformel (areal, 9\u201320 boliger uden elvarme): Pb = 0,12 \u00B7 (A\u00B7n)^0,74 \u2014 Elektroteknik Bind 5, Formel 246', 'Experience formula (area, 9\u201320 homes without el-heating): Pb = 0.12 \u00B7 (A\u00B7n)^0.74 \u2014 Elektroteknik Bind 5, Formel 246')
+        : tx('Netselskabets erfaringsformel (energi): Pb = 0,834 \u00B7 (W\u00B7n)^0,89 \u2014 Elektroteknik Bind 5, Formel 246', 'Net-company experience formula (energy): Pb = 0.834 \u00B7 (W\u00B7n)^0.89 \u2014 Elektroteknik Bind 5, Formel 246')}</div>
+      <div class="select-group">
+        <div class="select-label">${tx('Metode', 'Method')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${diversityState.method==='energy'?'selected':''}" onclick="diversityState.method='energy';renderModule('load')">${tx('Energi (W\u00B7n)', 'Energy (W\u00B7n)')}</button>
+          <button class="sel-btn ${diversityState.method==='area'?'selected':''}" onclick="diversityState.method='area';renderModule('load')">${tx('Areal (A\u00B7n)', 'Area (A\u00B7n)')}</button>
+        </div>
+      </div>
       <div class="select-group">
         <div class="select-label">${tx('Antal boliger (n)', 'Number of homes (n)')}</div>
         <div class="select-grid">
           ${[10,25,50,75,100,115,150,200,300].map(v=>`<button class="sel-btn ${diversityState.homes===v?'selected':''}" onclick="diversityState.homes=${v};renderModule('load')">${v}</button>`).join('')}
         </div>
       </div>
+      ${diversityState.method === 'area' ? `
+      <div class="select-group">
+        <div class="select-label">${tx('Gns. boligareal A (m\u00B2)', 'Avg. home area A (m\u00B2)')}</div>
+        <div class="select-grid">
+          ${[80,100,120,130,150,180,200,250].map(v=>`<button class="sel-btn ${diversityState.areaPerHome===v?'selected':''}" onclick="diversityState.areaPerHome=${v};renderModule('load')">${v}</button>`).join('')}
+        </div>
+      </div>` : `
       <div class="select-group">
         <div class="select-label">${tx('Energi pr. bolig (kWh/\u00E5r)', 'Energy per home (kWh/yr)')}</div>
         <div class="select-grid">
           ${[2000,3000,4300,5000,6000,8300,10000,12000].map(v=>`<button class="sel-btn ${diversityState.kwhPerHome===v?'selected':''}" onclick="diversityState.kwhPerHome=${v};renderModule('load')">${v}</button>`).join('')}
         </div>
-      </div>
+      </div>`}
       <div class="result-box">
         <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
-        <div class="result-row"><span class="label">Pb</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
+        <div class="result-row"><span class="label">P<sub>B</sub></span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
         <div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
+        <div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">${tx('Formel','Formula')}</span><span class="value">${diversityState.method==='area' ? 'P<sub>B</sub> = 0,12\u00B7(A\u00B7n)^0,74' : 'P<sub>B</sub> = 0,834\u00B7(W\u00B7n)^0,89'}</span></div>
       </div>
     `, { level: 'engineer', id: 'load_diversity' })}
   `;

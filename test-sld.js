@@ -15117,6 +15117,16 @@ test('eng: engTree renders expandable <details> nodes and classifies into exam s
   lang = prev;
 });
 
+test('load: housing-estate diversity matches both Elektroteknik Bind 5 Formel 246 methods', function () {
+  var pm = diversityState.method, ph = diversityState.homes, pk = diversityState.kwhPerHome, pa = diversityState.areaPerHome;
+  diversityState.method = 'energy'; diversityState.homes = 100; diversityState.kwhPerHome = 8300;
+  assert.ok(Math.abs(calcDiversityPb() - 0.834 * Math.pow(8.3 * 100, 0.89)) < 0.01, 'energy formula Pb=0.834·(W·n)^0.89 exact');
+  diversityState.method = 'area'; diversityState.homes = 15; diversityState.areaPerHome = 130;
+  assert.ok(Math.abs(calcDiversityPb() - 0.12 * Math.pow(130 * 15, 0.74)) < 0.01, 'area formula Pb=0.12·(A·n)^0.74 exact');
+  assert.ok(Math.abs(calcDiversityPb() - 32.6) < 0.2, 'area numeric ~32.6 kW');
+  diversityState.method = pm; diversityState.homes = ph; diversityState.kwhPerHome = pk; diversityState.areaPerHome = pa;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
