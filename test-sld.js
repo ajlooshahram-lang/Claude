@@ -16066,6 +16066,63 @@ test('Torque/speed curve text says Y-delta reduces torque to ~1/3 (not "halves")
 });
 
 
+// === Life-safety invariant regression tests (independent re-derivation audit) ===
+// Locks in the conservative DS/HD 60364 behaviour confirmed by hand-derivation:
+// IB<=In<=Iz, Zs<=U0/Ia (4-41), adiabatic S=sqrt(I^2 t)/k (4-43/5-54), TT RA*IdN<=50 V.
+console.log('\n=== Life-Safety Invariant Tests (audit re-derivation) ===\n');
+
+test('faultCalcIa uses CONSERVATIVE upper-bound magnetic factors (B=5x, C=10x, D=20x)', function() {
+  // Upper bound -> highest Ia -> lowest Zs_max -> strictest (safest) requirement.
+  assert.strictEqual(faultCalcIa('mcbB', 16), 80,  'B16 Ia must be 5x = 80 A');
+  assert.strictEqual(faultCalcIa('mcbC', 16), 160, 'C16 Ia must be 10x = 160 A');
+  assert.strictEqual(faultCalcIa('mcbD', 16), 320, 'D16 Ia must be 20x = 320 A');
+});
+
+test('faultCalcTN: Zs*Ia<=U0 (DS/HD 60364-4-41) and Zs_max=U0/Ia exact', function() {
+  var ia = faultCalcIa('mcbC', 16);                 // 160 A
+  var r = faultCalcTN(1.0, ia, 230);
+  assert.ok(r.ok, '1.0 ohm with C16 must pass in TN');
+  assert.ok(Math.abs(r.ZsMax - 230 / 160) < 1e-6, 'Zs_max must equal U0/Ia = 1.4375 ohm');
+  // Boundary: exactly at the limit must still be OK (<=, not <).
+  var edge = faultCalcTN(r.ZsMax, ia, 230);
+  assert.ok(edge.ok, 'Zs exactly equal to U0/Ia must be accepted (inclusive limit)');
+  // Just over the limit must FAIL (no dangerous rounding through the boundary).
+  assert.ok(!faultCalcTN(r.ZsMax + 1e-6, ia, 230).ok, 'Zs above U0/Ia must be rejected');
+});
+
+test('faultCalcMinCSA implements adiabatic S=sqrt(I^2*t)/k (DS/HD 60364-5-54)', function() {
+  var s = faultCalcMinCSA(3000, 0.1, 143);          // Cu/XLPE k=143
+  assert.ok(Math.abs(s - 3000 * Math.sqrt(0.1) / 143) < 1e-6, 'min CSA must be ~6.63 mm2');
+  // Higher fault energy must never reduce the required cross-section (monotonic, safe).
+  assert.ok(faultCalcMinCSA(6000, 0.1, 143) > s, 'doubling Ik must increase required CSA');
+  assert.ok(faultCalcMinCSA(3000, 0.4, 143) > s, 'longer trip time must increase required CSA');
+});
+
+test('faultCalcTT: RA*IdN<=50 V touch limit and RA_max=50/IdN exact', function() {
+  var r = faultCalcTT(1666, 0.03, 50);              // 30 mA RCD
+  assert.ok(r.ok, '1666 ohm with 30 mA must pass (1666*0.03=49.98<=50)');
+  assert.ok(Math.abs(r.RAmax - 50 / 0.03) < 1e-6, 'RA_max must equal 50/0.03 = 1666.7 ohm');
+  assert.ok(!faultCalcTT(1700, 0.03, 50).ok, '1700 ohm with 30 mA must FAIL (51>50)');
+});
+
+test('axVdrop: 3-phase uses sqrt(3) and 1-phase uses 2 (DS/HD 60364 Annex G)', function() {
+  var sin = Math.sqrt(1 - 0.81);
+  var v3 = axVdrop(80, 50, 0.387, 0.08, 0.9, 3, 400);
+  var hand3 = Math.sqrt(3) * 80 * 0.05 * (0.387 * 0.9 + 0.08 * sin);
+  assert.ok(Math.abs(v3.dU - hand3) < 1e-3, '3-phase dU must match sqrt(3) formula');
+  var v1 = axVdrop(80, 50, 0.387, 0.08, 0.9, 1, 230);
+  var hand1 = 2 * 80 * 0.05 * (0.387 * 0.9 + 0.08 * sin);
+  assert.ok(Math.abs(v1.dU - hand1) < 1e-3, '1-phase dU must match factor-2 formula');
+});
+
+test('axIkTrafoSecondary: trafo-only Ik is conservative and monotonic in ek', function() {
+  var a = axIkTrafoSecondary(630, 400, 5);
+  assert.ok(Math.abs(a.In - 630000 / (Math.sqrt(3) * 400)) < 0.2, 'In = S/(sqrt3*U) ~909 A');
+  assert.ok(Math.abs(a.Ik - a.In / 0.05) < 2, 'Ik = In/ek (trafo impedance only)');
+  // Lower ek -> higher prospective Ik (the device must be rated for the worst case).
+  assert.ok(axIkTrafoSecondary(630, 400, 4).Ik > a.Ik, 'lower ek must give higher Ik');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
