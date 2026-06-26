@@ -9978,7 +9978,7 @@ function renderFuse() {
         name: tx('Sikringsdimensionering', 'Fuse Dimensioning'),
         formula: 'IB \u2264 In, I\u2082t \u2264 k\u00b2S\u00b2, Icu \u2265 Ik,max',
         variables: [
-          { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('M\u00E6rkestr\u00F8m', 'Rated current'), symbol: 'Iₙ', value: fuseState.size, unit: 'A', source: tx('valgt', 'selected') },
           { name: tx('5s strøm', '5s current'), symbol: 'I5s', value: FUSE_5S[fuseState.size] || 0, unit: 'A', source: 'IEC 60269 / ' + tx('fabrikantdata', 'manufacturer data') },
           { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'I<sub>cu</sub>', value: holder.ikMax, unit: 'kA', source: fuseState.holder },
           { name: tx('Holder', 'Holder'), symbol: fuseState.holder, value: holder.range, unit: '', source: tx('valgt system', 'selected system') }
@@ -10105,7 +10105,7 @@ function renderMCB() {
         name: tx('MCB Dimensionering', 'MCB Dimensioning'),
         formula: 'IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max',
         variables: [
-          { name: tx('MÃ¦rkestrÃ¸m', 'Rated current'), symbol: 'Iₙ', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
+          { name: tx('M\u00E6rkestr\u00F8m', 'Rated current'), symbol: 'Iₙ', value: mcbState.rating, unit: 'A', source: tx('valgt', 'selected') },
           { name: tx('Brydeevne', 'Breaking capacity'), symbol: 'I<sub>cu</sub>', value: icu, unit: 'kA', source: mcbState.type + ' (' + mcb.standard + ')' },
           { name: tx('Kurve', 'Curve'), symbol: mcbState.curve, value: isdMin + '-' + isdMax, unit: 'A', source: 'Isd = ' + curve.isdMin + '-' + curve.isdMax + '\u00d7In' },
           { name: tx('Serviceevne', 'Service capacity'), symbol: 'Ics', value: (icu * mcb.ics).toFixed(1), unit: 'kA', source: mcb.ics + '\u00d7Icu' }
@@ -11373,7 +11373,7 @@ function renderTrafoSizing() {
   html += '<div class="result-row"><span class="label">' + tx('Ik (sekundær skinne)', 'Ik (secondary busbar)') + '</span><span class="value">' + (Ik/1000).toFixed(2) + ' kA</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + Ploss.toFixed(0) + ' W</span></div>';
   html += '</div>';
-  html += calcDetail({ name: tx('FuldlaststrÃ¸m', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U₂', value: 400, unit: 'V', source: tx('SekundÃ¦r', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
+  html += calcDetail({ name: tx('Fuldlaststr\u00F8m', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S\u2099', symbol: 'S\u2099', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U\u2082', symbol: 'U\u2082', value: 400, unit: 'V', source: tx('Sekund\u00E6r', 'Secondary') }], substitution: S + '\u00b71000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
   html += calcDetail({ name: tx('Kortslutningsstrøm', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
   html += '</div>';
   return html;
@@ -30863,7 +30863,7 @@ function renderRelay() {
     formula: 'I1N = S / (\u221A3 \u00D7 U1), I> = Igt \u00D7 I1N, I>> = Igg \u00D7 I1N',
     variables: [
       { name: tx('Transformator', 'Transformer'), symbol: 'S', value: relayState.trafoKVA, unit: 'kVA', source: tx('valgt', 'selected') },
-      { name: tx('PrimÃ¦r spÃ¦nding', 'Primary voltage'), symbol: 'U₁', value: relayState.primaryKV, unit: 'kV', source: tx('valgt', 'selected') },
+      { name: tx('Prim\u00E6r sp\u00E6nding', 'Primary voltage'), symbol: 'U₁', value: relayState.primaryKV, unit: 'kV', source: tx('valgt', 'selected') },
       { name: tx('Overstrøm multipel', 'Overcurrent multiple'), symbol: 'Igt', value: relayState.Igt, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
       { name: tx('Kortslutning multipel', 'Short-circuit multiple'), symbol: 'Igg', value: relayState.Igg, unit: '\u00D7I1N', source: tx('valgt', 'selected') },
       { name: tx('Tidsforsinkelse', 'Time delay'), symbol: 't>', value: relayState.tGt, unit: 's', source: tx('valgt', 'selected') },
