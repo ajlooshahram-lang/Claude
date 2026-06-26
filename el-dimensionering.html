@@ -11234,6 +11234,21 @@ function forsyningNetZfromSk(Skh_va, Un_volt, cosPhiK, c) {
   return { r: mag * Math.cos(phi), x: mag * Math.sin(phi), mag: mag };
 }
 
+// Forsyning: maximum allowable earth-electrode resistance R_E so the potential
+// rise during an earth fault stays within the permissible touch voltage U_Tp.
+//   R_E <= U_Tp / I_E    (DS/EN 50522 cl.5)
+// In a slukkespolejordet/isolated net I_E is taken as the capacitive earth-fault
+// current I_j (Viggo: "saettes I_E = I_J"). Conservative: a SMALLER required R_E.
+function forsyningEarthResistanceMax(IE_amp, Utp_volt) {
+  if (IE_amp <= 0) return { REmax: Infinity, Utp: Utp_volt, IE: IE_amp };
+  return { REmax: Utp_volt / IE_amp, Utp: Utp_volt, IE: IE_amp };
+}
+// Potential rise U_E = I_E * R_E and the pass/fail verdict against U_Tp.
+function forsyningPotentialRise(IE_amp, RE_ohm, Utp_volt) {
+  var UE = IE_amp * RE_ohm;
+  return { UE: UE, Utp: Utp_volt, RE: RE_ohm, ok: UE <= Utp_volt };
+}
+
 // Forsyning: 3-phase MAX short-circuit current on the LV side of N identical
 // distribution transformers in PARALLEL, fed through a common upstream network
 // (+HV) impedance. Computed on the HV side then referred to the LV side by the
@@ -34125,6 +34140,13 @@ function analyzerExtract(text) {
   if (hasTo && !hasTre) data.parallelTrafos = 2;
   else if (hasTre && !hasTo) data.parallelTrafos = 3;
   else if (!hasTo && !hasTre) { var npMatch = text.match(/(\d+)\s+transformere\s+parallelt/i); if (npMatch) data.parallelTrafos = parseInt(npMatch[1]); }
+  // Permissible touch voltage U_Tp (DS/EN 50522): "tilladelig beroeringsspaending 75 V",
+  // "U_tp = 80 V". Default 75 V for a long-duration (slukkespolejordet) fault.
+  var utpMatch = text.match(/(?:ber.ringssp.nding|U_?tp|tilladelig\w*\s+sp.nding)[^.\n]{0,25}?(\d+[.,]?\d*)\s*V/i);
+  if (utpMatch) { data.Utp_V = parseFloat(utpMatch[1].replace(',', '.')); data.confidence.Utp_V = 'high'; }
+  // Earth-electrode resistance R_E if stated: "jordingsmodstand 2 ohm", "R_E = 1,5 ohm"
+  var reMatch = text.match(/(?:jordingsmodstand|jordmodstand|R_?E)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:ohm|\u03a9)/i);
+  if (reMatch) { data.RE_ohm = parseFloat(reMatch[1].replace(',', '.')); data.confidence.RE_ohm = 'medium'; }
 
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
@@ -34153,6 +34175,7 @@ function analyzerDetectQuestions(text) {
     { re: /Ik(?:3|,?max)?.{0,40}(?:transformere?\s+parallelt|parallelt|lavsp.ndingssiden)|(?:to|tre|\d+)\s+transformere\s+parallelt/i, type: 'ik_par', label: 'Ik (parallelle transformere)', module: 'scircuit' },
     { re: /(?:beregn|bestem|find|dimensioner)[^.\n]{0,40}slukkespole|mindste\s+ideelle\s+slukkespole/i, type: 'petersen', label: 'Slukkespole (L)', module: 'scircuit' },
     { re: /(?:beregn|bestem|find)[^.\n]{0,40}(?:kapacitiv|jordfejlstr|jordslutningsstr|ladestr)/i, type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find|kontroller)[^.\n]{0,40}(?:potentialestigning|ber.ringssp|jordingsmodstand|jordmodstand)|potentialestigning/i, type: 'potential', label: 'Potentialestigning / R_E', module: 'scircuit' },
     // === TRANSFORMER (Bind 3 + 5) ===
     { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning', module: 'trafo' },
     { re: /(?:beregn|find)\s+(?:den\s+)?(?:inducerede\s+)?EMK|EMF\s*=\s*4[.,]44/i, type: 'trafo_emf', label: 'Trafo EMK/EMF', module: 'trafo' },
@@ -34434,6 +34457,24 @@ function analyzerSolve(data) {
       solved++;
     } else if (hasQuestion(data, 'petersen')) { flagged.push('Slukkespole: mangler jordfejlstr\u00f8m I_j'); }
     if (hasQuestion(data, 'petersen')) total++;
+
+    // (e) Potential rise / max earth-electrode resistance R_E <= U_Tp / I_E
+    if (hasQuestion(data, 'potential') && data.earthFaultA) {
+      var Utp = data.Utp_V || 75; // DS/EN 50522, long-duration touch voltage
+      var re = forsyningEarthResistanceMax(data.earthFaultA, Utp);
+      var hr = '<div class="result-box"><div class="result-title">\u26A1 Potentialestigning / jordingsmodstand</div>'
+        + row('U_Tp (till. ber\u00f8ringssp.)', nf(Utp, 0) + ' V') + row('I_E (= I_j)', nf(data.earthFaultA, 1) + ' A')
+        + row('R_E,max', '<strong>' + nf(re.REmax, 2) + ' \u03a9</strong>');
+      if (data.RE_ohm != null) {
+        var pr = forsyningPotentialRise(data.earthFaultA, data.RE_ohm, Utp);
+        hr += row('U_E = I_E\u00b7R_E', nf(pr.UE, 0) + ' V (R_E = ' + nf(data.RE_ohm, 2) + ' \u03a9)')
+          + '<div class="info-row" style="font-size:0.78rem;color:' + (pr.ok ? 'var(--success)' : 'var(--danger)') + '">' + (pr.ok ? '\u2705 U_E \u2264 U_Tp \u2014 OK' : '\u26d4 U_E > U_Tp \u2014 jordingsanl\u00e6g utilstr\u00e6kkeligt') + '</div>';
+      }
+      hr += '<div class="info-row" style="font-size:0.76rem">R_E \u2264 U_Tp/I_E (DS/EN 50522 \u00a75). I slukkespolejordet net s\u00e6ttes I_E = den kapacitive jordfejlstr\u00f8m I_j.</div></div>';
+      results.push({ type: 'potential', label: 'Potentialestigning (R_E)', value: 'R_E \u2264 ' + nf(re.REmax, 2) + ' \u03a9', html: hr, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'potential')) { flagged.push('Potentialestigning: mangler I_E (jordfejlstr\u00f8m)'); }
+    if (hasQuestion(data, 'potential')) total++;
   })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===

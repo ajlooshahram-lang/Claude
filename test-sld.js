@@ -16274,6 +16274,15 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
+test('Potentialestigning: R_E <= U_Tp/I_E and the touch-voltage verdict (DS/EN 50522)', function () {
+  var re = forsyningEarthResistanceMax(56, 75);
+  assert(Math.abs(re.REmax - 75 / 56) < 1e-9, 'R_E,max = U_Tp/I_E (got ' + re.REmax.toFixed(3) + ')');
+  var okCase = forsyningPotentialRise(56, 1.0, 75);
+  assert(okCase.UE === 56 && okCase.ok === true, 'U_E=56 V <= 75 V -> OK');
+  var badCase = forsyningPotentialRise(56, 2.0, 75);
+  assert(badCase.UE === 112 && badCase.ok === false, 'U_E=112 V > 75 V -> fail');
+});
+
 // === END-TO-END: a forsyning Opgave 1 is auto-extracted and solved ===
 test('Analyzer auto-solves a forsyning Opgave 1 (Sk, parallel-trafo Ik, slukkespole)', function () {
   var savedLang = lang; lang = 'da';
