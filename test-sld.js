@@ -16274,6 +16274,31 @@ test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z 
   assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
 });
 
+// === END-TO-END: a forsyning Opgave 1 is auto-extracted and solved ===
+test('Analyzer auto-solves a forsyning Opgave 1 (Sk, parallel-trafo Ik, slukkespole)', function () {
+  var savedLang = lang; lang = 'da';
+  var EXAM = [
+    'Opgave 1 Forsyningsanlaeg',
+    'Kortslutningseffekten paa 10 kV skinnen er 120 MVA med cos phi_k = 0,287.',
+    'Transformer: SN = 1000 kVA, uk = 5%, 10/0,4 kV.',
+    'Nettet er slukkespolejordet; den kapacitive jordfejlsstroem er 56 A.',
+    '1.1 Beregn kortslutningseffekten og Ik paa 10 kV skinnen.',
+    '1.2 Beregn Ikmax paa lavspaendingssiden med to transformere parallelt og med tre transformere parallelt.',
+    '1.3 Beregn den mindste ideelle slukkespole.'
+  ].join('\n');
+  analyzerRun(EXAM);
+  var sol = examBuildSolution(analyzerState);
+  var byNum = {};
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.num) byNum[q.num] = q; }); });
+  assert(byNum['1.1'] && byNum['1.1'].solved, '1.1 (Sk/Ik) solved');
+  assert(/6,9\d|6\.9\d/.test(byNum['1.1'].value), '1.1 ~ 6.9 kA (got ' + byNum['1.1'].value + ')');
+  assert(byNum['1.2'] && byNum['1.2'].solved, '1.2 (parallel transformers) solved');
+  assert(/4[34]/.test(byNum['1.2'].value) && /5[78]/.test(byNum['1.2'].value), '1.2 shows ~43 kA (N=2) and ~58 kA (N=3): ' + byNum['1.2'].value);
+  assert(byNum['1.3'] && byNum['1.3'].solved, '1.3 (slukkespole) solved');
+  assert(/0,3\d|0\.3\d/.test(byNum['1.3'].value), '1.3 ~ 0.33 H (got ' + byNum['1.3'].value + ')');
+  lang = savedLang;
+});
+
 test('examBuildSolution is SUB-QUESTION driven: answers 1.1, 1.2, 1.3 in document order', function () {
   var savedLang = lang; lang = 'da';
   var txt = 'Opgave 1\nData: 11 kW, 400 V, cos phi 0,9.\n1.1 Beregn IB.\n1.2 Beregn spaendingsfaldet for 20 m, 4 mm2.\n1.3 Vaelg sikring. In 20 A.';

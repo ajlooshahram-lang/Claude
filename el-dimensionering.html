@@ -34101,6 +34101,31 @@ function analyzerExtract(text) {
   else if (/60364-4-43/.test(text)) data.refClause = '4-43';
   else if (/60364-5-52/.test(text)) data.refClause = '5-52';
 
+  // === FORSYNING / HV NETWORK DATA (Bind 5) ===
+  // Short-circuit power Skh at the HV busbar: "kortslutningseffekt ... 120 MVA", "Skh = 150 MVA"
+  var skhMatch = text.match(/(?:kortslutningseffekt\w*|S_?kh?)[^.\n]{0,40}?(\d+[.,]?\d*)\s*MVA/i);
+  if (!skhMatch) skhMatch = text.match(/(\d+[.,]?\d*)\s*MVA/i);
+  if (skhMatch) { data.Skh_MVA = parseFloat(skhMatch[1].replace(',', '.')); data.confidence.Skh_MVA = 'high'; }
+  // Network short-circuit angle: "cos phi_k = 0,1" / "cos Fk 0,15" or R/X via "arccot 0,30"
+  var coskMatch = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*_?\s*k\s*\)?\s*[:=]?\s*(\d+[.,]\d+)/i);
+  if (coskMatch) { var ck = parseFloat(coskMatch[1].replace(',', '.')); if (ck > 0 && ck <= 1) { data.cosPhiK = ck; data.confidence.cosPhiK = 'high'; } }
+  var rxMatch = text.match(/(?:R\/X|arccot)\s*[:=(]?\s*(\d+[.,]\d+)/i);
+  if (rxMatch) { data.netRX = parseFloat(rxMatch[1].replace(',', '.')); data.confidence.netRX = 'medium'; }
+  // HV distribution voltage: "10 kV", "3 x 10 kV", "50/10 kV" -> take the lower (distribution) side
+  var hvMatch = text.match(/(\d{1,3})\s*\/\s*(\d{1,3})\s*kV/);
+  if (hvMatch) { data.UnHV_kV = parseFloat(hvMatch[2]); data.confidence.UnHV_kV = 'high'; }
+  else { var hv2 = text.match(/\b(?:3\s*[x\u00d7]\s*)?(\d{1,2})\s*kV\b/i); if (hv2) { data.UnHV_kV = parseFloat(hv2[1]); data.confidence.UnHV_kV = 'medium'; } }
+  // Capacitive earth-fault current stated directly: "jordfejlsstrøm ... 56 A", "op til 25 A"
+  var ijMatch = text.match(/(?:jordfejls?str.{0,2}m|jordslutningsstr.{0,2}m|ladestr.{0,2}m)[^.\n]{0,40}?(\d+[.,]?\d*)\s*A/i);
+  if (ijMatch) { data.earthFaultA = parseFloat(ijMatch[1].replace(',', '.')); data.confidence.earthFaultA = 'high'; }
+  // Number of transformers in parallel: "to/tre transformere parallelt". If BOTH
+  // are asked ("to ... og ... tre ... parallelt"), leave it open so the solver
+  // computes for N=2 AND N=3.
+  var hasTo = /\bto\s+transformere\s+parallelt/i.test(text), hasTre = /\btre\s+transformere\s+parallelt/i.test(text);
+  if (hasTo && !hasTre) data.parallelTrafos = 2;
+  else if (hasTre && !hasTo) data.parallelTrafos = 3;
+  else if (!hasTo && !hasTre) { var npMatch = text.match(/(\d+)\s+transformere\s+parallelt/i); if (npMatch) data.parallelTrafos = parseInt(npMatch[1]); }
+
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
 
@@ -34123,6 +34148,11 @@ function analyzerDetectQuestions(text) {
     { re: /selektivitet/i, type: 'selectivity', label: 'Selektivitet', module: 'discrim' },
     { re: /beregn\s+(?:den\s+)?tilladelige\s+str.{1,2}m/i, type: 'iz', label: 'Tilladeligt Iz', module: 'cable' },
     { re: /koordinering|IB\s*.\s*In\s*.\s*Iz/i, type: 'coord', label: 'Koordinering IB\u2264In\u2264Iz', module: 'mcb' },
+    // === FORSYNING / HV NETWORK (Bind 5) ===
+    { re: /(?:beregn|bestem|find|hvad\s+er)\b[^.\n]{0,40}kortslutningseffekt/i, type: 'sk_net', label: 'Kortslutningseffekt Sk', module: 'scircuit' },
+    { re: /Ik(?:3|,?max)?.{0,40}(?:transformere?\s+parallelt|parallelt|lavsp.ndingssiden)|(?:to|tre|\d+)\s+transformere\s+parallelt/i, type: 'ik_par', label: 'Ik (parallelle transformere)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find|dimensioner)[^.\n]{0,40}slukkespole|mindste\s+ideelle\s+slukkespole/i, type: 'petersen', label: 'Slukkespole (L)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find)[^.\n]{0,40}(?:kapacitiv|jordfejlstr|jordslutningsstr|ladestr)/i, type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', module: 'scircuit' },
     // === TRANSFORMER (Bind 3 + 5) ===
     { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning', module: 'trafo' },
     { re: /(?:beregn|find)\s+(?:den\s+)?(?:inducerede\s+)?EMK|EMF\s*=\s*4[.,]44/i, type: 'trafo_emf', label: 'Trafo EMK/EMF', module: 'trafo' },
@@ -34335,6 +34365,76 @@ function analyzerSolve(data) {
     flagged.push('Ik: mangler kabeldata');
   }
   total++;
+
+  // === FORSYNING / HV NETWORK (Bind 5): Sk, parallel transformers, slukkespole, jordfejl ===
+  (function () {
+    var UnHV = (data.UnHV_kV || 10) * 1000;       // distribution voltage [V]
+    var UnLV = 400;                                 // LV side [V]
+    var cF = 1.0;                                   // forsyning uses c = 1.0 (max)
+    var cosk = data.cosPhiK || (data.netRX ? Math.cos(Math.atan(1 / data.netRX)) : 0.1);
+    function fmtZ(r, x) {
+      var mag = Math.sqrt(r * r + x * x), ang = Math.atan2(x, r) * 180 / Math.PI;
+      return nf(r, 3) + (x >= 0 ? ' + j' : ' \u2212 j') + nf(Math.abs(x), 3) + ' \u03a9 = ' + nf(mag, 3) + ' \u2220 ' + nf(ang, 1) + '\u00b0';
+    }
+    function row(lbl, val) { return '<div class="result-row"><span class="label">' + lbl + '</span><span class="value" style="font-family:monospace">' + val + '</span></div>'; }
+    var zNetHV = data.Skh_MVA ? forsyningNetZfromSk(data.Skh_MVA * 1e6, UnHV, cosk, cF) : null;
+
+    // (a) Short-circuit power / fault current at the HV busbar
+    if (hasQuestion(data, 'sk_net') && data.Skh_MVA) {
+      var sk = forsyningNetworkSk(zNetHV.r, zNetHV.x, UnHV, cF);
+      var h = '<div class="result-box"><div class="result-title">\u26A1 Kortslutningseffekt / Ik (' + nf(UnHV / 1000, 0) + ' kV)</div>'
+        + row('S\u2096', nf(sk.Sk / 1e6, 1) + ' MVA') + row('Z\u2099\u2091\u209c', fmtZ(zNetHV.r, zNetHV.x))
+        + row('I\u2096\u2083max', nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0')
+        + '<div class="info-row" style="font-size:0.76rem">S\u2096 = c\u00b7U\u00b2/|Z|, I\u2096 = c\u00b7U/(\u221a3\u00b7|Z|); IEC 60909 / DS/EN 50522. Kabelimpedanser frem til en nedstr\u00f8ms station skal l\u00e6gges til Z\u2099\u2091\u209c.</div></div>';
+      results.push({ type: 'sk_net', label: 'Kortslutningseffekt S\u2096', value: nf(sk.Sk / 1e6, 1) + ' MVA / ' + nf(sk.Ik / 1000, 2) + ' kA', html: h, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'sk_net')) { flagged.push('Sk: mangler kortslutningseffekt (MVA) p\u00e5 HV-skinnen'); }
+    if (hasQuestion(data, 'sk_net')) total++;
+
+    // (b) LV-side fault current with N transformers in parallel
+    if (hasQuestion(data, 'ik_par') && zNetHV && data.trafoKVA && data.trafoUk) {
+      var Sn = data.trafoKVA * 1000, uk = data.trafoUk / 100;
+      var ztrMag = uk * UnHV * UnHV / Sn;
+      var erPct = data.trafoPcu ? (data.trafoPcu / (data.trafoKVA * 1000)) * 100 : 0;
+      var phiT = (erPct > 0 && erPct < data.trafoUk) ? Math.acos(erPct / data.trafoUk) : (Math.PI / 2);
+      var zTr = { r: ztrMag * Math.cos(phiT), x: ztrMag * Math.sin(phiT) };
+      var Ns = data.parallelTrafos ? [data.parallelTrafos] : [2, 3];
+      var hh = '<div class="result-box"><div class="result-title">\u26A1 Ik p\u00e5 LV-siden \u2014 transformere parallelt</div>'
+        + row('Z\u2099\u2091\u209c (HV)', fmtZ(zNetHV.r, zNetHV.x)) + row('Z\u209c\u1d63 (HV)', fmtZ(zTr.r, zTr.x));
+      var vals = [];
+      Ns.forEach(function (N) {
+        var R = scParallelTrafoIk(zNetHV, zTr, N, UnHV, UnLV, cF);
+        hh += row('N = ' + N + ': Z\u209c\u2092\u209c', fmtZ(R.R, R.X)) + row('N = ' + N + ': I\u2096,LV', '<strong>' + nf(R.ikLV / 1000, 1) + ' kA</strong> \u2220 \u2212' + nf(R.angleDeg, 1) + '\u00b0');
+        vals.push(N + '\u00d7: ' + nf(R.ikLV / 1000, 1) + ' kA');
+      });
+      hh += '<div class="info-row" style="font-size:0.76rem">I\u2096,LV = c\u00b7U_HV/(\u221a3\u00b7|Z\u2099\u2091\u209c + Z\u209c\u1d63/N|)\u00b7(U_HV/U_LV). Viggo Bitsch / IEC 60909.</div></div>';
+      results.push({ type: 'ik_par', label: 'Ik (parallelle transformere)', value: vals.join(', '), html: hh, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'ik_par')) { flagged.push('Ik parallel: mangler Skh, trafo kVA eller uk%'); }
+    if (hasQuestion(data, 'ik_par')) total++;
+
+    // (c) Capacitive earth-fault current (stated directly in the paper)
+    if (hasQuestion(data, 'earthfault') && data.earthFaultA) {
+      var hc = '<div class="result-box"><div class="result-title">\u26A1 Kapacitiv jordfejlstr\u00f8m</div>'
+        + row('I_j', nf(data.earthFaultA, 1) + ' A')
+        + '<div class="info-row" style="font-size:0.76rem">I_j = \u221a3\u00b7\u03c9\u00b7C\u2080\u00b7U_n (oplyst i opgaven). Slukkespolejordet net.</div></div>';
+      results.push({ type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', value: nf(data.earthFaultA, 1) + ' A', html: hc, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'earthfault')) { flagged.push('Jordfejlstr\u00f8m: mangler kabelkapacitans eller oplyst I_j'); }
+    if (hasQuestion(data, 'earthfault')) total++;
+
+    // (d) Petersen coil (slukkespole) that compensates the earth-fault current
+    if (hasQuestion(data, 'petersen') && data.earthFaultA) {
+      var coil = forsyningPetersenCoil(data.earthFaultA, UnHV, 50);
+      var hp = '<div class="result-box"><div class="result-title">\u26A1 Slukkespole (ideel kompensation)</div>'
+        + row('I_j (kompenseres)', nf(data.earthFaultA, 1) + ' A') + row('U_fase', nf(coil.Uphase, 0) + ' V')
+        + row('X_L', nf(coil.XL, 1) + ' \u03a9') + row('L', '<strong>' + nf(coil.L, 3) + ' H</strong>')
+        + '<div class="info-row" style="font-size:0.76rem">Ideel slukkespole: I_L = I_j \u21d2 X_L = U_fase/I_j, L = X_L/\u03c9 (resonans, L = 1/(3\u03c9\u00b2C\u2080)).</div></div>';
+      results.push({ type: 'petersen', label: 'Slukkespole L', value: nf(coil.L, 3) + ' H', html: hp, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'petersen')) { flagged.push('Slukkespole: mangler jordfejlstr\u00f8m I_j'); }
+    if (hasQuestion(data, 'petersen')) total++;
+  })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
   if (ib && data.deviceIn && izCorrected) {
