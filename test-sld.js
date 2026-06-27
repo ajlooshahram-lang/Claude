@@ -16993,6 +16993,66 @@ test('Analyzer end-to-end: a "kortslutningseffekt" question renders the Sk_net p
 });
 
 
+console.log('\n=== Universal Simulation Engine + cable thermal transient Tests ===\n');
+
+test('SimEngine: register/sample/step/reset/scenario behave deterministically', function () {
+  SimEngine.reset();
+  SimEngine.register('_t', function (t) { return { v: 2 * t }; });
+  assert.strictEqual(SimEngine.t, 0, 'reset zeroes the clock');
+  var s0 = SimEngine.sample(0);
+  assert.strictEqual(s0._t.v, 0, 'model evaluated at t=0');
+  SimEngine.dt = 1; SimEngine.speed = 1;
+  var s = SimEngine.step(5);
+  assert.strictEqual(SimEngine.t, 5, 'step advances the clock');
+  assert.strictEqual(s._t.v, 10, 'step samples all models at the new time');
+  SimEngine.setScenario('overload');
+  assert.strictEqual(SimEngine.scenario, 'overload', 'scenario set');
+  assert.strictEqual(SimEngine.t, 0, 'setScenario resets the clock');
+  delete SimEngine.models._t;
+});
+
+test('simThermalTransient: starts at ambient, reaches 63.2% at t=tau, asymptotes to theta_ss', function () {
+  assert.ok(Math.abs(simThermalTransient(30, 90, 600, 0) - 30) < 1e-9, 't=0 -> ambient');
+  assert.ok(Math.abs(simThermalTransient(30, 90, 600, 600) - 67.93) < 0.05, 't=tau -> +63.2% of rise');
+  assert.ok(Math.abs(simThermalTransient(30, 90, 600, 6000) - 90) < 0.1, 't>>tau -> theta_ss');
+});
+
+test('simThermalTimeToLimit: infinite when safe, exact analytic value under overload', function () {
+  assert.strictEqual(simThermalTimeToLimit(30, 65, 70, 600), Infinity, 'theta_ss < theta_max -> never reaches limit (safe)');
+  assert.strictEqual(simThermalTimeToLimit(30, 70, 70, 600), Infinity, 'theta_ss == theta_max -> limit only at infinity');
+  // amb=30, ss=100, max=70, tau=600: -600*ln(1-40/70) = 508.38 s
+  assert.ok(Math.abs(simThermalTimeToLimit(30, 100, 70, 600) - 508.38) < 0.5, 'overload time-to-limit matches the analytic value');
+});
+
+test('SimEngine cableThermal model: synced to thermalState, flags overload with a finite limit', function () {
+  SharedQuantities.set('ambient_temp', 30, 'test');   // the model reads the shared bus first
+  thermalState.ambientTemp = 30; thermalState.selectedCableType = 'PVC'; thermalState.loadRatio = 1.5; thermalState.tauMin = 10;
+  var out = SimEngine.sample(0).cableThermal;
+  assert.ok(Math.abs(out.thetaAmb - 30) < 1e-6, 'ambient pulled from the shared bus (synchronization)');
+  assert.ok(Math.abs(out.theta - 30) < 1e-6, 'at t=0 the conductor is at ambient');
+  // theta_ss = 30 + (70-30)*1.5^2 = 120 -> overloaded, finite time-to-limit
+  assert.ok(Math.abs(out.thetaSS - 120) < 1e-6, 'theta_ss uses the validated I^2 steady-state form');
+  assert.strictEqual(out.overloaded, true, '1.5x load on PVC is an overload');
+  assert.ok(isFinite(out.timeToLimitSec) && out.timeToLimitSec > 0, 'overload yields a finite time-to-limit');
+  thermalState.loadRatio = 0.9;
+  var safe = SimEngine.sample(0).cableThermal;
+  assert.strictEqual(safe.overloaded, false, '0.9x load is safe');
+  assert.strictEqual(safe.timeToLimitSec, Infinity, 'safe load never reaches the limit');
+  thermalState.loadRatio = 1.0;
+});
+
+test('renderThermal: shows the animated digital-twin heating curve + verdict', function () {
+  lang = 'da';
+  thermalState.loadRatio = 1.3; thermalState.selectedCableType = 'PVC'; thermalState.ambientTemp = 30; thermalState.tauMin = 10;
+  var html = renderThermal();
+  assert.ok(html.indexOf('Digital tvilling') >= 0, 'da: digital-twin section present');
+  assert.ok(html.indexOf('<svg') >= 0 && html.indexOf('animateMotion') >= 0, 'animated SVG curve rendered');
+  assert.ok(html.indexOf('OVERLAST') >= 0, 'overload verdict surfaced for 1.3x load');
+  assert.ok(html.indexOf('type="text"') < 0 && html.indexOf('<textarea') < 0, 'thermal sim stays click-only');
+  thermalState.loadRatio = 1.0;
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

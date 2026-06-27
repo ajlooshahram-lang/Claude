@@ -7897,7 +7897,9 @@ let thermalState = {
   ambientTemp: 30,
   groupingCount: 1,
   selectedCableType: 'PVC',
-  installMethod: 'tray'
+  installMethod: 'tray',
+  loadRatio: 1.0,   // I / Iz_derated (the dimensionless load for the transient sim)
+  tauMin: 10        // cable thermal time constant [min] (user-selected, installation-dependent)
 };
 
 function thermalCalcDerating(ambientTemp, nCables, method) {
@@ -7958,6 +7960,127 @@ function thermalCalcTemp(insulation, loadCurrent, iz, ambientTemp, deratingFacto
   return { currentTemp: currentTemp, maxTemp: maxTemp, margin: margin, overloaded: overloaded, loadRatio: loadRatio, clause: 'DS/HD 60364-5-52' };
 }
 
+// ===== UNIVERSAL SIMULATION ENGINE =====
+// A single, central time-stepping engine shared by every simulator. Each simulator
+// is registered as a PURE function (t, engine) -> outputs that reads live project
+// parameters from SharedQuantities, so changing any value anywhere in the app
+// automatically flows into every simulation. The engine itself holds only the
+// simulation clock/scenario; it fabricates no physics — simulators must reuse the
+// app's validated calculation functions.
+var SimEngine = {
+  t: 0,              // current simulation time [s]
+  dt: 1,             // default step [s]
+  speed: 1,          // playback multiplier
+  running: false,
+  scenario: 'normal',// 'normal' | 'overload' | 'fault' | ...
+  models: {},        // id -> function(t, engine) -> output object
+  register: function (id, fn) { this.models[id] = fn; return this; },
+  reset: function () { this.t = 0; this.running = false; return this; },
+  setScenario: function (s) { this.scenario = s; this.reset(); return this; },
+  step: function (dt) { this.t += (dt != null ? dt : this.dt) * this.speed; return this.sample(this.t); },
+  sample: function (t) { var o = {}; for (var k in this.models) { if (this.models.hasOwnProperty(k)) o[k] = this.models[k](t, this); } return o; },
+  // Read a live project quantity from the shared bus (keeps every sim synchronized).
+  param: function (key, def) { return (typeof SharedQuantities !== 'undefined') ? SharedQuantities.get(key, def) : def; }
+};
+
+// First-order (lumped) cable thermal transient toward the VALIDATED steady-state
+// conductor temperature. theta(t) = theta_amb + (theta_ss - theta_amb)*(1 - e^(-t/tau)),
+// starting from ambient. tau = cable thermal time constant [s] (geometry/installation
+// dependent — supplied by the user, not fabricated). theta_ss comes from the validated
+// thermalCalcTemp(). This is the standard heating curve used for overload/emergency
+// analysis (IEC 60853 lumped model).
+function simThermalTransient(thetaAmb, thetaSS, tauSec, tSec) {
+  if (!(tauSec > 0)) return thetaSS;
+  return thetaAmb + (thetaSS - thetaAmb) * (1 - Math.exp(-tSec / tauSec));
+}
+// Time [s] for the conductor to heat from ambient to the insulation limit theta_max
+// under a sustained load whose steady-state is theta_ss. Returns Infinity when the
+// steady-state never reaches the limit (theta_ss <= theta_max => the cable is safe
+// indefinitely). Used for the "how long can this overload last?" emergency question.
+function simThermalTimeToLimit(thetaAmb, thetaSS, thetaMax, tauSec) {
+  if (!(tauSec > 0)) return (thetaSS > thetaMax ? 0 : Infinity);
+  if (thetaSS <= thetaMax) return Infinity;       // never reaches the limit -> safe
+  if (thetaMax <= thetaAmb) return 0;             // already at/over the limit
+  var frac = (thetaMax - thetaAmb) / (thetaSS - thetaAmb); // in (0,1) for overload
+  return -tauSec * Math.log(1 - frac);
+}
+
+// Register the cable thermal transient as a live simulator on the engine. It reads
+// the shared ambient temperature and the thermal-module UI (load ratio, insulation,
+// tau) so it stays synchronized with the rest of the app. theta_ss uses the SAME
+// validated steady-state form as thermalCalcTemp(): theta_amb + (theta_max-theta_amb)*(I/Iz)^2.
+SimEngine.register('cableThermal', function (t, eng) {
+  var amb = eng.param('ambient_temp', (typeof thermalState !== 'undefined' ? thermalState.ambientTemp : 30));
+  var lr = (typeof thermalState !== 'undefined' && thermalState.loadRatio) ? thermalState.loadRatio : 1;
+  var maxT = (typeof thermalState !== 'undefined' && thermalState.selectedCableType === 'XLPE') ? 90 : 70;
+  var tau = ((typeof thermalState !== 'undefined' && thermalState.tauMin) ? thermalState.tauMin : 10) * 60;
+  var thetaSS = amb + (maxT - amb) * lr * lr;
+  return {
+    theta: simThermalTransient(amb, thetaSS, tau, t),
+    thetaSS: thetaSS, thetaMax: maxT, thetaAmb: amb, tauSec: tau,
+    timeToLimitSec: simThermalTimeToLimit(amb, thetaSS, maxT, tau),
+    overloaded: thetaSS > maxT
+  };
+});
+
+// Animated SVG heating curve theta(t): blue->amber->red as it approaches the limit.
+// Shows the theta_max limit line, the steady-state asymptote, and (under overload)
+// the time at which the insulation limit is reached.
+function simRenderThermalCurve(thetaAmb, thetaSS, thetaMax, tauMin) {
+  var W = 320, H = 180, ml = 38, mb = 24, mt = 10, mr = 10;
+  var pw = W - ml - mr, ph = H - mt - mb;
+  var tauSec = tauMin * 60;
+  var tLimit = simThermalTimeToLimit(thetaAmb, thetaSS, thetaMax, tauSec);
+  var overloaded = thetaSS > thetaMax;
+  // Time axis: enough to show settling, or 1.4x the time-to-limit under overload.
+  var tEndSec = overloaded && isFinite(tLimit) ? Math.max(tLimit * 1.4, tauSec * 1.5) : tauSec * 5;
+  var yMax = Math.max(thetaSS, thetaMax) * 1.08;
+  var yMin = Math.min(thetaAmb, 0) ;
+  yMin = Math.max(0, thetaAmb - 5);
+  function X(ts) { return ml + (ts / tEndSec) * pw; }
+  function Y(th) { return mt + ph - ((th - yMin) / (yMax - yMin)) * ph; }
+  var pts = [];
+  var N = 60;
+  for (var i = 0; i <= N; i++) {
+    var ts = (i / N) * tEndSec;
+    pts.push(X(ts).toFixed(1) + ',' + Y(simThermalTransient(thetaAmb, thetaSS, tauSec, ts)).toFixed(1));
+  }
+  var poly = pts.join(' ');
+  var col = thermalGetColor(Math.min(thetaSS, yMax), thetaMax);
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:420px;background:var(--bg);border-radius:8px">';
+  // axes
+  s += '<line x1="' + ml + '" y1="' + mt + '" x2="' + ml + '" y2="' + (mt + ph) + '" stroke="var(--border)" stroke-width="1"/>';
+  s += '<line x1="' + ml + '" y1="' + (mt + ph) + '" x2="' + (ml + pw) + '" y2="' + (mt + ph) + '" stroke="var(--border)" stroke-width="1"/>';
+  // theta_max limit line (red dashed)
+  s += '<line x1="' + ml + '" y1="' + Y(thetaMax).toFixed(1) + '" x2="' + (ml + pw) + '" y2="' + Y(thetaMax).toFixed(1) + '" stroke="var(--danger)" stroke-width="1.2" stroke-dasharray="5,3"/>';
+  s += '<text x="' + (ml + pw) + '" y="' + (Y(thetaMax) - 3).toFixed(1) + '" font-size="9" fill="var(--danger)" text-anchor="end">\u03b8max ' + thetaMax + '\u00b0C</text>';
+  // steady-state asymptote (grey dashed)
+  if (!overloaded) {
+    s += '<line x1="' + ml + '" y1="' + Y(thetaSS).toFixed(1) + '" x2="' + (ml + pw) + '" y2="' + Y(thetaSS).toFixed(1) + '" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3,3"/>';
+    s += '<text x="' + (ml + pw) + '" y="' + (Y(thetaSS) - 3).toFixed(1) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">\u03b8ss ' + Math.round(thetaSS) + '\u00b0C</text>';
+  }
+  // the curve
+  s += '<polyline points="' + poly + '" fill="none" stroke="' + col + '" stroke-width="2.4" stroke-linejoin="round"/>';
+  // animated marker travelling along the curve
+  s += '<circle r="4" fill="' + col + '"><animateMotion dur="3s" repeatCount="indefinite" path="M ' + poly.split(' ').join(' L ').replace(/,/g, ' ') + '"/></circle>';
+  // time-to-limit marker under overload
+  if (overloaded && isFinite(tLimit) && tLimit <= tEndSec) {
+    s += '<line x1="' + X(tLimit).toFixed(1) + '" y1="' + mt + '" x2="' + X(tLimit).toFixed(1) + '" y2="' + (mt + ph) + '" stroke="var(--danger)" stroke-width="1.2" stroke-dasharray="2,2"/>';
+    s += '<text x="' + X(tLimit).toFixed(1) + '" y="' + (mt + 8) + '" font-size="9" fill="var(--danger)" text-anchor="middle">' + simFmtDur(tLimit) + '</text>';
+  }
+  // axis labels
+  s += '<text x="' + (ml - 4) + '" y="' + (Y(thetaAmb) + 3).toFixed(1) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">' + Math.round(thetaAmb) + '</text>';
+  s += '<text x="' + (ml + pw) + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">' + simFmtDur(tEndSec) + '</text>';
+  s += '<text x="' + ml + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--text-muted)">0</text>';
+  s += '</svg>';
+  return s;
+}
+function simFmtDur(sec) {
+  if (!isFinite(sec)) return '\u221e';
+  if (sec < 90) return Math.round(sec) + ' s';
+  return (Math.round(sec / 6) / 10) + ' min';
+}
+
 function thermalCalcI2t(current, time) {
   const i2t = current * current * time;
   return { i2t: i2t, current: current, time: time, clause: 'IEC 60364-4-43' };
@@ -8009,6 +8132,28 @@ function renderThermal() {
       <div class="result-row"><span class="label">${tx('Kombineret','Combined')}</span><span class="value">${dr.combined}</span></div>
       <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${dr.clause}</span></div>
     </div>
+    ${(function(){
+      var maxT = thermalState.selectedCableType==='XLPE'?90:70;
+      var amb = thermalState.ambientTemp;
+      var lr = thermalState.loadRatio;
+      var thetaSS = amb + (maxT-amb)*lr*lr;
+      var tLimit = simThermalTimeToLimit(amb, thetaSS, maxT, thermalState.tauMin*60);
+      var overloaded = thetaSS > maxT;
+      var lrBtns = [0.5,0.7,0.9,1.0,1.1,1.3,1.5].map(function(v){return '<button class="sel-btn '+(Math.abs(thermalState.loadRatio-v)<1e-9?'selected':'')+'" onclick="thermalState.loadRatio='+v+';renderModule(\'thermal\')">'+nf(v,1)+'</button>';}).join('');
+      var tauBtns = [2,5,10,20,40].map(function(v){return '<button class="sel-btn '+(thermalState.tauMin===v?'selected':'')+'" onclick="thermalState.tauMin='+v+';renderModule(\'thermal\')">'+v+' min</button>';}).join('');
+      var verdict = overloaded
+        ? tx('OVERLAST: n\u00e5r '+maxT+'\u00b0C-gr\u00e6nsen efter '+simFmtDur(tLimit)+' \u2014 afbryd inden da.','OVERLOAD: reaches the '+maxT+'\u00b0C limit after '+simFmtDur(tLimit)+' \u2014 disconnect before then.')
+        : tx('Sikker: stabiliserer ved '+Math.round(thetaSS)+'\u00b0C (< '+maxT+'\u00b0C).','Safe: settles at '+Math.round(thetaSS)+'\u00b0C (< '+maxT+'\u00b0C).');
+      var col = overloaded ? 'var(--danger)' : 'var(--success)';
+      return '<div class="select-group"><div class="select-label">'+tx('Digital tvilling \u2014 kabelopvarmning over tid','Digital twin \u2014 cable heating over time')+'</div>'
+        + '<div class="select-label" style="font-weight:400;opacity:0.85">'+tx('Belastningsforhold I/Iz','Load ratio I/Iz')+': '+nf(lr,1)+'</div><div class="select-grid">'+lrBtns+'</div>'
+        + '<div class="select-label" style="font-weight:400;opacity:0.85;margin-top:6px">'+tx('Termisk tidskonstant \u03c4','Thermal time constant \u03c4')+' ('+tx('lille kabel ~2\u20135 min, stort ~20\u201340 min','small cable ~2\u20135 min, large ~20\u201340 min')+')</div><div class="select-grid">'+tauBtns+'</div></div>'
+        + '<div class="result-box" style="text-align:center">'+simRenderThermalCurve(amb, thetaSS, maxT, thermalState.tauMin)+'</div>'
+        + '<div class="result-box"><div class="result-row"><span class="label">'+tx('Station\u00e6r temperatur \u03b8ss','Steady-state temp \u03b8ss')+'</span><span class="value">'+Math.round(thetaSS)+' \u00b0C</span></div>'
+        + '<div class="result-row"><span class="label">'+tx('Tid til '+maxT+'\u00b0C-gr\u00e6nse','Time to '+maxT+'\u00b0C limit')+'</span><span class="value">'+simFmtDur(tLimit)+'</span></div>'
+        + '<div class="result-row"><span class="label">'+tx('Vurdering','Verdict')+'</span><span class="value" style="font-weight:700;color:'+col+'">'+verdict+'</span></div>'
+        + '<div class="result-row" style="opacity:0.7;font-size:0.8em"><span class="label">'+tx('Model','Model')+'</span><span class="value">\u03b8(t)=\u03b8a+(\u03b8ss\u2212\u03b8a)(1\u2212e^\u2212\u1d57\u141f\u1d5f), \u03b8ss=\u03b8a+(\u03b8max\u2212\u03b8a)(I/Iz)\u00b2 \u00b7 IEC 60853</span></div></div>';
+    })()}
     ${calcDetail({
       name: tx('Termisk derating', 'Thermal Derating'),
       formula: 'Iz_korr = Iz_tab \u00d7 K_temp \u00d7 K_group',
