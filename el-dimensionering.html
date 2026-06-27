@@ -30914,6 +30914,56 @@ function trefaseCalcTwoWatt(W1, W2) {
   return { P: P, Q: Q, S: S, cosPhi: cosPhi, phiDeg: phi * 180 / Math.PI };
 }
 
+// ===== Three-phase rotating phasor simulation (digital twin, on SimEngine) =====
+// Renders the validated asymmetric-star result (trefaseCalcAsymStar) as a rotating
+// phasor diagram: three voltage references (0/-120/+120) and the three current
+// phasors at their actual lag angles, plus the NEUTRAL current vector (the complex
+// sum Ia+Ib+Ic) which is zero for a balanced load and non-zero under unbalance.
+// All numbers come from the validated calc; this only visualizes them.
+function simIsBalanced(r) {
+  var maxI = Math.max(r.Ia, r.Ib, r.Ic, 1e-9);
+  return r.IN <= maxI * 0.01;     // neutral negligible vs phase currents
+}
+function simRenderPhasorDiagram(r) {
+  var S = 240, cx = S / 2, cy = S / 2, RV = 78, RI = 64;
+  var maxI = Math.max(r.Ia, r.Ib, r.Ic, r.IN, 1e-9);
+  function tip(L, deg) { var a = deg * Math.PI / 180; return [cx + L * Math.cos(a), cy - L * Math.sin(a)]; }
+  function arrow(L, deg, col, w) {
+    if (!(L > 0.5)) return '';
+    var p = tip(L, deg), hx = p[0], hy = p[1], hl = 7;
+    var b1 = (deg + 152) * Math.PI / 180, b2 = (deg - 152) * Math.PI / 180;
+    return '<line x1="' + cx + '" y1="' + cy + '" x2="' + hx.toFixed(1) + '" y2="' + hy.toFixed(1) + '" stroke="' + col + '" stroke-width="' + w + '"/>'
+      + '<line x1="' + hx.toFixed(1) + '" y1="' + hy.toFixed(1) + '" x2="' + (hx + hl * Math.cos(b1)).toFixed(1) + '" y2="' + (hy - hl * Math.sin(b1)).toFixed(1) + '" stroke="' + col + '" stroke-width="' + w + '"/>'
+      + '<line x1="' + hx.toFixed(1) + '" y1="' + hy.toFixed(1) + '" x2="' + (hx + hl * Math.cos(b2)).toFixed(1) + '" y2="' + (hy - hl * Math.sin(b2)).toFixed(1) + '" stroke="' + col + '" stroke-width="' + w + '"/>';
+  }
+  var L1 = '#a0522d', L2 = '#475569', L3 = '#94a3b8', NC = '#2563eb';
+  var g = '';
+  // voltage references (thin dashed)
+  [0, -120, 120].forEach(function (d) { var p = tip(RV, d); g += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '" stroke="#cbd5e1" stroke-width="1.1" stroke-dasharray="3,3"/>'; });
+  // current phasors (validated magnitudes/angles)
+  g += arrow(RI * r.Ia / maxI, r.IaAng, L1, 2.6);
+  g += arrow(RI * r.Ib / maxI, r.IbAng, L2, 2.6);
+  g += arrow(RI * r.Ic / maxI, r.IcAng, L3, 2.6);
+  g += arrow(RI * r.IN / maxI, r.INAng, NC, 3.2);   // neutral = vector sum
+  var svg = '<svg viewBox="0 0 ' + S + ' ' + S + '" width="100%" style="max-width:300px;background:var(--bg);border-radius:8px">';
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + RV + '" fill="none" stroke="var(--border)" stroke-width="1"/>';
+  // rotating group: spins the whole phasor set (authentic rotating phasors)
+  svg += '<g><animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 ' + cx + ' ' + cy + '" to="360 ' + cx + ' ' + cy + '" dur="5s" repeatCount="indefinite"/>' + g + '</g>';
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="3" fill="var(--text)"/>';
+  svg += '</svg>';
+  // static legend
+  var leg = '<div style="font-size:0.78rem;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px">'
+    + '<span style="color:' + L1 + '">\u25ac I\u2090</span><span style="color:' + L2 + '">\u25ac I_b</span><span style="color:' + L3 + '">\u25ac I_c</span><span style="color:' + NC + '">\u25ac I_N</span><span style="color:#94a3b8">\u254c U</span></div>';
+  return svg + leg;
+}
+
+SimEngine.register('threePhase', function (t, eng) {
+  if (typeof trefaseState === 'undefined') return null;
+  var r = trefaseCalcAsymStar(trefaseState.UL, trefaseState.Za, trefaseState.phiA, trefaseState.Zb, trefaseState.phiB, trefaseState.Zc, trefaseState.phiC);
+  r.balanced = simIsBalanced(r);
+  return r;
+});
+
 function renderTrefase() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('3-faset Beregner', '3-Phase Calculator') + '</div>';
@@ -31069,6 +31119,16 @@ function renderTrefase() {
     html += '<div class="result-row"><span class="label">Q<sub>total</sub></span><span class="value">' + nf(r.Q, 1) + ' var</span></div>';
     html += '<div class="result-row"><span class="label">S<sub>total</sub></span><span class="value">' + nf(r.S, 1) + ' VA</span></div>';
     html += '</div>';
+    // Digital twin: rotating phasor diagram + neutral-current verdict
+    html += '<div class="result-box" style="text-align:center"><div class="result-title" style="text-align:left">' + tx('Digital tvilling \u2014 roterende visere', 'Digital twin \u2014 rotating phasors') + '</div>';
+    html += simRenderPhasorDiagram(r);
+    var _bal = simIsBalanced(r);
+    var _col = _bal ? 'var(--success)' : 'var(--warning)';
+    var _verdict = _bal
+      ? tx('Balanceret: I_N \u2248 0 \u2014 nullederen f\u00f8rer ingen str\u00f8m.', 'Balanced: I_N \u2248 0 \u2014 the neutral carries no current.')
+      : tx('Ubalanceret: nullederen f\u00f8rer I_N = ' + nf(r.IN, 2) + ' A \u2220' + nf(r.INAng, 1) + '\u00b0 \u2014 nullederen skal dimensioneres til denne str\u00f8m (forst\u00e6rkes af 3. harmoniske).', 'Unbalanced: the neutral carries I_N = ' + nf(r.IN, 2) + ' A \u2220' + nf(r.INAng, 1) + '\u00b0 \u2014 size the neutral for this current (aggravated by 3rd harmonics).');
+    html += '<div class="result-row" style="text-align:left;margin-top:4px"><span class="value" style="font-weight:700;color:' + _col + '">' + _verdict + '</span></div>';
+    html += '<div class="result-row" style="text-align:left;opacity:0.7;font-size:0.8em"><span class="value">I_N = I\u2090 + I_b + I_c (' + tx('kompleks vektorsum', 'complex vector sum') + ') \u00b7 DS/HD 60364-5-52, 524</span></div></div>';
   } else if (trefaseState.loadType === 'asymDelta') {
     var r = trefaseCalcAsymDelta(trefaseState.UL, trefaseState.Za, trefaseState.phiA, trefaseState.Zb, trefaseState.phiB, trefaseState.Zc, trefaseState.phiC);
     html += '<div class="result-box"><div class="result-title">' + tx('Usymmetrisk trekant','Asymmetric Delta') + '</div>';

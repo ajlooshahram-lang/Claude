@@ -17092,6 +17092,44 @@ test('renderMotor: embeds the animated run-up digital twin', function () {
   assert.ok(/NEMA B|IEC 60034/.test(html), 'documents the standard induction-motor characteristic basis');
 });
 
+test('3-phase: balanced star load gives zero neutral current (vector sum cancels)', function () {
+  var r = trefaseCalcAsymStar(400, 100, 0, 100, 0, 100, 0);
+  assert.ok(Math.abs(r.Ia - r.Ib) < 1e-9 && Math.abs(r.Ib - r.Ic) < 1e-9, 'equal phase currents');
+  assert.ok(r.IN < 1e-6, 'balanced -> I_N = 0');
+  assert.strictEqual(simIsBalanced(r), true, 'flagged balanced');
+});
+
+test('3-phase: single-phase load -> neutral carries the full phase current', function () {
+  // Only phase A loaded (B,C open via huge Z): I_N = I_A = Up/Za = 230.94/100 = 2.309 A
+  var r = trefaseCalcAsymStar(400, 100, 0, 1e12, 0, 1e12, 0);
+  assert.ok(Math.abs(r.Ia - 2.309) < 0.01, 'I_A = Up/Za ~ 2.309 A');
+  assert.ok(Math.abs(r.IN - r.Ia) < 0.01, 'I_N equals the single loaded-phase current');
+  assert.strictEqual(simIsBalanced(r), false, 'flagged unbalanced');
+});
+
+test('3-phase: two equal resistive phases -> |I_N| equals one phase current (analytic)', function () {
+  // Ia (0deg) + Ib (-120deg), equal magnitudes m: |Ia+Ib| = m. So I_N = phase current.
+  var r = trefaseCalcAsymStar(400, 100, 0, 100, 0, 1e12, 0);
+  assert.ok(Math.abs(r.IN - r.Ia) < 0.01, '|I_N| = |Ia+Ib| = one phase magnitude');
+});
+
+test('simRenderPhasorDiagram: animated rotating phasors with neutral vector + legend', function () {
+  var r = trefaseCalcAsymStar(400, 100, 0, 1e12, 0, 1e12, 0); // unbalanced -> neutral drawn
+  var svg = simRenderPhasorDiagram(r);
+  assert.ok(svg.indexOf('animateTransform') >= 0 && svg.indexOf('type="rotate"') >= 0, 'rotation animation present');
+  assert.ok(svg.indexOf('I_N') >= 0 && svg.indexOf('I\u2090') >= 0, 'legend names the phase and neutral phasors');
+});
+
+test('renderTrefase: asymStar shows the rotating-phasor twin + unbalanced neutral verdict', function () {
+  lang = 'da';
+  trefaseState.loadType = 'asymStar'; trefaseState.UL = 400;
+  trefaseState.Za = 100; trefaseState.phiA = 0; trefaseState.Zb = 1e12; trefaseState.phiB = 0; trefaseState.Zc = 1e12; trefaseState.phiC = 0;
+  var html = renderTrefase();
+  assert.ok(html.indexOf('Digital tvilling') >= 0 && html.indexOf('animateTransform') >= 0, 'rotating phasor twin rendered');
+  assert.ok(html.indexOf('Ubalanceret') >= 0, 'unbalanced neutral verdict surfaced');
+  trefaseState.loadType = 'symStar';
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
