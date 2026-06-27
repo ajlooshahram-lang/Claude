@@ -16561,6 +16561,21 @@ test('examResetTimer: resets to the active mock total, not a hardcoded hour', fu
   assert.strictEqual(examState.timerLeft, total, 'reset restores the mock duration');
 });
 
+test('renderMock: start screen advertises a scaled timer + the real allotted minutes (not a fixed 60 min)', function () {
+  examState.mockOn = false;
+  lang = 'en';
+  var h = renderMock();
+  assert.ok(h.indexOf('60-min') < 0, 'stale "60-min" claim must be gone (en)');
+  assert.ok(/scaled to the exam length/i.test(h), 'explains the timer scales with length');
+  var fullSteps = EXAM_SCEN.reduce(function (n, s) { return n + s.steps.length; }, 0);
+  var fullMin = Math.round(examMockBudget(fullSteps) / 60);
+  assert.ok(h.indexOf('allotted ' + fullMin + ' min') >= 0, 'shows the computed allotted minutes for the full mock');
+  lang = 'da';
+  var hd = renderMock();
+  assert.ok(hd.indexOf('60-min') < 0, 'stale "60-min" claim must be gone (da)');
+  assert.ok(hd.indexOf('afsat ' + fullMin + ' min') >= 0, 'da shows the allotted minutes');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

@@ -16488,9 +16488,11 @@ function renderMock(){
   if(!examState.mockOn){
     const bf = store.mockBestFull!=null ? store.mockBestFull+'%' : (tx('ikke taget', 'not taken'));
     const bq = store.mockBestQuick!=null ? store.mockBestQuick+'%' : (tx('ikke taget', 'not taken'));
+    const fullSteps = EXAM_SCEN.reduce(function(n,s){ return n + s.steps.length; }, 0);
+    const fullMin = Math.round(examMockBudget(fullSteps)/60);
     return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${tx('Mock-eksamen', 'Mock exam')}</div>`
-      + `<div class="info-row">${da?'K\u00f8r en mock under eksamensbetingelser: intet facit undervejs, 60-min timer starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'% samlet + '+EXAM_CAT_FLOOR+'% pr. kategori).':'Run a mock under exam conditions: no answers shown, 60-min timer auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'% overall + '+EXAM_CAT_FLOOR+'% per category).'}</div>`
-      + `<div class="result-row"><span class="label">${tx('Fuld (11 scenarier / 68 trin)', 'Full (11 scenarios / 68 steps)')}</span><span class="value">${bf}</span></div>`
+      + `<div class="info-row">${da?'K\u00f8r en mock under eksamensbetingelser: intet facit undervejs, en timer der skalerer med pr\u00f8vens l\u00e6ngde (ca. 3 min pr. trin) starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'% samlet + '+EXAM_CAT_FLOOR+'% pr. kategori).':'Run a mock under exam conditions: no answers shown, a timer scaled to the exam length (about 3 min per step) auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'% overall + '+EXAM_CAT_FLOOR+'% per category).'}</div>`
+      + `<div class="result-row"><span class="label">${tx('Fuld (11 scenarier / 68 trin)', 'Full (11 scenarios / 68 steps)')}</span><span class="value">${bf} \u00b7 ${tx('afsat', 'allotted')} ${fullMin} min</span></div>`
       + `<div class="result-row"><span class="label">${tx('Hurtig (1 pr. kategori, tilf\u00e6ldig)', 'Quick (1 per category, random)')}</span><span class="value">${bq}</span></div>`
       + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examStartMock('full')">\u25B6 ${tx('Start fuld mock', 'Start full mock')}</button><button class="sel-btn" onclick="examStartMock('quick')">\u26A1 ${tx('Start hurtig mock', 'Start quick mock')}</button></div></div>`;
   }
