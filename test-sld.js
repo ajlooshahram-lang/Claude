@@ -16887,6 +16887,40 @@ test('Analyzer end-to-end: pickers appear ONLY in the unsolved branch (no fabric
   assert.ok(html.indexOf('V\u00e6lg S\u2099 og e\u2096') >= 0, 'shows the click-to-pick prompt instead');
 });
 
+console.log('\n=== Analyzer network short-circuit (Sk_net) picker Tests ===\n');
+
+test('analyzerSkWorked: Ik = Sk/(sqrt3*Un) and |Z_net| = c*Un^2/Sk (validated solver)', function () {
+  var r = analyzerSkWorked(250, 10);   // 250 MVA at 10 kV
+  assert.ok(Math.abs(r.IkkA - 14.43) < 0.1, 'Ik = 250e6/(sqrt3*10000) ~ 14.43 kA, got ' + r.IkkA);
+  assert.ok(Math.abs(r.Zmag - 0.4) < 0.005, '|Z_net| = 1e8/250e6 = 0.4 ohm, got ' + r.Zmag);
+  assert.ok(!r.complex, 'no cos(phi_k) -> magnitude only');
+});
+
+test('analyzerSkWorked: cos(phi_k) unlocks R+jX with |R+jX| reconstructing |Z|', function () {
+  var r = analyzerSkWorked(250, 10, 0.1);
+  assert.ok(r.complex, 'cos(phi_k) provided -> complex');
+  assert.ok(Math.abs(r.R - r.Zmag * 0.1) < 1e-6, 'R = |Z|*cos(phi_k)');
+  assert.ok(Math.abs(Math.sqrt(r.R * r.R + r.X * r.X) - r.Zmag) < 1e-6, '|R+jX| reconstructs |Z|');
+});
+
+test('analyzerSkPicker: requires Sk and Un before any result (no fabrication)', function () {
+  lang = 'da';
+  analyzerState.skPick = { 'g_1.1_sk_net': { sk: 250 } };
+  var h = analyzerSkPicker('g_1.1_sk_net');
+  assert.ok(h.indexOf('kA') < 0, 'no Ik before Un is also chosen');
+  analyzerState.skPick = { 'g_1.1_sk_net': { sk: 250, un: 10 } };
+  var h2 = analyzerSkPicker('g_1.1_sk_net');
+  assert.ok(h2.indexOf('14,4 kA') >= 0, 'full input -> Ik = 14,4 kA (da comma)');
+});
+
+test('Analyzer end-to-end: a "kortslutningseffekt" question renders the Sk_net picker', function () {
+  lang = 'da';
+  var fixture = 'Opgave 1 Forsyning\n1.1 Beregn nettets kortslutningseffekt ved tilslutningspunktet.';
+  analyzerState = { rawText: fixture, segments: analyzerSegment(fixture), extracted: {}, results: [], completeness: { solved: 0, total: 0, flagged: [] } };
+  var html = examRenderSolution(examBuildSolution(analyzerState));
+  assert.ok(html.indexOf('analyzerSkSet(') >= 0, 'Sk_net picker rendered for the kortslutningseffekt question');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

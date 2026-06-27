@@ -36388,6 +36388,69 @@ function analyzerPotPicker(qKey) {
   h += '</div>';
   return h;
 }
+
+// === Click-to-solve: network short-circuit power -> Z_net and Ik_net =========
+// The utility states the network short-circuit power S_k [MVA] at the connection
+// point. From it: |Z_net| = c*Un^2/S_k and Ik = S_k/(sqrt3*Un). An optional cos(phi_k)
+// (networks are strongly inductive) unlocks the R+jX / |Z|angle forms. Reuses the
+// validated forsyningNetZfromSk solver.
+var ANALYZER_SK_MVA = [100, 250, 500, 750, 1000];   // network short-circuit power [MVA]
+var ANALYZER_SK_UN = [10, 20, 50, 60];              // voltage at which S_k is stated [kV]
+var ANALYZER_SK_COSK = [0.1, 0.15, 0.2];            // network cos(phi_k) (optional) -> R+jX
+function analyzerSkSet(qKey, field, val) {
+  analyzerState.skPick = analyzerState.skPick || {};
+  analyzerState.skPick[qKey] = analyzerState.skPick[qKey] || {};
+  analyzerState.skPick[qKey][field] = val;
+  renderModule('analyzer');
+}
+function analyzerSkWorked(skMVA, un, cosk) {
+  var Skh = skMVA * 1e6, Un = un * 1000;
+  var Ik = Skh / (Math.sqrt(3) * Un);
+  var hasC = (cosk != null && cosk > 0 && cosk < 1);
+  var z = forsyningNetZfromSk(Skh, Un, hasC ? cosk : 1, 1.0);
+  var out = { skMVA: skMVA, un: un, cosk: cosk, Ik: Ik, IkkA: Ik / 1000, Zmag: z.mag, complex: hasC };
+  if (hasC) { out.R = z.r; out.X = z.x; out.phiDeg = Math.acos(cosk) * 180 / Math.PI; }
+  return out;
+}
+function analyzerSkWorkedHtml(r) {
+  function ohm(v) { return nf(v, 3) + ' \u03A9'; }
+  var h = '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Udregning (El-5 / IEC 60909 netimpedans)', 'Working (El-5 / IEC 60909 network impedance)') + '</div>';
+  h += '<div class="result-row"><span class="label">I<sub>k,net</sub></span><span class="value">S\u2096/(\u221a3\u00b7U\u2099) = ' + nf(r.skMVA, 0) + ' MVA/(\u221a3\u00b7' + r.un + ' kV) = <strong style="color:var(--primary)">' + nf(r.IkkA, 1) + ' kA</strong></span></div>';
+  h += '<div class="result-row"><span class="label">\u007cZ<sub>net</sub>\u007c</span><span class="value">c\u00b7U\u2099\u00b2/S\u2096 = <strong>' + ohm(r.Zmag) + '</strong></span></div>';
+  if (r.complex) {
+    var jsign = r.X >= 0 ? '+j' : '\u2212j';
+    h += '<div class="result-row"><span class="label">\u03c6\u2096</span><span class="value">arccos(' + nf(r.cosk, 2) + ') = ' + nf(r.phiDeg, 1) + '\u00b0</span></div>';
+    h += '<div class="result-row"><span class="label">Z<sub>net</sub> ' + tx('(rektangul\u00e6r)', '(rectangular)') + '</span><span class="value"><strong>' + nf(r.R, 3) + ' ' + jsign + ' ' + nf(Math.abs(r.X), 3) + ' \u03A9</strong></span></div>';
+    h += '<div class="result-row"><span class="label">Z<sub>net</sub> ' + tx('(pol\u00e6r)', '(polar)') + '</span><span class="value"><strong>' + ohm(r.Zmag) + ' \u2220 ' + nf(r.phiDeg, 1) + '\u00b0</strong></span></div>';
+  }
+  h += '<div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px">' + tx('S\u2096 og U\u2099 er valgt af dig fra forsyningsselskabets oplysninger / opgavens bilag.', 'S\u2096 and U\u2099 were selected by you from the utility data / exam appendix.') + '</div>';
+  h += '</div>';
+  return h;
+}
+function analyzerSkPicker(qKey) {
+  analyzerState.skPick = analyzerState.skPick || {};
+  var pick = analyzerState.skPick[qKey] || {};
+  function btnRow(label, field, opts, cur, suffix) {
+    var s = '<div style="margin-top:6px"><div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:2px">' + label + '</div><div class="select-grid">';
+    opts.forEach(function (o) {
+      s += '<button class="sel-btn ' + (cur === o ? 'selected' : '') + '" onclick="analyzerSkSet(\'' + qKey + '\',\'' + field + '\',' + o + ')">' + nf(o, (o % 1 ? 2 : 0)) + (suffix || '') + '</button>';
+    });
+    s += '</div></div>';
+    return s;
+  }
+  var h = '<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--primary);border-radius:6px;background:rgba(37,99,235,0.06)">';
+  h += '<div style="font-size:0.74rem;font-weight:700;color:var(--primary);text-transform:uppercase">\uD83D\uDDB1\uFE0F ' + tx('V\u00e6lg fra bilaget (kun klik) \u2014 s\u00e5 udregnes Z_net og I\u2096', 'Pick from the appendix (click only) \u2014 then Z_net and I\u2096 are solved') + '</div>';
+  h += btnRow(tx('Nettets kortslutningseffekt S\u2096 [MVA]', 'Network short-circuit power S\u2096 [MVA]'), 'sk', ANALYZER_SK_MVA, pick.sk, ' MVA');
+  h += btnRow(tx('Netsp\u00e6nding U\u2099 [kV]', 'System voltage U\u2099 [kV]'), 'un', ANALYZER_SK_UN, pick.un, ' kV');
+  h += btnRow(tx('cos\u03c6\u2096 (valgfri) \u2014 giver R+jX', 'cos\u03c6\u2096 (optional) \u2014 gives R+jX'), 'cosk', ANALYZER_SK_COSK, pick.cosk, '');
+  if (pick.sk && pick.un) {
+    h += analyzerSkWorkedHtml(analyzerSkWorked(pick.sk, pick.un, pick.cosk));
+  } else {
+    h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">' + tx('V\u00e6lg S\u2096 og U\u2099 ovenfor for at se den fulde udregning.', 'Select S\u2096 and U\u2099 above to see the full working.') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
 // sub-question to several calc types -> identical rows). Merge them into a
 // single question carrying ALL its answers, preserving order.
 function analyzerDedupeQuestions(questions) {
@@ -37020,6 +37083,8 @@ function examRenderSolution(sol) {
           h += analyzerEarthPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type, q.type);
         } else if (q.type === 'potential') {
           h += analyzerPotPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type);
+        } else if (q.type === 'sk_net') {
+          h += analyzerSkPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type);
         }
         h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen automatisk udregning \u2014 indtast de manglende v\u00E6rdier via det tilknyttede modul (kun klik).', 'No automatic working \u2014 enter the missing values via the linked module (click-only).') + '</div>';
         if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
