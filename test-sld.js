@@ -16576,6 +16576,62 @@ test('renderMock: start screen advertises a scaled timer + the real allotted min
   assert.ok(hd.indexOf('afsat ' + fullMin + ' min') >= 0, 'da shows the allotted minutes');
 });
 
+console.log('\n=== AI Curve Analyzer live-context Tests ===\n');
+
+test('curveLiveContext: MCB shows selected breaker + magnetic-trip band in amperes', function () {
+  lang = 'en';
+  mcbState = { type: 'C60N', curve: 'C', rating: 16, poles: 'multi' };
+  var h = curveLiveContext('mcb_C');
+  assert.ok(h.indexOf('C60N C16 A') >= 0, 'shows the actual selected breaker');
+  // C curve = 5-10x In => 80-160 A magnetic band for In = 16 A
+  assert.ok(h.indexOf('80\u2013160 A') >= 0, 'magnetic band = iecMin..iecMax * In in amperes');
+  assert.ok(/I.{0,3},min .{0,3} 160 A/.test(h.replace(/<[^>]+>/g, '')) || h.indexOf('160 A') >= 0, 'states Ik,min requirement = upper band');
+});
+
+test('curveLiveContext: MCB flags a curve mismatch between analyzer view and selected breaker', function () {
+  lang = 'en';
+  mcbState = { type: 'C60N', curve: 'C', rating: 16, poles: 'multi' };
+  var h = curveLiveContext('mcb_D'); // viewing D, device is C
+  assert.ok(/viewing curve D/.test(h) && /curve C/.test(h), 'notes the B/C/D mismatch');
+});
+
+test('curveLiveContext: MCB IB<=In check flips to undersized when load exceeds rating', function () {
+  lang = 'en';
+  mcbState = { type: 'C60N', curve: 'C', rating: 10, poles: 'multi' };
+  loadState = { voltage: '1x230', power: 5, cosPhi: 1.0, simFactor: 1, expFactor: 1 }; // IB = 5000/230 ~ 21.7 A > 10 A
+  var h = curveLiveContext('mcb_C');
+  assert.ok(h.indexOf('undersized') >= 0, 'IB > In must be surfaced as undersized');
+  // And the safe case does NOT say undersized
+  mcbState.rating = 32;
+  var h2 = curveLiveContext('mcb_C');
+  assert.ok(h2.indexOf('undersized') < 0, 'IB <= In must not be flagged undersized');
+});
+
+test('curveLiveContext: pointer when no breaker is selected (no fabricated verdict)', function () {
+  lang = 'en';
+  mcbState = { type: 'C60N', curve: 'C', rating: null, poles: 'multi' };
+  var h = curveLiveContext('mcb_C');
+  assert.ok(/No breaker selected/i.test(h), 'shows a pointer, not a verdict, when nothing is configured');
+  assert.ok(h.indexOf('\u2713') < 0 && h.indexOf('compliant') < 0, 'never asserts compliance with no data');
+});
+
+test('curveLiveContext: RCD reflects the selected type/sensitivity; non-device curves return empty', function () {
+  lang = 'en';
+  rcdSelected = 'Type B'; rcdSensitivity = 30;
+  var h = curveLiveContext('rcd_general');
+  assert.ok(h.indexOf('Type B') >= 0 && h.indexOf('30 mA') >= 0, 'shows selected RCD type and sensitivity');
+  assert.strictEqual(curveLiveContext('phasor'), '', 'phasor (no persistent device config) yields no context block');
+  assert.strictEqual(curveLiveContext('lsig'), '', 'lsig yields no context block');
+});
+
+test('curveAnalyze: embeds the live-context block for a configured MCB', function () {
+  lang = 'da';
+  mcbState = { type: 'C60N', curve: 'B', rating: 13, poles: 'multi' };
+  var h = curveAnalyze('mcb_B');
+  assert.ok(h.indexOf('Din aktuelle konfiguration') >= 0, 'analyzer output includes the live-config section (da)');
+  assert.ok(h.indexOf('C60N B13 A') >= 0, 'live section carries the actual breaker');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

@@ -6862,11 +6862,91 @@ function curveAnalyze(curveKey) {
     h += '</div>';
   }
   h += '<div class="result-row" style="margin-top:6px"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value" style="font-size:0.78rem;color:var(--text-muted)">' + kb.std + '</span></div>';
+  h += curveLiveContext(curveKey);
   h += '</div>';
   return h;
 }
 
 function curveAnalyzerSetSel(key) { curveAnalyzerSel = key; renderModule('standards'); }
+
+// curveLiveContext(): ties the (otherwise generic) curve explanation to the
+// user's ACTUAL configured device in the dependent module, so the analyzer is
+// connected to the rest of the app rather than standalone. It shows only pure,
+// unambiguous quantities (the selected rating, the magnetic-trip band in
+// amperes, IB from the load module, the IB<=In sanity check). It deliberately
+// does NOT render a final "compliant" verdict here: the magnetic-trip check
+// needs the live Ik, which lives in the fault/short-circuit module, and a
+// confidently-wrong life-safety verdict is worse than pointing the user there.
+function curveLiveContext(curveKey) {
+  var da = (typeof lang !== 'undefined' && lang === 'da');
+  var rows = [];
+  var note = '';
+  function fam() {
+    if (curveKey === 'mcb_B' || curveKey === 'mcb_C' || curveKey === 'mcb_D') return 'mcb';
+    if (curveKey === 'fuse_gG' || curveKey === 'fuse_aM') return 'fuse';
+    if (curveKey === 'rcd_general') return 'rcd';
+    if (curveKey === 'motor') return 'motor';
+    return null;
+  }
+  var f = fam();
+  if (!f) return '';
+  var ib = (typeof calcIB === 'function') ? calcIB() : null;
+
+  if (f === 'mcb') {
+    var analyzedCurve = curveKey.split('_')[1]; // B|C|D
+    if (mcbState && mcbState.rating) {
+      var info = MCB_TYPE_INFO[mcbState.curve] || MCB_TYPE_INFO['C'];
+      var lo = info.iecMin * mcbState.rating, hi = info.iecMax * mcbState.rating;
+      rows.push({ l: da ? 'Valgt afbryder' : 'Selected breaker', v: mcbState.type + ' ' + mcbState.curve + mcbState.rating + ' A' });
+      rows.push({ l: da ? 'Magnetisk udl\u00f8seb\u00e5nd' : 'Magnetic trip band', v: nf(lo, 0) + '\u2013' + nf(hi, 0) + ' A (' + info.iecMin + '\u2013' + info.iecMax + '\u00d7I\u2099)' });
+      rows.push({ l: da ? 'Krav for sikker kortslutningsudl\u00f8sning' : 'Required for reliable short-circuit trip', v: 'I\u2096,min \u2265 ' + nf(hi, 0) + ' A' });
+      if (mcbState.curve !== analyzedCurve) {
+        note = da ? ('Bem\u00e6rk: du ser p\u00e5 kurve ' + analyzedCurve + ', men din valgte afbryder er kurve ' + mcbState.curve + '.') : ('Note: you are viewing curve ' + analyzedCurve + ', but your selected breaker is curve ' + mcbState.curve + '.');
+      }
+      if (ib != null && isFinite(ib)) {
+        var okIb = ib <= mcbState.rating + 1e-9;
+        rows.push({ l: da ? 'Belastningsstr\u00f8m (fra last-modul)' : 'Load current (from load module)', v: 'I\u0299 = ' + nf(ib, 1) + ' A' });
+        rows.push({ l: 'I\u0299 \u2264 I\u2099', v: (okIb ? '\u2713 ' : '\u2717 ') + nf(ib, 1) + ' A ' + (okIb ? '\u2264' : '>') + ' ' + mcbState.rating + ' A' + (okIb ? '' : (da ? ' \u2014 underdimensioneret!' : ' \u2014 undersized!')) });
+      }
+    } else {
+      note = da ? 'Ingen afbryder valgt i MCB-modulet endnu \u2014 v\u00e6lg type, kurve og m\u00e6rkestr\u00f8m der for at se din konkrete konfiguration her.' : 'No breaker selected in the MCB module yet \u2014 pick a type, curve and rating there to see your concrete setup here.';
+    }
+  } else if (f === 'fuse') {
+    if (fuseState && fuseState.size) {
+      rows.push({ l: da ? 'Valgt sikring' : 'Selected fuse', v: (fuseState.holder || '') + ' ' + fuseState.size + ' A' });
+      if (ib != null && isFinite(ib)) {
+        var okF = ib <= fuseState.size + 1e-9;
+        rows.push({ l: 'I\u0299 \u2264 I\u2099', v: (okF ? '\u2713 ' : '\u2717 ') + nf(ib, 1) + ' A ' + (okF ? '\u2264' : '>') + ' ' + fuseState.size + ' A' + (okF ? '' : (da ? ' \u2014 underdimensioneret!' : ' \u2014 undersized!')) });
+      }
+    } else {
+      note = da ? 'Ingen sikring valgt i sikringsmodulet endnu.' : 'No fuse selected in the fuse module yet.';
+    }
+  } else if (f === 'rcd') {
+    if (typeof rcdSelected !== 'undefined' && rcdSelected) {
+      rows.push({ l: da ? 'Valgt RCD-type' : 'Selected RCD type', v: rcdSelected });
+      if (typeof rcdSensitivity !== 'undefined' && rcdSensitivity) rows.push({ l: 'I\u0394n', v: rcdSensitivity + ' mA' });
+    } else {
+      note = da ? 'Ingen RCD-type valgt endnu \u2014 v\u00e6lg en i HPFI/RCD-v\u00e6lgeren.' : 'No RCD type selected yet \u2014 pick one in the RCD selector.';
+    }
+  } else if (f === 'motor') {
+    if (motorState && motorState.kW) {
+      var inrush = { dol: '6\u20138\u00d7I\u2099', stardelta: '2\u20133\u00d7I\u2099', soft: '2\u20134\u00d7I\u2099', vfd: '~1\u20131,5\u00d7I\u2099' };
+      var st = motorState.startType || 'dol';
+      rows.push({ l: da ? 'Motor (motormodul)' : 'Motor (motor module)', v: motorState.kW + ' kW, ' + (motorState.poles || 4) + '-pol' });
+      rows.push({ l: da ? 'Startmetode' : 'Starting method', v: st.toUpperCase() + ' \u2192 ' + (inrush[st] || inrush.dol) });
+    }
+  }
+
+  if (!rows.length && !note) return '';
+  var h = '<div style="margin:8px 0;padding:8px 10px;background:rgba(37,99,235,0.07);border:1px dashed var(--primary);border-radius:6px">';
+  h += '<div style="font-size:0.74rem;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:4px">\uD83D\uDCCD ' + (da ? 'Din aktuelle konfiguration' : 'Your current configuration') + '</div>';
+  for (var i = 0; i < rows.length; i++) {
+    h += '<div class="result-row" style="font-size:0.8rem"><span class="label">' + rows[i].l + '</span><span class="value">' + rows[i].v + '</span></div>';
+  }
+  if (note) h += '<div style="font-size:0.78rem;line-height:1.45;color:var(--text-muted);margin-top:' + (rows.length ? '4px' : '0') + '">' + note + '</div>';
+  h += '</div>';
+  return h;
+}
 
 // Full AI Curve Analyzer card (click-only) for the Standards module.
 function renderCurveAnalyzer() {
