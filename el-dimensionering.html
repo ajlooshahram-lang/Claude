@@ -34631,6 +34631,17 @@ function analyzerSolve(data) {
       results.push({ type: 'pe_sizing', label: 'Udligningstv\u00e6rsnit', value: '\u2265 6 mm\u00b2 Cu (hoved)', html: peHtml, asked: true });
       solved++; total++;
     }
+
+    // (h) Fuse/relay selectivity (rule-based).
+    if (hasQuestion(data, 'selectivity')) {
+      var selHtml = '<div class="result-box"><div class="result-title">\u26A1 Selektivitet</div>'
+        + row('gG \u2192 gG (smeltesikringer)', 'Str\u00f8mforhold \u2265 1,6:1 mellem op- og nedstr\u00f8ms sikring')
+        + row('Betingelse', 'Nedstr\u00f8ms gennemslups-I\u00b2t < opstr\u00f8ms sm\u00e6lte-I\u00b2t i hele omr\u00e5det')
+        + row('HV/LV (trafo)', 'HV-rel\u00e6/sikring skal forblive over LV-sikringens kurve ved Ik')
+        + '<div class="info-row" style="font-size:0.76rem">IEC 60269 / DS/HD 60364-5-53. Verific\u00e9r med fabrikantens selektivitetstabel (TCC-modulet).</div></div>';
+      results.push({ type: 'selectivity', label: 'Selektivitet', value: 'gG\u2013gG \u2265 1,6:1', html: selHtml, asked: true });
+      solved++; total++;
+    }
   })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
