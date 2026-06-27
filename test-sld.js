@@ -4856,6 +4856,26 @@ test('zsCheckInstantTrip: 100A < 10x16A (C16) = FAIL', function() {
   assert.strictEqual(zsCheckInstantTrip(100, 'C16'), false);
 });
 
+// Hardened curve handling (IEC 60898-1 / 60947-2): D 20x, K 14x, Z 3x; fuses pass
+// by default (governed by the Zs<=Zs,max table, not a magnetic multiple). This
+// guards against a future D/K-curve breaker being silently assumed to trip.
+test('zsCheckInstantTrip: D-curve requires 20xIn (no longer auto-passes)', function() {
+  assert.strictEqual(zsCheckInstantTrip(20 * 16, 'D16'), true, '320A >= 20x16A trips');
+  assert.strictEqual(zsCheckInstantTrip(20 * 16 - 1, 'D16'), false, '319A < 20x16A does NOT trip (conservative)');
+});
+test('zsCheckInstantTrip: K-curve requires 14xIn, Z-curve requires 3xIn', function() {
+  assert.strictEqual(zsCheckInstantTrip(14 * 10, 'K10'), true, 'K10: 140A >= 14x10A');
+  assert.strictEqual(zsCheckInstantTrip(14 * 10 - 1, 'K10'), false, 'K10: 139A < 14x10A fails');
+  assert.strictEqual(zsCheckInstantTrip(3 * 10, 'Z10'), true, 'Z10: 30A >= 3x10A');
+  assert.strictEqual(zsCheckInstantTrip(3 * 10 - 1, 'Z10'), false, 'Z10: 29A < 3x10A fails');
+});
+test('zsCheckInstantTrip: gG fuse is not gated by a magnetic multiple (Zs<=Zs,max governs)', function() {
+  // Fuses have no instantaneous magnetic element; disconnection is verified via the
+  // Zs<=Zs,max table, so the magnetic gate returns true and never blocks a valid fuse.
+  assert.strictEqual(zsCheckInstantTrip(10, 'gG63'), true, 'gG fuse passes the magnetic gate by design');
+  assert.strictEqual(zsCheckInstantTrip(0, 'gG63'), true, 'even at trivial current the fuse is governed by Zs,max not this gate');
+});
+
 // Test 452: Long cable Zs exceeds limit
 test('zsCalcImpedance: 100m 1.5mm2 with Ze=0.80 exceeds B16 limit', function() {
   var zs = zsCalcImpedance(0.80, 24.2, 100);

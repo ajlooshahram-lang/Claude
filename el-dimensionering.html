@@ -23585,9 +23585,19 @@ function zsGetDeviceIn(device) {
 
 function zsCheckInstantTrip(faultCurrent, device) {
   var inRating = zsGetDeviceIn(device);
-  if (device.charAt(0) === 'B') return faultCurrent >= 5 * inRating;
-  if (device.charAt(0) === 'C') return faultCurrent >= 10 * inRating;
-  return true;
+  if (inRating <= 0) return true;
+  var c = device.charAt(0);
+  // MCB magnetic instantaneous-trip multiples (IEC 60898-1 / IEC 60947-2):
+  //   B 5x, C 10x, D 20x, K 14x (guaranteed), Z 3x.
+  // Fuses (gG/aM) have no magnetic trip element; their automatic disconnection is
+  // governed entirely by the Zs <= Zs,max time/current table, so they are NOT gated
+  // by a multiple here. The default is therefore conservative: a recognised MCB
+  // curve MUST meet its instantaneous multiple, and only non-MCB (fuse) devices
+  // pass by default. This prevents a future D/K-curve breaker from silently being
+  // assumed to trip instantaneously when it may not (life-safety).
+  var mult = { B: 5, C: 10, D: 20, K: 14, Z: 3 }[c];
+  if (mult) return faultCurrent >= mult * inRating;
+  return true; // fuses (gG/aM): disconnection verified via Zs <= Zs,max, not a multiple
 }
 
 function renderZs() {
@@ -23656,8 +23666,10 @@ function renderZs() {
   html += '<div class="result-title">' + tx('Fejlstrømsanalyse', 'Fault Current Analysis') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Fejlstrøm If = Uo/Zs', 'Fault Current If = Uo/Zs') + '</span><span class="value">' + nf(faultCurrent, 1) + ' A</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Maks. kabellængde', 'Maximum Cable Length') + '</span><span class="value">' + nf(Math.max(0, maxLength), 1) + ' m</span></div>';
-  if (zsState.device.charAt(0) === 'B' || zsState.device.charAt(0) === 'C') {
-    var tripMult = zsState.device.charAt(0) === 'B' ? 5 : 10;
+  var _tripMultMap = { B: 5, C: 10, D: 20, K: 14, Z: 3 };
+  var _tripMult = _tripMultMap[zsState.device.charAt(0)];
+  if (_tripMult) {
+    var tripMult = _tripMult;
     var inVal = zsGetDeviceIn(zsState.device);
     html += '<div class="result-row"><span class="label">' + tx('Momentan udløsning', 'Instantaneous Trip') + ' (If > ' + tripMult + '\u00D7In)</span><span class="value"' + (!instantTrip ? ' style="color:var(--danger)"' : '') + '>' + nf(faultCurrent, 0) + 'A ' + (instantTrip ? '\u2265' : '<') + ' ' + (tripMult * inVal) + 'A ' + (instantTrip ? '\u2705' : '\u274C') + '</span></div>';
   }
