@@ -34620,6 +34620,17 @@ function analyzerSolve(data) {
       solved++;
     } else if (hasQuestion(data, 'cable_prot')) { flagged.push('Kabelbeskyttelse: mangler kabeltv\u00e6rsnit / rel\u00e6tider / Skh'); }
     if (hasQuestion(data, 'cable_prot')) total++;
+
+    // (g) Protective bonding conductor cross-section (rule-based, no per-circuit data).
+    if (hasQuestion(data, 'pe_sizing')) {
+      var peHtml = '<div class="result-box"><div class="result-title">\u26A1 Beskyttende udligning \u2014 tv\u00e6rsnit</div>'
+        + row('Hovedpotentialudligning', '\u2265 6 mm\u00b2 Cu')
+        + row('Regel', '\u2265 \u00bd af st\u00f8rste PE-leder, min. 6 mm\u00b2, beh\u00f8ver ikke overstige 25 mm\u00b2 Cu')
+        + row('Supplerende udligning', '\u2265 2,5 mm\u00b2 (beskyttet) / 4 mm\u00b2 (ubeskyttet)')
+        + '<div class="info-row" style="font-size:0.76rem">DS/HD 60364-5-54 \u00a7544.1 (hovedudligning) og \u00a7544.2 (supplerende udligning).</div></div>';
+      results.push({ type: 'pe_sizing', label: 'Udligningstv\u00e6rsnit', value: '\u2265 6 mm\u00b2 Cu (hoved)', html: peHtml, asked: true });
+      solved++; total++;
+    }
   })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
