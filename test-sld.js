@@ -16685,6 +16685,49 @@ test('analyzerSegment: keeps a 3-level sub-question whole instead of splitting a
   assert.ok(sq.indexOf('|| .1 ') < 0, 'no orphan ".1" fragment produced');
 });
 
+console.log('\n=== Analyzer click-to-solve transformer Ik picker Tests ===\n');
+
+test('analyzerIkWorked: matches the validated axIkTrafoSecondary reference', function () {
+  var ref = axIkTrafoSecondary(630, 400, 4);   // In=909.3 A, Ik=22.7 kA
+  var r = analyzerIkWorked(630, 4, 1, 400, 1.0);
+  assert.strictEqual(r.In, ref.In, 'In equals the validated reference');
+  assert.ok(Math.abs(r.IkkA - ref.IkkA) < 0.15, 'Ik (single) matches reference ~22.7 kA, got ' + r.IkkA);
+  assert.ok(r.Zt > 10.0 && r.Zt < 10.3, 'Zt ~ 10.16 mOhm, got ' + r.Zt);
+});
+
+test('analyzerIkWorked: N parallel transformers give N x the single Ik', function () {
+  var r1 = analyzerIkWorked(1000, 6, 1, 400, 1.0);
+  var r2 = analyzerIkWorked(1000, 6, 2, 400, 1.0);
+  assert.ok(Math.abs(r2.IkkA - 2 * r1.IkkA) < 0.05, '2 parallel = 2x single Ik');
+  assert.ok(Math.abs(r2.Ztot - r1.Zt / 2) < 1e-6, 'Z_total halves for 2 identical transformers');
+});
+
+test('analyzerIkWorked: c=1.05 IEC-max variant is exactly 5% higher', function () {
+  var r = analyzerIkWorked(630, 4, 1, 400, 1.0);
+  assert.ok(Math.abs(r.IkkA105 - r.IkkA * 1.05) < 1e-9, 'c=1.05 variant = 1.05 x base');
+});
+
+test('analyzerIkPicker: shows the full working only AFTER S_n and e_k are picked (no fabrication before)', function () {
+  lang = 'da';
+  analyzerState.ikPick = {};
+  var empty = analyzerIkPicker('1_1.4_ik', 'ik');
+  assert.ok(empty.indexOf('kA') < 0 || empty.indexOf('V\u00e6lg S\u2099') >= 0, 'no Ik value shown before selection');
+  assert.ok(empty.indexOf('22,') < 0, 'no fabricated number before selection');
+  analyzerState.ikPick = { '1_1.4_ik': { sn: 630, ek: 4 } };
+  var done = analyzerIkPicker('1_1.4_ik', 'ik');
+  assert.ok(done.indexOf('22,7 kA') >= 0, 'after picking 630 kVA / 4% it shows Ik = 22,7 kA (da comma), got snippet around kA');
+});
+
+test('analyzerIkPicker: parallel variant defaults to N=2 and exposes the N selector', function () {
+  lang = 'da';
+  analyzerState.ikPick = { 'g_1.4.1_ik_par': { sn: 1000, ek: 6 } };
+  var h = analyzerIkPicker('g_1.4.1_ik_par', 'ik_par');
+  assert.ok(/Antal parallelle transformere/.test(h), 'parallel picker exposes the transformer-count selector');
+  // 1000 kVA, 6%, N=2: single ~9.6 kA -> 2x ~19.2 kA
+  var r = analyzerIkWorked(1000, 6, 2, 400, 1.0);
+  assert.ok(h.indexOf(nf(r.IkkA, 1) + ' kA') >= 0, 'shows the 2-transformer Ik, got expected ' + nf(r.IkkA, 1) + ' kA');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

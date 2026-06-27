@@ -36123,6 +36123,7 @@ var EXAM_METHOD_HINTS = {
   iz:        { f: 'I_z = I_z,tabel \u00b7 k_temp \u00b7 k_gruppe', n: 'kabeltype, tv\u00e6rsnit, installationsmetode, omgivelsestemperatur' },
   vdrop:     { f: '\u0394U = \u221a3 \u00b7 I_B \u00b7 L \u00b7 (R\u00b7cos\u03c6 + X\u00b7sin\u03c6)', n: 'I_B, kabell\u00e6ngde L, tv\u00e6rsnit' },
   ik:        { f: 'I_k = c\u00b7U / (\u221a3 \u00b7 Z),  Z = u_k\u00b7U\u00b2/S_n', n: 'transformer S_n [kVA], u_k [%] (og evt. netimpedans / antal parallelle transformere)' },
+  ik_par:    { f: 'I_k = c\u00b7U / (\u221a3 \u00b7 Z),  Z = (u_k\u00b7U\u00b2/S_n) / N', n: 'transformer S_n [kVA], u_k [%], antal parallelle transformere N' },
   zs:        { f: 'Z_s \u2264 U_0 / I_a  (DS/HD 60364-4-41)', n: 'fejlsl\u00f8jfeimpedans Z_s og udl\u00f8sestr\u00f8m I_a' },
   device:    { f: 'I_B \u2264 I_n \u2264 I_z  og  I_cu \u2265 I_k,max', n: 'I_B, kablets I_z, I_k,max' },
   adiabatic: { f: 'k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t  (DS/HD 60364-4-43 \u00a7434.5)', n: 'tv\u00e6rsnit S, I_k, udkoblingstid t' },
@@ -36136,6 +36137,78 @@ function examRenderMethodHint(type) {
   return '<div style="margin-top:6px;padding:6px 10px;background:var(--primary-glow);border-left:3px solid var(--primary-light);border-radius:4px;font-size:0.78rem">'
     + '<div><strong>' + tx('Metode', 'Method') + ':</strong> <span style="font-family:monospace">' + mmlEsc(hint.f) + '</span></div>'
     + '<div style="margin-top:2px;color:var(--text-muted)"><strong>' + tx('Mangler', 'Needs') + ':</strong> ' + mmlEsc(hint.n) + '</div></div>';
+}
+
+// === Click-to-solve transformer Ik picker ====================================
+// When a "Beregn Ik" (single) or "Ik parallelle transformere" question cannot be
+// auto-extracted (the transformer ratings live in a graphical bilag that text
+// extraction cannot read), the user reads S_n and e_k off the bilag and selects
+// them with CLICKS here -> the app produces the FULL worked Ik solution. Nothing
+// is fabricated: the values come from the user; the math reuses the validated
+// axIkTrafoSecondary reference (Ik = c*U/(sqrt3*Z), Z = (e_k/100)*U^2/S_n, c=1.0,
+// the El-7 "e_k-metode"; parallel: Z_total = Z_t/N for N identical transformers).
+var ANALYZER_IK_SN = [250, 400, 630, 1000, 1250, 1600, 2000];   // standard DK distribution kVA
+var ANALYZER_IK_EK = [4, 4.5, 5, 6];                            // typical e_k (uk) %
+function analyzerIkSet(qKey, field, val) {
+  analyzerState.ikPick = analyzerState.ikPick || {};
+  analyzerState.ikPick[qKey] = analyzerState.ikPick[qKey] || {};
+  analyzerState.ikPick[qKey][field] = val;
+  renderModule('analyzer');
+}
+// Pure worked-solution generator (testable headless). U in volts, c voltage factor.
+function analyzerIkWorked(sn, ek, n, U, c) {
+  U = U || 400; c = c || 1.0; n = n || 1;
+  var single = axIkTrafoSecondary(sn, U, ek);           // validated reference (c=1)
+  var Zt = (ek / 100) * (U * U) / (sn * 1000) * 1000;   // mOhm per transformer
+  var Ztot = Zt / n;                                    // N identical transformers in parallel
+  var Ik = (c * U) / (Math.sqrt(3) * Ztot / 1000);      // A
+  var IkkA = Ik / 1000;
+  return {
+    In: single.In, Zt: Zt, Ztot: Ztot, Ik: Ik, IkkA: IkkA,
+    IkkA105: IkkA * 1.05,
+    sn: sn, ek: ek, n: n, U: U, c: c
+  };
+}
+function analyzerIkWorkedHtml(r) {
+  function mO(v) { return nf(v, 2) + ' m\u03A9'; }
+  var h = '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Udregning (e\u2096-metode, El-7 / DS/HD 60364-4-43 \u00a7434.5)', 'Working (e\u2096 method, El-7 / DS/HD 60364-4-43 \u00a7434.5)') + '</div>';
+  h += '<div class="result-row"><span class="label">I\u2099 ' + tx('pr. transformer', 'per transformer') + '</span><span class="value">S\u2099/(\u221a3\u00b7U) = ' + r.sn + ' kVA/(\u221a3\u00b7' + r.U + ' V) = <strong>' + nf(r.In, 1) + ' A</strong></span></div>';
+  h += '<div class="result-row"><span class="label">Z\u209c ' + tx('pr. transformer', 'per transformer') + '</span><span class="value">(e\u2096/100)\u00b7U\u00b2/S\u2099 = (' + nf(r.ek, 1) + '/100)\u00b7' + r.U + '\u00b2/' + (r.sn * 1000) + ' = <strong>' + mO(r.Zt) + '</strong></span></div>';
+  if (r.n > 1) {
+    h += '<div class="result-row"><span class="label">Z\u209c\u2092\u209c (' + r.n + ' ' + tx('parallelle, ens', 'parallel, identical') + ')</span><span class="value">Z\u209c/' + r.n + ' = <strong>' + mO(r.Ztot) + '</strong></span></div>';
+  }
+  h += '<div class="result-row"><span class="label">I<sub>k,max</sub></span><span class="value">c\u00b7U/(\u221a3\u00b7Z) = ' + nf(r.c, 2) + '\u00b7' + r.U + '/(\u221a3\u00b7' + mO(r.Ztot) + ') = <strong style="color:var(--primary)">' + nf(r.IkkA, 1) + ' kA</strong></span></div>';
+  if (r.n > 1) h += '<div class="result-row" style="font-size:0.8rem;opacity:0.85"><span class="label">' + tx('Kontrol', 'Cross-check') + '</span><span class="value">= ' + r.n + '\u00b7I<sub>k,1</sub> = ' + r.n + '\u00b7' + nf((r.IkkA / r.n), 1) + ' kA</span></div>';
+  h += '<div class="result-row" style="font-size:0.78rem;color:var(--text-muted)"><span class="label">' + tx('IEC 60909 maks (c=1,05)', 'IEC 60909 max (c=1.05)') + '</span><span class="value">' + nf(r.IkkA105, 1) + ' kA</span></div>';
+  h += '<div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px">' + tx('c = 1,0 (e\u2096-metode, kun trafoimpedans \u2014 LV-sidens impedanser ses der bort fra). V\u00e6rdierne S\u2099 og e\u2096 er valgt af dig fra opgavens bilag.', 'c = 1.0 (e\u2096 method, transformer impedance only \u2014 LV-side impedances ignored). S\u2099 and e\u2096 were selected by you from the exam appendix.') + '</div>';
+  h += '</div>';
+  return h;
+}
+function analyzerIkPicker(qKey, type) {
+  analyzerState.ikPick = analyzerState.ikPick || {};
+  var pick = analyzerState.ikPick[qKey] || {};
+  var isPar = (type === 'ik_par');
+  var n = pick.n || (isPar ? 2 : 1);
+  function btnRow(label, field, opts, cur, suffix) {
+    var s = '<div style="margin-top:6px"><div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:2px">' + label + '</div><div class="select-grid">';
+    opts.forEach(function (o) {
+      s += '<button class="sel-btn ' + (cur === o ? 'selected' : '') + '" onclick="analyzerIkSet(\'' + qKey + '\',\'' + field + '\',' + o + ')">' + nf(o, (o % 1 ? 1 : 0)) + (suffix || '') + '</button>';
+    });
+    s += '</div></div>';
+    return s;
+  }
+  var h = '<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--primary);border-radius:6px;background:rgba(37,99,235,0.06)">';
+  h += '<div style="font-size:0.74rem;font-weight:700;color:var(--primary);text-transform:uppercase">\uD83D\uDDB1\uFE0F ' + tx('V\u00e6lg fra bilaget (kun klik) \u2014 s\u00e5 udregnes I\u2096', 'Pick from the appendix (click only) \u2014 then I\u2096 is solved') + '</div>';
+  h += btnRow(tx('Transformer S\u2099 [kVA]', 'Transformer S\u2099 [kVA]'), 'sn', ANALYZER_IK_SN, pick.sn, '');
+  h += btnRow(tx('Kortslutningssp\u00e6nding e\u2096 (u\u2096) [%]', 'Short-circuit voltage e\u2096 (u\u2096) [%]'), 'ek', ANALYZER_IK_EK, pick.ek, '%');
+  if (isPar) h += btnRow(tx('Antal parallelle transformere', 'Number of parallel transformers'), 'n', [1, 2, 3], n, '');
+  if (pick.sn && pick.ek) {
+    h += analyzerIkWorkedHtml(analyzerIkWorked(pick.sn, pick.ek, isPar ? n : 1, 400, 1.0));
+  } else {
+    h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">' + tx('V\u00e6lg S\u2099 og e\u2096 ovenfor for at se den fulde udregning.', 'Select S\u2099 and e\u2096 above to see the full working.') + '</div>';
+  }
+  h += '</div>';
+  return h;
 }
 
 // Collapse questions that share the same text (the detector often maps one
@@ -36763,6 +36836,11 @@ function examRenderSolution(sol) {
         h += q.calcHtml;
       } else {
         h += examRenderMethodHint(q.type);
+        // Click-to-solve picker for transformer Ik questions whose ratings live in
+        // a graphical bilag (not extractable): the user picks S_n/e_k -> full working.
+        if (q.type === 'ik' || q.type === 'ik_par') {
+          h += analyzerIkPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type, q.type);
+        }
         h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen automatisk udregning \u2014 indtast de manglende v\u00E6rdier via det tilknyttede modul (kun klik).', 'No automatic working \u2014 enter the missing values via the linked module (click-only).') + '</div>';
         if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
       }
