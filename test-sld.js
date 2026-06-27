@@ -9964,6 +9964,20 @@ test('fault module: CSA mode produces HTML', function() {
   faultState.calcMode = 'fault';
 });
 
+test('fault module: gG fuse Zs verdict is labelled 5 s and warns it does NOT prove 0.4 s', function() {
+  lang = 'da';
+  faultState.calcMode = 'fault'; faultState.earthSystem = 'tncs';
+  faultState.deviceType = 'fuse'; faultState.deviceIn = 63; faultState.zsValue = 0.5; faultState.voltage = 230;
+  var html = renderFault();
+  assert(html.indexOf('I<sub>5s</sub>') >= 0 || html.indexOf('5 s smelte') >= 0, 'Ia is labelled as the 5 s fusing current');
+  assert(/0,4 s/.test(html) && /smeltesikringer|gG/i.test(html), 'shows the explicit gG 0.4 s caveat box');
+  // An MCB must NOT show the fuse caveat (its magnetic trip clears <0.1 s).
+  faultState.deviceType = 'mcbB'; faultState.deviceIn = 16;
+  var htmlMcb = renderFault();
+  assert(htmlMcb.indexOf('5 s smelte') < 0, 'MCB result does not show the fuse 5 s caveat');
+  faultState.deviceType = 'mcbB';
+});
+
 test('fault module: translation exists in da/en/fa', function() {
   assert(T.da.modules.fault, 'da translation exists');
   assert(T.en.modules.fault, 'en translation exists');

@@ -31939,6 +31939,7 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     html += '<div class="result-box"><div class="result-title">' + tx('TN-system: Zs \u00B7 Ia \u2264 U0', 'TN system: Zs \u00B7 Ia \u2264 U0') + '</div>';
     html += '<div class="result-row"><span class="label">I<sub>a</sub> (' + tx('frakoblingsstrøm', 'disconnection current') + ')</span><span class="value">' + nf(Ia, 1) + ' A';
     if (dev && dev.factor > 0) html += ' = ' + dev.factor + ' \u00D7 ' + faultState.deviceIn;
+    else if (faultState.deviceType === 'fuse') html += ' (I<sub>5s</sub>, ' + tx('5 s smeltestr\u00f8m', '5 s fusing current') + ')';
     html += '</span></div>';
     html += '<div class="result-row"><span class="label">Z<sub>s</sub> \u00B7 I<sub>a</sub></span><span class="value">' + nf(tn.ZsIa, 1) + ' V</span></div>';
     html += '<div class="result-row"><span class="label">U<sub>0</sub></span><span class="value">' + tn.U0 + ' V</span></div>';
@@ -31956,6 +31957,20 @@ function renderFaultResults(isTN, isTT, isIT1, isIT2) {
     html += '<div class="result-row"><span class="label">' + tx('Fordelingskreds (' + faultState.voltage + 'V TN)', 'Distribution circuit (' + faultState.voltage + 'V TN)') + '</span><span class="value">\u2264 5.0 s</span></div>';
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Ref', 'Ref') + '</span><span class="value">DS/HD 60364-4-41 Tabel 41.1</span></div>';
     html += '</div>';
+
+    // gG fuses: the Zs.Ia<=U0 verdict above uses the 5 s fusing current (I5s), so it
+    // verifies <=5 s disconnection ONLY. A final circuit requiring <=0.4 s needs a
+    // HIGHER fault current (the 0.4 s point on the gG curve, typically ~2x I5s), i.e.
+    // a LOWER Zs than Zs,max shown here. Do not read the green tick as 0.4 s
+    // compliance. This is the conservative, honest position (no fabricated 0.4 s data).
+    if (faultState.deviceType === 'fuse') {
+      html += '<div class="result-box warning"><div class="result-title">\u26A0\uFE0F ' + tx('Vigtigt for smeltesikringer (gG)', 'Important for gG fuses') + '</div>';
+      html += '<div class="result-row" style="font-size:0.85em"><span class="value">' + tx(
+        'Verdiktet ovenfor bruger 5 s-smeltestr\u00f8mmen I\u2085\u209b og bekr\u00e6fter derfor KUN frakobling inden 5 s (fordelingskreds). En slutkreds, der kr\u00e6ver \u2264 0,4 s, skal have en h\u00f8jere fejlstr\u00f8m (0,4 s-punktet p\u00e5 gG-kurven, typisk ~2\u00d7 I\u2085\u209b) og dermed en LAVERE Zs end Zs,max her. Verific\u00e9r \u2264 0,4 s mod sikringens tid-str\u00f8m-kurve, eller brug automatsikring/HPFI.',
+        'The verdict above uses the 5 s fusing current I\u2085\u209b and therefore confirms disconnection within 5 s ONLY (distribution circuit). A final circuit requiring \u2264 0.4 s needs a HIGHER fault current (the 0.4 s point on the gG curve, typically ~2\u00d7 I\u2085\u209b) and thus a LOWER Zs than the Zs,max shown here. Verify \u2264 0.4 s against the fuse time/current curve, or use an MCB/RCD.') + '</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.8em"><span class="label">' + tx('Ref', 'Ref') + '</span><span class="value">IEC 60269-1 / DS/HD 60364-4-41 \u00a7411.3.2.2</span></div>';
+      html += '</div>';
+    }
 
     // 0.8 safety factor verification
     if (faultState.measuredZs > 0) {
