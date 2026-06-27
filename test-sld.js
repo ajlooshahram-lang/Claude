@@ -16854,6 +16854,39 @@ test('analyzerPotPicker: requires all three inputs before any verdict (no fabric
   assert.ok(h2.indexOf('100 V') >= 0 && h2.indexOf('IKKE OK') >= 0, 'full input -> U_E=100 V and the correct verdict');
 });
 
+console.log('\n=== Analyzer END-TO-END forsyning pipeline Tests ===\n');
+
+test('Analyzer end-to-end: a forsyning exam renders a click-solver for EVERY bilag-blocked type', function () {
+  lang = 'da';
+  var fixture = [
+    'Opgave 1 Forsyningsanl\u00e6g',
+    '1.1 Beregn kortslutningsstr\u00f8mmen Ik ved hovedtavlen.',
+    '1.2 Med to transformere parallelt skal Ik bestemmes.',
+    '1.3 Beregn den kapacitive jordfejlstr\u00f8m i kabelnettet.',
+    '1.4 Bestem den mindste ideelle slukkespole.',
+    '1.5 Hvad er potentialestigningen ved en jordfejl?'
+  ].join('\n');
+  analyzerState = { rawText: fixture, segments: analyzerSegment(fixture), extracted: {}, results: [], completeness: { solved: 0, total: 0, flagged: [] } };
+  var sol = examBuildSolution(analyzerState);
+  var html = examRenderSolution(sol);
+  assert.ok(html.indexOf('analyzerIkSet(') >= 0, 'Ik picker rendered (single transformer)');
+  assert.ok(html.indexOf('Antal parallelle transformere') >= 0, 'parallel-transformer picker rendered (ik_par)');
+  assert.ok(html.indexOf('analyzerEfSet(') >= 0, 'earth-fault / Petersen picker rendered');
+  assert.ok(html.indexOf('analyzerPotSet(') >= 0, 'potential-rise picker rendered');
+  // The questions are correctly numbered like the exam (Opgave 1.x), in order.
+  assert.ok(html.indexOf('Opgave 1.2') >= 0 && html.indexOf('Opgave 1.5') >= 0, 'sub-questions named exactly like the exam');
+});
+
+test('Analyzer end-to-end: pickers appear ONLY in the unsolved branch (no fabricated values up-front)', function () {
+  lang = 'da';
+  var fixture = 'Opgave 1 Forsyning\n1.1 Med to transformere parallelt skal Ik bestemmes.';
+  analyzerState = { rawText: fixture, segments: analyzerSegment(fixture), extracted: {}, results: [], completeness: { solved: 0, total: 0, flagged: [] } };
+  var html = examRenderSolution(examBuildSolution(analyzerState));
+  // Before any click, no kA result string is fabricated anywhere in the card.
+  assert.ok(/\d,\d\s*kA/.test(html) === false, 'no concrete kA value is shown before the user picks Sn/ek');
+  assert.ok(html.indexOf('V\u00e6lg S\u2099 og e\u2096') >= 0, 'shows the click-to-pick prompt instead');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
