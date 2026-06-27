@@ -16754,6 +16754,39 @@ test('analyzerIkSet: picking Sn+ek connects to the scircuit module (pre-fills sc
   assert.strictEqual(scState.trafoUk, 4, 'scState.trafoUk reflects the picked e_k');
 });
 
+test('analyzerIkWorked: e_r unlocks the complex decomposition (R = |Z|*e_r/e_k, both forms)', function () {
+  var r = analyzerIkWorked(630, 4, 1, 400, 1.0, 1.2);
+  assert.ok(r.complex, 'er provided -> complex decomposition computed');
+  // cos(phi) = er/ek = 0.3  =>  R = Zt*0.3
+  assert.ok(Math.abs(r.R - r.Zt * 0.3) < 0.01, 'R = |Z|*(er/ek), got R=' + r.R);
+  assert.ok(Math.abs(Math.sqrt(r.R * r.R + r.X * r.X) - r.Zt) < 0.02, '|R+jX| reconstructs |Z|');
+  assert.ok(Math.abs(r.phiDeg - Math.acos(0.3) * 180 / Math.PI) < 0.1, 'phi = arccos(0.3) ~ 72.5 deg, got ' + r.phiDeg);
+});
+
+test('analyzerIkWorked: e_r >= e_k or zero leaves it magnitude-only (no complex)', function () {
+  assert.ok(!analyzerIkWorked(630, 4, 1, 400, 1.0, 4).complex, 'er = ek -> not complex (er must be < ek)');
+  assert.ok(!analyzerIkWorked(630, 4, 1, 400, 1.0, 0).complex, 'er = 0 -> magnitude only');
+  assert.ok(!analyzerIkWorked(630, 4, 1, 400, 1.0).complex, 'er omitted -> magnitude only');
+});
+
+test('analyzerIkWorkedHtml: complex result shows BOTH rectangular (R+jX) and polar (|Z| angle)', function () {
+  lang = 'da';
+  var html = analyzerIkWorkedHtml(analyzerIkWorked(630, 4, 1, 400, 1.0, 1.2));
+  assert.ok(html.indexOf('rektangul\u00e6r') >= 0 && /\+j|\u2212j/.test(html), 'shows rectangular R+jX form');
+  assert.ok(html.indexOf('pol\u00e6r') >= 0 && html.indexOf('\u2220') >= 0, 'shows polar |Z| angle form');
+  assert.ok(html.indexOf('arccos(e\u1d63/e\u2096)') >= 0, 'cites Viggo arccos(er/ek) method');
+});
+
+test('analyzerIkSet: choosing e_r switches the scircuit module to Viggo complex mode', function () {
+  scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1, trafoAngleMode: 'rx', trafoUk: 4, trafoEr: 1, netAngleMode: 'rx', cosPhiNet: 0.1 };
+  analyzerState.ikPick = {};
+  analyzerIkSet('m', 'sn', 1000);
+  analyzerIkSet('m', 'ek', 6);
+  analyzerIkSet('m', 'er', 1.2);
+  assert.strictEqual(scState.trafoAngleMode, 'viggo', 'er selection enables Viggo complex mode in scircuit');
+  assert.strictEqual(scState.trafoEr, 1.2, 'scState.trafoEr reflects the picked e_r');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
