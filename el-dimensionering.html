@@ -33944,6 +33944,28 @@ function analyzerNormalize(text) {
   s = s.replace(/(\d)\s*\n\s*(MVA|kVA|kV|kW|mm2|A|km|m|V|\u00b0C|H|Hz)\b/g, '$1 $2');
   // (d) Spaced relational operators in relay settings: "I > =" -> "I> =", "I >> =" -> "I>> =".
   s = s.replace(/\bI\s*(>{1,3})\s*=/g, 'I$1 =');
+  // (f) Leading-glyph split repair: PDF extraction often detaches the FIRST
+  //     letter of a heading verb ("B eregn"->"Beregn", "K ontroller"->"Kontroller",
+  //     "L V"->"LV"). Restricted to a curated list of DISTINCTIVE lowercase stems
+  //     that begin no standalone Danish word, so it can NEVER corrupt legitimate
+  //     symbol prose such as "U er ...", "I beregnes ...", "F indf\u00f8res ...".
+  //     (Deliberately excludes risky stems like "ind"/"is".)
+  var WORD_FIX = [
+    ['B', 'eregn'], ['B', 'estem'], ['B', 'eskriv'],
+    ['K', 'ontroll'], ['V', '\u00e6lg'], ['T', 'egn'],
+    ['D', 'imensioner'], ['F', 'oretag'], ['F', 'orklar'],
+    ['A', 'ngiv'], ['A', 'fklar'], ['I', 'ndstil'], ['U', 'dregn'],
+    ['O', 'pstil'], ['R', 'edeg\u00f8r'], ['H', 'vad'], ['H', 'vilke'], ['H', 'vor']
+  ];
+  for (var wi = 0; wi < WORD_FIX.length; wi++) {
+    s = s.replace(new RegExp('\\b' + WORD_FIX[wi][0] + ' ' + WORD_FIX[wi][1], 'g'), WORD_FIX[wi][0] + WORD_FIX[wi][1]);
+  }
+  // (g) Split low-/high-voltage acronyms: "L V siden" -> "LV siden", "H V" -> "HV".
+  s = s.replace(/\bL V\b/g, 'LV').replace(/\bH V\b/g, 'HV');
+  // (h) Remove a stray space BEFORE punctuation ("station 4 ," -> "station 4,",
+  //     "siden :" -> "siden:"). Only the leading space is dropped (the space AFTER
+  //     is kept) so no false decimals are ever created from "4 . 5".
+  s = s.replace(/[ \t]+([,;:.!?])/g, '$1');
   // (e) Collapse table whitespace (multiple spaces/tabs) to single spaces.
   s = s.replace(/[ \t]{2,}/g, ' ');
   // Collapse multiple blank lines
@@ -33957,11 +33979,13 @@ function analyzerSegment(text) {
   // Split by Opgave headers ("Opgave 1", "Opgave 2", ...) but NOT the weighting
   // table ("Opgave 1 = 20 %"), which would otherwise create bogus offset sections.
   var parts = text.split(/(?=Opgave\s+\d+\b(?!\s*=))/i);
-  // Sub-question splitter: a real question number is N.M with 1-2 digits each
-  // (e.g. 1.1, 3.18, 5.2) at a token boundary, OR a list marker a)..f). It must
-  // NOT fire on Danish thousand/decimal values like "3.500 W" or "1.580" — hence
-  // the (?!\d) guard and the 1-2 digit limit on the fractional part.
-  var SUBQ = /(?=(?:^|\s)\d{1,2}\.\d{1,2}(?!\d)[\s:).]|(?:^|\s)[a-f]\)\s)/i;
+  // Sub-question splitter: a real question number is N.M (optionally N.M.K) with
+  // 1-2 digits each (e.g. 1.1, 3.18, 1.4.1) at a token boundary, OR a list marker
+  // a)..f). It must NOT fire on Danish thousand/decimal values like "3.500 W" or
+  // "1.580" — hence the (?!\d) guard and the 1-2 digit limit on each part. The
+  // optional third level keeps "1.4.1" intact instead of splitting it into "1.4"
+  // and a stray ".1".
+  var SUBQ = /(?=(?:^|\s)\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?!\d)[\s:).]|(?:^|\s)[a-f]\)\s)/i;
   var seenIds = {};
   for (var i = 0; i < parts.length; i++) {
     var part = parts[i].trim();
@@ -36062,12 +36086,12 @@ function renderAnalyzer() {
 // with 1-2 digits each; the (?!\d) guard rejects Danish thousand/decimal values
 // such as "3.500" or "1.580". Returns '' if none.
 function analyzerSubLabel(s) {
-  var m = String(s || '').match(/^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))/i);
+  var m = String(s || '').match(/^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))/i);
   if (!m) return '';
   return m[1].replace(/^\(/, '').replace(/[.)]+\s*$/, '');
 }
 // Shared strip pattern: removes a leading question-number label from display text.
-var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
+var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
 
 // Stable, long-unchanged regulatory answers (only rock-solid ones; everything else
 // stays "look up the standard"). Returns { svar, ref } or null.

@@ -16632,6 +16632,59 @@ test('curveAnalyze: embeds the live-context block for a configured MCB', functio
   assert.ok(h.indexOf('C60N B13 A') >= 0, 'live section carries the actual breaker');
 });
 
+console.log('\n=== Analyzer PDF-artifact repair + 3-level numbering Tests ===\n');
+
+test('analyzerNormalize: repairs leading-glyph splits in heading verbs', function () {
+  assert.ok(analyzerNormalize('K ontroller at str\u00f8mmen').indexOf('Kontroller') >= 0, 'K ontroller -> Kontroller');
+  assert.ok(analyzerNormalize('B eregn Ikmax').indexOf('Beregn') >= 0, 'B eregn -> Beregn');
+  assert.ok(analyzerNormalize('V \u00e6lg en MCCB').indexOf('V\u00e6lg') >= 0, 'V \u00e6lg -> V\u00e6lg');
+  assert.ok(analyzerNormalize('D imensioner hovedkablet').indexOf('Dimensioner') >= 0, 'D imensioner -> Dimensioner');
+  assert.ok(analyzerNormalize('H vad er ber\u00f8ringssp\u00e6ndingen').indexOf('Hvad') >= 0, 'H vad -> Hvad');
+});
+
+test('analyzerNormalize: joins split LV/HV acronyms', function () {
+  assert.ok(analyzerNormalize('p\u00e5 L V siden').indexOf('LV siden') >= 0, 'L V -> LV');
+  assert.ok(analyzerNormalize('p\u00e5 H V siden').indexOf('HV siden') >= 0, 'H V -> HV');
+});
+
+test('analyzerNormalize: removes a stray space before punctuation (display readability)', function () {
+  var o = analyzerNormalize('i station 4 , der ses bort fra impedanserne p\u00e5 LV siden :');
+  assert.ok(o.indexOf('station 4,') >= 0, 'space before comma removed');
+  assert.ok(o.indexOf('siden:') >= 0, 'space before colon removed');
+  assert.ok(analyzerNormalize('rel\u00e6beskyttelserne .').indexOf('rel\u00e6beskyttelserne.') >= 0, 'space before period removed');
+});
+
+test('analyzerNormalize: SAFETY — never corrupts legitimate symbol prose', function () {
+  // These must pass through untouched: a capital symbol followed by a real word.
+  assert.ok(analyzerNormalize('Sp\u00e6ndingen U er 230 V').indexOf('U er 230') >= 0, '"U er" stays "U er"');
+  assert.ok(analyzerNormalize('Str\u00f8mmen I beregnes som').indexOf('I beregnes') >= 0, '"I beregnes" untouched');
+  assert.ok(analyzerNormalize('Kraften F indf\u00f8res i ligningen').indexOf('F indf\u00f8res') >= 0, '"F indf\u00f8res" untouched (Find excluded)');
+  assert.ok(analyzerNormalize('Impedansen Z er kompleks').indexOf('Z er') >= 0, '"Z er" untouched');
+});
+
+test('analyzerSubLabel: captures a 3-level sub-question number (1.4.1) intact', function () {
+  assert.strictEqual(analyzerSubLabel('1.4.1 Med to transformere parallelt'), '1.4.1', '3-level number kept whole');
+  assert.strictEqual(analyzerSubLabel('1.4 Beregn Ikmax'), '1.4', '2-level still works');
+  assert.strictEqual(analyzerSubLabel('3.500 W effekt'), '', 'Danish thousands not a sub-number');
+});
+
+test('ANALYZER_NUM_STRIP: strips a leading 3-level label from the display text', function () {
+  assert.strictEqual('1.4.1 Med to transformere parallelt'.replace(ANALYZER_NUM_STRIP, ''), 'Med to transformere parallelt', 'leading 1.4.1 removed');
+  assert.strictEqual('1.4 Beregn'.replace(ANALYZER_NUM_STRIP, ''), 'Beregn', 'leading 1.4 removed');
+});
+
+test('examFullLabel: renders a 3-level number as Opgave 1.4.1 (not Opgave 1.4 + stray .1)', function () {
+  assert.strictEqual(examFullLabel(1, '1.4.1'), 'Opgave 1.4.1', '3-level label rendered whole');
+  assert.strictEqual(examFullLabel(1, '1.4'), 'Opgave 1.4', '2-level unchanged');
+});
+
+test('analyzerSegment: keeps a 3-level sub-question whole instead of splitting at 1.4', function () {
+  var segs = analyzerSegment('Opgave 1 Forsyningsanl\u00e6g\n1.4.1 Med to transformere parallelt skal Ik beregnes\n1.4.2 Noget andet');
+  var sq = segs[0].subQuestions.join(' || ');
+  assert.ok(/1\.4\.1 Med to transformere/.test(sq), 'sub-question retains the full 1.4.1 number, got: ' + sq);
+  assert.ok(sq.indexOf('|| .1 ') < 0, 'no orphan ".1" fragment produced');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
