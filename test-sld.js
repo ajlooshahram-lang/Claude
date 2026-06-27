@@ -16348,6 +16348,10 @@ test('Offline analyzer solves a real exam PDF above the benchmark floor', functi
   sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { tot++; if (q.solved) solved++; }); });
   assert(tot >= 25, 'detects most sub-questions (got ' + tot + ')');
   assert(solved >= 7, 'solves at least the benchmark floor (got ' + solved + '/' + tot + ')');
+  // Recognition floor: most questions should be classified (calc or rule), not unknown.
+  var recognized = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.type && q.type !== '?') recognized++; }); });
+  assert(recognized >= 24, 'recognizes most questions as calc or rule (got ' + recognized + '/' + tot + ')');
   lang = savedLang;
 });
 
