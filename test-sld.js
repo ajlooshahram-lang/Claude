@@ -16157,6 +16157,299 @@ test('analyzerRenderQuestionOutline binds questions to answers (numbers + Svar +
   lang = savedLang;
 });
 
+// === Real-exam robustness: values must not be mistaken for question numbers,
+// duplicate rows must be merged, weighting tables must not become sections ===
+test('analyzerSubLabel: Danish thousand/decimal values are NOT treated as question numbers', function () {
+  assert.strictEqual(analyzerSubLabel('1.4 Beregn'), '1.4');
+  assert.strictEqual(analyzerSubLabel('3.18 noget'), '3.18');
+  assert.strictEqual(analyzerSubLabel('a) test'), 'a');
+  assert.strictEqual(analyzerSubLabel('3.500 W kobbertab'), '', '"3.500 W" is a value, not a number');
+  assert.strictEqual(analyzerSubLabel('1.580 W'), '', '"1.580" is a value');
+  assert.strictEqual(analyzerSubLabel('0.000 V'), '', '"0.000" is a value');
+});
+
+test('analyzerSegment: "Opgave N = 20 %" weighting table is NOT treated as a section header', function () {
+  var txt = 'V\u00e6gtning:\nOpgave 1 = 20 %\nOpgave 2 = 60 %\nOpgave 3 = 20 %\n\nOpgave 1\n1.1 Beregn IB for 10 kW, 400 V, cos phi 0,9.\nOpgave 2\n2.1 Beregn Ik.';
+  var segs = analyzerSegment(txt);
+  var op1 = segs.filter(function (s) { return s.id === 1; });
+  assert(op1.length === 1, 'exactly one Opgave 1 section (got ' + op1.length + ')');
+  assert(op1[0].text.indexOf('Beregn IB') >= 0, 'Opgave 1 section holds the real question, not just "= 20 %"');
+});
+
+test('analyzerSegment: does not split sub-questions on Danish thousand-separated values', function () {
+  var txt = 'Opgave 1\n1.4 Beregn tabet. Kobbertab er 3.500 W og jerntab 1.580 W ved 0.000 belastning.';
+  var segs = analyzerSegment(txt);
+  var subs = segs[0].subQuestions;
+  var frags = subs.filter(function (s) { return /^\s*(3\.500|1\.580|0\.000)/.test(s); });
+  assert.strictEqual(frags.length, 0, 'no sub-question fragment starts at a value');
+});
+
+test('analyzerDedupeQuestions: identical-text rows are merged into one with all answers', function () {
+  var qs = [
+    { num: '3.6', type: 'star_delta', questionText: 'Samme tekst om motor', module: 'motor', solved: true, status: 'ok', calcLabel: 'A', value: '10 A' },
+    { num: '3.6', type: 'lys_cd', questionText: 'Samme tekst om motor', module: 'lys', solved: false, status: null, calcLabel: null, value: null },
+    { num: '3.6', type: 'thermal', questionText: 'Samme tekst om motor', module: 'thermal', solved: true, status: 'ok', calcLabel: 'B', value: '20 A' }
+  ];
+  var merged = analyzerDedupeQuestions(qs);
+  assert.strictEqual(merged.length, 1, 'three identical-text rows collapse to one');
+  assert.strictEqual(merged[0].answers.length, 2, 'keeps both distinct answers');
+  assert.strictEqual(merged[0].solved, true, 'merged row is solved if any part solved');
+});
+
+test('examFullLabel names questions EXACTLY like the original exam ("Opgave 1.1")', function () {
+  assert.strictEqual(examFullLabel(1, '1.1'), 'Opgave 1.1');
+  assert.strictEqual(examFullLabel(3, '3.6'), 'Opgave 3.6');
+  assert.strictEqual(examFullLabel(2, ''), 'Opgave 2', 'no sub-number -> just the Opgave');
+  assert.strictEqual(examFullLabel(1, 'a'), 'Opgave 1.a', 'letter sub-question attaches to its Opgave');
+});
+
+test('Q&A panel labels every question as "Opgave N.M"', function () {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(QA_EXAM_TEXT);
+  var html = analyzerRenderQuestionOutline();
+  assert(html.indexOf('Opgave 1.1') >= 0, 'shows "Opgave 1.1"');
+  assert(html.indexOf('Opgave 1.2') >= 0, 'shows "Opgave 1.2"');
+  assert(html.indexOf('Opgave 2.1') >= 0, 'shows "Opgave 2.1"');
+  lang = savedLang;
+});
+
+test('examRenderMethodHint gives the governing formula + needed inputs for a recognised type', function () {
+  var savedLang = lang; lang = 'da';
+  var h = examRenderMethodHint('ik');
+  assert(h.indexOf('I_k') >= 0 && h.indexOf('u_k') >= 0, 'Ik hint shows the formula');
+  assert(h.indexOf('Mangler') >= 0 || h.indexOf('Needs') >= 0, 'states what input is missing');
+  assert.strictEqual(examRenderMethodHint('nonexistent_type'), '', 'unknown type -> no hint (no fabrication)');
+  lang = savedLang;
+});
+
+// === Forsyning: N transformers in parallel, short-circuit current (Opgave 1) ===
+// Verified against the Viggo Bitsch worked solution: with the HV-side network
+// impedance Z_net = 0.240 + j0.798 ohm and transformer Z_tr = 1.00 + j4.90 ohm,
+// 10 kV / 400 V, c = 1.0, the LV-side Ik3max is 43.0 kA (N=2) and 57.2 kA (N=3).
+test('scParallelTrafoIk reproduces Viggo Bitsch: 43 kA (2 trafo) / 57 kA (3 trafo)', function () {
+  var zNet = { r: 0.240, x: 0.798 }, zTr = { r: 1.00, x: 4.90 };
+  var r2 = scParallelTrafoIk(zNet, zTr, 2, 10000, 400, 1.0);
+  var r3 = scParallelTrafoIk(zNet, zTr, 3, 10000, 400, 1.0);
+  assert(Math.abs(r2.ikLV / 1000 - 43.0) < 1.0, '2 transformers -> ~43 kA (got ' + (r2.ikLV / 1000).toFixed(1) + ')');
+  assert(Math.abs(r3.ikLV / 1000 - 57.2) < 1.5, '3 transformers -> ~57 kA (got ' + (r3.ikLV / 1000).toFixed(1) + ')');
+  assert(r3.ikLV > r2.ikLV, '3 parallel gives higher Ik than 2');
+  var r1 = scParallelTrafoIk(zNet, zTr, 1, 10000, 400, 1.0);
+  var Zmag1 = Math.sqrt(Math.pow(0.240 + 1.00, 2) + Math.pow(0.798 + 4.90, 2));
+  var expect1 = (1.0 * 10000) / (Math.sqrt(3) * Zmag1) * 25;
+  assert(Math.abs(r1.ikLV - expect1) < 1, 'N=1 reduces to the single-transformer series formula');
+});
+
+test('scParallelTrafoIk exposes BOTH complex forms: rectangular (R,X) and polar (|Z|, angle)', function () {
+  var r = scParallelTrafoIk({ r: 0.240, x: 0.798 }, { r: 1.00, x: 4.90 }, 2, 10000, 400, 1.0);
+  assert(typeof r.R === 'number' && typeof r.X === 'number', 'rectangular R + jX present');
+  assert(typeof r.Zmag === 'number' && typeof r.angleDeg === 'number', 'polar |Z| and argument present');
+  assert(Math.abs(Math.sqrt(r.R * r.R + r.X * r.X) - r.Zmag) < 1e-9, '|Z| = sqrt(R^2+X^2)');
+  assert(Math.abs(Math.atan2(r.X, r.R) * 180 / Math.PI - r.angleDeg) < 1e-9, 'argument = atan2(X,R)');
+});
+
+// === Forsyning: capacitive earth fault + Petersen coil (slukkespole) ===
+test('Petersen coil compensates the capacitive earth-fault current (resonance L = 1/(3*w^2*C0))', function () {
+  var Un = 10000, f = 50, C0 = 1e-6;
+  var omega = 2 * Math.PI * f;
+  var Ij = forsyningEarthFaultCurrent(C0, Un, f);
+  assert(Math.abs(Ij - Math.sqrt(3) * omega * C0 * Un) < 1e-9, 'earth-fault current formula');
+  var coil = forsyningPetersenCoil(Ij, Un, f);
+  assert.strictEqual(coil.IL, Ij, 'I_L = I_j (full compensation)');
+  var Lres = 1 / (3 * omega * omega * C0);
+  assert(Math.abs(coil.L - Lres) / Lres < 1e-6, 'L matches the resonance identity (got ' + coil.L.toFixed(4) + ' H, expect ' + Lres.toFixed(4) + ')');
+});
+
+test('Petersen coil for a stated earth-fault current (10 kV, I_j = 56 A -> ~0.328 H)', function () {
+  var coil = forsyningPetersenCoil(56, 10000, 50);
+  assert(Math.abs(coil.XL - 103.1) < 0.5, 'X_L ~ 103.1 ohm (got ' + coil.XL.toFixed(1) + ')');
+  assert(Math.abs(coil.L - 0.328) < 0.005, 'L ~ 0.328 H (got ' + coil.L.toFixed(3) + ')');
+});
+
+test('forsyningNetworkSk + forsyningNetZfromSk are mutually consistent (Sk -> Z -> Sk)', function () {
+  var Un = 10000, Skh = 150e6, cosk = 0.1;
+  var Z = forsyningNetZfromSk(Skh, Un, cosk, 1.0);
+  var sk = forsyningNetworkSk(Z.r, Z.x, Un, 1.0);
+  assert(Math.abs(sk.Sk - Skh) / Skh < 1e-6, 'round-trips to the original Sk (150 MVA)');
+  assert(Math.abs(sk.Ik - Skh / (Math.sqrt(3) * Un)) < 1, 'Ik = Sk/(sqrt3*Un)');
+  assert(Math.abs(sk.angleDeg - (Math.acos(0.1) * 180 / Math.PI)) < 0.5, 'network angle from cos phi_k');
+});
+
+// === Online AI analyzer path (Calcia/Sigma-style, law updates) ===
+test('analyzerBuildOnlinePrompt builds an expert Danish solver prompt incl. the exam text', function () {
+  var p = analyzerBuildOnlinePrompt('Opgave 1\n1.1 Beregn IB for 10 kW.');
+  assert(p.system.indexOf('DS/HD 60364') >= 0, 'cites the standard');
+  assert(/rektangul/.test(p.system) && /pol\u00e6r|pol/.test(p.system), 'requires both complex forms');
+  assert(/HELE/.test(p.system), 'instructs to solve the WHOLE set');
+  assert(/IB \u2264 In \u2264 Iz/.test(p.system), 'enforces the coordination safety check');
+  assert(/Sikkerhedsstyrelsen/.test(p.system), 'flags law verification (updates)');
+  assert(p.user.indexOf('1.1 Beregn IB for 10 kW') >= 0, 'user prompt carries the exam text');
+});
+
+test('analyzerLoadAiConfig + analyzerSolveOnline exist (online path wired)', function () {
+  assert.strictEqual(typeof analyzerLoadAiConfig, 'function', 'config loader present');
+  assert.strictEqual(typeof analyzerSolveOnline, 'function', 'online solver present');
+});
+
+test('analyzerBuildPricingPrompt asks for Danish wholesaler pricing + a law-version check', function () {
+  var p = analyzerBuildPricingPrompt('Opgave 1\n1.1 ...', '- IB: 16 A');
+  assert(/Solar|Lemvigh|Sanist|grossist/i.test(p.system), 'requests Danish wholesaler price level');
+  assert(/stykliste|BOM/i.test(p.system), 'asks for a bill of materials');
+  assert(/sikkerhedsstyrelsen|lovtjek|bekendtg/i.test(p.system), 'includes a law-version check');
+  assert(p.user.indexOf('IB: 16 A') >= 0, 'feeds the computed components into the prompt');
+});
+
+test('Online AI: prompt requests per-Opgave JSON, and the parser binds it to numbers', function () {
+  var p = analyzerBuildOnlinePrompt('Opgave 1\n1.1 Beregn IB.');
+  assert(/JSON/.test(p.system) && /"num"/.test(p.system) && /"udregning"/.test(p.system), 'asks for structured per-question JSON');
+  // tolerant parse: code-fenced JSON with prose around it
+  var raw = 'Her er svaret:\n```json\n[{"num":"1.1","spm":"Beregn IB","svar":"62,1 A","udregning":"IB = P/(sqrt3*U*cos) = 62,1 A"}]\n```';
+  var arr = analyzerParseOnlineJson(raw);
+  assert(Array.isArray(arr) && arr.length === 1, 'parses the JSON array');
+  assert.strictEqual(arr[0].num, '1.1', 'binds to Opgave number 1.1');
+  assert.strictEqual(arr[0].svar, '62,1 A', 'carries the short answer');
+  assert.strictEqual(analyzerParseOnlineJson('not json at all'), null, 'non-JSON -> null (falls back to raw)');
+});
+
+
+test('analyzerExtractPdf reads real exam PDFs into readable Danish text', function () {
+  var cases = [
+    { f: '2023_01_El-autorisation_Godkendt.pdf', needle: /autorisation/i },
+    { f: 'Autorisationsproven dec  2012 Endelig opgave.pdf', needle: /december\s+2012/i }
+  ];
+  cases.forEach(function (c) {
+    if (!fs.existsSync(__dirname + '/' + c.f)) return; // skip if fixture absent
+    var bytes = new Uint8Array(fs.readFileSync(__dirname + '/' + c.f));
+    var out = analyzerExtractPdf(bytes);
+    assert(out && out.length > 2000, c.f + ': extracts substantial text (got ' + (out ? out.length : 0) + ')');
+    assert(analyzerPdfReadableRatio(out) > 0.9, c.f + ': text is readable (ratio ' + analyzerPdfReadableRatio(out).toFixed(2) + ')');
+    assert(c.needle.test(out), c.f + ': contains expected content ' + c.needle);
+    assert(out.indexOf('beginbfchar') < 0 && out.indexOf('CIDInit') < 0, c.f + ': no CMap/CID metadata leaked into the text');
+  });
+});
+
+test('analyzerParseCMap maps bfchar and bfrange entries to Unicode', function () {
+  var cm = analyzerParseCMap('1 beginbfchar <0003> <0041> endbfchar 1 beginbfrange <0004> <0006> <0042> endbfrange');
+  assert.strictEqual(cm.width, 2, 'two-byte CID codes');
+  assert.strictEqual(cm.map[0x0003], 'A', 'bfchar 0003 -> A');
+  assert.strictEqual(cm.map[0x0004], 'B', 'bfrange start -> B');
+  assert.strictEqual(cm.map[0x0006], 'D', 'bfrange end -> D');
+});
+
+// Benchmark floor: the offline analyzer must keep solving a meaningful share of a
+// real exam (guards against extraction/detection regressions). Auto aug 2019 went
+// from 3/39 to 10/39 after the detection+extraction hardening.
+test('Offline analyzer solves a real exam PDF above the benchmark floor', function () {
+  var f = __dirname + '/Auto aug 2019.pdf';
+  if (!fs.existsSync(f)) return; // skip if fixture absent
+  var savedLang = lang; lang = 'da';
+  analyzerRun(analyzerExtractPdf(new Uint8Array(fs.readFileSync(f))));
+  var sol = examBuildSolution(analyzerState);
+  var tot = 0, solved = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { tot++; if (q.solved) solved++; }); });
+  assert(tot >= 25, 'detects most sub-questions (got ' + tot + ')');
+  assert(solved >= 7, 'solves at least the benchmark floor (got ' + solved + '/' + tot + ')');
+  // Recognition floor: most questions should be classified (calc or rule), not unknown.
+  var recognized = 0;
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.type && q.type !== '?') recognized++; }); });
+  assert(recognized >= 24, 'recognizes most questions as calc or rule (got ' + recognized + '/' + tot + ')');
+  lang = savedLang;
+});
+
+
+test('renderRecommendations highlights the chosen product and labels the alternatives', function () {
+  var savedLang = lang; lang = 'da';
+  var fuses = recommendFuses(50);
+  assert(fuses.length >= 2, 'has a chosen + alternatives');
+  var out = renderRecommendations('Sikringer', fuses, 'fuse');
+  assert(out.indexOf('VALGT') >= 0, 'chosen product carries a VALGT/CHOSEN badge');
+  assert(out.indexOf('border:2px solid var(--success)') >= 0, 'chosen row has the highlight border');
+  assert(out.indexOf('alternativ') >= 0, 'the other products are labelled as alternatives');
+  // exactly one chosen badge
+  assert.strictEqual(out.split('VALGT').length - 1, 1, 'exactly one product is marked chosen');
+  // cables too
+  var cab = renderRecommendations('Kabler', recommendCables(30, 'copper'), 'cable');
+  assert(cab.indexOf('VALGT') >= 0, 'cable recommendation also highlights the chosen one');
+  lang = savedLang;
+});
+
+
+test('Cable overload protection: corrected Iz vs protection current (Viggo: 371 A > 300 A)', function () {
+  var Izc = 515 * 0.90 * 0.80; // 240 mm2 -> 515 A; 35C -> 0.90; 2 circuits -> 0.80
+  assert(Math.abs(Izc - 371) < 0.5, 'corrected Iz = 371 A (got ' + Izc.toFixed(1) + ')');
+  assert.strictEqual(forsyningCableOverload(Izc, 300).ok, true, '371 A > 300 A -> overload protected');
+  assert.strictEqual(forsyningCableOverload(290, 300).ok, false, 'Iz < I_prot -> NOT protected');
+});
+
+test('Cable short-circuit protection adiabatic I_perm = k*S/sqrt(t); k from datasheet, not assumed', function () {
+  // Viggo uses k ~ 111 for the HV PEX-Al phase conductor (NOT the LV IEC value 94):
+  // 240 mm2, t = t>+t_breaker = 0.5+0.1 = 0.6 s -> ~34.3 kA withstand
+  var r = forsyningCableScProtection(240, 111, 6930, 35, 143, 6000, 0.6);
+  assert(Math.abs(r.phase.Iperm / 1000 - 34.3) < 0.3, 'phase withstand ~34.3 kA (got ' + (r.phase.Iperm / 1000).toFixed(1) + ')');
+  assert.strictEqual(r.phase.ok, true, 'phase withstands the 6.93 kA fault for 0.6 s');
+  assert(Math.abs(r.phase.Iperm - 111 * 240 / Math.sqrt(0.6)) < 1, 'I_perm = k*S/sqrt(t)');
+  assert.strictEqual(r.screen.ok, true, 'screen withstands its earth-fault current');
+});
+
+test('Potentialestigning: R_E <= U_Tp/I_E and the touch-voltage verdict (DS/EN 50522)', function () {
+  var re = forsyningEarthResistanceMax(56, 75);
+  assert(Math.abs(re.REmax - 75 / 56) < 1e-9, 'R_E,max = U_Tp/I_E (got ' + re.REmax.toFixed(3) + ')');
+  var okCase = forsyningPotentialRise(56, 1.0, 75);
+  assert(okCase.UE === 56 && okCase.ok === true, 'U_E=56 V <= 75 V -> OK');
+  var badCase = forsyningPotentialRise(56, 2.0, 75);
+  assert(badCase.UE === 112 && badCase.ok === false, 'U_E=112 V > 75 V -> fail');
+});
+
+// === END-TO-END: a forsyning Opgave 1 is auto-extracted and solved ===
+test('Analyzer auto-solves a forsyning Opgave 1 (Sk, parallel-trafo Ik, slukkespole)', function () {
+  var savedLang = lang; lang = 'da';
+  var EXAM = [
+    'Opgave 1 Forsyningsanlaeg',
+    'Kortslutningseffekten paa 10 kV skinnen er 120 MVA med cos phi_k = 0,287.',
+    'Transformer: SN = 1000 kVA, uk = 5%, 10/0,4 kV.',
+    'Nettet er slukkespolejordet; den kapacitive jordfejlsstroem er 56 A.',
+    '1.1 Beregn kortslutningseffekten og Ik paa 10 kV skinnen.',
+    '1.2 Beregn Ikmax paa lavspaendingssiden med to transformere parallelt og med tre transformere parallelt.',
+    '1.3 Beregn den mindste ideelle slukkespole.'
+  ].join('\n');
+  analyzerRun(EXAM);
+  var sol = examBuildSolution(analyzerState);
+  var byNum = {};
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.num) byNum[q.num] = q; }); });
+  assert(byNum['1.1'] && byNum['1.1'].solved, '1.1 (Sk/Ik) solved');
+  assert(/6,9\d|6\.9\d/.test(byNum['1.1'].value), '1.1 ~ 6.9 kA (got ' + byNum['1.1'].value + ')');
+  assert(byNum['1.2'] && byNum['1.2'].solved, '1.2 (parallel transformers) solved');
+  assert(/4[34]/.test(byNum['1.2'].value) && /5[78]/.test(byNum['1.2'].value), '1.2 shows ~43 kA (N=2) and ~58 kA (N=3): ' + byNum['1.2'].value);
+  assert(byNum['1.3'] && byNum['1.3'].solved, '1.3 (slukkespole) solved');
+  assert(/0,3\d|0\.3\d/.test(byNum['1.3'].value), '1.3 ~ 0.33 H (got ' + byNum['1.3'].value + ')');
+  lang = savedLang;
+});
+
+test('examBuildSolution is SUB-QUESTION driven: answers 1.1, 1.2, 1.3 in document order', function () {
+  var savedLang = lang; lang = 'da';
+  var txt = 'Opgave 1\nData: 11 kW, 400 V, cos phi 0,9.\n1.1 Beregn IB.\n1.2 Beregn spaendingsfaldet for 20 m, 4 mm2.\n1.3 Vaelg sikring. In 20 A.';
+  analyzerRun(txt);
+  var sol = examBuildSolution(analyzerState);
+  var op1 = sol.opgaver.filter(function (o) { return o.id === 1; })[0];
+  assert(op1, 'has Opgave 1');
+  var nums = op1.questions.map(function (q) { return q.num; });
+  assert.deepStrictEqual(nums, ['1.1', '1.2', '1.3'], 'one row per sub-question, in order (got ' + JSON.stringify(nums) + ')');
+  lang = savedLang;
+});
+
+test('Clock times and mismatched decimals are NOT shown as questions', function () {
+  var savedLang = lang; lang = 'da';
+  // Header with a time range; the real question is 1.1.
+  var txt = 'El-pr\u00f8ve kl. 8.30 - 14.30\nOpgave 1\n1.1 Beregn IB for 10 kW, 400 V, cos phi 0,9.';
+  analyzerRun(txt);
+  var sol = examBuildSolution(analyzerState);
+  var allNums = [];
+  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { if (q.num) allNums.push(q.num); }); });
+  assert(allNums.indexOf('8.30') < 0 && allNums.indexOf('14.30') < 0, 'clock times are not question numbers');
+  assert(allNums.indexOf('1.1') >= 0, 'the real question 1.1 is present');
+  // N.M only valid if N matches its Opgave: a "3.4" sitting in Opgave 1 is not numbered "3.4"
+  lang = savedLang;
+});
+
 // === thermalCalcTemp physics correction (audit) ===
 // A conductor loaded to its DERATED ampacity must reach exactly the insulation's
 // max temperature at ANY ambient -- this is what the Table B.52.14/15 derating
@@ -16221,6 +16514,66 @@ test('renderMotor surfaces Type-2 coordination warning + manufacturer catalog li
   assert.ok(out.indexOf('IEC 60947-4-1') >= 0, 'motor result must cite Type-2 coordination standard');
   assert.ok(out.indexOf('se.com/TeSys') >= 0 || out.indexOf('abb.com') >= 0,
     'motor result must include a manufacturer motor-control catalog link');
+});
+
+console.log('\n=== Exam Mock Timer (proportional duration) Tests ===\n');
+
+test('examFmtTime: shows MM:SS under an hour, H:MM:SS at/over an hour', function () {
+  assert.strictEqual(examFmtTime(0), '00:00', 'zero');
+  assert.strictEqual(examFmtTime(65), '01:05', 'just over a minute');
+  assert.strictEqual(examFmtTime(3599), '59:59', 'just under an hour stays MM:SS');
+  assert.strictEqual(examFmtTime(3600), '1:00:00', 'one hour gets the hour field');
+  assert.strictEqual(examFmtTime(7384), '2:03:04', 'two hours formats H:MM:SS');
+  assert.strictEqual(examFmtTime(-50), '00:00', 'negative clamps to zero');
+});
+
+test('examMockBudget: ~3 min per step, whole minutes, clamped to [15 min, 8 h]', function () {
+  assert.strictEqual(examMockBudget(10), 1800, '10 steps -> 30 min (10*180)');
+  assert.strictEqual(examMockBudget(20), 3600, '20 steps -> 1 h');
+  assert.strictEqual(examMockBudget(1), 900, '1 step floored to the 15-min minimum');
+  assert.strictEqual(examMockBudget(0), 900, 'zero/invalid floored to the 15-min minimum');
+  assert.strictEqual(examMockBudget(1000), 28800, 'huge step count capped at 8 h');
+  assert.strictEqual(examMockBudget(13) % 60, 0, 'budget is always a whole number of minutes');
+});
+
+test('examStartMock: timer scales to the number of mock steps (no flat 1 h)', function () {
+  examStartMock('full');
+  var steps = examMockSeq().length;
+  assert.ok(steps > 0, 'full mock produces at least one step');
+  assert.strictEqual(examState.timerTotal, examMockBudget(steps), 'timerTotal equals the per-step budget');
+  assert.strictEqual(examState.timerLeft, examState.timerTotal, 'timer starts full');
+});
+
+test('examStartMock: quick mock gets its own proportional budget; full has >= steps', function () {
+  examStartMock('quick');
+  var qSteps = examMockSeq().length;
+  assert.strictEqual(examState.timerTotal, examMockBudget(qSteps), 'quick mock budget matches its step count');
+  examStartMock('full');
+  var fSteps = examMockSeq().length;
+  assert.ok(fSteps >= qSteps, 'full mock has at least as many steps as quick');
+});
+
+test('examResetTimer: resets to the active mock total, not a hardcoded hour', function () {
+  examStartMock('full');
+  var total = examState.timerTotal;
+  examState.timerLeft = 5;            // simulate time elapsed
+  examResetTimer();
+  assert.strictEqual(examState.timerLeft, total, 'reset restores the mock duration');
+});
+
+test('renderMock: start screen advertises a scaled timer + the real allotted minutes (not a fixed 60 min)', function () {
+  examState.mockOn = false;
+  lang = 'en';
+  var h = renderMock();
+  assert.ok(h.indexOf('60-min') < 0, 'stale "60-min" claim must be gone (en)');
+  assert.ok(/scaled to the exam length/i.test(h), 'explains the timer scales with length');
+  var fullSteps = EXAM_SCEN.reduce(function (n, s) { return n + s.steps.length; }, 0);
+  var fullMin = Math.round(examMockBudget(fullSteps) / 60);
+  assert.ok(h.indexOf('allotted ' + fullMin + ' min') >= 0, 'shows the computed allotted minutes for the full mock');
+  lang = 'da';
+  var hd = renderMock();
+  assert.ok(hd.indexOf('60-min') < 0, 'stale "60-min" claim must be gone (da)');
+  assert.ok(hd.indexOf('afsat ' + fullMin + ' min') >= 0, 'da shows the allotted minutes');
 });
 
 

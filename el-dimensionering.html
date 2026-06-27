@@ -2956,6 +2956,9 @@ function daLocalizeTextSeg(seg) {
   if (!seg || seg.indexOf('.') === -1) return seg;
   var prot = [];
   function P(m) { prot.push(m); return '\u0001' + (prot.length - 1) + '\u0002'; }
+  // 0) Question references must KEEP the period: "Opgave 1.1", "Opgave 1.1.2",
+  //    "Spørgsmål 2.3" — these are numbering, not decimals.
+  seg = seg.replace(/(Opgave|Sp\u00f8rgsm\u00e5l|Question|Task|Pkt)\s+\d+\.\d+(?:\.\d+)*/gi, P);
   // 1) grouped thousands — only UNAMBIGUOUS forms keep the period:
   //    a) two or more grouping separators (1.234.567)
   seg = seg.replace(/\d{1,3}(?:\.\d{3}){2,}(?:,\d+)?/g, P);
@@ -3791,12 +3794,14 @@ function renderRecommendations(title, products, type) {
   const typeToCat = { cable:'cables', mcb:'mcbs', mccb:'mccbs', fuse:'fuses', contactor:'contactors', rcd:'rcds', mpcb:'mpcbs', relay:'overloadRelays' };
   const cat = typeToCat[type] || type;
 
-  const rowWrap = (p, mainLabel, valueText, sub) => `
-    <div class="result-row" style="align-items:center;gap:12px">
+  const rowWrap = (p, mainLabel, valueText, sub, isChosen) => `
+    <div class="result-row" style="align-items:center;gap:12px;${isChosen ? 'background:var(--success-bg);border:2px solid var(--success);border-radius:8px;padding:8px;margin:4px 0' : 'opacity:0.7'}">
       ${getComponentVisual(cat, p)}
       <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-        <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
-          <span class="label">${mainLabel}</span>
+        <div style="display:flex;justify-content:space-between;width:100%;gap:8px;align-items:center">
+          <span class="label">${isChosen
+            ? '<span style="display:inline-block;background:var(--success);color:#fff;font-size:0.64rem;font-weight:800;letter-spacing:.04em;padding:1px 7px;border-radius:10px;margin-right:7px">\u2705 ' + tx('VALGT', 'CHOSEN') + '</span>'
+            : '<span style="display:inline-block;font-size:0.66rem;color:var(--text-muted);border:1px solid var(--border);padding:0 6px;border-radius:10px;margin-right:7px">' + tx('alternativ', 'alternative') + '</span>'}${mainLabel}</span>
           <span class="value">${valueText}</span>
         </div>
         ${sub ? `<span style="font-size:0.75rem;color:var(--text-muted)">${sub}</span>` : ''}
@@ -3805,21 +3810,21 @@ function renderRecommendations(title, products, type) {
 
   let rows = '';
   if (type === 'cable') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${tl(p, 'use')} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${tl(p, 'use')} | R=${p.r} X=${p.x} \u03A9/km`, i === 0)).join('');
   } else if (type === 'mcb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `I<sub>cu</sub> = ${p.icu} kA`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `I<sub>cu</sub> = ${p.icu} kA`, '', i === 0)).join('');
   } else if (type === 'mccb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `I<sub>cu</sub> = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `I<sub>cu</sub> = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`, i === 0)).join('');
   } else if (type === 'fuse') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`, i === 0)).join('');
   } else if (type === 'contactor') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `AC-3: ${p.ac3_A} A`, `${p.ac3_kW} kW`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `AC-3: ${p.ac3_A} A`, `${p.ac3_kW} kW`, i === 0)).join('');
   } else if (type === 'rcd') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A`, `${p.sensitivity} mA`, `Type ${p.rcdType}`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A`, `${p.sensitivity} mA`, `Type ${p.rcdType}`, i === 0)).join('');
   } else if (type === 'mpcb') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, `${p.kW} kW`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, `${p.kW} kW`, i === 0)).join('');
   } else if (type === 'relay') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`)).join('');
+    rows = products.map((p, i) => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, '', i === 0)).join('');
   }
 
   // Engineering reasoning panel (VB methodology) — shows WHY these are recommended
@@ -11190,6 +11195,105 @@ function scTrafoParts(zMag, scSt) {
   return scComplexParts(zMag, scState.rxTrafo);
 }
 // Complex short-circuit calculation per IEC 60909-0 (vector method).
+// Forsyning: capacitive earth-fault current of a (cable) distribution network.
+//   I_j = sqrt(3) * omega * C0 * U_n     (C0 = total per-phase earth capacitance, F)
+// Often the exam states C0 per km, or states I_j directly. Returns I_j in amperes.
+function forsyningEarthFaultCurrent(C0_farad, Un_volt, f) {
+  f = f || 50;
+  var omega = 2 * Math.PI * f;
+  return Math.sqrt(3) * omega * C0_farad * Un_volt;
+}
+
+// Forsyning: ideal Petersen coil (slukkespole) that exactly compensates the
+// capacitive earth-fault current I_j (resonance / "slukket" net).
+//   I_L = I_j ,  X_L = U_phase / I_j ,  L = X_L / omega
+// (Equivalently L = 1/(3*omega^2*C0) -- the resonance identity, used as the test.)
+function forsyningPetersenCoil(Ij_amp, Un_volt, f) {
+  f = f || 50;
+  var omega = 2 * Math.PI * f;
+  var Uphase = Un_volt / Math.sqrt(3);
+  if (Ij_amp <= 0) return { IL: 0, XL: 0, L: 0 };
+  var XL = Uphase / Ij_amp;
+  return { IL: Ij_amp, XL: XL, L: XL / omega, Uphase: Uphase };
+}
+
+// Forsyning: short-circuit power and 3-phase fault current at a busbar from the
+// network impedance (Viggo / IEC 60909). Z is the complex network impedance {r,x}
+// in ohms at voltage Un (line). Returns Sk [VA], Ik [A] and both complex forms.
+//   |Z| = sqrt(R^2+X^2) ,  Sk = c*Un^2/|Z| ,  Ik = c*Un/(sqrt3*|Z|) = Sk/(sqrt3*Un)
+function forsyningNetworkSk(zR, zX, Un_volt, c) {
+  c = (c == null) ? 1.0 : c;
+  var Zmag = Math.sqrt(zR * zR + zX * zX);
+  if (Zmag <= 0 || !isFinite(Zmag)) return { Sk: 0, Ik: 0, Zmag: 0, angleDeg: 0, R: zR, X: zX };
+  var Sk = c * Un_volt * Un_volt / Zmag;
+  var Ik = (c * Un_volt) / (Math.sqrt(3) * Zmag);
+  return { Sk: Sk, Ik: Ik, Zmag: Zmag, angleDeg: Math.atan2(zX, zR) * 180 / Math.PI, R: zR, X: zX };
+}
+// Network impedance referred from a short-circuit power Skh and angle (cos phi_k):
+//   |Z_net| = c*Un^2/Skh ,  R = |Z|*cos(phi_k) ,  X = |Z|*sin(phi_k)
+function forsyningNetZfromSk(Skh_va, Un_volt, cosPhiK, c) {
+  c = (c == null) ? 1.0 : c;
+  if (Skh_va <= 0) return { r: 0, x: 0, mag: 0 };
+  var mag = c * Un_volt * Un_volt / Skh_va;
+  var phi = Math.acos(Math.max(-1, Math.min(1, cosPhiK)));
+  return { r: mag * Math.cos(phi), x: mag * Math.sin(phi), mag: mag };
+}
+
+// Forsyning: is an HV cable protected by its (constant-time) relay?
+// OVERLOAD: the corrected ampacity must carry the protected/relay current.
+function forsyningCableOverload(IzCorrected, Iprotection) {
+  return { Iz: IzCorrected, Iprot: Iprotection, ok: IzCorrected >= Iprotection };
+}
+// SHORT-CIRCUIT (adiabatic, DS/HD 60364-4-43 / IEC 60949): the conductor must
+// withstand the fault current for the relay clearing time t. Checked for BOTH the
+// phase conductor (3-phase fault) and the screen/skaerm conductor (earth fault):
+//   I_perm = k*S/sqrt(t)   must be >= the prospective fault current.
+function forsyningCableScProtection(Sphase, kPhase, IkPhase, Sscreen, kScreen, IkScreen, t) {
+  function chk(S, k, Ik) {
+    if (!S || !k || t <= 0) return null;
+    var Iperm = k * S / Math.sqrt(t);
+    return { Iperm: Iperm, Ik: Ik, ok: (Ik == null) ? null : (Iperm >= Ik) };
+  }
+  return { t: t, phase: chk(Sphase, kPhase, IkPhase), screen: chk(Sscreen, kScreen, IkScreen) };
+}
+
+// Forsyning: maximum allowable earth-electrode resistance R_E so the potential
+// rise during an earth fault stays within the permissible touch voltage U_Tp.
+//   R_E <= U_Tp / I_E    (DS/EN 50522 cl.5)
+// In a slukkespolejordet/isolated net I_E is taken as the capacitive earth-fault
+// current I_j (Viggo: "saettes I_E = I_J"). Conservative: a SMALLER required R_E.
+function forsyningEarthResistanceMax(IE_amp, Utp_volt) {
+  if (IE_amp <= 0) return { REmax: Infinity, Utp: Utp_volt, IE: IE_amp };
+  return { REmax: Utp_volt / IE_amp, Utp: Utp_volt, IE: IE_amp };
+}
+// Potential rise U_E = I_E * R_E and the pass/fail verdict against U_Tp.
+function forsyningPotentialRise(IE_amp, RE_ohm, Utp_volt) {
+  var UE = IE_amp * RE_ohm;
+  return { UE: UE, Utp: Utp_volt, RE: RE_ohm, ok: UE <= Utp_volt };
+}
+
+// Forsyning: 3-phase MAX short-circuit current on the LV side of N identical
+// distribution transformers in PARALLEL, fed through a common upstream network
+// (+HV) impedance. Computed on the HV side then referred to the LV side by the
+// turns ratio (Viggo Bitsch method, DS/EN 50522 / IEC 60909):
+//   Z_total = Z_net,HV + Z_tr,HV / N      (parallel transformers share the duty)
+//   I_k,LV  = c · U_HV / (√3 · |Z_total|) · (U_HV / U_LV)
+// zNetHV and zTrafoHV are complex {r, x} in ohms referred to the HV side.
+// Verified against Viggo Bitsch's worked solution (see test-sld.js): with
+// Z_net = 0.240 + j0.798 Ω and Z_tr = 1.00 + j4.90 Ω, U_HV = 10 kV, U_LV = 400 V,
+// this returns 43.0 kA for N = 2 and 57.2 kA for N = 3.
+function scParallelTrafoIk(zNetHV, zTrafoHV, N, U_HV, U_LV, c) {
+  c = (c == null) ? 1.0 : c;
+  N = N || 1;
+  var R = zNetHV.r + zTrafoHV.r / N;
+  var X = zNetHV.x + zTrafoHV.x / N;
+  var Zmag = Math.sqrt(R * R + X * X);
+  if (Zmag <= 0 || !isFinite(Zmag)) return { ikLV: 0, ikHV: 0, Zmag: 0, R: R, X: X, N: N };
+  var ikHV = (c * U_HV) / (Math.sqrt(3) * Zmag);
+  var ratio = (U_LV > 0) ? (U_HV / U_LV) : 1;
+  return { ikLV: ikHV * ratio, ikHV: ikHV, Zmag: Zmag, R: R, X: X, N: N, angleDeg: Math.atan2(X, R) * 180 / Math.PI };
+}
+
 // Impedances are added as vectors (R + jX) for accurate fault current.
 // Results: Ik3max at busbar (3-phase, c=1.05), Ik2min at cable far end (2-phase, c=0.95).
 // Verified: Ik3max per IEC 60909-0 clause 4.2; Ik2min per clause 4.3.2: 2024-audit-pass.
@@ -16093,13 +16197,13 @@ function axCatSuggest(cat) {
   return m[cat] || { da: 'Repetér det relevante DS/HD 60364-afsnit.', en: 'Revisit the relevant DS/HD 60364 clause.' };
 }
 
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600, timerTotal:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
 function examLoadStore(){ try { return JSON.parse(localStorage.getItem('examStore')||'{}'); } catch(e){ return {}; } }
 function examSaveStore(s){ try { localStorage.setItem('examStore', JSON.stringify(s)); } catch(e){} }
-function examFmtTime(s){ const m=Math.floor(s/60), ss=s%60; return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+function examFmtTime(s){ s=Math.max(0,s|0); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; if(h>0){ return h+':'+(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; } return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
 
 const EXAM_QUIZ = [
   { q:{da:'Hvad er grundreglen for overbelastningsbeskyttelse?',en:'What is the fundamental rule for overload protection?'}, opts:['IB \u2264 In \u2264 Iz','Iz \u2264 In \u2264 IB','In \u2264 IB \u2264 Iz','IB \u2265 In \u2265 Iz'], ci:0, ex:{da:'Belastningsstr\u00f8m (IB) \u2264 beskyttelsens m\u00e6rkestr\u00f8m (In) \u2264 kablets korrigerede str\u00f8mb\u00e6reevne (Iz). Kablet kan dermed aldrig overbelastes uden at beskyttelsen udl\u00f8ser.',en:'Load current (IB) \u2264 device rating (In) \u2264 corrected cable ampacity (Iz). The cable can never be overloaded without the protection tripping.'}, clause:'DS/HD 60364-4-43 \u00a7433.1' },
@@ -16288,7 +16392,7 @@ function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){
 
 function examStartTimer(){ examState.timerOn = true; examState.timerEnd = Date.now() + examState.timerLeft*1000; if(examTimerHandle) clearInterval(examTimerHandle); examTimerHandle = setInterval(examTick, 1000); renderModule('exam'); }
 function examPauseTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } renderModule('exam'); }
-function examResetTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerLeft = 3600; renderModule('exam'); }
+function examResetTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerLeft = examState.timerTotal || 3600; renderModule('exam'); }
 function examTick(){ const left = Math.max(0, Math.round((examState.timerEnd - Date.now())/1000)); examState.timerLeft = left; const el = document.getElementById('examTimer'); if(el) el.textContent = examFmtTime(left); if(left<=0){ if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerOn = false; renderModule('exam'); } }
 function examFeedback(ok, exObj, clause){
   const da = lang==='da';
@@ -16343,7 +16447,14 @@ function examMockSeq(){ var seq=[]; var ids=(examState.mockSet&&examState.mockSe
 function examMockCur(){ var seq=examMockSeq(); var p=seq[examState.mockPos]; if(!p) return null; var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); return { sid:p.sid, j:p.j, sc:sc, step:sc.steps[p.j], pos:examState.mockPos, total:seq.length }; }
 function examMockAnswered(){ var seq=examMockSeq(), a=0; seq.forEach(function(p){ if(examState.scPick[p.sid+':'+p.j]!==undefined) a++; }); return a; }
 function examMockScore(){ var seq=examMockSeq(), c=0; seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) c++; }); return { correct:c, total:seq.length }; }
-function examStartMock(kind){ kind = kind||'full'; var ids; if(kind==='quick'){ ids=[]; ['forsyning','maskine','installation'].forEach(function(c){ var pool=EXAM_SCEN.filter(function(s){return s.cat===c;}); if(pool.length) ids.push(pool[Math.floor(Math.random()*pool.length)].id); }); } else { ids=EXAM_SCEN.map(function(s){return s.id;}); } examState.mockKind=kind; examState.mockSet=ids; examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
+// Realistic time budget for the legacy exam mock: ~3 min per multiple-choice
+// scenario step (the real autorisationspr\u00f8ve allocates generous time per task),
+// rounded to a whole minute and clamped to [15 min, 8 h]. Replaces the old flat
+// 1-hour timer that gave the same time to a 9-step quick mock and a 40+ step
+// full mock. The autoexam module has the formal 2h/4h/8h duration bands; this
+// keeps the lighter MCQ trainer proportional and honest.
+function examMockBudget(steps){ var n=Math.max(1, steps|0); var sec=Math.round(n*180/60)*60; return Math.max(900, Math.min(28800, sec)); }
+function examStartMock(kind){ kind = kind||'full'; var ids; if(kind==='quick'){ ids=[]; ['forsyning','maskine','installation'].forEach(function(c){ var pool=EXAM_SCEN.filter(function(s){return s.cat===c;}); if(pool.length) ids.push(pool[Math.floor(Math.random()*pool.length)].id); }); } else { ids=EXAM_SCEN.map(function(s){return s.id;}); } examState.mockKind=kind; examState.mockSet=ids; examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerTotal=examMockBudget(examMockSeq().length); examState.timerLeft=examState.timerTotal; examStartTimer(); }
 function examAbortMock(){ examState.mockOn=false; examPauseTimer(); }
 function examMockNav(d){ var n=examMockSeq().length; examState.mockPos=Math.max(0, Math.min(n-1, examState.mockPos+d)); renderModule('exam'); }
 function examSaveMock(){ examState.mockSet.forEach(function(id){ var sc=EXAM_SCEN.find(function(s){return s.id===id;}); if(sc) examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); var key=examState.mockKind==='quick'?'mockBestQuick':'mockBestFull'; store[key]=Math.max(store[key]||0,pct); examSaveStore(store); }
@@ -16377,9 +16488,11 @@ function renderMock(){
   if(!examState.mockOn){
     const bf = store.mockBestFull!=null ? store.mockBestFull+'%' : (tx('ikke taget', 'not taken'));
     const bq = store.mockBestQuick!=null ? store.mockBestQuick+'%' : (tx('ikke taget', 'not taken'));
+    const fullSteps = EXAM_SCEN.reduce(function(n,s){ return n + s.steps.length; }, 0);
+    const fullMin = Math.round(examMockBudget(fullSteps)/60);
     return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${tx('Mock-eksamen', 'Mock exam')}</div>`
-      + `<div class="info-row">${da?'K\u00f8r en mock under eksamensbetingelser: intet facit undervejs, 60-min timer starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'% samlet + '+EXAM_CAT_FLOOR+'% pr. kategori).':'Run a mock under exam conditions: no answers shown, 60-min timer auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'% overall + '+EXAM_CAT_FLOOR+'% per category).'}</div>`
-      + `<div class="result-row"><span class="label">${tx('Fuld (11 scenarier / 68 trin)', 'Full (11 scenarios / 68 steps)')}</span><span class="value">${bf}</span></div>`
+      + `<div class="info-row">${da?'K\u00f8r en mock under eksamensbetingelser: intet facit undervejs, en timer der skalerer med pr\u00f8vens l\u00e6ngde (ca. 3 min pr. trin) starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'% samlet + '+EXAM_CAT_FLOOR+'% pr. kategori).':'Run a mock under exam conditions: no answers shown, a timer scaled to the exam length (about 3 min per step) auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'% overall + '+EXAM_CAT_FLOOR+'% per category).'}</div>`
+      + `<div class="result-row"><span class="label">${tx('Fuld (11 scenarier / 68 trin)', 'Full (11 scenarios / 68 steps)')}</span><span class="value">${bf} \u00b7 ${tx('afsat', 'allotted')} ${fullMin} min</span></div>`
       + `<div class="result-row"><span class="label">${tx('Hurtig (1 pr. kategori, tilf\u00e6ldig)', 'Quick (1 per category, random)')}</span><span class="value">${bq}</span></div>`
       + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examStartMock('full')">\u25B6 ${tx('Start fuld mock', 'Start full mock')}</button><button class="sel-btn" onclick="examStartMock('quick')">\u26A1 ${tx('Start hurtig mock', 'Start quick mock')}</button></div></div>`;
   }
@@ -16397,7 +16510,7 @@ function renderMock(){
     const catRows = order.map(function(c){ var pc=catPct[c]; return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':(pc>=EXAM_CAT_FLOOR?'#b8860b':'var(--danger)')}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
     const rd = examReportData();
     const weak = rd.weakClauses.length ? rd.weakClauses.slice(0,6).map(function(w){return w.clause+' \u00d7'+w.count;}).join('<br>') : (tx('Ingen', 'None'));
-    const used = examFmtTime(Math.max(0, 3600-examState.timerLeft));
+    const used = examFmtTime(Math.max(0, (examState.timerTotal||3600)-examState.timerLeft));
     return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${tx('Mock-resultat', 'Mock result')}</div>`
       + `<div class="result-box ${pass?'':'error'}"><div class="result-title">${pass?(tx('\uD83C\uDF89 Best\u00e5et', '\uD83C\uDF89 Passed')):(tx('\u26A0\uFE0F Ikke best\u00e5et', '\u26A0\uFE0F Not passed'))} \u2014 ${pct}%</div>`
       + `<div class="result-row"><span class="label">${tx('Rigtige trin', 'Correct steps')}</span><span class="value">${r.correct}/${r.total}</span></div>`
@@ -33729,8 +33842,7 @@ var analyzerState = {
   moduleFlow: [],    // Which modules were used and how values flowed
   busPopulated: false, // Whether reactive bus was auto-populated
   solutionShown: false, // Whether the capstone "Complete exam solution" is rendered
-  mode: 'upload', // 'upload' or 'paste'
-  notice: null,   // trilingual user message (e.g. scanned PDF / unsupported file)
+  mode: 'upload', // 'upload' or 'paste'  notice: null,   // trilingual user message (e.g. scanned PDF / unsupported file)
   extracting: false // true while PDF/DOCX text extraction is in progress
 };
 // Normalize input text: strip page numbers, headers, fix encoding
@@ -33742,6 +33854,18 @@ function analyzerNormalize(text) {
   // Strip common exam headers
   s = s.replace(/Autorisationspr.ve\s*\d{4}/gi, '');
   s = s.replace(/Sikkerhedsstyrelsen/gi, '');
+  // === PDF-artifact repair (this is what unlocks real exam extraction) ===
+  // (a) Subscript split: a lone S/U/I/P/Z at a line end glued to its subscript on
+  //     the next line. "S\nk,max = 225 MVA" -> "Sk,max = 225 MVA"; "U\nN = ..." -> "UN = ...".
+  s = s.replace(/\b([SUIPZ])\s*\n\s*([a-zN\u00e6\u00f8\u00e5][\w,.]*\s*[=:])/g, '$1$2');
+  // (b) Unit "mm" split from its exponent, and normalise "mm 2"/"mm²" -> "mm2".
+  s = s.replace(/mm\s*\n\s*2\b/g, 'mm2').replace(/mm\s*\u00b2/g, 'mm2').replace(/mm\s+2\b/g, 'mm2');
+  // (c) A value split from its unit across a line break: "225\nMVA" -> "225 MVA".
+  s = s.replace(/(\d)\s*\n\s*(MVA|kVA|kV|kW|mm2|A|km|m|V|\u00b0C|H|Hz)\b/g, '$1 $2');
+  // (d) Spaced relational operators in relay settings: "I > =" -> "I> =", "I >> =" -> "I>> =".
+  s = s.replace(/\bI\s*(>{1,3})\s*=/g, 'I$1 =');
+  // (e) Collapse table whitespace (multiple spaces/tabs) to single spaces.
+  s = s.replace(/[ \t]{2,}/g, ' ');
   // Collapse multiple blank lines
   s = s.replace(/\n{3,}/g, '\n\n');
   return s.trim();
@@ -33750,8 +33874,14 @@ function analyzerNormalize(text) {
 // Segment text by Opgave/sub-task structure
 function analyzerSegment(text) {
   var segments = [];
-  // Split by Opgave headers: "Opgave 1", "Opgave 2", etc.
-  var parts = text.split(/(?=Opgave\s+\d+)/i);
+  // Split by Opgave headers ("Opgave 1", "Opgave 2", ...) but NOT the weighting
+  // table ("Opgave 1 = 20 %"), which would otherwise create bogus offset sections.
+  var parts = text.split(/(?=Opgave\s+\d+\b(?!\s*=))/i);
+  // Sub-question splitter: a real question number is N.M with 1-2 digits each
+  // (e.g. 1.1, 3.18, 5.2) at a token boundary, OR a list marker a)..f). It must
+  // NOT fire on Danish thousand/decimal values like "3.500 W" or "1.580" — hence
+  // the (?!\d) guard and the 1-2 digit limit on the fractional part.
+  var SUBQ = /(?=(?:^|\s)\d{1,2}\.\d{1,2}(?!\d)[\s:).]|(?:^|\s)[a-f]\)\s)/i;
   var seenIds = {};
   for (var i = 0; i < parts.length; i++) {
     var part = parts[i].trim();
@@ -33763,7 +33893,7 @@ function analyzerSegment(text) {
     // (handles cases where assignment + answer key are pasted together)
     if (seenIds[segId] !== undefined) {
       segments[seenIds[segId]].text += '\n' + part;
-      var subParts2 = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+      var subParts2 = part.split(SUBQ);
       for (var k = 0; k < subParts2.length; k++) {
         var s2 = subParts2[k].trim();
         if (s2 && s2 !== title) segments[seenIds[segId]].subQuestions.push(s2);
@@ -33771,7 +33901,7 @@ function analyzerSegment(text) {
       continue;
     }
     // Split sub-questions within each Opgave
-    var subParts = part.split(/(?=\d+\.\d+[\s.):]|\b[a-f]\))/i);
+    var subParts = part.split(SUBQ);
     var subQuestions = [];
     for (var j = 0; j < subParts.length; j++) {
       var sub = subParts[j].trim();
@@ -33821,6 +33951,18 @@ function analyzerExtract(text) {
     var pwMatch = text.match(/(?:P[n]?|effekt|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*W\b/i);
     if (pwMatch) { var pVal = parseFloat(pwMatch[1].replace(',', '.')); if (pVal >= 100) { data.power_kW = pVal / 1000; data.confidence.power_kW = 'medium'; } }
   }
+  // Load schedule row: "<voltage> <kVA> <cos phi>" e.g. "3x400/230 325 kVA 0,8".
+  // Gives apparent power S [kVA] and cos phi for a circuit -> IB = S/(sqrt3*U).
+  var loadRow = text.match(/(3\s*x\s*400(?:\/230)?|1\s*x\s*230|400\/230|400|230)\D{0,14}?(\d{2,4})\s*kVA\D{0,8}?(0[.,]\d+|1[.,]0+|1\b)/i);
+  if (loadRow) {
+    var lkva = parseFloat(loadRow[2]); var lcos = parseFloat(loadRow[3].replace(',', '.'));
+    if (lkva > 0 && lcos > 0 && lcos <= 1) {
+      data.loadKVA = lkva;
+      if (!data.cosPhi) { data.cosPhi = lcos; data.confidence.cosPhi = 'medium'; }
+      if (!data.power_kW) { data.power_kW = lkva * lcos; data.confidence.power_kW = 'medium'; } // active kW (IB = S/(sqrt3*U))
+      if (!/3\s*x|400\/230/.test(loadRow[1])) { /* single phase 230 */ }
+    }
+  }
 
   // Voltage: "400 V", "3-faset 400V", "230V", "3x400", "690V", "10 kV"
   var vMatch = text.match(/(\d+)\s*V(?:\s|,|\.|\b)/);
@@ -33838,9 +33980,12 @@ function analyzerExtract(text) {
   // cos phi: "cos(phi) = 0,86", "cos\u03C6 = 0.86", "cos phi 0,86", "effektfaktor 0,86", "PF 0,9"
   // The separator is OPTIONAL so natural phrasings without "=" are recognised;
   // a 0<value<=1 sanity clamp prevents false matches (e.g. an angle "cos 30").
+  // Load power factor: 0.50-1.00 (real loads). A "cos phi" below 0.5 is almost
+  // always the network short-circuit angle (cos phi_k), so it must NOT pollute the
+  // load cosPhi -- it is captured separately as cosPhiK below.
   var cosMatch = text.match(/cos\s*(?:\(?\s*(?:phi|\u03C6)\s*\)?)?\s*[:=]?\s*(\d+[.,]\d+)/i);
   if (!cosMatch) cosMatch = text.match(/(?:effektfaktor|power\s*factor|\bPF)\s*[:=]?\s*(\d+[.,]\d+)/i);
-  if (cosMatch) { var cosV = parseFloat(cosMatch[1].replace(',', '.')); if (cosV > 0 && cosV <= 1) { data.cosPhi = cosV; data.confidence.cosPhi = 'high'; } }
+  if (cosMatch) { var cosV = parseFloat(cosMatch[1].replace(',', '.')); if (cosV >= 0.5 && cosV <= 1) { data.cosPhi = cosV; data.confidence.cosPhi = 'high'; } }
 
   // Efficiency eta: "eta = 0,93", "η = 0.93", "virkningsgrad 0,93"
   var etaMatch = text.match(/(?:eta|\u03B7|virkningsgrad)\s*[:=]\s*(\d+[.,]\d+)/i);
@@ -34029,6 +34174,69 @@ function analyzerExtract(text) {
   else if (/60364-4-43/.test(text)) data.refClause = '4-43';
   else if (/60364-5-52/.test(text)) data.refClause = '5-52';
 
+  // === FORSYNING / HV NETWORK DATA (Bind 5) ===
+  // Short-circuit power Skh at the HV busbar: "kortslutningseffekt ... 120 MVA", "Skh = 150 MVA"
+  // Capture Sk,max and Sk,min separately. Tolerant of the PDF splitting the
+  // subscript ("S k,max", "S\nk,max") and an orphan "= value" on the next line.
+  var skMaxM = text.match(/S\s*\n?\s*k\s*,?\s*max[\s\S]{0,15}?(\d+[.,]?\d*)\s*MVA/i);
+  var skMinM = text.match(/S\s*\n?\s*k\s*,?\s*min[\s\S]{0,15}?(\d+[.,]?\d*)\s*MVA/i);
+  if (skMaxM) data.Skh_max_MVA = parseFloat(skMaxM[1].replace(',', '.'));
+  if (skMinM) data.Skh_min_MVA = parseFloat(skMinM[1].replace(',', '.'));
+  var skhMatch = text.match(/(?:kortslutningseffekt\w*|S\s*\n?\s*k[nh]?)[\s\S]{0,40}?(\d+[.,]?\d*)\s*MVA/i);
+  if (!skhMatch) skhMatch = text.match(/(\d+[.,]?\d*)\s*MVA/i);
+  // Primary Skh = the max value (for Ik,max); fall back to the first MVA found.
+  if (data.Skh_max_MVA) { data.Skh_MVA = data.Skh_max_MVA; data.confidence.Skh_MVA = 'high'; }
+  else if (skhMatch) { data.Skh_MVA = parseFloat(skhMatch[1].replace(',', '.')); data.confidence.Skh_MVA = 'high'; }
+  // Network angle for min: a second, larger cos(phi_k) (e.g. 0,20) if present.
+  var allLowCos = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*\)?\s*[:=]?\s*0[.,][0-4]\d*/ig);
+  if (allLowCos && allLowCos.length >= 2) {
+    var vals = allLowCos.map(function (x) { return parseFloat((x.match(/0[.,]\d+/) || ['0'])[0].replace(',', '.')); }).sort(function (a, b) { return a - b; });
+    data.cosPhiK = vals[0]; data.cosPhiK_min = vals[vals.length - 1]; // smallest angle uses largest cos? max fault uses lowest cos -> keep min cos as primary
+  }
+  // Network short-circuit angle: "cos phi_k = 0,1" / "cos Fk 0,15" or R/X via "arccot 0,30"
+  // Network short-circuit angle cos(phi_k): explicit "cos phi_k = .." OR (fallback)
+  // any "cos phi = X" with X < 0.5 (a short-circuit angle, never a load PF).
+  var coskMatch = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*_?\s*k\s*\)?\s*[:=]?\s*(\d+[.,]\d+)/i);
+  if (!coskMatch) { var lowCos = text.match(/cos\s*\(?\s*(?:phi|\u03c6|f)\s*\)?\s*[:=]?\s*(0[.,][0-4]\d*)/i); if (lowCos) coskMatch = lowCos; }
+  if (coskMatch) { var ck = parseFloat(coskMatch[1].replace(',', '.')); if (ck > 0 && ck < 1) { data.cosPhiK = ck; data.confidence.cosPhiK = 'high'; } }
+  var rxMatch = text.match(/(?:R\/X|arccot)\s*[:=(]?\s*(\d+[.,]\d+)/i);
+  if (rxMatch) { data.netRX = parseFloat(rxMatch[1].replace(',', '.')); data.confidence.netRX = 'medium'; }
+  // HV distribution voltage: "10 kV", "3 x 10 kV", "50/10 kV" -> take the lower (distribution) side
+  var hvMatch = text.match(/(\d{1,3})\s*\/\s*(\d{1,3})\s*kV/);
+  if (hvMatch) { data.UnHV_kV = parseFloat(hvMatch[2]); data.confidence.UnHV_kV = 'high'; }
+  else { var hv2 = text.match(/\b(?:3\s*[x\u00d7]\s*)?(\d{1,2})\s*kV\b/i); if (hv2) { data.UnHV_kV = parseFloat(hv2[1]); data.confidence.UnHV_kV = 'medium'; } }
+  // Capacitive earth-fault current stated directly: "jordfejlsstrøm ... 56 A", "op til 25 A"
+  // Capacitive earth-fault current stated directly. Danish exams phrase this with
+  // a long lead-in ("jordslutningsstroemme i distributionsnettet kan antage
+  // vaerdier op til 25 A"), so allow a wide gap to the value.
+  var ijMatch = text.match(/(?:jordfejls?str.{0,3}m\w*|jordslutningsstr.{0,3}m\w*|ladestr.{0,3}m\w*)[^.\n]{0,90}?(\d+[.,]?\d*)\s*A\b/i);
+  if (ijMatch) { data.earthFaultA = parseFloat(ijMatch[1].replace(',', '.')); data.confidence.earthFaultA = 'high'; }
+  // Number of transformers in parallel: "to/tre transformere parallelt". If BOTH
+  // are asked ("to ... og ... tre ... parallelt"), leave it open so the solver
+  // computes for N=2 AND N=3.
+  var hasTo = /\bto\s+transformere\s+parallelt/i.test(text), hasTre = /\btre\s+transformere\s+parallelt/i.test(text);
+  if (hasTo && !hasTre) data.parallelTrafos = 2;
+  else if (hasTre && !hasTo) data.parallelTrafos = 3;
+  else if (!hasTo && !hasTre) { var npMatch = text.match(/(\d+)\s+transformere\s+parallelt/i); if (npMatch) data.parallelTrafos = parseInt(npMatch[1]); }
+  // Permissible touch voltage U_Tp (DS/EN 50522): "tilladelig beroeringsspaending 75 V",
+  // "U_tp = 80 V". Default 75 V for a long-duration (slukkespolejordet) fault.
+  var utpMatch = text.match(/(?:ber.ringssp.nding|U_?tp|tilladelig\w*\s+sp.nding)[^.\n]{0,25}?(\d+[.,]?\d*)\s*V/i);
+  if (utpMatch) { data.Utp_V = parseFloat(utpMatch[1].replace(',', '.')); data.confidence.Utp_V = 'high'; }
+  // Earth-electrode resistance R_E if stated: "jordingsmodstand 2 ohm", "R_E = 1,5 ohm"
+  var reMatch = text.match(/(?:jordingsmodstand|jordmodstand|R_?E)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:ohm|\u03a9)/i);
+  if (reMatch) { data.RE_ohm = parseFloat(reMatch[1].replace(',', '.')); data.confidence.RE_ohm = 'medium'; }
+  // HV cable phase+screen cross-section: "3x240+35 mm2" -> phase 240, screen 35
+  var hvCableMatch = text.match(/(\d)\s*[x\u00d7]\s*(\d+)\s*\+\s*(\d+)\s*mm/i);
+  if (hvCableMatch) { data.cablePhaseMm2 = parseFloat(hvCableMatch[2]); data.cableScreenMm2 = parseFloat(hvCableMatch[3]); data.confidence.cablePhaseMm2 = 'high'; }
+  // Relay clearing time: t> setting + breaker time. "t> = 0,5 s" + "brydetid 0,1 s"
+  var tgtMatch = text.match(/t\s*>\s*[:=]?\s*(\d+[.,]?\d*)\s*s/i);
+  var tbrMatch = text.match(/(?:brydetid|bryde-?tid|afbrydertid)[^.\n]{0,15}?(\d+[.,]?\d*)\s*s/i);
+  if (tgtMatch) { data.relayTgt = parseFloat(tgtMatch[1].replace(',', '.')); data.confidence.relayTgt = 'high'; }
+  if (tbrMatch) { data.breakerTime = parseFloat(tbrMatch[1].replace(',', '.')); }
+  // Stated cable ampacity ("240 mm2 ~ 515 A" / "Iz = 515 A")
+  var izStated = text.match(/(?:Iz|str.mv.rdi|bel.stbarhed)[^.\n]{0,12}?(\d{2,4})\s*A/i);
+  if (izStated) { data.cableIzStated = parseFloat(izStated[1]); }
+
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
 
@@ -34051,6 +34259,13 @@ function analyzerDetectQuestions(text) {
     { re: /selektivitet/i, type: 'selectivity', label: 'Selektivitet', module: 'discrim' },
     { re: /beregn\s+(?:den\s+)?tilladelige\s+str.{1,2}m/i, type: 'iz', label: 'Tilladeligt Iz', module: 'cable' },
     { re: /koordinering|IB\s*.\s*In\s*.\s*Iz/i, type: 'coord', label: 'Koordinering IB\u2264In\u2264Iz', module: 'mcb' },
+    // === FORSYNING / HV NETWORK (Bind 5) ===
+    { re: /(?:beregn|bestem|find|hvad\s+er)\b[^.\n]{0,40}kortslutningseffekt/i, type: 'sk_net', label: 'Kortslutningseffekt Sk', module: 'scircuit' },
+    { re: /Ik(?:3|,?max)?.{0,40}(?:transformere?\s+parallelt|parallelt|lavsp.ndingssiden)|(?:to|tre|\d+)\s+transformere\s+parallelt/i, type: 'ik_par', label: 'Ik (parallelle transformere)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find|dimensioner)[^.\n]{0,40}slukkespole|mindste\s+ideelle\s+slukkespole/i, type: 'petersen', label: 'Slukkespole (L)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find)[^.\n]{0,40}(?:kapacitiv|jordfejlstr|jordslutningsstr|ladestr)/i, type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', module: 'scircuit' },
+    { re: /(?:kontroller|unders.g|er)[^.\n]{0,50}(?:kabl|leder|stikled)[^.\n]{0,40}(?:overbelastnings|kortslutnings)beskytt|fase-?\s*og\s*sk.rmleder/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
+    { re: /(?:beregn|bestem|find|kontroller)[^.\n]{0,40}(?:potentialestigning|ber.ringssp|jordingsmodstand|jordmodstand)|potentialestigning/i, type: 'potential', label: 'Potentialestigning / R_E', module: 'scircuit' },
     // === TRANSFORMER (Bind 3 + 5) ===
     { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning', module: 'trafo' },
     { re: /(?:beregn|find)\s+(?:den\s+)?(?:inducerede\s+)?EMK|EMF\s*=\s*4[.,]44/i, type: 'trafo_emf', label: 'Trafo EMK/EMF', module: 'trafo' },
@@ -34122,10 +34337,35 @@ function analyzerDetectQuestions(text) {
     { re: /(?:kondensator|kapacitor)\b|(?:beregn|bestem|find).{0,12}kapacitans|kondensatorens\s+(?:ladning|energi)/i, type: 'kapacitor', label: 'Kondensatorberegning', module: 'kapacitor' },
     { re: /U-?v.{1,2}rdi|varmetab|transmissionstab|varmebehov|isoleringskrav/i, type: 'varme', label: 'U-v\u00e6rdi/varmetab', module: 'varme' },
     { re: /(?:j.{1,2}vnstr.{1,2}ms?)(?:maskine|motor|generator)|ankerstr.{1,2}m|mod-?EMK|tv.{1,2}rmagnetisering/i, type: 'dcmaskine', label: 'DC-maskine', module: 'dcmaskine' },
-    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
+    // === REAL EXAM PHRASINGS (verbs: Dimensioner/Valg af/Foretag valg/Afklar/Kontrol om/Hvad er) ===
+    { re: /(?:beregn|bestem|find)[^.\n]{0,35}(?:st.rste|mindste|maks\w*|min\w*\b)?[^.\n]{0,15}kortslutnings\s?str/i, type: 'sk_net', label: 'Kortslutningsstr\u00f8m (net)', module: 'scircuit' },
+    { re: /(?:foretag\s+)?valg\s+af[^.\n]{0,60}(?:smeltesikring|automatsikring|kombiafbryder|sikring|MCCB|MCB|maksimalafbryder|str.mtransformer|konstanttidsrel.|rel.|lastadskiller)/i, type: 'device', label: 'Valg af beskyttelse', module: 'mcb' },
+    { re: /d\s?imensioner[^.\n]{0,45}(?:hovedkabel|forsyningskred|gruppeledning|stikledning|tilledning|kabel|ledning)/i, type: 'cable', label: 'Dimensioner kabel/ledning', module: 'cable' },
+    { re: /(?:dimensioner|kontrol\w*)[^.\n]{0,30}kanalskinne|kanalskinne[^.\n]{0,30}(?:belastnings|kortslutnings|st.dstr.m)/i, type: 'busbar', label: 'Kanalskinne', module: 'busbar' },
+    { re: /(?:afklar|kontrol\w*|unders.g)[^.\n]{0,75}(?:kortslutningsbeskyt|overbelastningsbeskyt)/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
+    { re: /(?:hvad\s+er|bestem|find|beregn)[^.\n]{0,30}(?:maksimale?\s+)?ber.ringssp.nding/i, type: 'potential', label: 'Ber\u00f8ringssp\u00e6nding / R_E', module: 'scircuit' },
+    { re: /(?:kontrol\w*|unders.g)[^.\n]{0,35}fejlbeskyttet|er\s+\u2013?\w*\s*fejlbeskyttet/i, type: 'fault', label: 'Fejlbeskyttelse', module: 'fault' },
+    { re: /(?:bestem|find|beregn)[^.\n]{0,30}(?:antallet\s+af\s+)?fasekompens|fasekompensatorbatteri/i, type: 'pfc', label: 'Fasekompensering', module: 'trefase' },
+    { re: /tegn[^.\n]{0,30}(?:en-?stregs?skema|kredsskema|enstreg|diagram)/i, type: 'diagram', label: 'Tegn diagram (kredsskema)', module: 'draw' },
+    { re: /(?:dimensioner|bestem)[^.\n]{0,40}(?:potentialudligning|udligningsforbindelse|beskyttelsesleder|PE-?leder)/i, type: 'pe_sizing', label: 'PE/udligning tv\u00e6rsnit', module: 'cable' },
+    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' },
+    // More real-exam phrasings (kept before the catch-all rule pattern)
+    { re: /(?:v.{1,2}lg|indstil)[^.\n]{0,48}(?:kredsbryder|minikredsbryder|smeltesikring\w*|kombiafbryder|udl\u00f8ser)/i, type: 'device', label: 'Valg/indstilling af beskyttelse', module: 'mcb' },
+    { re: /unders.g[^.\n]{0,55}(?:indirekte\s+ber.ring|beskyttet\s+mod\s+indirekte)/i, type: 'fault', label: 'Indirekte ber\u00f8ring (fejlbeskyttelse)', module: 'fault' },
+    { re: /(?:afklar|kontrol\w*|unders.g)[^.\n]{0,75}kortslutnings\s?beskyt/i, type: 'cable_prot', label: 'Kabelbeskyttelse (rel\u00e6)', module: 'scircuit' },
+    { re: /enstregs?\s?diagram|en-?stregs?\s?skema|kredsskema/i, type: 'diagram', label: 'Enstregsdiagram', module: 'draw' },
+    // Regulatory question (no calculation) -- recognise so it is not 'Mangler input'.
+    // Kept LAST so any calc pattern wins first.
+    { re: /\b(?:m\u00e5\s+(?:der|en|man|installationen|hovedstr)|skal\s+(?:der|en|man|ledere|belysning)|hvilke[nt]?\b|hvor\s+(?:mange|stor|lang|h\u00f8j|dyb)|hvordan\b|hvorn\u00e5r\b|redeg\u00f8r|er\s+hovedstr\w*kredse|er\s+det\s+(?:en\s+)?lovlig|hvad\s+er\s+(?:kravet|mindste|den\s+maksimale|IP))/i, type: 'rule', label: 'Regelsp\u00f8rgsm\u00e5l', module: 'standards' }
   ];
+  // Detection runs against the raw text AND a "despaced" copy that repairs PDF
+  // word-splitting ("D imensioner" -> "Dimensioner", "kortslutnings stroem" ->
+  // "kortslutningsstroem"). We collapse a space that sits between a letter and a
+  // following lowercase letter -- this merges some real word boundaries too, but
+  // since we only substring-match calc keywords, that is harmless for detection.
+  var softText = String(text).replace(/([A-Za-z\u00c6\u00d8\u00c5\u00e6\u00f8\u00e5])[ \t]+(?=[a-z\u00e6\u00f8\u00e5])/g, '$1');
   for (var i = 0; i < patterns.length; i++) {
-    if (patterns[i].re.test(text)) {
+    if (patterns[i].re.test(text) || patterns[i].re.test(softText)) {
       questions.push({ type: patterns[i].type, label: patterns[i].label, module: patterns[i].module, source: 'detected' });
     }
   }
@@ -34263,6 +34503,155 @@ function analyzerSolve(data) {
     flagged.push('Ik: mangler kabeldata');
   }
   total++;
+
+  // === FORSYNING / HV NETWORK (Bind 5): Sk, parallel transformers, slukkespole, jordfejl ===
+  (function () {
+    var UnHV = (data.UnHV_kV || 10) * 1000;       // distribution voltage [V]
+    var UnLV = 400;                                 // LV side [V]
+    var cF = 1.0;                                   // forsyning uses c = 1.0 (max)
+    var cosk = data.cosPhiK || (data.netRX ? Math.cos(Math.atan(1 / data.netRX)) : 0.1);
+    function fmtZ(r, x) {
+      var mag = Math.sqrt(r * r + x * x), ang = Math.atan2(x, r) * 180 / Math.PI;
+      return nf(r, 3) + (x >= 0 ? ' + j' : ' \u2212 j') + nf(Math.abs(x), 3) + ' \u03a9 = ' + nf(mag, 3) + ' \u2220 ' + nf(ang, 1) + '\u00b0';
+    }
+    function row(lbl, val) { return '<div class="result-row"><span class="label">' + lbl + '</span><span class="value" style="font-family:monospace">' + val + '</span></div>'; }
+    var zNetHV = data.Skh_MVA ? forsyningNetZfromSk(data.Skh_MVA * 1e6, UnHV, cosk, cF) : null;
+
+    // (a) Short-circuit power / fault current at the HV busbar
+    if (hasQuestion(data, 'sk_net') && data.Skh_MVA) {
+      var sk = forsyningNetworkSk(zNetHV.r, zNetHV.x, UnHV, cF);
+      var h = '<div class="result-box"><div class="result-title">\u26A1 Kortslutningseffekt / Ik (' + nf(UnHV / 1000, 0) + ' kV)</div>'
+        + row('Z\u2099\u2091\u209c = c\u00b7U\u00b2/S\u2096', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/(' + nf(data.Skh_MVA, 0) + '\u00b710\u2076) = ' + fmtZ(zNetHV.r, zNetHV.x))
+        + row('S\u2096 = c\u00b7U\u00b2/|Z|', nf(cF, 1) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/' + nf(zNetHV.mag, 3) + ' = ' + nf(sk.Sk / 1e6, 1) + ' MVA')
+        + row('I\u2096\u2083max = c\u00b7U/(\u221a3\u00b7|Z|)', nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zNetHV.mag, 3) + ') = ' + nf(sk.Ik / 1000, 2) + ' kA \u2220 \u2212' + nf(sk.angleDeg, 1) + '\u00b0');
+      var valStr = nf(sk.Sk / 1e6, 1) + ' MVA / ' + nf(sk.Ik / 1000, 2) + ' kA';
+      if (data.Skh_min_MVA) {
+        var cosMin = data.cosPhiK_min || cosk;
+        var zMin = forsyningNetZfromSk(data.Skh_min_MVA * 1e6, UnHV, cosMin, 0.95);
+        var skMin = forsyningNetworkSk(zMin.r, zMin.x, UnHV, 0.95);
+        h += row('I\u2096\u2083min = c\u2098\u1d62\u2099\u00b7U/(\u221a3\u00b7|Z_min|)', '0,95\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(zMin.mag, 3) + ') = ' + nf(skMin.Ik / 1000, 2) + ' kA');
+        valStr += ' \u00b7 Ik,min ' + nf(skMin.Ik / 1000, 2) + ' kA';
+      }
+      h += '<div class="info-row" style="font-size:0.76rem">S\u2096 = c\u00b7U\u00b2/|Z|, I\u2096 = c\u00b7U/(\u221a3\u00b7|Z|); IEC 60909 / DS/EN 50522. Ik,max: c=1,0 og S\u2096,max; Ik,min: c=0,95 og S\u2096,min. Kabelimpedanser til en nedstr\u00f8ms station l\u00e6gges til Z\u2099\u2091\u209c.</div></div>';
+      results.push({ type: 'sk_net', label: 'Kortslutningseffekt S\u2096', value: valStr, html: h, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'sk_net')) { flagged.push('Sk: mangler kortslutningseffekt (MVA) p\u00e5 HV-skinnen'); }
+    if (hasQuestion(data, 'sk_net')) total++;
+
+    // (b) LV-side fault current with N transformers in parallel
+    if (hasQuestion(data, 'ik_par') && zNetHV && data.trafoKVA && data.trafoUk) {
+      var Sn = data.trafoKVA * 1000, uk = data.trafoUk / 100;
+      var ztrMag = uk * UnHV * UnHV / Sn;
+      var erPct = data.trafoPcu ? (data.trafoPcu / (data.trafoKVA * 1000)) * 100 : 0;
+      var phiT = (erPct > 0 && erPct < data.trafoUk) ? Math.acos(erPct / data.trafoUk) : (Math.PI / 2);
+      var zTr = { r: ztrMag * Math.cos(phiT), x: ztrMag * Math.sin(phiT) };
+      var Ns = data.parallelTrafos ? [data.parallelTrafos] : [2, 3];
+      var hh = '<div class="result-box"><div class="result-title">\u26A1 Ik p\u00e5 LV-siden \u2014 transformere parallelt</div>'
+        + row('Z\u2099\u2091\u209c (HV)', fmtZ(zNetHV.r, zNetHV.x))
+        + row('Z\u209c\u1d63 = u\u2096\u00b7U\u00b2/S\u2099', nf(uk, 3) + '\u00b7(' + nf(UnHV, 0) + ')\u00b2/' + nf(Sn, 0) + ' = ' + fmtZ(zTr.r, zTr.x) + (erPct ? ' (\u03c6=arccos(e\u1d63/u\u2096))' : ''))
+        + row('Omsætningsforhold', nf(UnHV, 0) + '/' + nf(UnLV, 0) + ' = ' + nf(UnHV / UnLV, 0));
+      var vals = [];
+      Ns.forEach(function (N) {
+        var R = scParallelTrafoIk(zNetHV, zTr, N, UnHV, UnLV, cF);
+        hh += row('N = ' + N + ': Z\u209c\u2092\u209c = Z\u2099\u2091\u209c + Z\u209c\u1d63/' + N, fmtZ(R.R, R.X))
+          + row('N = ' + N + ': I\u2096,LV = c\u00b7U/(\u221a3\u00b7|Z|)\u00b7' + nf(UnHV / UnLV, 0), nf(cF, 1) + '\u00b7' + nf(UnHV, 0) + '/(\u221a3\u00b7' + nf(R.Zmag, 3) + ')\u00b7' + nf(UnHV / UnLV, 0) + ' = <strong>' + nf(R.ikLV / 1000, 1) + ' kA</strong> \u2220 \u2212' + nf(R.angleDeg, 1) + '\u00b0');
+        vals.push(N + '\u00d7: ' + nf(R.ikLV / 1000, 1) + ' kA');
+      });
+      hh += '<div class="info-row" style="font-size:0.76rem">I\u2096,LV = c\u00b7U_HV/(\u221a3\u00b7|Z\u2099\u2091\u209c + Z\u209c\u1d63/N|)\u00b7(U_HV/U_LV). N parallelle transformere \u21d2 Z\u209c\u1d63/N. Viggo Bitsch / IEC 60909.</div></div>';
+      results.push({ type: 'ik_par', label: 'Ik (parallelle transformere)', value: vals.join(', '), html: hh, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'ik_par')) { flagged.push('Ik parallel: mangler Skh, trafo kVA eller uk%'); }
+    if (hasQuestion(data, 'ik_par')) total++;
+
+    // (c) Capacitive earth-fault current (stated directly in the paper)
+    if (hasQuestion(data, 'earthfault') && data.earthFaultA) {
+      var hc = '<div class="result-box"><div class="result-title">\u26A1 Kapacitiv jordfejlstr\u00f8m</div>'
+        + row('I_j', nf(data.earthFaultA, 1) + ' A')
+        + '<div class="info-row" style="font-size:0.76rem">I_j = \u221a3\u00b7\u03c9\u00b7C\u2080\u00b7U_n (oplyst i opgaven). Slukkespolejordet net.</div></div>';
+      results.push({ type: 'earthfault', label: 'Kapacitiv jordfejlstr\u00f8m', value: nf(data.earthFaultA, 1) + ' A', html: hc, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'earthfault')) { flagged.push('Jordfejlstr\u00f8m: mangler kabelkapacitans eller oplyst I_j'); }
+    if (hasQuestion(data, 'earthfault')) total++;
+
+    // (d) Petersen coil (slukkespole) that compensates the earth-fault current
+    if (hasQuestion(data, 'petersen') && data.earthFaultA) {
+      var coil = forsyningPetersenCoil(data.earthFaultA, UnHV, 50);
+      var hp = '<div class="result-box"><div class="result-title">\u26A1 Slukkespole (ideel kompensation)</div>'
+        + row('I_j (kompenseres)', nf(data.earthFaultA, 1) + ' A') + row('U_fase = U_n/\u221a3', nf(UnHV, 0) + '/\u221a3 = ' + nf(coil.Uphase, 0) + ' V')
+        + row('X_L = U_fase/I_j', nf(coil.Uphase, 0) + '/' + nf(data.earthFaultA, 1) + ' = ' + nf(coil.XL, 1) + ' \u03a9')
+        + row('L = X_L/\u03c9', nf(coil.XL, 1) + '/(2\u03c0\u00b750) = <strong>' + nf(coil.L, 3) + ' H</strong>')
+        + '<div class="info-row" style="font-size:0.76rem">Ideel slukkespole: I_L = I_j \u21d2 X_L = U_fase/I_j, L = X_L/\u03c9 (resonans, L = 1/(3\u03c9\u00b2C\u2080)).</div></div>';
+      results.push({ type: 'petersen', label: 'Slukkespole L', value: nf(coil.L, 3) + ' H', html: hp, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'petersen')) { flagged.push('Slukkespole: mangler jordfejlstr\u00f8m I_j'); }
+    if (hasQuestion(data, 'petersen')) total++;
+
+    // (e) Potential rise / max earth-electrode resistance R_E <= U_Tp / I_E
+    if (hasQuestion(data, 'potential') && data.earthFaultA) {
+      var Utp = data.Utp_V || 75; // DS/EN 50522, long-duration touch voltage
+      var re = forsyningEarthResistanceMax(data.earthFaultA, Utp);
+      var hr = '<div class="result-box"><div class="result-title">\u26A1 Potentialestigning / jordingsmodstand</div>'
+        + row('U_Tp (till. ber\u00f8ringssp.)', nf(Utp, 0) + ' V') + row('I_E (= I_j)', nf(data.earthFaultA, 1) + ' A')
+        + row('R_E,max', '<strong>' + nf(re.REmax, 2) + ' \u03a9</strong>');
+      if (data.RE_ohm != null) {
+        var pr = forsyningPotentialRise(data.earthFaultA, data.RE_ohm, Utp);
+        hr += row('U_E = I_E\u00b7R_E', nf(pr.UE, 0) + ' V (R_E = ' + nf(data.RE_ohm, 2) + ' \u03a9)')
+          + '<div class="info-row" style="font-size:0.78rem;color:' + (pr.ok ? 'var(--success)' : 'var(--danger)') + '">' + (pr.ok ? '\u2705 U_E \u2264 U_Tp \u2014 OK' : '\u26d4 U_E > U_Tp \u2014 jordingsanl\u00e6g utilstr\u00e6kkeligt') + '</div>';
+      }
+      hr += '<div class="info-row" style="font-size:0.76rem">R_E \u2264 U_Tp/I_E (DS/EN 50522 \u00a75). I slukkespolejordet net s\u00e6ttes I_E = den kapacitive jordfejlstr\u00f8m I_j.</div></div>';
+      results.push({ type: 'potential', label: 'Potentialestigning (R_E)', value: 'R_E \u2264 ' + nf(re.REmax, 2) + ' \u03a9', html: hr, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'potential')) { flagged.push('Potentialestigning: mangler I_E (jordfejlstr\u00f8m)'); }
+    if (hasQuestion(data, 'potential')) total++;
+
+    // (f) Cable protection by relay: overload (Iz>=Iprot) + short-circuit adiabatic
+    //     (phase + screen). k from the cable datasheet (bog 5); when unknown we use
+    //     the conservative IEC 60364-4-43 Table 43A values (lower k => stricter check).
+    if (hasQuestion(data, 'cable_prot') && (data.cablePhaseMm2 || data.cableIzStated)) {
+      var tClear = (data.relayTgt || 0.5) + (data.breakerTime || 0.1);
+      var hcp = '<div class="result-box"><div class="result-title">\u26A1 Kabelbeskyttelse via rel\u00e6 (t = ' + nf(tClear, 2) + ' s)</div>';
+      // Overload
+      if (data.cableIzStated) {
+        var ov = forsyningCableOverload(data.cableIzStated, data.deviceIn || data.cableIzStated);
+        hcp += row('Overlast', 'Iz = ' + nf(data.cableIzStated, 0) + ' A ' + (ov.ok ? '\u2265' : '<') + ' I_beskyt \u2014 ' + (ov.ok ? '\u2705 beskyttet' : '\u26d4 ikke beskyttet'));
+      }
+      // Short-circuit (needs network Ik)
+      if (data.cablePhaseMm2 && zNetHV) {
+        var skc = forsyningNetworkSk(zNetHV.r, zNetHV.x, UnHV, cF);
+        var IkPh = skc.Ik, IkScr = skc.Ik * Math.sqrt(3) / 2; // screen sees the 2-phase fault
+        var kPh = 94, kScr = 143; // Al/XLPE phase, Cu screen (conservative IEC 60364 Table 43A)
+        var sc = forsyningCableScProtection(data.cablePhaseMm2, kPh, IkPh, data.cableScreenMm2, kScr, IkScr, tClear);
+        hcp += row('Fase (' + data.cablePhaseMm2 + ' mm\u00b2, k=' + kPh + ')', 'I_perm = ' + nf(sc.phase.Iperm / 1000, 1) + ' kA ' + (sc.phase.ok ? '\u2265' : '<') + ' I_k = ' + nf(IkPh / 1000, 2) + ' kA \u2014 ' + (sc.phase.ok ? '\u2705' : '\u26d4'));
+        if (sc.screen) hcp += row('Sk\u00e6rm (' + data.cableScreenMm2 + ' mm\u00b2, k=' + kScr + ')', 'I_perm = ' + nf(sc.screen.Iperm / 1000, 1) + ' kA ' + (sc.screen.ok ? '\u2265' : '<') + ' I_k2 = ' + nf(IkScr / 1000, 2) + ' kA \u2014 ' + (sc.screen.ok ? '\u2705' : '\u26d4'));
+      }
+      hcp += '<div class="info-row" style="font-size:0.76rem">Overlast: korrigeret Iz \u2265 beskyttelsesstr\u00f8m. Kortslutning (adiabatisk, DS/HD 60364-4-43): I_perm = k\u00b7S/\u221at \u2265 I_k for fase- OG sk\u00e6rmleder. k er konservativ (IEC 60364 tabel 43A) \u2014 brug kablets datablad (bog 5) for n\u00f8jagtig v\u00e6rdi.</div></div>';
+      results.push({ type: 'cable_prot', label: 'Kabelbeskyttelse', value: 'kontrolleret (t = ' + nf(tClear, 2) + ' s)', html: hcp, asked: true });
+      solved++;
+    } else if (hasQuestion(data, 'cable_prot')) { flagged.push('Kabelbeskyttelse: mangler kabeltv\u00e6rsnit / rel\u00e6tider / Skh'); }
+    if (hasQuestion(data, 'cable_prot')) total++;
+
+    // (g) Protective bonding conductor cross-section (rule-based, no per-circuit data).
+    if (hasQuestion(data, 'pe_sizing')) {
+      var peHtml = '<div class="result-box"><div class="result-title">\u26A1 Beskyttende udligning \u2014 tv\u00e6rsnit</div>'
+        + row('Hovedpotentialudligning', '\u2265 6 mm\u00b2 Cu')
+        + row('Regel', '\u2265 \u00bd af st\u00f8rste PE-leder, min. 6 mm\u00b2, beh\u00f8ver ikke overstige 25 mm\u00b2 Cu')
+        + row('Supplerende udligning', '\u2265 2,5 mm\u00b2 (beskyttet) / 4 mm\u00b2 (ubeskyttet)')
+        + '<div class="info-row" style="font-size:0.76rem">DS/HD 60364-5-54 \u00a7544.1 (hovedudligning) og \u00a7544.2 (supplerende udligning).</div></div>';
+      results.push({ type: 'pe_sizing', label: 'Udligningstv\u00e6rsnit', value: '\u2265 6 mm\u00b2 Cu (hoved)', html: peHtml, asked: true });
+      solved++; total++;
+    }
+
+    // (h) Fuse/relay selectivity (rule-based).
+    if (hasQuestion(data, 'selectivity')) {
+      var selHtml = '<div class="result-box"><div class="result-title">\u26A1 Selektivitet</div>'
+        + row('gG \u2192 gG (smeltesikringer)', 'Str\u00f8mforhold \u2265 1,6:1 mellem op- og nedstr\u00f8ms sikring')
+        + row('Betingelse', 'Nedstr\u00f8ms gennemslups-I\u00b2t < opstr\u00f8ms sm\u00e6lte-I\u00b2t i hele omr\u00e5det')
+        + row('HV/LV (trafo)', 'HV-rel\u00e6/sikring skal forblive over LV-sikringens kurve ved Ik')
+        + '<div class="info-row" style="font-size:0.76rem">IEC 60269 / DS/HD 60364-5-53. Verific\u00e9r med fabrikantens selektivitetstabel (TCC-modulet).</div></div>';
+      results.push({ type: 'selectivity', label: 'Selektivitet', value: 'gG\u2013gG \u2265 1,6:1', html: selHtml, asked: true });
+      solved++; total++;
+    }
+  })();
 
   // === ALWAYS COMPUTE: Coordination check IB <= In <= Iz ===
   if (ib && data.deviceIn && izCorrected) {
@@ -34719,6 +35108,8 @@ function analyzerRun(text) {
     if (d.deviceIn && d.deviceCurve) { mcbState.curve = d.deviceCurve; mcbState.rating = d.deviceIn; }
     if (d.trafoKVA) trafoState.size = d.trafoKVA;
     if (d.trafoUk) trafoState.scUkPct = d.trafoUk;
+    if (d.trafoUk) scState.trafoUk = d.trafoUk;            // link analyzer -> short-circuit module
+    if (d.cosPhiK) scState.cosPhiNet = d.cosPhiK;          // network angle (cos phi_k)
     if (d.frequency) { impedansState.f = d.frequency; trefaseState.f = d.frequency; motorteoriState.f = d.frequency; }
     if (d.earthSystem) {
       var eMap = {'TN-S':'tns','TN-C':'tnc','TN-C-S':'tncs','TT':'tt','IT':'it1'};
@@ -35001,9 +35392,82 @@ function analyzerReadZipEntries(bytes) {
 // Scans content streams, inflates FlateDecode, pulls text from PDF string
 // operators. LIMITATIONS: scanned/image PDFs yield no text (handled by the
 // low-text notice); CID/Identity-H fonts may yield unmapped glyphs.
+// --- ToUnicode CMap support (decodes CID / Identity-H subset fonts) ----------
+// Many real exam PDFs embed Type0/CID fonts whose content-stream "glyph codes"
+// are meaningless without the font's /ToUnicode CMap. Without this, extraction
+// yields garbage ("0 01 12 23...") and the quality gate rejects the whole PDF.
+// We parse every ToUnicode CMap and map each font resource name (/F1, /F2, ...)
+// to its CMap so the content decoder can recover real Unicode text.
+function analyzerHexToUni(h) {
+  var s = '';
+  for (var i = 0; i + 4 <= h.length; i += 4) s += String.fromCharCode(parseInt(h.substr(i, 4), 16));
+  return s;
+}
+function analyzerParseCMap(t) {
+  var map = {}, width = 1, m;
+  var bc = /beginbfchar([\s\S]*?)endbfchar/g;
+  while ((m = bc.exec(t)) !== null) {
+    var pr = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g, p;
+    while ((p = pr.exec(m[1])) !== null) { if (p[1].length >= 4) width = 2; map[parseInt(p[1], 16)] = analyzerHexToUni(p[2]); }
+  }
+  var br = /beginbfrange([\s\S]*?)endbfrange/g;
+  while ((m = br.exec(t)) !== null) {
+    var rng = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:<([0-9A-Fa-f]+)>|\[([\s\S]*?)\])/g, r;
+    while ((r = rng.exec(m[1])) !== null) {
+      var lo = parseInt(r[1], 16), hi = parseInt(r[2], 16);
+      if (r[1].length >= 4) width = 2;
+      if (hi - lo > 65535) hi = lo + 65535;
+      if (r[3] != null) { var base = parseInt(r[3], 16); for (var c = lo; c <= hi; c++) map[c] = String.fromCharCode(base + (c - lo)); }
+      else if (r[4] != null) { var arr = r[4].match(/<([0-9A-Fa-f]+)>/g) || []; for (var k = 0; k < arr.length; k++) map[lo + k] = analyzerHexToUni(arr[k].replace(/[<>]/g, '')); }
+    }
+  }
+  return { map: map, width: width };
+}
+// Build { fontResourceName -> {map,width} } for the whole document.
+function analyzerBuildFontCMaps(s, inflate) {
+  var fontToUni = {};   // object number of font -> object number of its ToUnicode
+  var objStream = {};   // object number -> raw stream bytes (latin1 string)
+  // (1) object number -> ToUnicode reference, for /Type/Font objects
+  var fobj = /(\d+)\s+0\s+obj([\s\S]*?)(?:endobj|stream)/g, fm;
+  while ((fm = fobj.exec(s)) !== null) {
+    var num = fm[1], dict = fm[2];
+    var tu = dict.match(/\/ToUnicode\s+(\d+)\s+0\s+R/);
+    if (tu) fontToUni[num] = tu[1];
+  }
+  // (2) cache stream bytes per object (for the ToUnicode CMap objects)
+  var sobj = /(\d+)\s+0\s+obj([\s\S]*?)stream\r?\n?/g, sm;
+  while ((sm = sobj.exec(s)) !== null) {
+    var onum = sm[1], odict = sm[2];
+    var dataStart = sm.index + sm[0].length;
+    var endIdx = s.indexOf('endstream', dataStart);
+    if (endIdx < 0) continue;
+    var chunk = s.substring(dataStart, endIdx);
+    var txt = null;
+    if (/\/FlateDecode/.test(odict)) {
+      try { var raw = new Uint8Array(chunk.length); for (var i = 0; i < chunk.length; i++) raw[i] = chunk.charCodeAt(i) & 0xff; txt = analyzerBytesToLatin1(inflate(raw)); } catch (e) { txt = null; }
+    } else if (!/\/Filter/.test(odict)) { txt = chunk; }
+    if (txt && (txt.indexOf('beginbfchar') >= 0 || txt.indexOf('beginbfrange') >= 0)) objStream[onum] = txt;
+  }
+  // (3) parse each ToUnicode CMap once
+  var cmapByObj = {};
+  Object.keys(objStream).forEach(function (onum) { cmapByObj[onum] = analyzerParseCMap(objStream[onum]); });
+  // (4) resource name (/F1) -> font object -> CMap, via "/F1 12 0 R" in resources
+  var nameToCMap = {};
+  var resRe = /\/(F\w+|TT\d+|C\d+_\d+|R\d+)\s+(\d+)\s+0\s+R/g, rmm;
+  while ((rmm = resRe.exec(s)) !== null) {
+    var resName = rmm[1], fontObj = rmm[2];
+    var tuObj = fontToUni[fontObj];
+    if (tuObj && cmapByObj[tuObj]) nameToCMap[resName] = cmapByObj[tuObj];
+  }
+  return nameToCMap;
+}
+
 function analyzerExtractPdf(bytes) {
   if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
   var s = analyzerBytesToLatin1(bytes);
+  // Build font-resource -> ToUnicode CMap map so CID/Identity-H text decodes.
+  var fontCMaps = {};
+  try { fontCMaps = analyzerBuildFontCMaps(s, analyzerInflate); } catch (e) { fontCMaps = {}; }
   var collected = [];
   var MAX_STREAM_BYTES = 256 * 1024; // 256 KB: real content streams are small; fonts/images are huge
   var MAX_INFLATED = 512 * 1024; // 512 KB: cap inflated output (real page content ≈ 2-20 KB)
@@ -35043,7 +35507,9 @@ function analyzerExtractPdf(bytes) {
       content = chunk; // plain (uncompressed) content stream, no unknown filter
     }
     if (content) {
-      var txt = analyzerPdfContentToText(content);
+      // Skip CMap / CID definition streams (they are font metadata, not page text).
+      if (/begincmap|CIDInit|\/CMapType|usecmap|beginbfchar|beginbfrange|begincidrange/.test(content.substr(0, 600))) { continue; }
+      var txt = analyzerPdfContentToText(content, fontCMaps);
       if (txt) collected.push(txt);
     }
   }
@@ -35091,10 +35557,23 @@ function analyzerPdfReadableRatio(text) {
 // text-showing operators (Tj, TJ, ', "). TJ-array string fragments are joined
 // without inserting spaces (kerning is usually intra-word); a space is added
 // only for large negative kerning, and positioning operators add line breaks.
-function analyzerPdfContentToText(content) {
+function analyzerPdfContentToText(content, fontCMaps) {
   // Guard: skip absurdly large content (real page content streams are 2-30 KB text).
   if (!content || content.length > 512 * 1024) return '';
   var i = 0, n = content.length, result = '';
+  fontCMaps = fontCMaps || {};
+  var curCMap = null, pendingName = null;
+  // Decode a raw operand string through the active font's ToUnicode CMap (if any).
+  function decode(str) {
+    if (!curCMap) return str;
+    var w = curCMap.width, map = curCMap.map, out = '', k;
+    if (w === 2) {
+      for (k = 0; k + 1 < str.length; k += 2) { var code = (str.charCodeAt(k) << 8) | str.charCodeAt(k + 1); out += (map[code] != null ? map[code] : ''); }
+    } else {
+      for (k = 0; k < str.length; k++) { var c = str.charCodeAt(k); out += (map[c] != null ? map[c] : str.charAt(k)); }
+    }
+    return out;
+  }
   function readLiteral(start) {
     var depth = 1, j = start, str = '';
     while (j < n && depth > 0) {
@@ -35129,15 +35608,16 @@ function analyzerPdfContentToText(content) {
   function isNumChar(c) { return (c >= '0' && c <= '9') || c === '-' || c === '.' || c === '+'; }
   while (i < n) {
     var ch = content[i];
-    if (ch === '(') { var r = readLiteral(i + 1); result += r.str; i = r.next; continue; }
-    if (ch === '<' && content[i + 1] !== '<') { var rh = readHex(i + 1); result += rh.str; i = rh.next; continue; }
+    if (ch === '/') { var nm = ''; var jj = i + 1; while (jj < n && /[^\s\/\[\]<>()]/.test(content[jj])) { nm += content[jj]; jj++; } pendingName = nm; i = jj; continue; }
+    if (ch === '(') { var r = readLiteral(i + 1); result += decode(r.str); i = r.next; continue; }
+    if (ch === '<' && content[i + 1] !== '<') { var rh = readHex(i + 1); result += decode(rh.str); i = rh.next; continue; }
     if (ch === '[') {
       // TJ array: concatenate string fragments; big negative kerning => space.
       var j = i + 1;
       while (j < n && content[j] !== ']') {
         var c2 = content[j];
-        if (c2 === '(') { var rr = readLiteral(j + 1); result += rr.str; j = rr.next; continue; }
-        if (c2 === '<' && content[j + 1] !== '<') { var rrh = readHex(j + 1); result += rrh.str; j = rrh.next; continue; }
+        if (c2 === '(') { var rr = readLiteral(j + 1); result += decode(rr.str); j = rr.next; continue; }
+        if (c2 === '<' && content[j + 1] !== '<') { var rrh = readHex(j + 1); result += decode(rrh.str); j = rrh.next; continue; }
         if (isNumChar(c2)) { var num = ''; while (j < n && isNumChar(content[j])) { num += content[j]; j++; } if (parseFloat(num) <= -100) result += ' '; continue; }
         j++;
       }
@@ -35145,6 +35625,7 @@ function analyzerPdfContentToText(content) {
     }
     if (ch === 'T') {
       var op = content.substr(i, 2);
+      if (op === 'Tf') { curCMap = (pendingName && fontCMaps[pendingName]) ? fontCMaps[pendingName] : null; i += 2; continue; }
       if (op === 'Td' || op === 'TD' || op === 'Tm' || op === 'T*') { result += '\n'; i += 2; continue; }
       if (op === 'Tj' || op === 'TJ') { result += ' '; i += 2; continue; }
     }
@@ -35268,6 +35749,153 @@ function analyzerSetMode(m) {
   renderModule('analyzer');
 }
 // Render the analyzer module - ENHANCED with dependency graph and module flow
+// === ONLINE AI: solve the whole exam, Calcia/Sigma-style projektering + live law ===
+// Builds the expert prompt (pure + testable). Used when the local deterministic
+// engine lacks data, and to keep pricing/legislation current.
+function analyzerBuildOnlinePrompt(examText) {
+  var sys = 'Du er Danmarks mest erfarne autoriserede elinstallat\u00f8r og censor ved el-autorisationspr\u00f8ven (maskinmester). '
+    + 'Du mestrer DS/HD 60364, IEC 60909, DS/EN 50522, St\u00e6rkstr\u00f8msbekendtg\u00f8relsen, Installationsbekendtg\u00f8relsen, '
+    + 'F\u00e6llesregulativet og Viggo Bitsch-metoden (komplekse impedanser, arccot for nettet, arccos(e\u1d63/u\u2096) for transformeren, '
+    + 'dobbelt rektangul\u00e6r+pol\u00e6r visning, vektoriel str\u00f8msummering, dansk decimalkomma, NKT-kabeltabeller). '
+    + 'L\u00d8S HELE opgaves\u00e6ttet: gennemg\u00e5 hver opgave og hvert delsp\u00f8rgsm\u00e5l (1.1, 1.2, ...) i r\u00e6kkef\u00f8lge. '
+    + 'For hvert delsp\u00f8rgsm\u00e5l: angiv formlen, inds\u00e6t tallene eksplicit, og giv resultatet med korrekt enhed og SI-notation. '
+    + 'Vis komplekse tal i B\u00c5DE rektangul\u00e6r (R + jX) og pol\u00e6r (|Z| \u2220 \u03c6) form. '
+    + 'Kontroll\u00e9r altid IB \u2264 In \u2264 Iz, Icu \u2265 Ik,max, k\u00b2S\u00b2 \u2265 I\u00b2t og Zs \u2264 U0/Ia. V\u00e6r konservativ (livssikkerhed). '
+    + 'Anbefal konkrete, CE-m\u00e6rkede produkter (Schneider/ABB/Siemens/Hager/nkt) og FREMH\u00c6V det valgte; '
+    + 'angiv dansk grossist-prisniveau (Solar/Lemvigh-M\u00fcller/Sanist\u00e5l) i Calcia/Sigma-stil hvor relevant. '
+    + 'Henvis til den relevante DS/HD 60364-paragraf. N\u00e6vn hvis en regel kan v\u00e6re opdateret og b\u00f8r verificeres hos Sikkerhedsstyrelsen (sikkerhedsstyrelsen.dk). '
+    + 'Svar struktureret i markdown, p\u00e5 dansk.';
+  // Structured output so each answer can be bound to its Opgave-nummer in the UI.
+  var jsonReq = '\n\nVIGTIGT \u2014 returner KUN gyldig JSON (intet andet, ingen markdown-fence): '
+    + 'et array af objekter, \u00e9t pr. delsp\u00f8rgsm\u00e5l, i opgaver\u00e6kkef\u00f8lge, med felterne: '
+    + '"num" (opgavenummer pr\u00e6cis som i pr\u00f8ven, fx "1.1"), '
+    + '"spm" (kort gengivelse af sp\u00f8rgsm\u00e5let), '
+    + '"svar" (kort slutresultat med enhed og korrekt notation), '
+    + '"udregning" (FULD trinvis udregning som tekst: formel \u2192 indsatte tal \u2192 resultat, '
+    + 'komplekse tal i B\u00c5DE rektangul\u00e6r og pol\u00e6r form, med DS/HD 60364-henvisning). '
+    + 'Eksempel: [{"num":"1.1","spm":"Beregn IB","svar":"62,1 A","udregning":"IB = P/(\u221a3\u00b7U\u00b7cos\u03c6) = ..."}]';
+  return { system: sys + jsonReq, user: 'L\u00f8s f\u00f8lgende autorisationspr\u00f8ve fuldst\u00e6ndigt, opgave for opgave med fulde udregninger:\n\n' + (examText || '') };
+}
+
+// Parse the model's JSON solution (tolerant: strips code fences / prose around it).
+function analyzerParseOnlineJson(text) {
+  if (!text) return null;
+  var s = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+  var a = s.indexOf('['), b = s.lastIndexOf(']');
+  if (a < 0 || b <= a) return null;
+  try {
+    var arr = JSON.parse(s.substring(a, b + 1));
+    if (Array.isArray(arr) && arr.length && arr[0] && (arr[0].num != null || arr[0].svar != null)) return arr;
+  } catch (e) { return null; }
+  return null;
+}
+
+// Read a small ai-config.json {endpoint, key, model} (click-only, no typing).
+function analyzerLoadAiConfig(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  var r = new FileReader();
+  r.onload = function (e) {
+    try {
+      var c = JSON.parse(e.target.result);
+      if (c && c.endpoint && c.key) {
+        localStorage.setItem('aiElectricianCfg', JSON.stringify({ endpoint: c.endpoint, key: c.key, model: c.model || 'gpt-4o' }));
+        analyzerState.notice = tx('Online AI tilsluttet \u2705', 'Online AI connected \u2705');
+      } else { analyzerState.notice = tx('Ugyldig config (mangler endpoint/key).', 'Invalid config (missing endpoint/key).'); }
+    } catch (err) { analyzerState.notice = tx('Kunne ikke l\u00e6se config-filen.', 'Could not read the config file.'); }
+    if (typeof renderModule === 'function') renderModule('analyzer');
+  };
+  r.readAsText(input.files[0]);
+}
+
+// Solve the loaded exam with the online AI (OpenAI-compatible endpoint).
+function analyzerSolveOnline() {
+  var cfg = {}; try { cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  if (!cfg.endpoint || !cfg.key) { analyzerState.notice = tx('Online AI er ikke tilsluttet. Upload en ai-config.json via "Tilslut AI".', 'Online AI is not connected. Upload an ai-config.json via "Connect AI".'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  if (!analyzerState.rawText) { analyzerState.notice = tx('Inds\u00e6t eller upload f\u00f8rst en opgave.', 'Paste or upload an exam first.'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  analyzerState.onlineBusy = true; analyzerState.onlineAnswer = null; analyzerState.onlineStructured = null; analyzerState.notice = null;
+  if (typeof renderModule === 'function') renderModule('analyzer');
+  var p = analyzerBuildOnlinePrompt(analyzerState.rawText);
+  fetch(cfg.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model: cfg.model || 'gpt-4o', messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }], temperature: 0.1 })
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    var content = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    analyzerState.onlineStructured = analyzerParseOnlineJson(content);
+    analyzerState.onlineAnswer = analyzerState.onlineStructured ? null : content; // keep raw only if not structured
+    analyzerState.onlineBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  }).catch(function (e) {
+    analyzerState.onlineAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
+    analyzerState.onlineBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  });
+}
+
+// Online pricing (Calcia/Sigma-style BOM) + live law-version check. Reuses the
+// configured AI channel: asks for current Danish wholesaler price levels for the
+// solved circuit's components, and verifies the cited standards/laws are current.
+function analyzerBuildPricingPrompt(examText, summary) {
+  var sys = 'Du er en dansk el-projekteringsekspert (Calcia/Sigma-stil). Ud fra opgaven og de beregnede komponenter: '
+    + '(1) Opstil en stykliste (BOM) med konkrete CE-m\u00e6rkede produkter (Schneider/ABB/Siemens/Hager/nkt) og '
+    + 'AKTUELT dansk grossist-prisniveau i DKK (Solar, Lemvigh-M\u00fcller, Sanist\u00e5l, Wex\u00f8e) \u2014 angiv enhedspris, antal og sum. '
+    + 'Markl\u00e9r tydeligt det VALGTE produkt pr. funktion. '
+    + '(2) Lav et LOVTJEK: list de relevante standarder/bekendtg\u00f8relser (DS/HD 60364, Elsikkerhedsloven, '
+    + 'Installationsbekendtg\u00f8relsen) og angiv om de citerede paragraffer er g\u00e6ldende; henvis til at den '
+    + 'aktuelle udgave verificeres p\u00e5 sikkerhedsstyrelsen.dk, og n\u00e6vn datoen for din viden. Svar i markdown, p\u00e5 dansk.';
+  return { system: sys, user: 'Opgave:\n' + (examText || '') + (summary ? ('\n\nBeregnede komponenter:\n' + summary) : '') };
+}
+
+function analyzerResultsSummary() {
+  // Compact summary of the local solve to feed the pricing/law prompt.
+  if (!analyzerState.results || !analyzerState.results.length) return '';
+  return analyzerState.results.map(function (r) { return '- ' + (r.label || r.type) + ': ' + (r.value != null ? r.value : '?'); }).join('\n');
+}
+
+function analyzerFetchPricingLaw() {
+  var cfg = {}; try { cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  if (!cfg.endpoint || !cfg.key) { analyzerState.notice = tx('Online AI er ikke tilsluttet. Upload en ai-config.json via "Tilslut AI".', 'Online AI is not connected. Upload an ai-config.json via "Connect AI".'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  if (!analyzerState.rawText) { analyzerState.notice = tx('Inds\u00e6t eller upload f\u00f8rst en opgave.', 'Paste or upload an exam first.'); if (typeof renderModule === 'function') renderModule('analyzer'); return; }
+  analyzerState.priceBusy = true; analyzerState.priceAnswer = null; analyzerState.notice = null;
+  if (typeof renderModule === 'function') renderModule('analyzer');
+  var p = analyzerBuildPricingPrompt(analyzerState.rawText, analyzerResultsSummary());
+  fetch(cfg.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model: cfg.model || 'gpt-4o', messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }], temperature: 0.1 })
+  }).then(function (res) { return res.json(); }).then(function (data) {
+    analyzerState.priceAnswer = (data.choices && data.choices[0] && data.choices[0].message) ? data.choices[0].message.content : tx('Intet svar modtaget.', 'No answer received.');
+    analyzerState.priceBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  }).catch(function (e) {
+    analyzerState.priceAnswer = tx('Fejl ved forbindelse: ', 'Connection error: ') + (e && e.message ? e.message : e);
+    analyzerState.priceBusy = false; if (typeof renderModule === 'function') renderModule('analyzer');
+  });
+}
+
+// Render the online AI solution bound to each Opgave-nummer (matches the offline
+// panel layout): grouped by Opgave, each sub-question with its short answer and
+// an expandable full working.
+function analyzerRenderOnlineStructured() {
+  var arr = analyzerState.onlineStructured || [];
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning (alle opgaver)', 'Online AI \u2014 complete solution (all tasks)') + ' (' + arr.length + ')</div>';
+  html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  var curOp = null;
+  arr.forEach(function (q) {
+    var num = String((q && q.num) != null ? q.num : '').trim();
+    var op = (num.match(/^(\d+)/) || [])[1];
+    if (op && op !== curOp) { curOp = op; html += '<div style="padding:5px 10px;background:var(--primary-glow);font-weight:700;font-size:0.82rem">Opgave ' + mmlEsc(op) + '</div>'; }
+    html += '<div style="padding:7px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
+    html += '<div style="flex:1">' + (num ? '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc('Opgave ' + num) + '</strong> ' : '') + mmlEsc((q && q.spm) || '') + '</div>';
+    html += '<span style="white-space:nowrap;color:var(--success);font-weight:700;font-family:monospace">' + mmlEsc((q && q.svar) || '') + '</span></div>';
+    if (q && q.udregning) {
+      html += '<details style="margin-top:4px"><summary style="cursor:pointer;font-size:0.76rem;color:var(--text-muted)">' + tx('Vis udregning', 'Show working') + '</summary>';
+      html += '<div style="white-space:pre-wrap;font-size:0.82rem;line-height:1.5;margin-top:4px">' + mmlEsc(q.udregning) + '</div></details>';
+    }
+    html += '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
 function renderAnalyzer() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('\uD83D\uDD0D Projektanalysator (Intelligent)', '\uD83D\uDD0D Project Analyzer (Intelligent)') + '</div>';
@@ -35314,7 +35942,33 @@ function renderAnalyzer() {
     html += '<div style="margin:8px 0"><button class="sel-btn" onclick="analyzerReset()">' + tx('\u21BA Nulstil', '\u21BA Reset') + '</button></div>';
   }
 
+  // Online AI (Calcia/Sigma-style projektering + lovopdatering). Click-only:
+  // configured by uploading a small ai-config.json (no typing -> guard unchanged).
+  var aiCfg = {}; try { aiCfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}'); } catch (e) { }
+  var aiConnected = !!(aiCfg.endpoint && aiCfg.key);
+  html += '<div class="select-group" style="margin-top:10px"><div class="select-label">' + tx('Online AI \u2014 l\u00f8s hele s\u00e6ttet, projektering & lovopdatering', 'Online AI \u2014 solve whole set, projecting & law updates') + '</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  html += '<label class="sel-btn" style="cursor:pointer">' + (aiConnected ? '\u2705 ' : '\uD83D\uDD0C ') + tx('Tilslut AI', 'Connect AI') + '<input type="file" accept=".json,application/json" style="display:none" onchange="analyzerLoadAiConfig(this)"></label>';
+  html += '<button class="sel-btn' + (aiConnected ? ' selected' : '') + '"' + ((aiConnected && analyzerState.rawText && !analyzerState.onlineBusy) ? '' : ' disabled style="opacity:.5;pointer-events:none"') + ' onclick="analyzerSolveOnline()">' + (analyzerState.onlineBusy ? tx('\u23F3 L\u00f8ser online\u2026', '\u23F3 Solving online\u2026') : tx('\uD83C\uDF10 L\u00f8s med Online AI', '\uD83C\uDF10 Solve with Online AI')) + '</button>';
+  html += '<button class="sel-btn"' + ((aiConnected && analyzerState.rawText && !analyzerState.priceBusy) ? '' : ' disabled style="opacity:.5;pointer-events:none"') + ' onclick="analyzerFetchPricingLaw()">' + (analyzerState.priceBusy ? tx('\u23F3 Henter\u2026', '\u23F3 Fetching\u2026') : tx('\uD83D\uDCB0 Priser & lovtjek', '\uD83D\uDCB0 Pricing & law check')) + '</button>';
   html += '</div>';
+  html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">' + tx('Tilslut en OpenAI-kompatibel tjeneste via en lille ai-config.json (endpoint, key, model). Bruges n\u00e5r den lokale motor mangler data \u2014 og holder pris/lovgivning opdateret.', 'Connect an OpenAI-compatible service via a small ai-config.json (endpoint, key, model). Used when the local engine lacks data \u2014 and keeps pricing/legislation current.') + '</div></div>';
+
+  html += '</div>';
+
+  // Online AI answer: structured per Opgave-nummer, or raw text fallback.
+  if (analyzerState.onlineStructured) {
+    html += analyzerRenderOnlineStructured();
+  } else if (analyzerState.onlineAnswer) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Online AI \u2014 komplet l\u00f8sning', 'Online AI \u2014 complete solution') + '</div>';
+    html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.onlineAnswer) + '</div></div>';
+  }
+
+  // Online pricing (BOM) + law-version check
+  if (analyzerState.priceAnswer) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCB0 ' + tx('Priser (stykliste) & lovtjek', 'Pricing (BOM) & law check') + '</div>';
+    html += '<div style="white-space:pre-wrap;font-size:0.86rem;line-height:1.55">' + mmlEsc(analyzerState.priceAnswer) + '</div></div>';
+  }
 
   // Results section
   if (analyzerState.results.length > 0) {
@@ -35323,54 +35977,135 @@ function renderAnalyzer() {
 
   return html;
 }
-// Parse the original sub-question label (e.g. "1.1", "2.3", "a", "12") from the
-// start of a question string, as written in the exam. Returns '' if none.
+// Parse the original sub-question label (e.g. "1.1", "3.18", "a", "(3)") from the
+// start of a question string, as written in the exam. A question number is N.M
+// with 1-2 digits each; the (?!\d) guard rejects Danish thousand/decimal values
+// such as "3.500" or "1.580". Returns '' if none.
 function analyzerSubLabel(s) {
-  var m = String(s || '').match(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)/i);
+  var m = String(s || '').match(/^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))/i);
   if (!m) return '';
   return m[1].replace(/^\(/, '').replace(/[.)]+\s*$/, '');
 }
+// Shared strip pattern: removes a leading question-number label from display text.
+var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
+
+// Stable, long-unchanged regulatory answers (only rock-solid ones; everything else
+// stays "look up the standard"). Returns { svar, ref } or null.
+function analyzerRuleAnswer(text) {
+  var t = String(text || '').toLowerCase();
+  if (/(rcd|hpfi|fejlstr.{1,2}msafbryder|indirekte\s+ber.ring)/.test(t) && /(stikkontakt|bolig|boliger|30\s*ma|tilslutningssted)/.test(t))
+    return { svar: 'RCD (HPFI) I\u0394n \u2264 30 mA, type A', ref: 'DS/HD 60364-4-41 \u00a7411.3.3' };
+  if (/tv.rsnit/.test(t) && /(beskyttelsesleder|pe-?leder|beskyttende\s+leder)/.test(t) && !/udligning|potential/.test(t))
+    return { svar: 'S\u226416: S_PE = S; 16<S\u226435: 16 mm\u00b2; S>35: S/2 (Cu)', ref: 'DS/HD 60364-5-54 tabel 54.7' };
+  if (/sikringsgrupper/.test(t) && /belysning|f\u00e6lles\s*adgangsvej/.test(t))
+    return { svar: 'Mindst 2 sikringsgrupper (f\u00e6lles adgangsvej)', ref: 'DS/HD 60364-5-56 (n\u00f8d/sikkerhed)' };
+  return null;
+}
+
+// Build the question label EXACTLY as in the original exam: "Opgave 1.1",
+// "Opgave 3.6", etc. A sub-number that already encodes the opgave (1.1) just
+// gets the "Opgave " prefix; a bare letter/number is attached to the section id.
+function examFullLabel(opId, num) {
+  if (!num) return opId ? ('Opgave ' + opId) : tx('Generelt', 'General');
+  if (/^\d+\.\d/.test(num) || /^\d+$/.test(num)) return 'Opgave ' + num;
+  return opId ? ('Opgave ' + opId + '.' + num) : ('Opgave ' + num);
+}
+
+// Governing formula + the inputs still needed, shown when a recognised question
+// cannot be auto-solved (so the user gets the method, never a fabricated number).
+var EXAM_METHOD_HINTS = {
+  ib:        { f: 'I_B = P / (\u221a3 \u00b7 U \u00b7 cos\u03c6)', n: 'effekt P, sp\u00e6nding U, cos\u03c6' },
+  iz:        { f: 'I_z = I_z,tabel \u00b7 k_temp \u00b7 k_gruppe', n: 'kabeltype, tv\u00e6rsnit, installationsmetode, omgivelsestemperatur' },
+  vdrop:     { f: '\u0394U = \u221a3 \u00b7 I_B \u00b7 L \u00b7 (R\u00b7cos\u03c6 + X\u00b7sin\u03c6)', n: 'I_B, kabell\u00e6ngde L, tv\u00e6rsnit' },
+  ik:        { f: 'I_k = c\u00b7U / (\u221a3 \u00b7 Z),  Z = u_k\u00b7U\u00b2/S_n', n: 'transformer S_n [kVA], u_k [%] (og evt. netimpedans / antal parallelle transformere)' },
+  zs:        { f: 'Z_s \u2264 U_0 / I_a  (DS/HD 60364-4-41)', n: 'fejlsl\u00f8jfeimpedans Z_s og udl\u00f8sestr\u00f8m I_a' },
+  device:    { f: 'I_B \u2264 I_n \u2264 I_z  og  I_cu \u2265 I_k,max', n: 'I_B, kablets I_z, I_k,max' },
+  adiabatic: { f: 'k\u00b2\u00b7S\u00b2 \u2265 I\u00b2\u00b7t  (DS/HD 60364-4-43 \u00a7434.5)', n: 'tv\u00e6rsnit S, I_k, udkoblingstid t' },
+  trafo:     { f: 'I_N = S_n / (\u221a3 \u00b7 U_N)', n: 'transformer S_n [kVA] og U_N' },
+  energy:    { f: 'W = P \u00b7 t  (\u00e5rlig overf\u00f8ring)', n: 'effekt/belastningsforl\u00f8b og driftstimer' },
+  rule:      { f: 'Regelsp\u00f8rgsm\u00e5l \u2014 ikke en beregning', n: 'opslag i DS/HD 60364 / St\u00e6rkstr\u00f8msbekendtg\u00f8relsen / Installationsbekendtg\u00f8relsen' }
+};
+function examRenderMethodHint(type) {
+  var hint = EXAM_METHOD_HINTS[type];
+  if (!hint) return '';
+  return '<div style="margin-top:6px;padding:6px 10px;background:var(--primary-glow);border-left:3px solid var(--primary-light);border-radius:4px;font-size:0.78rem">'
+    + '<div><strong>' + tx('Metode', 'Method') + ':</strong> <span style="font-family:monospace">' + mmlEsc(hint.f) + '</span></div>'
+    + '<div style="margin-top:2px;color:var(--text-muted)"><strong>' + tx('Mangler', 'Needs') + ':</strong> ' + mmlEsc(hint.n) + '</div></div>';
+}
+
+// Collapse questions that share the same text (the detector often maps one
+// sub-question to several calc types -> identical rows). Merge them into a
+// single question carrying ALL its answers, preserving order.
+function analyzerDedupeQuestions(questions) {
+  var map = {}, order = [];
+  (questions || []).forEach(function (q) {
+    var key = (q.num ? (q.num + '|') : '') + String(q.questionText || q.label || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (!map[key]) { map[key] = { num: q.num, questionText: q.questionText, label: q.label, module: q.module, answers: [], solved: false, anyFail: false }; order.push(key); }
+    var g = map[key];
+    if (!g.module && q.module) g.module = q.module;
+    if (q.solved) {
+      g.solved = true;
+      if (q.status === 'fail') g.anyFail = true;
+      // avoid duplicate identical answer chips
+      var sig = (q.calcLabel || '') + '=' + (q.value != null ? q.value : '');
+      if (!g.answers.some(function (a) { return (a.calcLabel || '') + '=' + (a.value != null ? a.value : '') === sig; })) {
+        g.answers.push({ calcLabel: q.calcLabel, value: q.value, status: q.status });
+      }
+    }
+  });
+  return order.map(function (k) { return map[k]; });
+}
 
 // Render the numbered Q&A panel grouped by Opgave: every question is shown
-// TOGETHER with its answer + status badge so the user can see exactly which
+// TOGETHER with its answer(s) + status badge so the user can see exactly which
 // questions are answered and what each answer is. Driven by the tested
 // examBuildSolution() (per-segment solving) and annotated with the exam's own
-// numbering (1.1, 2.1, a, ...). Click-only, da/en/fa.
+// numbering (1.1, 2.1, a, ...). Identical-text rows are merged; empty sections
+// are hidden. Click-only, da/en/fa.
 function analyzerRenderQuestionOutline() {
   var sol;
   try { sol = examBuildSolution(analyzerState); } catch (e) { sol = null; }
   if (!sol || !sol.opgaver || !sol.opgaver.length) return '';
+  // Dedupe per Opgave and drop empty sections.
+  var groups = [];
+  sol.opgaver.forEach(function (o) {
+    var qs = analyzerDedupeQuestions(o.questions);
+    if (qs.length) groups.push({ id: o.id, title: o.title, questions: qs });
+  });
   var total = 0, answered = 0, failed = 0;
-  sol.opgaver.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) answered++; if (q.status === 'fail') failed++; }); });
+  groups.forEach(function (o) { o.questions.forEach(function (q) { total++; if (q.solved) answered++; if (q.anyFail) failed++; }); });
   if (total === 0) return '';
   var html = '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Sp\u00f8rgsm\u00e5l & svar', 'Questions & answers') + ' (' + answered + '/' + total + ' ' + tx('besvaret', 'answered') + (failed ? (' \u00b7 ' + failed + ' \u26d4') : '') + '):</strong>';
   html += '<div style="margin-top:6px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
-  sol.opgaver.forEach(function (o) {
+  groups.forEach(function (o) {
     html += '<div style="padding:5px 10px;background:var(--primary-glow);font-weight:700;font-size:0.82rem">' + (o.id ? ('Opgave ' + o.id) : (o.title || tx('Generelt', 'General'))) + '</div>';
-    if (!o.questions.length) {
-      html += '<div style="padding:5px 10px;font-size:0.78rem;color:var(--text-muted)">' + tx('Ingen detekterede sp\u00f8rgsm\u00e5l.', 'No detected questions.') + '</div>';
-      return;
-    }
     o.questions.forEach(function (q) {
       var badge, badgeColor;
-      if (q.status === 'fail') { badge = '\u26d4 ' + tx('Fejler', 'Fails'); badgeColor = 'var(--danger)'; }
+      if (q.anyFail) { badge = '\u26d4 ' + tx('Fejler', 'Fails'); badgeColor = 'var(--danger)'; }
       else if (q.solved) { badge = '\u2705 ' + tx('Besvaret', 'Answered'); badgeColor = 'var(--success)'; }
       else { badge = '\u26a0\ufe0f ' + tx('Mangler input', 'Needs input'); badgeColor = 'var(--warning)'; }
       html += '<div style="padding:6px 10px;border-top:1px solid var(--border-light);font-size:0.8rem">';
       html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
       html += '<div style="flex:1">';
-      if (q.num) html += '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc(q.num) + '</strong> ';
+      html += '<strong style="color:var(--primary);font-family:monospace">' + mmlEsc(examFullLabel(o.id, q.num)) + '</strong> ';
       html += mmlEsc(q.questionText || q.label);
       html += '</div>';
       html += '<span style="white-space:nowrap;color:' + badgeColor + ';font-size:0.74rem;font-weight:700">' + badge + '</span>';
       html += '</div>';
-      if (q.solved) {
-        html += '<div style="margin-top:4px;padding:4px 8px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:4px">';
-        html += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Svar', 'Answer') + (q.calcLabel ? ' \u00b7 ' + q.calcLabel : '') + ':</span> ';
-        html += '<span style="font-family:monospace;font-weight:700;color:var(--primary)">' + (q.value != null ? mmlEsc(String(q.value)) : '\u2014') + '</span>';
-        html += '</div>';
+      if (q.solved && q.answers.length) {
+        q.answers.forEach(function (a) {
+          html += '<div style="margin-top:4px;padding:4px 8px;background:var(--success-bg);border-left:3px solid var(--success);border-radius:4px">';
+          html += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Svar', 'Answer') + (a.calcLabel ? ' \u00b7 ' + a.calcLabel : '') + ':</span> ';
+          html += '<span style="font-family:monospace;font-weight:700;color:var(--primary)">' + (a.value != null ? mmlEsc(String(a.value)) : '\u2014') + '</span>';
+          html += '</div>';
+        });
       } else {
-        html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
+        html += examRenderMethodHint(q.type);
+        if (q.type === 'rule') {
+          html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--text-muted)">' + tx('Regelsp\u00f8rgsm\u00e5l \u2014 sl\u00e5 op i DS/HD 60364 / bekendtg\u00f8relsen (ikke en beregning).', 'Regulatory question \u2014 look up DS/HD 60364 / the regulation (not a calculation).') + '</div>';
+        } else {
+          html += '<div style="margin-top:4px;font-size:0.74rem;color:var(--warning)">' + tx('Kr\u00e6ver klik-bekr\u00e6ftet input \u2014 \u00e5bn modulet', 'Needs click-confirmed input \u2014 open the module') + (q.module ? ' (' + q.module + ')' : '') + '</div>';
+        }
       }
       html += '</div>';
     });
@@ -35626,7 +36361,7 @@ function examFindQuestionMeta(seg, type) {
       if (qs[j].type === type) {
         var raw = (subs[i] || '').replace(/\s+/g, ' ').trim();
         var num = (typeof analyzerSubLabel === 'function') ? analyzerSubLabel(raw) : '';
-        var t = num ? raw.replace(/^\s*(\d+(?:\.\d+){1,3}|[a-z\u00e6\u00f8\u00e5]\)|\(\d+\)|\d+\)|\d+\.)\s*/i, '') : raw;
+        var t = num ? raw.replace(ANALYZER_NUM_STRIP, '') : raw;
         var meta = { num: num, text: t.length > 260 ? t.slice(0, 260) + '\u2026' : t };
         if (qs[j].source === 'detected') return meta; // explicit question wins (carries the number)
         if (!fallbackMeta) fallbackMeta = meta;        // remember inferred match as a fallback only
@@ -35682,7 +36417,6 @@ function examBuildSolution(state) {
   var opgaver = [];
   var detectedCount = 0, solvedCount = 0, needInputCount = 0;
   segments.forEach(function (seg) {
-    var qs = analyzerDetectQuestions(seg.text || '');
     // Per-Opgave solving: each segment is solved with ITS OWN extracted
     // parameters (merged with the paper-wide context) so mixed-type Opgaver map
     // each sub-question to the right value. Falls back to the global solve when
@@ -35695,24 +36429,63 @@ function examBuildSolution(state) {
         (segSolution.results || []).forEach(function (r) { if (r && r.type && !segByType[r.type]) segByType[r.type] = r; });
       }
     } catch (e) { segByType = {}; }
-    var seen = {};
     var qBlocks = [];
-    qs.forEach(function (q) {
-      if (seen[q.type]) return; seen[q.type] = true;
-      var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
-      // Prefer this Opgave's own result; fall back to the global solve so a
-      // value stated once for the whole paper is still shown (never lost).
-      var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
+    // SUB-QUESTION DRIVEN: walk every sub-question in the exam's own order
+    // (1.1, 1.2, 1.3, ...) and solve each one individually. This guarantees the
+    // solution answers the questions in order, one row per sub-question, instead
+    // of collapsing them by calculation type.
+    var subs = (seg.subQuestions && seg.subQuestions.length) ? seg.subQuestions : [seg.text || ''];
+    var seenKey = {};
+    subs.forEach(function (subRaw) {
+      var raw = String(subRaw || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return;
+      var num = (typeof analyzerSubLabel === 'function') ? analyzerSubLabel(raw) : '';
+      var qtypes = analyzerDetectQuestions(raw).filter(function (t) { return t.source === 'detected'; });
+      var isNumeric = /^\d+\.\d+/.test(num);
+      var isLetter = /^[a-z\u00e6\u00f8\u00e5]$/i.test(num);
+      // A dotted number N.M is a real sub-question only if N matches THIS Opgave
+      // (rejects clock times like 8.30/14.30 and stray decimals).
+      if (isNumeric && parseInt(num, 10) !== seg.id) { num = ''; isNumeric = false; }
+      var validNumeric = isNumeric && seg.id > 0;
+      // A row is a question if: it has a valid numeric sub-number, OR an explicit
+      // calc verb was detected, OR it is a short "?" question. A bare letter "a)/b)"
+      // with no calc content is a REGELSAET CHOICE ("a) I overensstemmelse..."),
+      // NOT an opgave -> excluded. Intro/header lines ("Opgave 1 Forsyningsanlaeg...")
+      // are excluded too.
+      var isQ = validNumeric || qtypes.length > 0 || (/\?\s*$/.test(raw) && raw.length < 180);
+      if (isQ && !validNumeric && qtypes.length === 0 && /^\s*Opgave\s+\d/i.test(raw)) isQ = false;
+      if (!isQ) return;
+      if (isLetter && qtypes.length === 0) num = ''; // drop a stray letter label on a non-typed line
+      var dispText = num ? raw.replace(ANALYZER_NUM_STRIP, '') : raw;
+      var key = (num || '') + '|' + dispText.toLowerCase().slice(0, 80);
+      if (seenKey[key]) return; seenKey[key] = true;
+      if (dispText.length > 260) dispText = dispText.slice(0, 260) + '\u2026';
+      // Solve: first detected type that has a worked result; else first type (for the method hint).
+      var primary = qtypes.length ? qtypes[0] : null;
+      var res = null, usedType = primary ? primary.type : null, usedModule = primary ? primary.module : null, usedLabel = primary ? primary.label : tx('Sp\u00f8rgsm\u00e5l', 'Question');
+      for (var ti = 0; ti < qtypes.length; ti++) {
+        var rt = EXAM_SOLUTION_RESULT_ALIAS[qtypes[ti].type] || qtypes[ti].type;
+        var r = segByType[rt] || segByType[qtypes[ti].type] || byType[rt] || byType[qtypes[ti].type];
+        if (r && r.html) { res = r; usedType = qtypes[ti].type; usedModule = qtypes[ti].module; usedLabel = qtypes[ti].label; break; }
+      }
       var solved = !!(res && res.html);
-      var qMeta = examFindQuestionMeta(seg, q.type);
+      // Rule questions: attach a stable regulatory answer when we have one.
+      if (!solved && usedType === 'rule') {
+        var ra = analyzerRuleAnswer(raw);
+        if (ra) {
+          res = { label: 'Regelsvar', value: ra.svar, status: 'ok',
+            html: '<div class="result-box"><div class="result-row"><span class="label">Svar</span><span class="value">' + ra.svar + '</span></div><div class="info-row" style="font-size:0.76rem">' + ra.ref + '</div></div>' };
+          solved = true;
+        }
+      }
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;
       qBlocks.push({
-        type: q.type,
-        num: qMeta.num,
-        label: q.label,
-        module: q.module,
-        questionText: qMeta.text,
+        type: usedType,
+        num: num,
+        label: usedLabel,
+        module: usedModule,
+        questionText: dispText,
         calcLabel: res ? res.label : null,
         calcHtml: res ? (res.html || '') : '',
         value: res ? res.value : null,
@@ -35721,6 +36494,22 @@ function examBuildSolution(state) {
         needsInput: !solved
       });
     });
+    // Fallback for unstructured segments (no sub-questions detected): keep the
+    // older type-driven detection so nothing is lost.
+    if (qBlocks.length === 0) {
+      var qs = analyzerDetectQuestions(seg.text || '');
+      var seen = {};
+      qs.forEach(function (q) {
+        if (seen[q.type]) return; seen[q.type] = true;
+        var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
+        var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
+        var solved = !!(res && res.html);
+        var qMeta = examFindQuestionMeta(seg, q.type);
+        detectedCount++;
+        if (solved) solvedCount++; else needInputCount++;
+        qBlocks.push({ type: q.type, num: qMeta.num, label: q.label, module: q.module, questionText: qMeta.text, calcLabel: res ? res.label : null, calcHtml: res ? (res.html || '') : '', value: res ? res.value : null, status: res ? (res.status || null) : null, solved: solved, needsInput: !solved });
+      });
+    }
     opgaver.push({ id: seg.id, title: seg.title, questions: qBlocks });
   });
 
@@ -35857,18 +36646,19 @@ function examRenderSolution(sol) {
     }
     op.questions.forEach(function (q) {
       h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
-      // Question text
-      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + (q.num ? ' ' + mmlEsc(q.num) : '') + ':</strong> ' + (q.questionText || q.label) + '</div>';
+      // Question text — named exactly like the original exam: "Opgave 1.1: ..."
+      h += '<div style="font-size:0.82rem"><strong>' + mmlEsc(examFullLabel(op.id, q.num)) + ':</strong> ' + (q.questionText || q.label) + '</div>';
       // Mapped calculation
       h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
       if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
       if (q.status === 'ok') h += ' \u2705'; else if (q.status === 'fail') h += ' \u26D4';
       h += '</div>';
-      // FULL worked solution (calcDetail HTML) OR a click-only gap chip
+      // FULL worked solution (calcDetail HTML) OR a method hint + click-only gap chip
       if (q.solved && q.calcHtml) {
         h += q.calcHtml;
       } else {
-        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen udregning tilg\u00E6ngelig \u2014 bekr\u00E6ft de manglende input via det tilknyttede modul (kun klik).', 'No working available \u2014 confirm the missing inputs via the linked module (click-only).') + '</div>';
+        h += examRenderMethodHint(q.type);
+        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen automatisk udregning \u2014 indtast de manglende v\u00E6rdier via det tilknyttede modul (kun klik).', 'No automatic working \u2014 enter the missing values via the linked module (click-only).') + '</div>';
         if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
       }
       h += '</div>';
