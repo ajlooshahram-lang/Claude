@@ -36329,6 +36329,65 @@ function analyzerEarthPicker(qKey, type) {
   h += '</div>';
   return h;
 }
+
+// === Click-to-solve: potential rise / max earthing resistance (EN 50522) =====
+// U_E = I_E * R_E checked against the permissible touch voltage U_Tp; also gives
+// the maximum allowed earthing resistance R_E,max = U_Tp / I_E. Reuses the
+// validated forsyningPotentialRise / forsyningEarthResistanceMax solvers. This is
+// a genuine life-safety verdict (touch voltage), computed directly from the
+// user-supplied values \u2014 not fabricated \u2014 and framed conservatively.
+var ANALYZER_POT_IE = [20, 40, 50, 60, 80, 100];   // earth-fault current through the earthing [A]
+var ANALYZER_POT_RE = [1, 2, 5, 10];               // earthing resistance R_E [ohm]
+var ANALYZER_POT_UTP = [50, 75, 80, 150, 220];     // permissible touch voltage U_Tp [V] (EN 50522)
+function analyzerPotSet(qKey, field, val) {
+  analyzerState.potPick = analyzerState.potPick || {};
+  analyzerState.potPick[qKey] = analyzerState.potPick[qKey] || {};
+  analyzerState.potPick[qKey][field] = val;
+  renderModule('analyzer');
+}
+function analyzerPotWorked(ie, re, utp) {
+  var pr = forsyningPotentialRise(ie, re, utp);
+  var rm = forsyningEarthResistanceMax(ie, utp);
+  return { ie: ie, re: re, utp: utp, UE: pr.UE, ok: pr.ok, REmax: rm.REmax };
+}
+function analyzerPotWorkedHtml(r) {
+  var h = '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Udregning (DS/EN 50522 / DS/HD 60364-4-41)', 'Working (DS/EN 50522 / DS/HD 60364-4-41)') + '</div>';
+  h += '<div class="result-row"><span class="label">U<sub>E</sub> ' + tx('(potentialestigning)', '(potential rise)') + '</span><span class="value">I<sub>E</sub>\u00b7R<sub>E</sub> = ' + nf(r.ie, 0) + ' A \u00b7 ' + nf(r.re, 1) + ' \u03A9 = <strong>' + nf(r.UE, 0) + ' V</strong></span></div>';
+  h += '<div class="result-row"><span class="label">R<sub>E,max</sub> ' + tx('(st\u00f8rste tilladte)', '(largest permissible)') + '</span><span class="value">U<sub>Tp</sub>/I<sub>E</sub> = ' + nf(r.utp, 0) + '/' + nf(r.ie, 0) + ' = <strong>' + nf(r.REmax, 2) + ' \u03A9</strong></span></div>';
+  var col = r.ok ? 'var(--success)' : 'var(--danger)';
+  var verdict = r.ok
+    ? tx('OK \u2014 U_E \u2264 U_Tp: ber\u00f8ringssp\u00e6ndingen er inden for den tilladte gr\u00e6nse.', 'OK \u2014 U_E \u2264 U_Tp: the touch voltage is within the permissible limit.')
+    : tx('IKKE OK \u2014 U_E > U_Tp: ber\u00f8ringssp\u00e6ndingen er FOR H\u00d8J. S\u00e6nk R_E (flere/l\u00e6ngere elektroder) eller hurtigere udkobling.', 'NOT OK \u2014 U_E > U_Tp: the touch voltage is TOO HIGH. Lower R_E (more/longer electrodes) or clear the fault faster.');
+  h += '<div class="result-row"><span class="label">' + tx('Verdikt (U_E \u2264 U_Tp?)', 'Verdict (U_E \u2264 U_Tp?)') + '</span><span class="value" style="font-weight:700;color:' + col + '">' + nf(r.UE, 0) + ' V ' + (r.ok ? '\u2264' : '>') + ' ' + nf(r.utp, 0) + ' V</span></div>';
+  h += '<div style="font-size:0.8rem;color:' + col + ';margin-top:2px">' + verdict + '</div>';
+  h += '<div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px">' + tx('I\u2091, R\u2091 og U_Tp er valgt af dig fra opgavens bilag (U_Tp jf. EN 50522 tids-/sp\u00e6ndingskurve).', 'I\u2091, R\u2091 and U_Tp were selected by you from the exam appendix (U_Tp per the EN 50522 time/voltage curve).') + '</div>';
+  h += '</div>';
+  return h;
+}
+function analyzerPotPicker(qKey) {
+  analyzerState.potPick = analyzerState.potPick || {};
+  var pick = analyzerState.potPick[qKey] || {};
+  function btnRow(label, field, opts, cur, suffix) {
+    var s = '<div style="margin-top:6px"><div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:2px">' + label + '</div><div class="select-grid">';
+    opts.forEach(function (o) {
+      s += '<button class="sel-btn ' + (cur === o ? 'selected' : '') + '" onclick="analyzerPotSet(\'' + qKey + '\',\'' + field + '\',' + o + ')">' + nf(o, (o % 1 ? 1 : 0)) + (suffix || '') + '</button>';
+    });
+    s += '</div></div>';
+    return s;
+  }
+  var h = '<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--primary);border-radius:6px;background:rgba(37,99,235,0.06)">';
+  h += '<div style="font-size:0.74rem;font-weight:700;color:var(--primary);text-transform:uppercase">\uD83D\uDDB1\uFE0F ' + tx('V\u00e6lg fra bilaget (kun klik) \u2014 s\u00e5 udregnes U_E og R_E,max', 'Pick from the appendix (click only) \u2014 then U_E and R_E,max are solved') + '</div>';
+  h += btnRow(tx('Jordfejlstr\u00f8m I\u2091 [A]', 'Earth-fault current I\u2091 [A]'), 'ie', ANALYZER_POT_IE, pick.ie, ' A');
+  h += btnRow(tx('Jordingsmodstand R\u2091 [\u03A9]', 'Earthing resistance R\u2091 [\u03A9]'), 're', ANALYZER_POT_RE, pick.re, ' \u03A9');
+  h += btnRow(tx('Tilladt ber\u00f8ringssp\u00e6nding U_Tp [V]', 'Permissible touch voltage U_Tp [V]'), 'utp', ANALYZER_POT_UTP, pick.utp, ' V');
+  if (pick.ie && pick.re && pick.utp) {
+    h += analyzerPotWorkedHtml(analyzerPotWorked(pick.ie, pick.re, pick.utp));
+  } else {
+    h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">' + tx('V\u00e6lg I\u2091, R\u2091 og U_Tp ovenfor for at se den fulde udregning.', 'Select I\u2091, R\u2091 and U_Tp above to see the full working.') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
 // sub-question to several calc types -> identical rows). Merge them into a
 // single question carrying ALL its answers, preserving order.
 function analyzerDedupeQuestions(questions) {
@@ -36959,6 +37018,8 @@ function examRenderSolution(sol) {
           h += analyzerIkPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type, q.type);
         } else if (q.type === 'earthfault' || q.type === 'petersen') {
           h += analyzerEarthPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type, q.type);
+        } else if (q.type === 'potential') {
+          h += analyzerPotPicker((op.id || 'g') + '_' + (q.num || '') + '_' + q.type);
         }
         h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen automatisk udregning \u2014 indtast de manglende v\u00E6rdier via det tilknyttede modul (kun klik).', 'No automatic working \u2014 enter the missing values via the linked module (click-only).') + '</div>';
         if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';

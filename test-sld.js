@@ -16823,6 +16823,37 @@ test('analyzerEarthPicker: no fabrication before all three inputs are picked', f
   assert.ok(/V\u00e6lg U\u2099/.test(h), 'shows a selection prompt instead of a fabricated value');
 });
 
+console.log('\n=== Analyzer potential-rise / R_E,max picker Tests ===\n');
+
+test('analyzerPotWorked: U_E = I_E*R_E, R_E,max = U_Tp/I_E, and the touch-voltage verdict', function () {
+  var bad = analyzerPotWorked(50, 2, 75);   // UE = 100 V > 75 V -> NOT OK
+  assert.strictEqual(bad.UE, 100, 'U_E = 50*2 = 100 V');
+  assert.ok(Math.abs(bad.REmax - 1.5) < 1e-9, 'R_E,max = 75/50 = 1.5 ohm');
+  assert.strictEqual(bad.ok, false, '100 V > 75 V must be NOT OK (conservative)');
+  var good = analyzerPotWorked(50, 1, 75);  // UE = 50 V <= 75 V -> OK
+  assert.strictEqual(good.ok, true, '50 V <= 75 V is OK');
+});
+
+test('analyzerPotWorkedHtml: surfaces the life-safety verdict honestly (red on fail, never "OK" when over limit)', function () {
+  lang = 'da';
+  var bad = analyzerPotWorkedHtml(analyzerPotWorked(60, 2, 75)); // 120 V > 75
+  assert.ok(bad.indexOf('IKKE OK') >= 0, 'fail case clearly says IKKE OK');
+  assert.ok(bad.indexOf('var(--danger)') >= 0, 'fail case rendered in danger colour');
+  assert.ok(bad.indexOf('120 V') >= 0 && bad.indexOf('75 V') >= 0, 'shows U_E and the limit');
+  var good = analyzerPotWorkedHtml(analyzerPotWorked(40, 1, 75)); // 40 V <= 75
+  assert.ok(good.indexOf('IKKE OK') < 0, 'pass case does not say IKKE OK');
+});
+
+test('analyzerPotPicker: requires all three inputs before any verdict (no fabrication)', function () {
+  lang = 'da';
+  analyzerState.potPick = { 'g_1.5_potential': { ie: 50, re: 2 } };
+  var h = analyzerPotPicker('g_1.5_potential');
+  assert.ok(h.indexOf('U<sub>E</sub>') < 0, 'no U_E computed until U_Tp is also chosen');
+  analyzerState.potPick = { 'g_1.5_potential': { ie: 50, re: 2, utp: 75 } };
+  var h2 = analyzerPotPicker('g_1.5_potential');
+  assert.ok(h2.indexOf('100 V') >= 0 && h2.indexOf('IKKE OK') >= 0, 'full input -> U_E=100 V and the correct verdict');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
