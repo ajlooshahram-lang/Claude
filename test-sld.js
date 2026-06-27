@@ -16516,6 +16516,51 @@ test('renderMotor surfaces Type-2 coordination warning + manufacturer catalog li
     'motor result must include a manufacturer motor-control catalog link');
 });
 
+console.log('\n=== Exam Mock Timer (proportional duration) Tests ===\n');
+
+test('examFmtTime: shows MM:SS under an hour, H:MM:SS at/over an hour', function () {
+  assert.strictEqual(examFmtTime(0), '00:00', 'zero');
+  assert.strictEqual(examFmtTime(65), '01:05', 'just over a minute');
+  assert.strictEqual(examFmtTime(3599), '59:59', 'just under an hour stays MM:SS');
+  assert.strictEqual(examFmtTime(3600), '1:00:00', 'one hour gets the hour field');
+  assert.strictEqual(examFmtTime(7384), '2:03:04', 'two hours formats H:MM:SS');
+  assert.strictEqual(examFmtTime(-50), '00:00', 'negative clamps to zero');
+});
+
+test('examMockBudget: ~3 min per step, whole minutes, clamped to [15 min, 8 h]', function () {
+  assert.strictEqual(examMockBudget(10), 1800, '10 steps -> 30 min (10*180)');
+  assert.strictEqual(examMockBudget(20), 3600, '20 steps -> 1 h');
+  assert.strictEqual(examMockBudget(1), 900, '1 step floored to the 15-min minimum');
+  assert.strictEqual(examMockBudget(0), 900, 'zero/invalid floored to the 15-min minimum');
+  assert.strictEqual(examMockBudget(1000), 28800, 'huge step count capped at 8 h');
+  assert.strictEqual(examMockBudget(13) % 60, 0, 'budget is always a whole number of minutes');
+});
+
+test('examStartMock: timer scales to the number of mock steps (no flat 1 h)', function () {
+  examStartMock('full');
+  var steps = examMockSeq().length;
+  assert.ok(steps > 0, 'full mock produces at least one step');
+  assert.strictEqual(examState.timerTotal, examMockBudget(steps), 'timerTotal equals the per-step budget');
+  assert.strictEqual(examState.timerLeft, examState.timerTotal, 'timer starts full');
+});
+
+test('examStartMock: quick mock gets its own proportional budget; full has >= steps', function () {
+  examStartMock('quick');
+  var qSteps = examMockSeq().length;
+  assert.strictEqual(examState.timerTotal, examMockBudget(qSteps), 'quick mock budget matches its step count');
+  examStartMock('full');
+  var fSteps = examMockSeq().length;
+  assert.ok(fSteps >= qSteps, 'full mock has at least as many steps as quick');
+});
+
+test('examResetTimer: resets to the active mock total, not a hardcoded hour', function () {
+  examStartMock('full');
+  var total = examState.timerTotal;
+  examState.timerLeft = 5;            // simulate time elapsed
+  examResetTimer();
+  assert.strictEqual(examState.timerLeft, total, 'reset restores the mock duration');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

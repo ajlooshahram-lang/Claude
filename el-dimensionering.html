@@ -16197,13 +16197,13 @@ function axCatSuggest(cat) {
   return m[cat] || { da: 'Repetér det relevante DS/HD 60364-afsnit.', en: 'Revisit the relevant DS/HD 60364 clause.' };
 }
 
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600, timerTotal:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
 function examLoadStore(){ try { return JSON.parse(localStorage.getItem('examStore')||'{}'); } catch(e){ return {}; } }
 function examSaveStore(s){ try { localStorage.setItem('examStore', JSON.stringify(s)); } catch(e){} }
-function examFmtTime(s){ const m=Math.floor(s/60), ss=s%60; return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+function examFmtTime(s){ s=Math.max(0,s|0); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; if(h>0){ return h+':'+(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; } return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
 
 const EXAM_QUIZ = [
   { q:{da:'Hvad er grundreglen for overbelastningsbeskyttelse?',en:'What is the fundamental rule for overload protection?'}, opts:['IB \u2264 In \u2264 Iz','Iz \u2264 In \u2264 IB','In \u2264 IB \u2264 Iz','IB \u2265 In \u2265 Iz'], ci:0, ex:{da:'Belastningsstr\u00f8m (IB) \u2264 beskyttelsens m\u00e6rkestr\u00f8m (In) \u2264 kablets korrigerede str\u00f8mb\u00e6reevne (Iz). Kablet kan dermed aldrig overbelastes uden at beskyttelsen udl\u00f8ser.',en:'Load current (IB) \u2264 device rating (In) \u2264 corrected cable ampacity (Iz). The cable can never be overloaded without the protection tripping.'}, clause:'DS/HD 60364-4-43 \u00a7433.1' },
@@ -16392,7 +16392,7 @@ function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){
 
 function examStartTimer(){ examState.timerOn = true; examState.timerEnd = Date.now() + examState.timerLeft*1000; if(examTimerHandle) clearInterval(examTimerHandle); examTimerHandle = setInterval(examTick, 1000); renderModule('exam'); }
 function examPauseTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } renderModule('exam'); }
-function examResetTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerLeft = 3600; renderModule('exam'); }
+function examResetTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerLeft = examState.timerTotal || 3600; renderModule('exam'); }
 function examTick(){ const left = Math.max(0, Math.round((examState.timerEnd - Date.now())/1000)); examState.timerLeft = left; const el = document.getElementById('examTimer'); if(el) el.textContent = examFmtTime(left); if(left<=0){ if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } examState.timerOn = false; renderModule('exam'); } }
 function examFeedback(ok, exObj, clause){
   const da = lang==='da';
@@ -16447,7 +16447,14 @@ function examMockSeq(){ var seq=[]; var ids=(examState.mockSet&&examState.mockSe
 function examMockCur(){ var seq=examMockSeq(); var p=seq[examState.mockPos]; if(!p) return null; var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); return { sid:p.sid, j:p.j, sc:sc, step:sc.steps[p.j], pos:examState.mockPos, total:seq.length }; }
 function examMockAnswered(){ var seq=examMockSeq(), a=0; seq.forEach(function(p){ if(examState.scPick[p.sid+':'+p.j]!==undefined) a++; }); return a; }
 function examMockScore(){ var seq=examMockSeq(), c=0; seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) c++; }); return { correct:c, total:seq.length }; }
-function examStartMock(kind){ kind = kind||'full'; var ids; if(kind==='quick'){ ids=[]; ['forsyning','maskine','installation'].forEach(function(c){ var pool=EXAM_SCEN.filter(function(s){return s.cat===c;}); if(pool.length) ids.push(pool[Math.floor(Math.random()*pool.length)].id); }); } else { ids=EXAM_SCEN.map(function(s){return s.id;}); } examState.mockKind=kind; examState.mockSet=ids; examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
+// Realistic time budget for the legacy exam mock: ~3 min per multiple-choice
+// scenario step (the real autorisationspr\u00f8ve allocates generous time per task),
+// rounded to a whole minute and clamped to [15 min, 8 h]. Replaces the old flat
+// 1-hour timer that gave the same time to a 9-step quick mock and a 40+ step
+// full mock. The autoexam module has the formal 2h/4h/8h duration bands; this
+// keeps the lighter MCQ trainer proportional and honest.
+function examMockBudget(steps){ var n=Math.max(1, steps|0); var sec=Math.round(n*180/60)*60; return Math.max(900, Math.min(28800, sec)); }
+function examStartMock(kind){ kind = kind||'full'; var ids; if(kind==='quick'){ ids=[]; ['forsyning','maskine','installation'].forEach(function(c){ var pool=EXAM_SCEN.filter(function(s){return s.cat===c;}); if(pool.length) ids.push(pool[Math.floor(Math.random()*pool.length)].id); }); } else { ids=EXAM_SCEN.map(function(s){return s.id;}); } examState.mockKind=kind; examState.mockSet=ids; examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerTotal=examMockBudget(examMockSeq().length); examState.timerLeft=examState.timerTotal; examStartTimer(); }
 function examAbortMock(){ examState.mockOn=false; examPauseTimer(); }
 function examMockNav(d){ var n=examMockSeq().length; examState.mockPos=Math.max(0, Math.min(n-1, examState.mockPos+d)); renderModule('exam'); }
 function examSaveMock(){ examState.mockSet.forEach(function(id){ var sc=EXAM_SCEN.find(function(s){return s.id===id;}); if(sc) examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); var key=examState.mockKind==='quick'?'mockBestQuick':'mockBestFull'; store[key]=Math.max(store[key]||0,pct); examSaveStore(store); }
@@ -16501,7 +16508,7 @@ function renderMock(){
     const catRows = order.map(function(c){ var pc=catPct[c]; return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':(pc>=EXAM_CAT_FLOOR?'#b8860b':'var(--danger)')}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
     const rd = examReportData();
     const weak = rd.weakClauses.length ? rd.weakClauses.slice(0,6).map(function(w){return w.clause+' \u00d7'+w.count;}).join('<br>') : (tx('Ingen', 'None'));
-    const used = examFmtTime(Math.max(0, 3600-examState.timerLeft));
+    const used = examFmtTime(Math.max(0, (examState.timerTotal||3600)-examState.timerLeft));
     return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${tx('Mock-resultat', 'Mock result')}</div>`
       + `<div class="result-box ${pass?'':'error'}"><div class="result-title">${pass?(tx('\uD83C\uDF89 Best\u00e5et', '\uD83C\uDF89 Passed')):(tx('\u26A0\uFE0F Ikke best\u00e5et', '\u26A0\uFE0F Not passed'))} \u2014 ${pct}%</div>`
       + `<div class="result-row"><span class="label">${tx('Rigtige trin', 'Correct steps')}</span><span class="value">${r.correct}/${r.total}</span></div>`
