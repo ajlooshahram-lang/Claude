@@ -35980,6 +35980,19 @@ function analyzerSubLabel(s) {
 // Shared strip pattern: removes a leading question-number label from display text.
 var ANALYZER_NUM_STRIP = /^\s*(\d{1,2}\.\d{1,2}(?!\d)|[a-z\u00e6\u00f8\u00e5]\)|\(\d{1,2}\)|\d{1,2}\))\s*/i;
 
+// Stable, long-unchanged regulatory answers (only rock-solid ones; everything else
+// stays "look up the standard"). Returns { svar, ref } or null.
+function analyzerRuleAnswer(text) {
+  var t = String(text || '').toLowerCase();
+  if (/(rcd|hpfi|fejlstr.{1,2}msafbryder|indirekte\s+ber.ring)/.test(t) && /(stikkontakt|bolig|boliger|30\s*ma|tilslutningssted)/.test(t))
+    return { svar: 'RCD (HPFI) I\u0394n \u2264 30 mA, type A', ref: 'DS/HD 60364-4-41 \u00a7411.3.3' };
+  if (/tv.rsnit/.test(t) && /(beskyttelsesleder|pe-?leder|beskyttende\s+leder)/.test(t) && !/udligning|potential/.test(t))
+    return { svar: 'S\u226416: S_PE = S; 16<S\u226435: 16 mm\u00b2; S>35: S/2 (Cu)', ref: 'DS/HD 60364-5-54 tabel 54.7' };
+  if (/sikringsgrupper/.test(t) && /belysning|f\u00e6lles\s*adgangsvej/.test(t))
+    return { svar: 'Mindst 2 sikringsgrupper (f\u00e6lles adgangsvej)', ref: 'DS/HD 60364-5-56 (n\u00f8d/sikkerhed)' };
+  return null;
+}
+
 // Build the question label EXACTLY as in the original exam: "Opgave 1.1",
 // "Opgave 3.6", etc. A sub-number that already encodes the opgave (1.1) just
 // gets the "Opgave " prefix; a bare letter/number is attached to the section id.
@@ -36447,6 +36460,15 @@ function examBuildSolution(state) {
         if (r && r.html) { res = r; usedType = qtypes[ti].type; usedModule = qtypes[ti].module; usedLabel = qtypes[ti].label; break; }
       }
       var solved = !!(res && res.html);
+      // Rule questions: attach a stable regulatory answer when we have one.
+      if (!solved && usedType === 'rule') {
+        var ra = analyzerRuleAnswer(raw);
+        if (ra) {
+          res = { label: 'Regelsvar', value: ra.svar, status: 'ok',
+            html: '<div class="result-box"><div class="result-row"><span class="label">Svar</span><span class="value">' + ra.svar + '</span></div><div class="info-row" style="font-size:0.76rem">' + ra.ref + '</div></div>' };
+          solved = true;
+        }
+      }
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;
       qBlocks.push({
