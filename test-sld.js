@@ -17130,6 +17130,50 @@ test('renderTrefase: asymStar shows the rotating-phasor twin + unbalanced neutra
   trefaseState.loadType = 'symStar';
 });
 
+test('simEvAllocate: full speed when the grid budget covers every charger', function () {
+  // 16 A/charger, 3 cars, 50 A budget: 50/3=16.7 >= 16 -> all full
+  var a = simEvAllocate(3, 16, 50);
+  assert.strictEqual(a.perCharger, 16, 'each car at full current');
+  assert.strictEqual(a.queued, 0, 'none queued');
+  assert.strictEqual(a.throttled, false, 'not throttled');
+  assert.strictEqual(a.total, 48, 'total = 3*16');
+});
+
+test('simEvAllocate: throttles all cars to stay within budget (>=6 A)', function () {
+  // 16 A/charger, 4 cars, 50 A: 50/4=12.5 (in [6,16)) -> throttle all to 12.5, total=50
+  var a = simEvAllocate(4, 16, 50);
+  assert.ok(Math.abs(a.perCharger - 12.5) < 1e-9, 'throttled to equal share 12.5 A');
+  assert.strictEqual(a.queued, 0, 'all served');
+  assert.strictEqual(a.throttled, true, 'flagged throttled');
+  assert.ok(Math.abs(a.total - 50) < 1e-9, 'total uses the full budget, never exceeds it');
+});
+
+test('simEvAllocate: queues surplus cars when budget cannot give everyone 6 A', function () {
+  // 16 A/charger, 9 cars, 50 A: 50/9=5.56 < 6 -> served=floor(50/6)=8, 1 queued
+  var a = simEvAllocate(9, 16, 50);
+  assert.strictEqual(a.served, 8, 'serves as many as can get >=6 A');
+  assert.strictEqual(a.queued, 1, 'one car queued');
+  assert.ok(a.total <= 50 + 1e-9, 'total never exceeds the grid budget');
+  assert.ok(a.perCharger >= 6 - 1e-9, 'served cars get at least the 6 A minimum');
+});
+
+test('simEvAllocate: degenerate inputs are safe', function () {
+  assert.strictEqual(simEvAllocate(0, 16, 50).total, 0, 'no cars -> nothing drawn');
+  assert.strictEqual(simEvAllocate(3, 16, 0).served, 0, 'zero budget -> none served');
+});
+
+test('SimEngine evBalancing + renderEV: animated balancing chart synced to evState', function () {
+  lang = 'da';
+  evState.powerKW = 11; evState.phases = 3; evState.numChargers = 9; evState.mainFuse = 50; evState.cableLength = 15; evState.mode = 3;
+  var out = SimEngine.sample(0).evBalancing;
+  assert.ok(out && out.queued >= 1, 'engine model flags queuing for 9 cars on a 50 A budget');
+  var html = renderEV();
+  assert.ok(html.indexOf('Digital tvilling') >= 0 && html.indexOf('animateMotion') >= 0, 'animated balancing chart rendered');
+  assert.ok(/i k\u00f8|queued/.test(html), 'verdict surfaces queued cars');
+  assert.ok(html.indexOf('type="text"') < 0 && html.indexOf('<textarea') < 0, 'EV sim stays click-only');
+  evState.numChargers = 1;
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

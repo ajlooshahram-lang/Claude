@@ -19369,6 +19369,80 @@ function evCheckGridCapacity(mainFuseA, designCurrent) {
   };
 }
 
+// ===== EV dynamic load-balancing simulation (digital twin, on SimEngine) =====
+// Equal-share allocation that keeps the sum of charger currents within the grid
+// budget (main fuse). Each charger is capped at its full current and floored at the
+// IEC 61851 minimum of 6 A; when the budget cannot give every connected car >=6 A,
+// the surplus cars QUEUE. This is the standard smart-charging behaviour (OCPP /
+// dynamic load management) — pure allocation logic, no fabricated physical data.
+var EV_MIN_CHARGE_A = 6; // IEC 61851-1 minimum continuous charging current
+function simEvAllocate(nActive, iFull, budgetA) {
+  nActive = Math.max(0, nActive | 0);
+  if (nActive === 0 || iFull <= 0 || budgetA <= 0) return { perCharger: 0, served: 0, queued: nActive, total: 0, throttled: false };
+  var equalShare = budgetA / nActive;
+  if (equalShare >= iFull) {                                   // everyone at full speed
+    return { perCharger: iFull, served: nActive, queued: 0, total: iFull * nActive, throttled: false };
+  }
+  if (equalShare >= EV_MIN_CHARGE_A) {                          // throttle all, still legal
+    return { perCharger: equalShare, served: nActive, queued: 0, total: budgetA, throttled: true };
+  }
+  // budget too small for everyone at >=6 A -> serve as many as possible, queue the rest
+  var served = Math.max(0, Math.floor(budgetA / EV_MIN_CHARGE_A));
+  if (served > nActive) served = nActive;
+  if (served === 0) return { perCharger: 0, served: 0, queued: nActive, total: 0, throttled: true };
+  var per = Math.min(iFull, budgetA / served);
+  return { perCharger: per, served: served, queued: nActive - served, total: per * served, throttled: true };
+}
+
+function simRenderEvBalancing(iFull, budgetA, maxChargers, currentN) {
+  var W = 320, H = 180, ml = 40, mb = 26, mt = 12, mr = 12;
+  var pw = W - ml - mr, ph = H - mt - mb;
+  var nMax = Math.max(2, maxChargers);
+  var yMax = Math.max(budgetA, iFull * 1.1, iFull) * 1.12;
+  function X(n) { return ml + ((n - 1) / (nMax - 1)) * pw; }
+  function Y(a) { return mt + ph - (a / yMax) * ph; }
+  var perPts = [], totPts = [];
+  for (var n = 1; n <= nMax; n++) {
+    var a = simEvAllocate(n, iFull, budgetA);
+    perPts.push(X(n).toFixed(1) + ',' + Y(a.perCharger).toFixed(1));
+    totPts.push(X(n).toFixed(1) + ',' + Y(a.total).toFixed(1));
+  }
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:420px;background:var(--bg);border-radius:8px">';
+  s += '<line x1="' + ml + '" y1="' + mt + '" x2="' + ml + '" y2="' + (mt + ph) + '" stroke="var(--border)"/>';
+  s += '<line x1="' + ml + '" y1="' + (mt + ph) + '" x2="' + (ml + pw) + '" y2="' + (mt + ph) + '" stroke="var(--border)"/>';
+  // grid budget line
+  s += '<line x1="' + ml + '" y1="' + Y(budgetA).toFixed(1) + '" x2="' + (ml + pw) + '" y2="' + Y(budgetA).toFixed(1) + '" stroke="var(--danger)" stroke-width="1.2" stroke-dasharray="5,3"/>';
+  s += '<text x="' + (ml + pw) + '" y="' + (Y(budgetA) - 3).toFixed(1) + '" font-size="9" fill="var(--danger)" text-anchor="end">' + tx('netgr\u00e6nse', 'grid limit') + ' ' + nf(budgetA, 0) + ' A</text>';
+  // 6 A minimum line
+  s += '<line x1="' + ml + '" y1="' + Y(EV_MIN_CHARGE_A).toFixed(1) + '" x2="' + (ml + pw) + '" y2="' + Y(EV_MIN_CHARGE_A).toFixed(1) + '" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="2,3"/>';
+  s += '<text x="' + (ml + 2) + '" y="' + (Y(EV_MIN_CHARGE_A) - 2).toFixed(1) + '" font-size="8" fill="var(--text-muted)">6 A min</text>';
+  // total current (rises, capped at budget) and per-charger (falls)
+  s += '<polyline points="' + totPts.join(' ') + '" fill="none" stroke="var(--primary)" stroke-width="2.2"/>';
+  s += '<polyline points="' + perPts.join(' ') + '" fill="none" stroke="var(--success)" stroke-width="2.4"/>';
+  // animated marker on the per-charger line
+  s += '<circle r="4" fill="var(--success)"><animateMotion dur="4s" repeatCount="indefinite" path="M ' + perPts.join(' ').split(' ').join(' L ').replace(/,/g, ' ') + '"/></circle>';
+  // current-state marker
+  if (currentN >= 1 && currentN <= nMax) {
+    var a2 = simEvAllocate(currentN, iFull, budgetA);
+    s += '<line x1="' + X(currentN).toFixed(1) + '" y1="' + mt + '" x2="' + X(currentN).toFixed(1) + '" y2="' + (mt + ph) + '" stroke="var(--primary)" stroke-width="1" stroke-dasharray="2,2"/>';
+    s += '<circle cx="' + X(currentN).toFixed(1) + '" cy="' + Y(a2.perCharger).toFixed(1) + '" r="4" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  }
+  s += '<text x="' + (ml - 4) + '" y="' + (mt + 8) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">A</text>';
+  s += '<text x="' + ml + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--text-muted)">1</text>';
+  s += '<text x="' + (ml + pw) + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--text-muted)" text-anchor="end">' + nMax + ' ' + tx('biler', 'cars') + '</text>';
+  s += '</svg>';
+  var leg = '<div style="font-size:0.78rem;display:flex;gap:12px;justify-content:center;margin-top:2px"><span style="color:var(--success)">\u25ac ' + tx('pr. lader', 'per charger') + '</span><span style="color:var(--primary)">\u25ac ' + tx('total', 'total') + '</span></div>';
+  return s + leg;
+}
+
+SimEngine.register('evBalancing', function (t, eng) {
+  if (typeof evState === 'undefined') return null;
+  var iFull = evCalcCurrent(evState.powerKW, evState.phases);
+  var a = simEvAllocate(evState.numChargers, iFull, evState.mainFuse);
+  a.iFull = iFull; a.budgetA = evState.mainFuse; a.nActive = evState.numChargers;
+  return a;
+});
+
 function renderEV() {
   var current = evCalcCurrent(evState.powerKW, evState.phases);
   var designCurrent = evCalcDesignCurrent(evState.powerKW, evState.phases, evState.numChargers);
@@ -19490,6 +19564,22 @@ function renderEV() {
     html += '<div class="result-row" style="color:var(--warning)"><span class="label">\u26A0\uFE0F ' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + tx('Lastbalancering anbefales (>80% af hovedsikring)', 'Load balancing recommended (>80% of main fuse)') + '</span></div>';
   }
   html += '</div>';
+
+  // Digital twin: dynamic load-balancing as more cars connect
+  (function () {
+    var iFull = evCalcCurrent(evState.powerKW, evState.phases);
+    var maxN = Math.max(evState.numChargers, 8);
+    var a = simEvAllocate(evState.numChargers, iFull, evState.mainFuse);
+    html += '<div class="result-box" style="text-align:center"><div class="result-title" style="text-align:left">' + tx('Digital tvilling \u2014 dynamisk lastbalancering', 'Digital twin \u2014 dynamic load balancing') + '</div>';
+    html += simRenderEvBalancing(iFull, evState.mainFuse, maxN, evState.numChargers);
+    var perTxt = nf(a.perCharger, 1) + ' A/' + tx('lader', 'charger');
+    var vtxt, vcol;
+    if (a.queued > 0) { vcol = 'var(--danger)'; vtxt = tx(a.served + ' biler lader (' + perTxt + '), ' + a.queued + ' i k\u00f8 \u2014 netgr\u00e6nsen kan ikke give alle 6 A.', a.served + ' cars charging (' + perTxt + '), ' + a.queued + ' queued \u2014 the grid limit cannot give every car 6 A.'); }
+    else if (a.throttled) { vcol = 'var(--warning)'; vtxt = tx('Alle ' + evState.numChargers + ' lader, men neddroslet til ' + perTxt + ' for at holde \u2264 ' + evState.mainFuse + ' A.', 'All ' + evState.numChargers + ' charging, throttled to ' + perTxt + ' to stay \u2264 ' + evState.mainFuse + ' A.'); }
+    else { vcol = 'var(--success)'; vtxt = tx('Alle ' + evState.numChargers + ' lader ved fuld effekt (' + perTxt + '); total ' + nf(a.total, 0) + ' A \u2264 ' + evState.mainFuse + ' A.', 'All ' + evState.numChargers + ' charging at full power (' + perTxt + '); total ' + nf(a.total, 0) + ' A \u2264 ' + evState.mainFuse + ' A.'); }
+    html += '<div class="result-row" style="text-align:left;margin-top:4px"><span class="value" style="font-weight:700;color:' + vcol + '">' + vtxt + '</span></div>';
+    html += '<div class="result-row" style="text-align:left;opacity:0.7;font-size:0.8em"><span class="value">' + tx('Ligedeling, loft = fuld str\u00f8m, gulv = 6 A (IEC 61851); overskydende biler s\u00e6ttes i k\u00f8 \u00b7 DS/HD 60364-7-722', 'Equal share, capped at full current, floored at 6 A (IEC 61851); surplus cars queue \u00b7 DS/HD 60364-7-722') + '</span></div></div>';
+  })();
 
   // calcDetail for EV charging
   html += calcDetail({
