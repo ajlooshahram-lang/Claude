@@ -19677,7 +19677,8 @@ var solarState = {
   panelWp: 440,          // Wp per panel
   batteryKWh: 10,        // kWh
   selfConsumption: 50,   // % (30, 50, 70, 90)
-  inverterMaxVdc: 600    // typical inverter max Vdc
+  inverterMaxVdc: 600,   // typical inverter max Vdc
+  simLoadKW: 1           // day-simulation baseline household load [kW] (user-selected)
 };
 
 // Constants for solar calculations
@@ -19740,6 +19741,78 @@ function solarCheckStringVoltage(panelCount, vocPerPanel, inverterMaxVdc) {
 // Annual yield estimate
 function solarCalcAnnualYield(kWp) {
   return Math.round(kWp * SOLAR_ANNUAL_YIELD_FACTOR);
+}
+
+// ===== Solar PV + battery 24-hour day simulation (digital twin, on SimEngine) =====
+// Hour-by-hour energy flow over a representative average day. PV energy integrates
+// to the VALIDATED annual yield / 365 (solarCalcAnnualYield); its hourly SHAPE is the
+// standard clear-day half-sine (06:00-18:00, textbook). The household load is an
+// EXPLICIT user value (kW, constant) - no fabricated load profile. Battery: ~95%
+// charge efficiency, 0..capacity. Strict energy accounting is preserved:
+//   PV  = self-consumed + charged + exported
+//   load = self-consumed + from-battery + imported
+function simSolarDay(kWp, batteryKWh, loadKW) {
+  var dailyYield = kWp * SOLAR_ANNUAL_YIELD_FACTOR / 365; // kWh/day from the validated annual figure
+  var shape = [], sumShape = 0;
+  for (var h = 0; h < 24; h++) { var s = (h >= 6 && h <= 18) ? Math.max(0, Math.sin(Math.PI * (h - 6) / 12)) : 0; shape.push(s); sumShape += s; }
+  var scale = sumShape > 0 ? dailyYield / sumShape : 0;
+  var cap = Math.max(0, batteryKWh || 0), effChg = 0.95, soc = 0;
+  var hours = [], tot = { pv: 0, load: 0, self: 0, charge: 0, discharge: 0, imp: 0, exp: 0 };
+  for (var hh = 0; hh < 24; hh++) {
+    var pv = scale * shape[hh];
+    var load = Math.max(0, loadKW || 0);
+    var self = Math.min(pv, load);
+    var surplus = pv - self, deficit = load - self;
+    var charge = 0, discharge = 0, imp = 0, exp = 0;
+    if (surplus > 0) {
+      if (cap > 0) { var stored = Math.min(surplus * effChg, cap - soc); charge = stored / effChg; soc += stored; exp = surplus - charge; }
+      else exp = surplus;
+    }
+    if (deficit > 0) { discharge = Math.min(deficit, soc); soc -= discharge; imp = deficit - discharge; }
+    hours.push({ h: hh, pv: pv, load: load, self: self, charge: charge, discharge: discharge, imp: imp, exp: exp, soc: soc });
+    tot.pv += pv; tot.load += load; tot.self += self; tot.charge += charge; tot.discharge += discharge; tot.imp += imp; tot.exp += exp;
+  }
+  var pvUsed = tot.self + tot.discharge;
+  return { hours: hours, dailyYield: dailyYield, cap: cap, socEnd: soc, totals: tot, selfConsumptionPct: tot.pv > 0 ? Math.min(100, pvUsed / tot.pv * 100) : 0 };
+}
+
+function simRenderSolarDay(kWp, batteryKWh, loadKW) {
+  var sim = simSolarDay(kWp, batteryKWh, loadKW);
+  var W = 340, H = 190, ml = 34, mb = 26, mt = 12, mr = 12;
+  var pw = W - ml - mr, ph = H - mt - mb;
+  var pMax = 0; sim.hours.forEach(function (r) { pMax = Math.max(pMax, r.pv, r.load); }); pMax = Math.max(pMax, 0.1) * 1.1;
+  var cap = Math.max(sim.cap, 0.1);
+  function X(h) { return ml + (h / 23) * pw; }
+  function YP(p) { return mt + ph - (p / pMax) * ph; }
+  function YS(s) { return mt + ph - (s / cap) * ph; }
+  var pvPts = [], loadPts = [], socPts = [];
+  sim.hours.forEach(function (r) { pvPts.push(X(r.h).toFixed(1) + ',' + YP(r.pv).toFixed(1)); loadPts.push(X(r.h).toFixed(1) + ',' + YP(r.load).toFixed(1)); socPts.push(X(r.h).toFixed(1) + ',' + YS(r.soc).toFixed(1)); });
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:440px;background:var(--bg);border-radius:8px">';
+  s += '<line x1="' + ml + '" y1="' + (mt + ph) + '" x2="' + (ml + pw) + '" y2="' + (mt + ph) + '" stroke="var(--border)"/>';
+  // PV filled area
+  s += '<polygon points="' + (ml + ',' + (mt + ph)) + ' ' + pvPts.join(' ') + ' ' + ((ml + pw) + ',' + (mt + ph)) + '" fill="#f59e0b" opacity="0.22"/>';
+  s += '<polyline points="' + pvPts.join(' ') + '" fill="none" stroke="#f59e0b" stroke-width="2.2"/>';
+  // load line
+  s += '<polyline points="' + loadPts.join(' ') + '" fill="none" stroke="#475569" stroke-width="1.8" stroke-dasharray="4,3"/>';
+  // battery SOC (green, on its own 0..cap scale)
+  if (sim.cap > 0) s += '<polyline points="' + socPts.join(' ') + '" fill="none" stroke="#10b981" stroke-width="2"/>';
+  // animated sun marker along the PV curve
+  s += '<circle r="4" fill="#f59e0b"><animateMotion dur="6s" repeatCount="indefinite" path="M ' + pvPts.join(' ').split(' ').join(' L ').replace(/,/g, ' ') + '"/></circle>';
+  // hour ticks
+  [0, 6, 12, 18, 24].forEach(function (hr) { var hh = Math.min(23, hr); s += '<text x="' + X(hh).toFixed(1) + '" y="' + (mt + ph + 14) + '" font-size="8.5" fill="var(--text-muted)" text-anchor="middle">' + hr + '</text>'; });
+  s += '</svg>';
+  var leg = '<div style="font-size:0.76rem;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:2px"><span style="color:#f59e0b">\u25ac PV</span><span style="color:#475569">\u254c ' + tx('last', 'load') + '</span>' + (sim.cap > 0 ? '<span style="color:#10b981">\u25ac ' + tx('batteri SOC', 'battery SOC') + '</span>' : '') + '</div>';
+  return svg_wrap(s + leg);
+}
+function svg_wrap(x) { return x; }
+
+if (typeof SimEngine !== 'undefined') {
+  SimEngine.register('solarDay', function (t, eng) {
+    if (typeof solarState === 'undefined') return null;
+    var kWp = solarCalcKWp(solarState.panelCount, solarState.panelWp);
+    var bat = (solarState.systemType === 'gridbat' || solarState.systemType === 'hybrid') ? solarState.batteryKWh : 0;
+    return simSolarDay(kWp, bat, solarState.simLoadKW || 1);
+  });
 }
 
 // Payback estimate
@@ -19914,6 +19987,22 @@ function renderSolar() {
   html += '<div class="result-row"><span class="label">' + tx('Systemomkostning (estimat)', 'System cost (estimate)') + '</span><span class="value">' + payback.systemCost + ' DKK</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetalingstid', 'Payback period') + '</span><span class="value">~' + payback.paybackYears + ' ' + tx('år', 'years') + '</span></div>';
   html += '</div>';
+
+  // Digital twin: 24-hour energy-flow day simulation
+  (function(){
+    var bat = (solarState.systemType === 'gridbat' || solarState.systemType === 'hybrid') ? solarState.batteryKWh : 0;
+    var sim = simSolarDay(kWp, bat, solarState.simLoadKW || 1);
+    var loadBtns = [0.3,0.5,1,2,3,5].map(function(v){return '<button class="sel-btn '+(Math.abs((solarState.simLoadKW||1)-v)<1e-9?'selected':'')+'" onclick="solarState.simLoadKW='+v+';renderModule(\'solar\')">'+nf(v,1)+' kW</button>';}).join('');
+    html += '<div class="result-box" style="text-align:center"><div class="result-title" style="text-align:left">' + tx('Digital tvilling \u2014 d\u00f8gnforl\u00f8b (PV, last, batteri)', 'Digital twin \u2014 24-hour flow (PV, load, battery)') + '</div>';
+    html += '<div class="select-label" style="font-weight:400;opacity:0.85;text-align:left">' + tx('Husstandslast (konstant)', 'Household load (constant)') + '</div><div class="select-grid">' + loadBtns + '</div>';
+    html += simRenderSolarDay(kWp, bat, solarState.simLoadKW || 1);
+    html += '<div class="result-row" style="text-align:left;margin-top:4px"><span class="label">' + tx('Egetforbrug', 'Self-consumption') + '</span><span class="value" style="font-weight:700;color:var(--success)">' + nf(sim.selfConsumptionPct,0) + '%</span></div>';
+    html += '<div class="result-row" style="text-align:left"><span class="label">' + tx('PV-produktion (gns. dag)', 'PV production (avg day)') + '</span><span class="value">' + nf(sim.totals.pv,1) + ' kWh</span></div>';
+    html += '<div class="result-row" style="text-align:left"><span class="label">' + tx('Eksport til net', 'Export to grid') + '</span><span class="value">' + nf(sim.totals.exp,1) + ' kWh</span></div>';
+    html += '<div class="result-row" style="text-align:left"><span class="label">' + tx('Import fra net', 'Import from grid') + '</span><span class="value">' + nf(sim.totals.imp,1) + ' kWh</span></div>';
+    if (bat>0) html += '<div class="result-row" style="text-align:left"><span class="label">' + tx('Batteri-gennemstr\u00f8mning', 'Battery throughput') + '</span><span class="value">' + nf(sim.totals.discharge,1) + ' kWh/' + tx('d\u00f8gn','day') + '</span></div>';
+    html += '<div class="result-row" style="text-align:left;opacity:0.7;font-size:0.78em"><span class="value">' + tx('PV integrerer til den validerede \u00e5rsydelse/365 (' + SOLAR_ANNUAL_YIELD_FACTOR + ' kWh/kWp); kurveform = standard klar-dag (halv-sinus). Last valgt af dig. Batteri \u224895% ladevirkningsgrad.', 'PV integrates to the validated annual yield/365 (' + SOLAR_ANNUAL_YIELD_FACTOR + ' kWh/kWp); curve shape = standard clear day (half-sine). Load is your choice. Battery \u224895% charge efficiency.') + '</span></div></div>';
+  })();
 
   // Verdict
   var safe = stringCheck.ok;

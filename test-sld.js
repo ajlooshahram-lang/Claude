@@ -17208,6 +17208,39 @@ test('SimEngine mcbClearTime + renderMCB: interactive clearing-time readout', fu
   mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi', faultMult: 10 };
 });
 
+test('simSolarDay: strict energy conservation (PV = self+charge+export; load = self+discharge+import)', function () {
+  var sim = simSolarDay(5, 10, 1);
+  var t = sim.totals;
+  assert.ok(Math.abs(t.pv - (t.self + t.charge + t.exp)) < 1e-6, 'PV balance holds');
+  assert.ok(Math.abs(t.load - (t.self + t.discharge + t.imp)) < 1e-6, 'load balance holds');
+  assert.ok(Math.abs(t.pv - sim.dailyYield) < 1e-6, 'PV integrates to the validated daily yield');
+  assert.ok(Math.abs(t.load - 24) < 1e-6, 'constant 1 kW load = 24 kWh/day');
+  assert.ok(sim.selfConsumptionPct >= 0 && sim.selfConsumptionPct <= 100, 'self-consumption % in range');
+  assert.ok(sim.socEnd >= -1e-9 && sim.socEnd <= sim.cap + 1e-9, 'battery SOC stays within [0, capacity]');
+});
+
+test('simSolarDay: a battery raises self-consumption and cuts export vs no battery', function () {
+  // Big PV, small load -> lots of midday surplus. Battery should store & shift it.
+  var noBat = simSolarDay(10, 0, 0.3);
+  var withBat = simSolarDay(10, 10, 0.3);
+  assert.ok(withBat.selfConsumptionPct > noBat.selfConsumptionPct, 'battery increases self-consumption');
+  assert.ok(withBat.totals.exp < noBat.totals.exp, 'battery reduces grid export');
+  // no-battery case: nothing charged/discharged
+  assert.ok(noBat.totals.charge < 1e-9 && noBat.totals.discharge < 1e-9, 'no battery -> no charge/discharge');
+});
+
+test('SimEngine solarDay + renderSolar: animated 24h day twin synced to solarState', function () {
+  lang = 'da';
+  solarState.systemType = 'hybrid'; solarState.panelCount = 12; solarState.panelWp = 440; solarState.batteryKWh = 10; solarState.simLoadKW = 1;
+  var out = SimEngine.sample(0).solarDay;
+  assert.ok(out && out.totals.pv > 0, 'engine produces a day profile from solarState');
+  var html = renderSolar();
+  assert.ok(html.indexOf('Digital tvilling') >= 0 && html.indexOf('animateMotion') >= 0, 'animated day chart rendered');
+  assert.ok(/Egetforbrug|Self-consumption/.test(html), 'self-consumption surfaced');
+  assert.ok(html.indexOf('type="text"') < 0 && html.indexOf('<textarea') < 0, 'solar sim stays click-only');
+  solarState.systemType = 'grid';
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
