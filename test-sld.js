@@ -17174,6 +17174,40 @@ test('SimEngine evBalancing + renderEV: animated balancing chart synced to evSta
   evState.numChargers = 1;
 });
 
+test('simMcbClearTime: magnetic (instantaneous) at/above the curve multiple, thermal below', function () {
+  // B16: iecMax 5x -> at 5x magnetic, at 2.5x thermal, at <1.13x no trip
+  assert.strictEqual(simMcbClearTime('B', 16, 5 * 16).zone, 'magnetic', 'B at 5xIn -> magnetic');
+  assert.ok(simMcbClearTime('B', 16, 5 * 16).time <= 0.02, 'magnetic clears ~instantly');
+  assert.strictEqual(simMcbClearTime('B', 16, 2.5 * 16).zone, 'thermal', 'B at 2.5xIn -> thermal');
+  assert.strictEqual(simMcbClearTime('B', 16, 1.0 * 16).zone, 'none', 'B at 1.0xIn -> no trip');
+  // C16: at 5xIn still THERMAL (C needs 10x for magnetic) -> key curve distinction
+  assert.strictEqual(simMcbClearTime('C', 16, 5 * 16).zone, 'thermal', 'C at 5xIn is still thermal');
+  assert.strictEqual(simMcbClearTime('C', 16, 10 * 16).zone, 'magnetic', 'C at 10xIn -> magnetic');
+  // D16: magnetic only at 20x
+  assert.strictEqual(simMcbClearTime('D', 16, 10 * 16).zone, 'thermal', 'D at 10xIn still thermal');
+  assert.strictEqual(simMcbClearTime('D', 16, 20 * 16).zone, 'magnetic', 'D at 20xIn -> magnetic');
+});
+
+test('simMcbClearTime: thermal time matches the validated mcbThermalT model', function () {
+  // 2.55xIn must give ~60 s (the IEC calibration point)
+  assert.ok(Math.abs(simMcbClearTime('B', 16, 2.55 * 16).time - 60) < 0.5, '2.55xIn -> ~60 s (calibration)');
+  assert.strictEqual(simMcbClearTime('B', 0, 100).time, Infinity, 'invalid In -> no trip');
+});
+
+test('SimEngine mcbClearTime + renderMCB: interactive clearing-time readout', function () {
+  lang = 'da';
+  mcbState = { type: 'C60N', curve: 'B', rating: 16, poles: 'multi', faultMult: 5 };
+  var out = SimEngine.sample(0).mcbClearTime;
+  assert.ok(out && out.zone === 'magnetic', 'engine: B16 at 5xIn -> magnetic (synced to mcbState)');
+  var html = renderMCB();
+  assert.ok(/Simulering: udl\u00f8setid|Simulation: clearing time/.test(html), 'clearing-time simulation box rendered');
+  assert.ok(html.indexOf('Magnetisk') >= 0, 'explains the magnetic (instantaneous) decision');
+  mcbState.faultMult = 2;
+  var html2 = renderMCB();
+  assert.ok(/Termisk|Thermal/.test(html2), 'at 2xIn explains the thermal (overload) decision');
+  mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi', faultMult: 10 };
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');

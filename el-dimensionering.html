@@ -4909,7 +4909,7 @@ function renderLoadSchedule(){
 let fuseState = { holder: 'D02', size: null };
 let fuseCurveSel = ['gG']; // selected fuse classes for the curve comparison
 // MCB state
-let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
+let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi', faultMult: 10 };
 // MCCB state
 let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2, tripUnit: 'Micrologic 5.2', trL: 16, trS: 0.1, iiMult: 12, igMult: 0.3, tg: 0.1 };
 // Cable state
@@ -5205,6 +5205,21 @@ function mcbThermalT(m, edge) {
   var t = k / (m * m - 1);
   if (t > 7200) t = 7200;
   return t;
+}
+
+// Interactive clearing-time of an MCB at a given fault current (reuses the
+// validated mcbThermalT model + the hardened magnetic multiples in MCB_TYPE_INFO).
+// Returns the conservative (slowest, tMax) clearing time and the operating zone:
+//   m >= iecMax -> magnetic (instantaneous ~10 ms);  1.13 < m < iecMax -> thermal
+//   (overload, inverse-time);  m <= 1.13 -> no trip. This powers "explain every
+//   protection decision" without inventing data.
+function simMcbClearTime(curve, In, Ifault) {
+  var info = MCB_TYPE_INFO[curve];
+  if (!info || !(In > 0) || !(Ifault > 0)) return { time: Infinity, zone: 'none', m: 0 };
+  var m = Ifault / In;
+  if (m >= info.iecMax) return { time: 0.01, zone: 'magnetic', m: m };
+  if (m > 1.13) return { time: mcbThermalT(m, 'max'), zone: 'thermal', m: m };
+  return { time: Infinity, zone: 'none', m: m };
 }
 
 // Returns the trip-time envelope for an MCB type: maxEdge (latest trip) and
@@ -8005,10 +8020,14 @@ function simThermalTimeToLimit(thetaAmb, thetaSS, thetaMax, tauSec) {
   return -tauSec * Math.log(1 - frac);
 }
 
-// Register the cable thermal transient as a live simulator on the engine. It reads
-// the shared ambient temperature and the thermal-module UI (load ratio, insulation,
-// tau) so it stays synchronized with the rest of the app. theta_ss uses the SAME
-// validated steady-state form as thermalCalcTemp(): theta_amb + (theta_max-theta_amb)*(I/Iz)^2.
+// MCB clearing-time simulator (registered here, after SimEngine is defined).
+SimEngine.register('mcbClearTime', function (t, eng) {
+  if (typeof mcbState === 'undefined' || !mcbState.rating) return null;
+  var mult = mcbState.faultMult || 10;
+  var r = simMcbClearTime(mcbState.curve, mcbState.rating, mult * mcbState.rating);
+  r.Ifault = mult * mcbState.rating; r.mult = mult;
+  return r;
+});
 SimEngine.register('cableThermal', function (t, eng) {
   var amb = eng.param('ambient_temp', (typeof thermalState !== 'undefined' ? thermalState.ambientTemp : 30));
   var lr = (typeof thermalState !== 'undefined' && thermalState.loadRatio) ? thermalState.loadRatio : 1;
@@ -10779,6 +10798,24 @@ function renderMCB() {
           'Kurven viser den valgte automatsikrings tid/str\u00f8m-karakteristik (IEC 60898 / IEC 60947-2). Det <strong>termiske</strong> omr\u00e5de (venstre, h\u00e6ldende) beskytter mod overlast; det <strong>magnetiske</strong> omr\u00e5de (lodret fald) giver \u00f8jeblikkelig udl\u00f8sning ved kortslutning. For kurve ' + mcbState.curve + ' sker den magnetiske udl\u00f8sning i b\u00e5ndet Isd = ' + isdMin + '\u2013' + isdMax + ' A (' + curve.isdMin + '\u2013' + curve.isdMax + '\u00d7I\u2099). En kortslutningsstr\u00f8m Ik skal v\u00e6re st\u00f8rre end \u00f8vre b\u00e5ndgr\u00e6nse (' + isdMax + ' A) for at sikre \u00f8jeblikkelig udl\u00f8sning og opfylde Zs \u2264 U0/Ia (DS/HD 60364-4-41).',
           'The curve shows the selected breaker\u2019s time/current characteristic (IEC 60898 / IEC 60947-2). The <strong>thermal</strong> region (left, sloped) protects against overload; the <strong>magnetic</strong> region (vertical drop) gives instantaneous tripping on a short circuit. For curve ' + mcbState.curve + ' magnetic tripping occurs in the band Isd = ' + isdMin + '\u2013' + isdMax + ' A (' + curve.isdMin + '\u2013' + curve.isdMax + '\u00d7I\u2099). A prospective fault current Ik must exceed the upper band edge (' + isdMax + ' A) to guarantee instantaneous tripping and satisfy Zs \u2264 U0/Ia (DS/HD 60364-4-41).')}</div>
       </div>
+      ${(function(){
+        var mults=[1.5,2,3,5,10,20];
+        var fm = mcbState.faultMult||10;
+        var inA = mcbState.rating;
+        var res = simMcbClearTime(mcbState.curve, inA, fm*inA);
+        var btns = mults.map(function(v){return '<button class="sel-btn '+(fm===v?'selected':'')+'" onclick="mcbState.faultMult='+v+';renderModule(\'mcb\')">'+v+'\u00d7</button>';}).join('');
+        function ft(s){ if(!isFinite(s)) return '\u221e'; if(s<0.1) return Math.round(s*1000)+' ms'; if(s<90) return nf(s,2)+' s'; return nf(s/60,1)+' min'; }
+        var col, msg;
+        if(res.zone==='magnetic'){ col='var(--success)'; msg=tx('Magnetisk omr\u00e5de: \u00f8jeblikkelig udl\u00f8sning (~10 ms) \u2014 rydder kortslutningen og opfylder \u2264 0,4 s frakobling (DS/HD 60364-4-41).','Magnetic region: instantaneous trip (~10 ms) \u2014 clears the short circuit and meets the \u2264 0.4 s disconnection requirement (DS/HD 60364-4-41).'); }
+        else if(res.zone==='thermal'){ col='var(--warning)'; msg=tx('Termisk omr\u00e5de (overlast): udl\u00f8ser efter '+ft(res.time)+' \u2014 dette er overlastbeskyttelse, IKKE \u00f8jeblikkelig fejludkobling. En kortslutning skal n\u00e5 \u2265 '+isdMax+' A ('+MCB_TYPE_INFO[mcbState.curve].iecMax+'\u00d7I\u2099) for at udl\u00f8se magnetisk.','Thermal region (overload): trips after '+ft(res.time)+' \u2014 this is overload protection, NOT instantaneous fault clearing. A short circuit must reach \u2265 '+isdMax+' A ('+MCB_TYPE_INFO[mcbState.curve].iecMax+'\u00d7I\u2099) to trip magnetically.'); }
+        else { col='var(--text-muted)'; msg=tx('Under konventionel udl\u00f8sestr\u00f8m (\u2264 1,13\u00d7I\u2099): sikringen udl\u00f8ser ikke \u2014 normal drift.','Below the conventional tripping current (\u2264 1.13\u00d7I\u2099): the breaker does not trip \u2014 normal operation.'); }
+        return '<div class="result-box" style="margin-top:12px"><div class="result-title">\u26A1 '+tx('Simulering: udl\u00f8setid ved fejlstr\u00f8m','Simulation: clearing time at a fault current')+'</div>'
+          + '<div class="select-label" style="font-weight:400;opacity:0.85">'+tx('Fejlstr\u00f8m','Fault current')+' = '+fm+'\u00d7I\u2099 = '+nf(fm*inA,0)+' A</div><div class="select-grid">'+btns+'</div>'
+          + '<div class="result-row" style="margin-top:6px"><span class="label">'+tx('Udl\u00f8setid','Clearing time')+'</span><span class="value" style="font-weight:700;color:'+col+'">'+ft(res.time)+'</span></div>'
+          + '<div class="result-row"><span class="label">'+tx('Omr\u00e5de','Region')+'</span><span class="value">'+(res.zone==='magnetic'?tx('Magnetisk (kortslutning)','Magnetic (short circuit)'):(res.zone==='thermal'?tx('Termisk (overlast)','Thermal (overload)'):tx('Ingen udl\u00f8sning','No trip')))+'</span></div>'
+          + '<div class="result-row" style="font-size:0.82em"><span class="value" style="color:'+col+'">'+msg+'</span></div>'
+          + '<div class="result-row" style="opacity:0.7;font-size:0.78em"><span class="value">'+tx('Model: t = 330/(m\u00b2\u22121) (termisk, kalibreret 2,55\u00d7I\u2099\u219260 s); magnetisk \u2265 '+MCB_TYPE_INFO[mcbState.curve].iecMax+'\u00d7I\u2099 \u00b7 IEC 60898','Model: t = 330/(m\u00b2\u22121) (thermal, calibrated 2.55\u00d7I\u2099\u219260 s); magnetic \u2265 '+MCB_TYPE_INFO[mcbState.curve].iecMax+'\u00d7I\u2099 \u00b7 IEC 60898')+'</span></div></div>';
+      })()}
       <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">\uD83D\uDCCB ${tx('Produktreference', 'Product reference')}</div>
         <div class="result-row"><span class="label">${tx('Fabrikat', 'Manufacturer')}</span><span class="value"><strong>Schneider Electric</strong></span></div>
