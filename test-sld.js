@@ -16787,6 +16787,42 @@ test('analyzerIkSet: choosing e_r switches the scircuit module to Viggo complex 
   assert.strictEqual(scState.trafoEr, 1.2, 'scState.trafoEr reflects the picked e_r');
 });
 
+console.log('\n=== Analyzer earth-fault -> Petersen coil picker Tests ===\n');
+
+test('analyzerEarthWorked: capacitive earth-fault current Ij = sqrt3*w*C0*Un (validated solver)', function () {
+  var r = analyzerEarthWorked(10, 0.3, 30, 50);   // 10 kV, 0.3 uF/km, 30 km
+  assert.ok(Math.abs(r.C0uF - 9) < 1e-9, 'C0 = 0.3*30 = 9 uF');
+  // Ij = sqrt3 * 2pi*50 * 9e-6 * 10000 ~ 48.97 A
+  assert.ok(Math.abs(r.Ij - 48.97) < 0.2, 'Ij ~ 48.97 A, got ' + r.Ij);
+});
+
+test('analyzerEarthWorked: ideal Petersen coil L satisfies the resonance identity 1/(3 w^2 C0)', function () {
+  var r = analyzerEarthWorked(10, 0.3, 30, 50);
+  var Lres = 1 / (3 * Math.pow(2 * Math.PI * 50, 2) * (r.C0uF * 1e-6));
+  assert.ok(Math.abs(r.L - Lres) < 1e-4, 'L from Uf/(w*Ij) equals the resonance form 1/(3 w^2 C0)');
+  assert.ok(Math.abs(r.L - 0.375) < 0.01, 'L ~ 0.375 H, got ' + r.L);
+});
+
+test('analyzerEarthPicker: earthfault shows Ij; petersen additionally shows L + resonance check', function () {
+  lang = 'da';
+  analyzerState.efPick = { 'g_1.2_earthfault': { un: 10, ckm: 0.3, len: 30 } };
+  var hf = analyzerEarthPicker('g_1.2_earthfault', 'earthfault');
+  assert.ok(/I<sub>j<\/sub>/.test(hf) && hf.indexOf(' A') >= 0, 'earthfault picker shows Ij in A');
+  assert.ok(hf.indexOf(' H') < 0, 'earthfault picker does NOT compute the coil L');
+  analyzerState.efPick = { 'g_1.3_petersen': { un: 10, ckm: 0.3, len: 30 } };
+  var hp = analyzerEarthPicker('g_1.3_petersen', 'petersen');
+  assert.ok(hp.indexOf(' H') >= 0, 'petersen picker computes the coil L in henry');
+  assert.ok(/resonans/i.test(hp), 'petersen picker shows the resonance cross-check');
+});
+
+test('analyzerEarthPicker: no fabrication before all three inputs are picked', function () {
+  lang = 'da';
+  analyzerState.efPick = { 'g_x_petersen': { un: 10 } };
+  var h = analyzerEarthPicker('g_x_petersen', 'petersen');
+  assert.ok(h.indexOf(' H') < 0 && h.indexOf('I<sub>j') < 0, 'no result shown until Un, C and length are all chosen');
+  assert.ok(/V\u00e6lg U\u2099/.test(h), 'shows a selection prompt instead of a fabricated value');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
