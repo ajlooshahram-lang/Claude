@@ -36153,6 +36153,16 @@ function analyzerIkSet(qKey, field, val) {
   analyzerState.ikPick = analyzerState.ikPick || {};
   analyzerState.ikPick[qKey] = analyzerState.ikPick[qKey] || {};
   analyzerState.ikPick[qKey][field] = val;
+  // Connect to the scircuit module: once S_n and e_k are known, push the derived
+  // transformer impedance into scState so opening that module lands pre-filled
+  // (the "all modules linked" requirement). Net impedance is left as-is.
+  var p = analyzerState.ikPick[qKey];
+  if (p.sn && p.ek && typeof scState !== 'undefined') {
+    var Zt = (p.ek / 100) * (400 * 400) / (p.sn * 1000) * 1000;   // mOhm
+    var nn = p.n || 1;
+    scState.zTrafo = Math.round((Zt / nn) * 100) / 100;
+    scState.trafoUk = p.ek;
+  }
   renderModule('analyzer');
 }
 // Pure worked-solution generator (testable headless). U in volts, c voltage factor.
@@ -36163,9 +36173,11 @@ function analyzerIkWorked(sn, ek, n, U, c) {
   var Ztot = Zt / n;                                    // N identical transformers in parallel
   var Ik = (c * U) / (Math.sqrt(3) * Ztot / 1000);      // A
   var IkkA = Ik / 1000;
+  var SkkVA = sn / (ek / 100) * n;                       // transformer short-circuit power [kVA], N parallel
   return {
-    In: single.In, Zt: Zt, Ztot: Ztot, Ik: Ik, IkkA: IkkA,
-    IkkA105: IkkA * 1.05,
+    In: single.In, InTotal: Math.round(single.In * n * 10) / 10,
+    Zt: Zt, Ztot: Ztot, Ik: Ik, IkkA: IkkA,
+    IkkA105: IkkA * 1.05, SkMVA: SkkVA / 1000,
     sn: sn, ek: ek, n: n, U: U, c: c
   };
 }
@@ -36179,6 +36191,7 @@ function analyzerIkWorkedHtml(r) {
   }
   h += '<div class="result-row"><span class="label">I<sub>k,max</sub></span><span class="value">c\u00b7U/(\u221a3\u00b7Z) = ' + nf(r.c, 2) + '\u00b7' + r.U + '/(\u221a3\u00b7' + mO(r.Ztot) + ') = <strong style="color:var(--primary)">' + nf(r.IkkA, 1) + ' kA</strong></span></div>';
   if (r.n > 1) h += '<div class="result-row" style="font-size:0.8rem;opacity:0.85"><span class="label">' + tx('Kontrol', 'Cross-check') + '</span><span class="value">= ' + r.n + '\u00b7I<sub>k,1</sub> = ' + r.n + '\u00b7' + nf((r.IkkA / r.n), 1) + ' kA</span></div>';
+  h += '<div class="result-row"><span class="label">S<sub>k</sub> ' + tx('(trafoens kortslutningseffekt)', '(transformer short-circuit power)') + '</span><span class="value">S\u2099/(e\u2096/100)' + (r.n > 1 ? '\u00b7' + r.n : '') + ' = <strong>' + nf(r.SkMVA, 2) + ' MVA</strong></span></div>';
   h += '<div class="result-row" style="font-size:0.78rem;color:var(--text-muted)"><span class="label">' + tx('IEC 60909 maks (c=1,05)', 'IEC 60909 max (c=1.05)') + '</span><span class="value">' + nf(r.IkkA105, 1) + ' kA</span></div>';
   h += '<div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px">' + tx('c = 1,0 (e\u2096-metode, kun trafoimpedans \u2014 LV-sidens impedanser ses der bort fra). V\u00e6rdierne S\u2099 og e\u2096 er valgt af dig fra opgavens bilag.', 'c = 1.0 (e\u2096 method, transformer impedance only \u2014 LV-side impedances ignored). S\u2099 and e\u2096 were selected by you from the exam appendix.') + '</div>';
   h += '</div>';
@@ -36200,6 +36213,19 @@ function analyzerIkPicker(qKey, type) {
   var h = '<div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--primary);border-radius:6px;background:rgba(37,99,235,0.06)">';
   h += '<div style="font-size:0.74rem;font-weight:700;color:var(--primary);text-transform:uppercase">\uD83D\uDDB1\uFE0F ' + tx('V\u00e6lg fra bilaget (kun klik) \u2014 s\u00e5 udregnes I\u2096', 'Pick from the appendix (click only) \u2014 then I\u2096 is solved') + '</div>';
   h += btnRow(tx('Transformer S\u2099 [kVA]', 'Transformer S\u2099 [kVA]'), 'sn', ANALYZER_IK_SN, pick.sn, '');
+  // The pure full-load-current question needs only S_n; Ik/Sk also need e_k.
+  if (type === 'trafo') {
+    if (pick.sn) {
+      var InT = pick.sn * 1000 / (Math.sqrt(3) * 400);
+      h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Udregning (DS/HD 60364-4-43 \u00a7433.1)', 'Working (DS/HD 60364-4-43 \u00a7433.1)') + '</div>';
+      h += '<div class="result-row"><span class="label">I<sub>N</sub></span><span class="value">S\u2099/(\u221a3\u00b7U\u2099) = ' + pick.sn + ' kVA/(\u221a3\u00b7400 V) = <strong style="color:var(--primary)">' + nf(InT, 1) + ' A</strong></span></div>';
+      h += '<div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px">' + tx('Fuldlaststr\u00f8mmen er grundlaget for hovedbeskyttelsens m\u00e6rkestr\u00f8m (I\u0299 \u2264 I\u2099).', 'The full-load current is the basis for the main protection rating (I\u0299 \u2264 I\u2099).') + '</div></div>';
+    } else {
+      h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">' + tx('V\u00e6lg S\u2099 ovenfor.', 'Select S\u2099 above.') + '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
   h += btnRow(tx('Kortslutningssp\u00e6nding e\u2096 (u\u2096) [%]', 'Short-circuit voltage e\u2096 (u\u2096) [%]'), 'ek', ANALYZER_IK_EK, pick.ek, '%');
   if (isPar) h += btnRow(tx('Antal parallelle transformere', 'Number of parallel transformers'), 'n', [1, 2, 3], n, '');
   if (pick.sn && pick.ek) {

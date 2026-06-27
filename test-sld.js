@@ -16728,6 +16728,32 @@ test('analyzerIkPicker: parallel variant defaults to N=2 and exposes the N selec
   assert.ok(h.indexOf(nf(r.IkkA, 1) + ' kA') >= 0, 'shows the 2-transformer Ik, got expected ' + nf(r.IkkA, 1) + ' kA');
 });
 
+test('analyzerIkWorked: reports the transformer short-circuit power Sk = Sn/(ek/100)', function () {
+  var r = analyzerIkWorked(630, 4, 1, 400, 1.0);
+  assert.ok(Math.abs(r.SkMVA - 15.75) < 0.01, 'Sk = 630/0.04 = 15.75 MVA, got ' + r.SkMVA);
+  var r2 = analyzerIkWorked(630, 4, 2, 400, 1.0);
+  assert.ok(Math.abs(r2.SkMVA - 31.5) < 0.02, '2 parallel -> 2x Sk = 31.5 MVA');
+});
+
+test('analyzerIkPicker: trafo type solves the full-load current from Sn alone', function () {
+  lang = 'da';
+  analyzerState.ikPick = { 'x_1.1_trafo': { sn: 630 } };
+  var h = analyzerIkPicker('x_1.1_trafo', 'trafo');
+  // In = 630000/(sqrt3*400) = 909.3 A
+  assert.ok(h.indexOf('909,3 A') >= 0 || h.indexOf('909,3') >= 0, 'shows In = 909,3 A (da comma)');
+  assert.ok(h.indexOf('e\u2096') < 0 || h.indexOf('Kortslutningssp') < 0, 'trafo picker does not require e_k');
+});
+
+test('analyzerIkSet: picking Sn+ek connects to the scircuit module (pre-fills scState.zTrafo)', function () {
+  scState = { zNet: 1, zTrafo: 5, scMethod: 'scalar', rxNet: 0.1, rxTrafo: 0.1, trafoAngleMode: 'rx', trafoUk: 4, trafoEr: 1, netAngleMode: 'rx', cosPhiNet: 0.1 };
+  analyzerState.ikPick = {};
+  analyzerIkSet('k', 'sn', 630);
+  analyzerIkSet('k', 'ek', 4);
+  // Zt = 0.04*400^2/630000*1000 = 10.16 mOhm (n=1)
+  assert.ok(Math.abs(scState.zTrafo - 10.16) < 0.05, 'scState.zTrafo pre-filled from the picked transformer, got ' + scState.zTrafo);
+  assert.strictEqual(scState.trafoUk, 4, 'scState.trafoUk reflects the picked e_k');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
