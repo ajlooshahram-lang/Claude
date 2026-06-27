@@ -9978,6 +9978,21 @@ test('fault module: gG fuse Zs verdict is labelled 5 s and warns it does NOT pro
   faultState.deviceType = 'mcbB';
 });
 
+test('fault module: PE-CSA for S>300mm2 recommends the kLarge-corrected size (self-consistent)', function() {
+  lang = 'da';
+  // I*sqrt(t)/k with k=115 gives Smin in (400,500]; kLarge=103 pushes SminLarge>500.
+  // The recommended standard size must follow the corrected (larger) value, not Smin.
+  faultState.calcMode = 'csa'; faultState.csaConductor = 'cuPVC';
+  faultState.csaManualI = 51750; faultState.csaManualT = 1;
+  var Smin = faultCalcMinCSA(51750, 1, 115);
+  var SminLarge = faultCalcMinCSA(51750, 1, 103);
+  assert(Smin > 400 && Smin <= 500, 'sanity: Smin in (400,500], got ' + Smin);
+  assert(SminLarge > 500, 'sanity: SminLarge > 500, got ' + SminLarge);
+  var html = renderFault();
+  assert(html.indexOf('630 mm') >= 0, 'recommends 630 mm2 (>= SminLarge), not 500 mm2 from the un-corrected Smin');
+  faultState.calcMode = 'fault'; faultState.csaManualI = 500; faultState.csaManualT = 0.2;
+});
+
 test('fault module: translation exists in da/en/fa', function() {
   assert(T.da.modules.fault, 'da translation exists');
   assert(T.en.modules.fault, 'en translation exists');

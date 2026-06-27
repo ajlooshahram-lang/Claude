@@ -32109,11 +32109,15 @@ function renderFaultCSA() {
 
   // Standard sizes
   var stdSizes = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400, 500, 630];
+  // When Smin > 300 mm^2 the conservative kLarge value is shown; the recommended
+  // standard size MUST honour that larger corrected Smin (SminLarge), otherwise the
+  // app would display a bigger requirement than the size it actually recommends.
+  var sNeeded = (Smin > 300) ? SminLarge : Smin;
   var chosen = 0;
   for (var i = 0; i < stdSizes.length; i++) {
-    if (stdSizes[i] >= Smin) { chosen = stdSizes[i]; break; }
+    if (stdSizes[i] >= sNeeded) { chosen = stdSizes[i]; break; }
   }
-  if (chosen === 0 && Smin > 0) chosen = stdSizes[stdSizes.length - 1];
+  if (chosen === 0 && sNeeded > 0) chosen = stdSizes[stdSizes.length - 1];
   html += '<div class="result-row"><span class="label">' + tx('Nærmeste standardtværsnit', 'Nearest standard size') + '</span><span class="value">' + (chosen > 0 ? chosen + ' mm\u00B2' : '-') + '</span></div>';
   html += '</div>';
 
