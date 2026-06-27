@@ -4876,6 +4876,28 @@ test('zsCheckInstantTrip: gG fuse is not gated by a magnetic multiple (Zs<=Zs,ma
   assert.strictEqual(zsCheckInstantTrip(0, 'gG63'), true, 'even at trivial current the fuse is governed by Zs,max not this gate');
 });
 
+// === §433.1 second condition: I2 <= 1.45*Iz, per-device I2/In factor =========
+test('coordI2Factor: MCB=1.45, MCCB=1.30, gG fuse=1.60/1.90/2.10 per IEC standard', function() {
+  assert.strictEqual(coordI2Factor({ model: 'iC60N', curve: 'C', rating: 16, icu: 6 }), 1.45, 'MCB (IEC 60898-1)');
+  assert.strictEqual(coordI2Factor({ model: 'NSX100F', frame: 'NSX100', inOptions: [16, 25, 40], icu: 36 }), 1.30, 'MCCB (IEC 60947-2)');
+  assert.strictEqual(coordI2Factor({ model: 'D02 gG', size: 'D02', rating: 32, i5s: 145 }), 1.60, 'gG fuse In>=16A');
+  assert.strictEqual(coordI2Factor({ model: 'D01 gG', size: 'D01', rating: 10, i5s: 43 }), 1.90, 'gG fuse 4<In<16A');
+  assert.strictEqual(coordI2Factor({ model: 'gG', rating: 4, i5s: 18 }), 2.10, 'gG fuse In<=4A');
+  assert.strictEqual(coordI2Factor(null), 1.45, 'missing protection defaults to the MCB factor');
+});
+
+test('§433.1: a gG fuse imposes the binding I2<=1.45*Iz constraint an MCB does not', function() {
+  // gG 63A: I2 = 1.6*63 = 100.8 A. Minimum compliant Iz = 100.8/1.45 = 69.5 A.
+  var fuse = { model: 'NH000 gG', rating: 63, i5s: 290 };
+  var i2 = coordI2Factor(fuse) * 63;
+  assert.ok(Math.abs(i2 - 100.8) < 0.01, 'I2 = 1.6*63 = 100.8 A');
+  assert.ok(i2 > 1.45 * 68, 'Iz = 68 A FAILS (cable too small for the fuse) even though In<=Iz holds');
+  assert.ok(i2 <= 1.45 * 70, 'Iz = 70 A PASSES the second condition');
+  // The same 63A rating on an MCB (factor 1.45) is satisfied at Iz=63 already.
+  var mcb = { model: 'iC60N', curve: 'C', rating: 63 };
+  assert.ok(coordI2Factor(mcb) * 63 <= 1.45 * 63 + 1e-9, 'MCB In<=Iz is sufficient (no extra cable margin)');
+});
+
 // Test 452: Long cable Zs exceeds limit
 test('zsCalcImpedance: 100m 1.5mm2 with Ze=0.80 exceeds B16 limit', function() {
   var zs = zsCalcImpedance(0.80, 24.2, 100);

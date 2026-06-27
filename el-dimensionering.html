@@ -7231,6 +7231,28 @@ function sldPropagateAll(tree) {
 }
 
 // --- DS/HD 60364 Compliance Verification ---
+// Conventional tripping/fusing current factor I2/In per device standard, used for
+// the second §433.1 overload condition I2 <= 1.45*Iz:
+//   MCB  (IEC 60898-1):    1.45  (so the condition reduces to In <= Iz)
+//   MCCB (IEC 60947-2):    1.30
+//   gG fuse (IEC 60269-1): 1.60 (In >= 16 A), 1.90 (4 A < In < 16 A), 2.10 (In <= 4 A)
+// For gG fuses this is the BINDING constraint (forces Iz >= 1.10*In for In>=16A) —
+// a fuse-protected cable must be larger than the IB<=In<=Iz rule alone implies.
+function coordI2Factor(protection) {
+  if (!protection) return 1.45;
+  var model = (protection.model || '') + ' ' + (protection.series || '') + ' ' + (protection.curve || '');
+  var isFuse = /\bgG\b|\baM\b|\bgR\b|\baR\b/i.test(model) ||
+    (protection.i5s != null && !protection.curve && !protection.frame && !protection.inOptions);
+  if (isFuse) {
+    var In = protection.rating || 0;
+    if (In > 0 && In <= 4) return 2.10;
+    if (In > 4 && In < 16) return 1.90;
+    return 1.60;
+  }
+  if (protection.frame || protection.inOptions) return 1.30; // MCCB (IEC 60947-2)
+  return 1.45; // MCB (IEC 60898-1)
+}
+
 function sldVerifyNode(tree, nodeId) {
   const node = tree.nodes[nodeId];
   if (!node || node.type === 'transformer') return [];
@@ -7258,19 +7280,18 @@ function sldVerifyNode(tree, nodeId) {
     }
   }
 
-  // I2 <= 1.45 * Iz check (DS/HD 60364-4-43 cl. 433.1)
-  // For MCBs, I2 = 1.45*In by construction (IEC 60898), so this is always satisfied when In <= Iz.
-  // For MCCBs with adjustable trip units, verify the conventional tripping current.
+  // I2 <= 1.45 * Iz check (DS/HD 60364-4-43 cl. 433.1, second overload condition).
+  // I2 = conventional tripping/fusing current = coordI2Factor(device) * In. This is
+  // now evaluated for EVERY device type (MCB/MCCB/gG fuse), not just MCCBs — for a
+  // gG fuse the 1.60*In factor is the binding constraint that an MCB does not impose.
   if (protIn > 0 && iz > 0 && node.protection) {
-    const isMCCB = node.protection.frame || node.protection.inOptions;
-    if (isMCCB) {
-      // MCCB conventional tripping current I2 = 1.3 * In (IEC 60947-2)
-      const i2 = 1.3 * protIn;
-      if (i2 <= 1.45 * iz) {
-        results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: 'I2=' + nf(i2, 1) + 'A <= 1.45*Iz=' + nf((1.45 * iz), 1) + 'A' });
-      } else {
-        results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'I2=' + nf(i2, 1) + 'A > 1.45*Iz=' + nf((1.45 * iz), 1) + 'A' });
-      }
+    var i2f = coordI2Factor(node.protection);
+    var i2 = i2f * protIn;
+    var i2lim = 1.45 * iz;
+    if (i2 <= i2lim + 1e-9) {
+      results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: 'I2=' + nf(i2, 1) + 'A (=' + nf(i2f, 2) + '\u00d7In) <= 1.45\u00d7Iz=' + nf(i2lim, 1) + 'A' });
+    } else {
+      results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'I2=' + nf(i2, 1) + 'A (=' + nf(i2f, 2) + '\u00d7In) > 1.45\u00d7Iz=' + nf(i2lim, 1) + 'A \u2014 st\u00f8rre tv\u00e6rsnit kr\u00e6ves' });
     }
   }
 
