@@ -20160,6 +20160,74 @@ function motorCalcStartCurrent(kW, poles, startType) {
   return Math.ceil(flc * mult.typical);
 }
 
+// ===== Motor starting transient (digital twin, on SimEngine) =====
+// Run-up of an asynchronous motor: speed rises exponentially toward (near) synchronous
+// while the stator current stays near the locked-rotor value I_start = mult*FLC until
+// ~80% speed, then falls to FLC. The MAGNITUDES (I_start, FLC, mult, t_start) are the
+// app's VALIDATED values (MOTOR_START_MULTIPLIERS / MOTOR_START_TIMES / motorGetFLC);
+// the current-vs-speed SHAPE is the standard NEMA Design B / IEC induction-motor
+// characteristic (textbook, not fabricated data).
+function simMotorStart(flc, startMult, tStartSec, t) {
+  if (!(tStartSec > 0)) tStartSec = 1.5;
+  var tAcc = tStartSec / 4;                                  // ~98% speed at t_start
+  var speedFrac = Math.min(0.98, 1 - Math.exp(-t / tAcc));   // fraction of synchronous
+  var factor;
+  if (speedFrac < 0.8) factor = startMult;                   // locked-rotor plateau
+  else factor = startMult - (startMult - 1) * ((speedFrac - 0.8) / (0.98 - 0.8)); // drop to FLC
+  if (factor < 1) factor = 1;
+  if (factor > startMult) factor = startMult;
+  return { speedFrac: speedFrac, currentFactor: factor, current: flc * factor };
+}
+
+SimEngine.register('motorStart', function (t, eng) {
+  if (typeof motorState === 'undefined') return null;
+  var flc = motorGetFLC(motorState.kW, motorState.poles);
+  var m = MOTOR_START_MULTIPLIERS[motorState.startType] || MOTOR_START_MULTIPLIERS.dol;
+  var ts = (MOTOR_START_TIMES[motorState.startType] || MOTOR_START_TIMES.dol).typical;
+  if (motorState.startTimeSec) ts = motorState.startTimeSec;
+  var r = simMotorStart(flc, m.typical, ts, t);
+  r.flc = flc; r.iStart = flc * m.typical; r.tStart = ts; r.startType = motorState.startType;
+  return r;
+});
+
+function simRenderMotorStart(flc, startMult, tStartSec) {
+  var W = 320, H = 180, ml = 40, mb = 24, mt = 12, mr = 12;
+  var pw = W - ml - mr, ph = H - mt - mb;
+  var iStart = flc * startMult;
+  var tEnd = tStartSec * 1.4;
+  var yMax = iStart * 1.1;
+  function X(ts) { return ml + (ts / tEnd) * pw; }
+  function YI(a) { return mt + ph - (a / yMax) * ph; }       // current axis
+  function YS(f) { return mt + ph - f * ph; }                // speed fraction axis (0..1)
+  var iPts = [], sPts = [];
+  var N = 70;
+  for (var i = 0; i <= N; i++) {
+    var ts = (i / N) * tEnd;
+    var r = simMotorStart(flc, startMult, tStartSec, ts);
+    iPts.push(X(ts).toFixed(1) + ',' + YI(r.current).toFixed(1));
+    sPts.push(X(ts).toFixed(1) + ',' + YS(r.speedFrac).toFixed(1));
+  }
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:420px;background:var(--bg);border-radius:8px">';
+  s += '<line x1="' + ml + '" y1="' + mt + '" x2="' + ml + '" y2="' + (mt + ph) + '" stroke="var(--border)"/>';
+  s += '<line x1="' + ml + '" y1="' + (mt + ph) + '" x2="' + (ml + pw) + '" y2="' + (mt + ph) + '" stroke="var(--border)"/>';
+  // FLC reference line
+  s += '<line x1="' + ml + '" y1="' + YI(flc).toFixed(1) + '" x2="' + (ml + pw) + '" y2="' + YI(flc).toFixed(1) + '" stroke="var(--success)" stroke-width="1" stroke-dasharray="3,3"/>';
+  s += '<text x="' + (ml + pw) + '" y="' + (YI(flc) - 3).toFixed(1) + '" font-size="9" fill="var(--success)" text-anchor="end">FLC ' + nf(flc, 1) + ' A</text>';
+  // speed curve (light, secondary axis)
+  s += '<polyline points="' + sPts.join(' ') + '" fill="none" stroke="var(--text-muted)" stroke-width="1.3" stroke-dasharray="2,3" opacity="0.8"/>';
+  s += '<text x="' + (ml + 4) + '" y="' + (YS(1) + 9).toFixed(1) + '" font-size="8.5" fill="var(--text-muted)">' + tx('omdr.', 'speed') + ' 100%</text>';
+  // current curve
+  s += '<polyline points="' + iPts.join(' ') + '" fill="none" stroke="var(--danger)" stroke-width="2.4" stroke-linejoin="round"/>';
+  s += '<circle r="4" fill="var(--danger)"><animateMotion dur="3s" repeatCount="indefinite" path="M ' + iPts.join(' ').split(' ').join(' L ').replace(/,/g, ' ') + '"/></circle>';
+  // I_start label + t_start marker
+  s += '<text x="' + (ml + 3) + '" y="' + (YI(iStart) + 10).toFixed(1) + '" font-size="9" fill="var(--danger)">I\u209b\u209c\u2090\u209b\u209c ' + nf(iStart, 0) + ' A (' + nf(startMult, 1) + '\u00d7)</text>';
+  s += '<line x1="' + X(tStartSec).toFixed(1) + '" y1="' + mt + '" x2="' + X(tStartSec).toFixed(1) + '" y2="' + (mt + ph) + '" stroke="var(--primary)" stroke-width="1" stroke-dasharray="2,2"/>';
+  s += '<text x="' + X(tStartSec).toFixed(1) + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--primary)" text-anchor="middle">t\u209b\u209c\u2090\u209b\u209c ' + nf(tStartSec, 1) + ' s</text>';
+  s += '<text x="' + ml + '" y="' + (mt + ph + 16) + '" font-size="9" fill="var(--text-muted)">0</text>';
+  s += '</svg>';
+  return s;
+}
+
 // Calculate voltage dip during start: deltaU% = (Istart * Zcable) / Un * 100
 function motorCalcVoltageDip(kW, poles, startType, cableLengthM) {
   var iStart = motorCalcStartCurrent(kW, poles, startType);
@@ -20326,6 +20394,11 @@ function renderMotor() {
   html += '<div class="result-row"><span class="label">I\u00B2t (' + tx('termisk belastning', 'thermal stress') + ')</span><span class="value">' + i2t + ' A\u00B2s</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Driftsart reduktion', 'Duty derating') + '</span><span class="value">' + derating + ' (IEC 60034-1)</span></div>';
   html += '</div>';
+
+  // Digital twin: animated motor run-up (current + speed vs time)
+  html += '<div class="result-box" style="text-align:center"><div class="result-title" style="text-align:left">' + tx('Digital tvilling \u2014 motorstart (str\u00f8m & omdrejninger)', 'Digital twin \u2014 motor run-up (current & speed)') + '</div>';
+  html += simRenderMotorStart(flc, mult.typical, startTime.typical);
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.8em;text-align:left"><span class="value">' + tx('I\u209b\u209c\u2090\u209b\u209c og FLC er validerede v\u00e6rdier; str\u00f8m/omdr.-formen er den typiske asynkronmotor-karakteristik (NEMA B / IEC 60034).', 'I\u209b\u209c\u2090\u209b\u209c and FLC are validated values; the current/speed shape is the typical induction-motor characteristic (NEMA B / IEC 60034).') + '</span></div></div>';
 
   // Voltage Dip
   html += '<div class="result-box">';

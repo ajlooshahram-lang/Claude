@@ -17052,6 +17052,46 @@ test('renderThermal: shows the animated digital-twin heating curve + verdict', f
   thermalState.loadRatio = 1.0;
 });
 
+test('simMotorStart: anchored at validated I_start (t=0) and FLC (t>=t_start), monotonic decay', function () {
+  var flc = 15.5, mult = 7, ts = 1.5;
+  var s0 = simMotorStart(flc, mult, ts, 0);
+  assert.ok(Math.abs(s0.current - flc * mult) < 1e-6, 't=0 -> I_start = mult*FLC (validated magnitude)');
+  assert.ok(Math.abs(s0.speedFrac) < 1e-6, 't=0 -> standstill');
+  var sEnd = simMotorStart(flc, mult, ts, ts);
+  assert.ok(Math.abs(sEnd.current - flc) < flc * 0.05, 't=t_start -> ~FLC (within 5%)');
+  assert.ok(sEnd.speedFrac > 0.95, 't=t_start -> near full speed');
+  // current never below FLC nor above I_start
+  for (var t = 0; t <= ts * 1.4; t += ts / 10) {
+    var r = simMotorStart(flc, mult, ts, t);
+    assert.ok(r.current >= flc - 1e-6 && r.current <= flc * mult + 1e-6, 'current stays within [FLC, I_start]');
+  }
+});
+
+test('simMotorStart: current holds near locked-rotor until ~80% speed (induction characteristic)', function () {
+  // At 80% speed the current is still the full starting multiple; it only drops after.
+  var flc = 10, mult = 6, ts = 2;
+  // find a t where speedFrac is just under 0.8
+  var lowSpeed = simMotorStart(flc, mult, ts, 0.05);
+  assert.ok(lowSpeed.speedFrac < 0.8 && Math.abs(lowSpeed.currentFactor - mult) < 1e-6, 'below 80% speed -> full start multiple');
+});
+
+test('SimEngine motorStart model: reads motorState (validated FLC/mult/t_start)', function () {
+  motorState.kW = 7.5; motorState.poles = 4; motorState.startType = 'dol';
+  var out = SimEngine.sample(0).motorStart;
+  assert.ok(out && out.flc > 0, 'FLC pulled from the validated table');
+  assert.ok(Math.abs(out.iStart - out.flc * MOTOR_START_MULTIPLIERS.dol.typical) < 1e-6, 'I_start = DOL typical * FLC');
+  assert.ok(Math.abs(out.current - out.iStart) < 1e-6, 'at t=0 the motor draws locked-rotor current');
+});
+
+test('renderMotor: embeds the animated run-up digital twin', function () {
+  lang = 'da';
+  motorState.kW = 7.5; motorState.poles = 4; motorState.startType = 'dol'; motorState.duty = 'S1'; motorState.cableLength = 30;
+  var html = renderMotor();
+  assert.ok(html.indexOf('Digital tvilling') >= 0, 'motor digital-twin section present');
+  assert.ok(html.indexOf('animateMotion') >= 0, 'animated run-up curve rendered');
+  assert.ok(/NEMA B|IEC 60034/.test(html), 'documents the standard induction-motor characteristic basis');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
