@@ -36,6 +36,7 @@ from api.routes_rebalance import router as rebalance_router
 from api.routes_shadow import router as shadow_router
 from api.routes_etf import router as etf_router
 from api.routes_etf_overlap import router as etf_overlap_router
+from api.routes_crypto import router as crypto_router
 
 # Create the app
 app = FastAPI(
@@ -76,6 +77,7 @@ app.include_router(rebalance_router)
 app.include_router(shadow_router)
 app.include_router(etf_router)
 app.include_router(etf_overlap_router)
+app.include_router(crypto_router)
 
 
 # Global error handler — returns friendly JSON instead of crashing
