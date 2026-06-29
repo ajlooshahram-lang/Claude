@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -17,6 +17,7 @@ import { isLockEnabled, setPIN, isPINSet } from '@/lib/app-lock';
 
 const nav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Unified', href: '/unified', icon: Wallet },
   { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
   { name: 'Search', href: '/search', icon: Search },
   { name: 'Watchlist', href: '/watchlist', icon: Bookmark },
