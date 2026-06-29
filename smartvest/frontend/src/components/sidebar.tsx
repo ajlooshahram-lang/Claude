@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat, Cpu,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -53,6 +53,7 @@ const nav = [
   { name: 'DRIP Sim', href: '/drip', icon: Repeat },
   { name: 'Report', href: '/report', icon: FileText },
   { name: 'Monte Carlo', href: '/montecarlo', icon: Sparkles },
+  { name: 'Strategy', href: '/strategy', icon: Cpu },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
