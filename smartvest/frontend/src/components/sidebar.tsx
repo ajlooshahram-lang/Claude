@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat, Cpu, ShieldAlert,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat, Cpu, ShieldAlert, GitCompare,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -56,6 +56,7 @@ const nav = [
   { name: 'Strategy', href: '/strategy', icon: Cpu },
   { name: 'Options Flow', href: '/options-flow', icon: Activity },
   { name: 'VaR', href: '/var', icon: ShieldAlert },
+  { name: 'Pairs', href: '/pairs', icon: GitCompare },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
