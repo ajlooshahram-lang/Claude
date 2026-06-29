@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -49,6 +49,7 @@ const nav = [
   { name: 'Retirement', href: '/retirement', icon: Timer },
   { name: 'AI Manager', href: '/ai-manager', icon: Brain },
   { name: 'Benchmark', href: '/benchmark', icon: BarChart3 },
+  { name: 'DRIP Sim', href: '/drip', icon: Repeat },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
