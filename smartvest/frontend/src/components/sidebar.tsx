@@ -48,6 +48,7 @@ const nav = [
   { name: 'Crypto', href: '/crypto', icon: Coins },
   { name: 'Retirement', href: '/retirement', icon: Timer },
   { name: 'AI Manager', href: '/ai-manager', icon: Brain },
+  { name: 'Benchmark', href: '/benchmark', icon: BarChart3 },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 

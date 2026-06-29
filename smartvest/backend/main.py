@@ -39,6 +39,7 @@ from api.routes_etf_overlap import router as etf_overlap_router
 from api.routes_crypto import router as crypto_router
 from api.routes_unified import router as unified_router
 from api.routes_ai_manager import router as ai_manager_router
+from api.routes_benchmark import router as benchmark_router
 
 # Create the app
 app = FastAPI(
@@ -82,6 +83,7 @@ app.include_router(etf_overlap_router)
 app.include_router(crypto_router)
 app.include_router(unified_router)
 app.include_router(ai_manager_router)
+app.include_router(benchmark_router)
 
 
 # Global error handler — returns friendly JSON instead of crashing
