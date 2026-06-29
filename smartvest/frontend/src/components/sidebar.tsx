@@ -62,6 +62,7 @@ const nav = [
   { name: 'Factors', href: '/factors', icon: BarChart3 },
   { name: 'Regime', href: '/regime', icon: Compass },
   { name: 'Execution', href: '/execution', icon: Zap },
+  { name: 'Tax DK/US', href: '/tax-optimizer', icon: Receipt },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
