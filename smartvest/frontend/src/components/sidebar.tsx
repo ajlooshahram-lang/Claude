@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -46,6 +46,7 @@ const nav = [
   { name: 'ETFs', href: '/etf', icon: Layers },
   { name: 'ETF Overlap', href: '/etf-overlap', icon: Layers },
   { name: 'Crypto', href: '/crypto', icon: Coins },
+  { name: 'Retirement', href: '/retirement', icon: Timer },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
