@@ -59,6 +59,7 @@ const nav = [
   { name: 'Pairs', href: '/pairs', icon: GitCompare },
   { name: 'Earnings AI', href: '/earnings-surprise', icon: Flame },
   { name: 'Dark Pool', href: '/darkpool', icon: Eye },
+  { name: 'Factors', href: '/factors', icon: BarChart3 },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
