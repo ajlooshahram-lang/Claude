@@ -12,13 +12,18 @@ import {
   FlaskConical,
   Newspaper,
   Settings,
+  Shield,
+  Globe,
+  Calculator,
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
-  { name: 'Screener', href: '/screener', icon: Filter },
+  { name: 'Smart Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Portfolio Builder', href: '/portfolio-builder', icon: Calculator },
   { name: 'AI Assistant', href: '/ai', icon: MessageSquare },
+  { name: 'Global Scanner', href: '/screener', icon: Globe },
+  { name: 'Risk Guardian', href: '/risk', icon: Shield },
+  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
   { name: 'Charts', href: '/stock/AAPL', icon: LineChart },
   { name: 'Alerts', href: '/alerts', icon: Bell },
   { name: 'Backtest', href: '/backtest', icon: FlaskConical },

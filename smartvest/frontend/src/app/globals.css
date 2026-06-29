@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* SmartVest Design System — Dark-mode-first financial dashboard */
+
+:root {
+  --background: #0b0f19;
+  --foreground: #e4e7ec;
+  --card: #111827;
+  --card-border: #1f2937;
+  --muted: #6b7280;
+  --primary: #3b82f6;
+  --gain: #10b981;
+  --loss: #ef4444;
+  --warning: #f59e0b;
+  --accent: #8b5cf6;
+}
+
+.light {
+  --background: #f8fafc;
+  --foreground: #1a1a2e;
+  --card: #ffffff;
+  --card-border: #e2e8f0;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --gain: #059669;
+  --loss: #dc2626;
+  --warning: #d97706;
+  --accent: #7c3aed;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-warning: var(--warning);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Light mode: fix opacity-based backgrounds */
+.light .bg-white\/5,
+.light [class*="bg-white/5"] {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+.light .bg-black\/20,
+.light [class*="bg-black/20"] {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+.light .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+.light [class*="bg-white/10"] {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 3px;
+}
+
+/* Tabular numbers for financial data */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* Print styles — for PDF export */
+@media print {
+  /* White background for paper */
+  body {
+    background: white !important;
+    color: #1a1a1a !important;
+  }
+
+  /* Hide navigation, chat, mobile nav */
+  aside,
+  nav[class*="fixed"],
+  [data-print-hide],
+  button[aria-label="Open AI chat"],
+  [class*="fixed bottom"],
+  [class*="fixed top"] {
+    display: none !important;
+  }
+
+  /* Full width content */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Clean card borders for print */
+  [class*="rounded-xl"] {
+    border-color: #e5e7eb !important;
+    background: white !important;
+  }
+
+  /* Ensure text is dark */
+  * {
+    color: #1a1a1a !important;
+  }
+
+  /* Keep colored gain/loss text */
+  [class*="text-\\[var\\(--gain\\)\\]"] {
+    color: #059669 !important;
+  }
+  [class*="text-\\[var\\(--loss\\)\\]"] {
+    color: #dc2626 !important;
+  }
+
+  /* Header for PDF */
+  body::before {
+    content: "SmartVest — Portfolio Performance Report";
+    display: block;
+    font-size: 11px;
+    color: #6b7280;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* Footer with date */
+  body::after {
+    content: "Generated on " attr(data-date);
+    display: block;
+    font-size: 10px;
+    color: #9ca3af;
+    margin-top: 24px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+  }
+
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always;
+  }
+}

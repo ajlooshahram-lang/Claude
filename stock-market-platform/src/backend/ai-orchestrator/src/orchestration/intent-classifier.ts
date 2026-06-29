@@ -26,6 +26,13 @@ export enum QueryIntent {
   EXPLAIN = 'explain',
   LEARN = 'learn',
   WHAT_IS = 'what_is',
+  // Small Investor Guardian intents
+  BUDGET_INVEST = 'budget_invest',
+  POSITION_SIZE = 'position_size',
+  CAPITAL_PROTECTION = 'capital_protection',
+  DCA_SCHEDULE = 'dca_schedule',
+  SMART_PICK = 'smart_pick',
+  BEGINNER_HELP = 'beginner_help',
 }
 
 export interface ClassificationResult {
@@ -98,6 +105,26 @@ export class IntentClassifier {
     }
     if (/sentiment|positive|negative|bullish|bearish/i.test(normalizedQuery)) {
       intents.push(QueryIntent.SENTIMENT);
+    }
+
+    // Small Investor Guardian intents
+    if (/budget|afford|small amount|limited money|how much|can i invest|little money|\$\d+/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.BUDGET_INVEST);
+    }
+    if (/position size|how many shares|how much to buy|allocation|percentage/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.POSITION_SIZE);
+    }
+    if (/protect|safe|lose money|capital|preservation|can't afford|don't lose/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.CAPITAL_PROTECTION);
+    }
+    if (/dca|dollar cost|monthly|weekly invest|regular invest|auto invest/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.DCA_SCHEDULE);
+    }
+    if (/best stock|top pick|smart pick|recommend|suggest|which stock|what to buy/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.SMART_PICK);
+    }
+    if (/beginner|new to|first time|getting started|never invested|start investing/i.test(normalizedQuery)) {
+      intents.push(QueryIntent.BEGINNER_HELP);
     }
 
     // Default: if no intents detected, treat as fundamental analysis

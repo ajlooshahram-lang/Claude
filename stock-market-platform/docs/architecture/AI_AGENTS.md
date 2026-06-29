@@ -860,3 +860,117 @@ User                Gateway        Orchestrator      Agents (parallel)     Data 
 ---
 
 *End of AI Agent Architecture Document*
+
+
+
+---
+
+# APPENDIX A — Full 15-Agent Research Ecosystem (v2)
+
+The master research vision expands the agent roster to a comprehensive ecosystem. Every investment opportunity is evaluated by the relevant subset of these agents, whose findings are reconciled by the orchestrator into one unified, explainable report.
+
+## A.1 Agent Roster & Implementation Status
+
+| # | Agent | Domain | Status | Backing Service |
+|---|-------|--------|:------:|-----------------|
+| 1 | **Fundamental Analysis** | Financial statements, business model, moat | ✅ Implemented | `investment-analyst.agent.ts` |
+| 2 | **Technical Analysis** | Price action, indicators, patterns | ✅ Implemented | `technical-analyst.agent.ts` |
+| 3 | **Quantitative Analysis** | Factors, risk metrics, distributions | ✅ Implemented | `quantitative.agent.ts` + `factor-model` |
+| 4 | **Valuation** | DCF, DDM, comparables, Monte Carlo | ◑ Service ready | `valuation` service ✅ |
+| 5 | **Macroeconomic** | Cycle, rates, sector implications | ✅ Implemented | `macro-economics.agent.ts` |
+| 6 | **Earnings Analysis** | Earnings quality, surprises, guidance | ○ Specified | (roadmap) |
+| 7 | **Risk Analysis** | VaR, drawdown, stress, concentration | ◑ Partial | `risk.service.ts` ✅ + quant |
+| 8 | **Options Analysis** | IV, skew, flow, positioning | ○ Specified | (roadmap) |
+| 9 | **Sector Rotation** | Cycle-based sector positioning | ○ Specified | (roadmap, uses macro) |
+| 10 | **Portfolio Optimization** | Diversification, weights, rebalance | ✅ Implemented | `portfolio-advisor.agent.ts` |
+| 11 | **Sentiment Analysis** | News/social sentiment scoring | ◑ Partial | within `news-intelligence` |
+| 12 | **News Intelligence** | Event detection, summarization | ✅ Implemented | `news-intelligence.agent.ts` |
+| 13 | **Insider Trading** | Insider buy/sell signal analysis | ○ Specified | (roadmap) |
+| 14 | **Institutional Ownership** | 13F flow, smart-money tracking | ○ Specified | (roadmap) |
+| 15 | **ESG Analysis** | Environmental, social, governance | ○ Specified | (roadmap) |
+| + | **Education** | Adaptive concept explanation | ✅ Implemented | `education.agent.ts` |
+| + | **Investment Score** | Explainable multi-factor scoring | ✅ Service ready | `investment-score` service ✅ |
+
+✅ Implemented · ◑ Partial/service-ready · ○ Specified for build-out
+
+## A.2 New Agent Specifications
+
+### Valuation AI (#4)
+- **Purpose:** Run intrinsic-value models and reconcile them into a fair-value range.
+- **Backing:** `valuation` microservice (DCF two-stage + Gordon terminal, DDM, comparables, Monte Carlo, sensitivity grid). 16 passing tests.
+- **Output:** Fair-value range (bear/base/bull from Monte Carlo p10/p50/p90), upside/downside vs. current price, % of value from terminal (fragility flag), sensitivity table, and the explicit assumptions used.
+- **Explainability:** Returns every assumption (WACC, growth, terminal growth) and the full sensitivity grid so users see how fragile the valuation is.
+
+### Earnings Analysis AI (#6)
+- **Purpose:** Assess earnings quality and event risk around reports.
+- **Inputs:** Historical surprises, estimate dispersion, guidance trends, accruals, revenue recognition signals.
+- **Output:** Earnings quality score, surprise probability, guidance trajectory, "what to watch this quarter."
+
+### Risk Analysis AI (#7)
+- **Purpose:** Quantify and explain downside risk at security and portfolio level.
+- **Backing:** `risk.service.ts` (beta, Sharpe, Sortino, max drawdown, VaR 95/99, HHI concentration, correlation matrix).
+- **Output:** Risk metrics with plain-language interpretation, stress-scenario impacts, concentration warnings.
+
+### Options Analysis AI (#8)
+- **Purpose:** Read the options market for positioning and implied expectations.
+- **Inputs:** Implied volatility surface, put/call skew, open-interest flow, term structure.
+- **Output:** Implied move, sentiment from positioning, unusual-activity flags, IV rank/percentile.
+
+### Sector Rotation AI (#9)
+- **Purpose:** Position the cycle and identify favored/disfavored sectors.
+- **Backing:** Consumes Macro agent + relative-strength quant signals.
+- **Output:** Cycle phase, overweight/underweight sectors with rationale, rotation signals.
+
+### Insider Trading AI (#13)
+- **Purpose:** Interpret Form 4 insider transactions as a confidence signal.
+- **Inputs:** Insider buys/sells, cluster detection, transaction size vs. holdings, role of insider.
+- **Output:** Net insider direction, significance, notable cluster activity.
+
+### Institutional Ownership AI (#14)
+- **Purpose:** Track "smart money" via 13F filings.
+- **Inputs:** Institutional ownership %, quarter-over-quarter changes, notable fund entries/exits.
+- **Output:** Ownership trend, concentration, recent accumulation/distribution by major holders.
+
+### ESG Analysis AI (#15)
+- **Purpose:** Evaluate environmental, social, and governance factors.
+- **Inputs:** Emissions/intensity, board independence, controversies, governance structure.
+- **Output:** E/S/G sub-scores, material controversies, governance red flags — clearly labeled as one input among many, not a moral verdict.
+
+## A.3 Unified Report Assembly
+
+When a user requests full analysis, the orchestrator:
+
+1. **Selects** the relevant agents for the query (routing matrix §3.2) plus always-on Valuation + Investment Score for a full company review.
+2. **Executes** independent agents in parallel; dependent ones (e.g., Sector Rotation needs Macro) sequentially.
+3. **Reconciles** outputs in the Response Merger — surfacing agreement, and where agents **disagree**, presenting both sides explicitly (e.g., "Fundamentals are strong (score 78) but Technicals are bearish (downtrend below 200-DMA)").
+4. **Synthesizes** a unified report structured as:
+   - Investment Score (with category breakdown)
+   - Fair-value range (Valuation agent)
+   - Bull / Base / Bear cases
+   - Key strengths and risks (ranked, sourced)
+   - Confidence level and data coverage
+   - "What could change the outlook"
+   - Disclaimer
+
+## A.4 Cross-Agent Contradiction Handling
+
+A core differentiator: when agents conflict, InvestorIQ **shows the tension** rather than averaging it away.
+
+```
+Example reconciliation:
+  Fundamental:  Score 78 — strong margins, low debt, double-digit growth
+  Valuation:    Overvalued — trading at p85 of historical EV/EBITDA
+  Technical:    Bearish — below 200-DMA, negative MACD
+  News:         Positive sentiment (+0.4), upcoming product catalyst
+
+  → Unified narrative: "A high-quality business (fundamentals 78/100) that
+    appears expensively priced and is in a short-term downtrend. The
+    long-term quality case and the near-term valuation/technical caution
+    are both valid — your time horizon determines which matters more."
+```
+
+This honest presentation of conflicting evidence — with confidence and sources — is what no incumbent platform delivers and what makes InvestorIQ a genuine research mentor rather than a black-box rating.
+
+---
+
+*End of Appendix A — Full 15-Agent Research Ecosystem*

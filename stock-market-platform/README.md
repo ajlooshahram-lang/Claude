@@ -1,8 +1,19 @@
-# InvestorIQ — AI-Native Stock Market Platform
+# InvestorIQ — AI-Native Stock Market Platform for Smart Investors
 
 ## Overview
 
-InvestorIQ is a production-grade, AI-native stock market platform designed for private investors. It combines advanced multi-agent AI analytics, real-time market intelligence, portfolio management, strategy backtesting, and institutional-grade quantitative tools—all through an intuitive, educational interface.
+InvestorIQ is a production-grade, AI-native stock market platform designed specifically for **small investors who want to minimize risk**. It combines advanced multi-agent AI analytics, risk-first stock screening, position sizing via Kelly Criterion, and global market scanning—all optimized to protect capital while finding the best opportunities worldwide.
+
+### What Makes InvestorIQ Different?
+
+| Traditional Platforms | InvestorIQ |
+|---|---|
+| Maximize returns first | **Minimize risk of loss first** |
+| One-size-fits-all | **Budget-aware recommendations** |
+| Generic screeners | **Risk-first scoring (safety 28%, value 22%, quality 18%)** |
+| Manual position sizing | **AI-optimized Kelly + ERC + Drawdown-constrained sizing** |
+| US-only focus | **11 global exchanges scanned** |
+| No guidance for beginners | **Guardian Agent protects from common mistakes** |
 
 ## Architecture
 
