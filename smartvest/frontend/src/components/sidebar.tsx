@@ -52,6 +52,7 @@ const nav = [
   { name: 'Benchmark', href: '/benchmark', icon: BarChart3 },
   { name: 'DRIP Sim', href: '/drip', icon: Repeat },
   { name: 'Report', href: '/report', icon: FileText },
+  { name: 'Monte Carlo', href: '/montecarlo', icon: Sparkles },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
