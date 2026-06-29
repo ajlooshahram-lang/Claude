@@ -5,12 +5,14 @@ import { Send, Square, Sparkles, RefreshCw } from 'lucide-react';
 import { useAIChat, ChatMessage } from '../../../hooks/use-ai-chat';
 
 const SUGGESTED_QUESTIONS = [
-  'Is NVIDIA overvalued?',
-  'Compare MSFT vs GOOG',
-  'What is a P/E ratio?',
-  'How risky is my portfolio?',
-  'Best dividend stocks for income',
-  'Impact of rising interest rates',
+  'I have $500 to invest — what should I buy?',
+  'Best safe stocks for beginners',
+  'How much of my budget should go in each stock?',
+  'Is NVIDIA overvalued for a small investor?',
+  'Create a DCA plan for $200/month',
+  'What are the safest dividend stocks?',
+  'Compare MSFT vs GOOG for low risk',
+  'Help me build a portfolio under $1000',
 ];
 
 export default function AIChatPage() {
@@ -207,6 +209,7 @@ const AGENT_LABELS: Record<string, { label: string; color: string }> = {
   'agent.macro_economics': { label: 'Macro', color: 'bg-green-500/20 text-green-400' },
   'agent.portfolio_advisor': { label: 'Portfolio', color: 'bg-pink-500/20 text-pink-400' },
   'agent.education': { label: 'Education', color: 'bg-yellow-500/20 text-yellow-400' },
+  'agent.small_investor_guardian': { label: 'Guardian', color: 'bg-emerald-500/20 text-emerald-400' },
 };
 
 function AgentBadge({ agentId }: { agentId: string }) {
