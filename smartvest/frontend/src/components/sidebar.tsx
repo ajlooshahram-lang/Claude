@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -42,6 +42,7 @@ const nav = [
   { name: 'Rebalance', href: '/rebalance', icon: Scale },
   { name: 'Shadow', href: '/shadow', icon: Ghost },
   { name: 'Thesis', href: '/thesis', icon: FileText },
+  { name: 'ETFs', href: '/etf', icon: Layers },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 

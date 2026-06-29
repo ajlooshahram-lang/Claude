@@ -34,6 +34,7 @@ from api.routes_options import router as options_router
 from api.routes_sentiment import router as sentiment_router
 from api.routes_rebalance import router as rebalance_router
 from api.routes_shadow import router as shadow_router
+from api.routes_etf import router as etf_router
 
 # Create the app
 app = FastAPI(
@@ -72,6 +73,7 @@ app.include_router(options_router)
 app.include_router(sentiment_router)
 app.include_router(rebalance_router)
 app.include_router(shadow_router)
+app.include_router(etf_router)
 
 
 # Global error handler — returns friendly JSON instead of crashing
