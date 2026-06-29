@@ -14,6 +14,7 @@ import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
 import { getSavedTheme, saveTheme, applyTheme, Theme } from '@/lib/theme';
 import { isLockEnabled, setPIN, isPINSet } from '@/lib/app-lock';
+import { MarketHoursWidget } from './market-hours';
 
 const nav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -100,6 +101,9 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Market Hours Widget */}
+      <MarketHoursWidget />
 
       {/* Bottom */}
       <div className="border-t border-[var(--card-border)] px-3 py-4">
