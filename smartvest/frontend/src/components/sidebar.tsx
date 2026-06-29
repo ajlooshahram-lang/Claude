@@ -51,6 +51,7 @@ const nav = [
   { name: 'AI Manager', href: '/ai-manager', icon: Brain },
   { name: 'Benchmark', href: '/benchmark', icon: BarChart3 },
   { name: 'DRIP Sim', href: '/drip', icon: Repeat },
+  { name: 'Report', href: '/report', icon: FileText },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
