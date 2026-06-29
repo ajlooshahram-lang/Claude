@@ -47,6 +47,7 @@ const nav = [
   { name: 'ETF Overlap', href: '/etf-overlap', icon: Layers },
   { name: 'Crypto', href: '/crypto', icon: Coins },
   { name: 'Retirement', href: '/retirement', icon: Timer },
+  { name: 'AI Manager', href: '/ai-manager', icon: Brain },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
