@@ -58,8 +58,9 @@ services:
     volumes:
       - nats_data:/data
 
+
   # ---------------------------------------------------------------
-  # Application Services
+  # Application Services (NestJS / TypeScript)
   # ---------------------------------------------------------------
   api-gateway:
     build:
@@ -77,10 +78,18 @@ services:
       MARKET_DATA_SERVICE_URL: http://market-data-service:3002
       PORTFOLIO_SERVICE_URL: http://portfolio-service:3003
       AI_ORCHESTRATOR_URL: http://ai-orchestrator:3004
+      POSITION_SIZING_URL: http://position-sizing:3005
+      SMART_SCREENER_URL: http://smart-screener:8004
+      GLOBAL_SCANNER_URL: http://global-scanner:8005
       CORS_ORIGINS: http://localhost:3100
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   ai-orchestrator:
     build:
@@ -92,13 +101,47 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3004
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       MARKET_DATA_SERVICE_URL: http://market-data-service:3002
-      FACTOR_MODEL_URL: http://factor-model:3010
+      FACTOR_MODEL_URL: http://factor-model:8001
+      INVESTMENT_SCORE_URL: http://investment-score:8002
+      VALUATION_URL: http://valuation:8003
+      SMART_SCREENER_URL: http://smart-screener:8004
+      GLOBAL_SCANNER_URL: http://global-scanner:8005
+      POSITION_SIZING_URL: http://position-sizing:3005
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       - redis
+      - factor-model
+      - smart-screener
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  position-sizing:
+    build:
+      context: ./src/backend/position-sizing-service
+      dockerfile: Dockerfile
+    container_name: investoriq-position-sizing
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      SMART_SCREENER_URL: http://smart-screener:8004
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3005/api/v1/position-sizing/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ---------------------------------------------------------------
-  # ML Services (Python)
+  # ML Services (Python / FastAPI)
   # ---------------------------------------------------------------
   factor-model:
     build:
@@ -106,19 +149,14 @@ services:
       dockerfile: Dockerfile
     container_name: investoriq-factor-model
     ports:
-      - "3010:3010"
+      - "8001:8001"
     environment:
-      PORT: 3010
-
-  valuation:
-    build:
-      context: ./src/ml-services/valuation
-      dockerfile: Dockerfile
-    container_name: investoriq-valuation
-    ports:
-      - "3015:3015"
-    environment:
-      PORT: 3015
+      PORT: 8001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   investment-score:
     build:
@@ -126,12 +164,76 @@ services:
       dockerfile: Dockerfile
     container_name: investoriq-investment-score
     ports:
-      - "3016:3016"
+      - "8002:8002"
     environment:
-      PORT: 3016
+      PORT: 8002
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  valuation:
+    build:
+      context: ./src/ml-services/valuation
+      dockerfile: Dockerfile
+    container_name: investoriq-valuation
+    ports:
+      - "8003:8003"
+    environment:
+      PORT: 8003
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # --- NEW: Smart Stock Screener (risk-first scoring for small investors) ---
+  smart-screener:
+    build:
+      context: ./src/ml-services/smart-screener
+      dockerfile: Dockerfile
+    container_name: investoriq-smart-screener
+    ports:
+      - "8004:8004"
+    environment:
+      PORT: 8004
+      INVESTMENT_SCORE_URL: http://investment-score:8002
+      VALUATION_URL: http://valuation:8003
+      FACTOR_MODEL_URL: http://factor-model:8001
+    depends_on:
+      - investment-score
+      - valuation
+      - factor-model
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- NEW: Global Market Opportunity Scanner ---
+  global-scanner:
+    build:
+      context: ./src/ml-services/global-scanner
+      dockerfile: Dockerfile
+    container_name: investoriq-global-scanner
+    ports:
+      - "8005:8005"
+    environment:
+      PORT: 8005
+      SMART_SCREENER_URL: http://smart-screener:8004
+      INVESTMENT_SCORE_URL: http://investment-score:8002
+    depends_on:
+      - smart-screener
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ---------------------------------------------------------------
-  # Frontend
+  # Frontend (Next.js 14)
   # ---------------------------------------------------------------
   frontend:
     build:
@@ -143,6 +245,9 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:3000/v1
       NEXT_PUBLIC_WS_URL: ws://localhost:3000
+      NEXT_PUBLIC_SMART_SCREENER_URL: http://localhost:8004
+      NEXT_PUBLIC_GLOBAL_SCANNER_URL: http://localhost:8005
+      NEXT_PUBLIC_POSITION_SIZING_URL: http://localhost:3005
     depends_on:
       - api-gateway
 

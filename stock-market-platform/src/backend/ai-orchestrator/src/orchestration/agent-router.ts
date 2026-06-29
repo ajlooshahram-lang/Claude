@@ -8,6 +8,7 @@ import { NewsIntelligenceAgent } from '../agents/news-intelligence.agent';
 import { MacroEconomicsAgent } from '../agents/macro-economics.agent';
 import { PortfolioAdvisorAgent } from '../agents/portfolio-advisor.agent';
 import { EducationAgent } from '../agents/education.agent';
+import { SmallInvestorGuardianAgent } from '../agents/small-investor-guardian.agent';
 
 // Maps intents to the agent IDs that should handle them
 const INTENT_AGENT_MAP: Record<string, string[]> = {
@@ -36,6 +37,13 @@ const INTENT_AGENT_MAP: Record<string, string[]> = {
   [QueryIntent.EXPLAIN]: ['agent.education'],
   [QueryIntent.LEARN]: ['agent.education'],
   [QueryIntent.WHAT_IS]: ['agent.education'],
+  // Small Investor Guardian routes
+  [QueryIntent.BUDGET_INVEST]: ['agent.small_investor_guardian', 'agent.portfolio_advisor'],
+  [QueryIntent.POSITION_SIZE]: ['agent.small_investor_guardian', 'agent.quantitative'],
+  [QueryIntent.CAPITAL_PROTECTION]: ['agent.small_investor_guardian', 'agent.portfolio_advisor'],
+  [QueryIntent.DCA_SCHEDULE]: ['agent.small_investor_guardian'],
+  [QueryIntent.SMART_PICK]: ['agent.small_investor_guardian', 'agent.investment_analyst', 'agent.quantitative'],
+  [QueryIntent.BEGINNER_HELP]: ['agent.small_investor_guardian', 'agent.education'],
 };
 
 @Injectable()
@@ -50,6 +58,7 @@ export class AgentRouter {
     macroEconomics: MacroEconomicsAgent,
     portfolioAdvisor: PortfolioAdvisorAgent,
     education: EducationAgent,
+    smallInvestorGuardian: SmallInvestorGuardianAgent,
   ) {
     this.register(investmentAnalyst);
     this.register(technicalAnalyst);
@@ -58,6 +67,7 @@ export class AgentRouter {
     this.register(macroEconomics);
     this.register(portfolioAdvisor);
     this.register(education);
+    this.register(smallInvestorGuardian);
   }
 
   private register(agent: BaseAgent): void {
