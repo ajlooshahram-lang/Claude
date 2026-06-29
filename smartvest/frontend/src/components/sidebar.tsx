@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat, Cpu, ShieldAlert, GitCompare, Flame,
+  GraduationCap, Newspaper, Scale, Ghost, FileText, Layers, Coins, Wallet, Timer, Repeat, Cpu, ShieldAlert, GitCompare, Flame, Compass,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -60,6 +60,7 @@ const nav = [
   { name: 'Earnings AI', href: '/earnings-surprise', icon: Flame },
   { name: 'Dark Pool', href: '/darkpool', icon: Eye },
   { name: 'Factors', href: '/factors', icon: BarChart3 },
+  { name: 'Regime', href: '/regime', icon: Compass },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
