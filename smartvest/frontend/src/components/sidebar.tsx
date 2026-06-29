@@ -43,6 +43,7 @@ const nav = [
   { name: 'Shadow', href: '/shadow', icon: Ghost },
   { name: 'Thesis', href: '/thesis', icon: FileText },
   { name: 'ETFs', href: '/etf', icon: Layers },
+  { name: 'ETF Overlap', href: '/etf-overlap', icon: Layers },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
