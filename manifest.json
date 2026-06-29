@@ -1,0 +1,40 @@
+{
+  "name": "SmartVest",
+  "short_name": "SmartVest",
+  "description": "Your AI-powered stock market assistant for beginner investors",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Portfolio Glance",
+      "short_name": "Glance",
+      "description": "Quick view of portfolio value and daily change",
+      "url": "/glance",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Smart Picks",
+      "short_name": "Picks",
+      "description": "Today's stock recommendations",
+      "url": "/picks",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

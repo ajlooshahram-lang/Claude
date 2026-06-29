@@ -1,0 +1,22 @@
+# SmartVest Backend Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# Market data
+yfinance>=0.2.36
+
+# Data handling
+pandas>=2.1.0
+numpy>=1.24.0
+
+# HTTP client (for Alpha Vantage and other APIs)
+httpx>=0.25.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Type validation
+pydantic>=2.5.0
