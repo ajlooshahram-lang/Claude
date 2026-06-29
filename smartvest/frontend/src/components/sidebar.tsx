@@ -58,6 +58,7 @@ const nav = [
   { name: 'VaR', href: '/var', icon: ShieldAlert },
   { name: 'Pairs', href: '/pairs', icon: GitCompare },
   { name: 'Earnings AI', href: '/earnings-surprise', icon: Flame },
+  { name: 'Dark Pool', href: '/darkpool', icon: Eye },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 

@@ -47,6 +47,7 @@ from api.routes_options_flow import router as options_flow_router
 from api.routes_var import router as var_router
 from api.routes_pairs import router as pairs_router
 from api.routes_earnings_surprise import router as earnings_surprise_router
+from api.routes_darkpool import router as darkpool_router
 
 # Create the app
 app = FastAPI(
@@ -98,6 +99,7 @@ app.include_router(options_flow_router)
 app.include_router(var_router)
 app.include_router(pairs_router)
 app.include_router(earnings_surprise_router)
+app.include_router(darkpool_router)
 
 
 # Global error handler — returns friendly JSON instead of crashing
