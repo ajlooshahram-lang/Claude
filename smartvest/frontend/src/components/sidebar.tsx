@@ -8,6 +8,7 @@ import {
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   Lock, AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
+  GraduationCap, Newspaper,
 } from 'lucide-react';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
@@ -35,6 +36,9 @@ const nav = [
   { name: 'Report Card', href: '/report-card', icon: ClipboardCheck },
   { name: 'Patterns', href: '/patterns', icon: Eye },
   { name: 'Money Flow', href: '/money-flow', icon: Activity },
+  { name: 'Earnings', href: '/earnings', icon: Calendar },
+  { name: 'Options Lab', href: '/options', icon: GraduationCap },
+  { name: 'Sentiment', href: '/sentiment', icon: Newspaper },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 
