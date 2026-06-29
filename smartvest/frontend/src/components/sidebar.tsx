@@ -54,6 +54,7 @@ const nav = [
   { name: 'Report', href: '/report', icon: FileText },
   { name: 'Monte Carlo', href: '/montecarlo', icon: Sparkles },
   { name: 'Strategy', href: '/strategy', icon: Cpu },
+  { name: 'Options Flow', href: '/options-flow', icon: Activity },
   { name: 'Glossary', href: '/glossary', icon: BookOpen },
 ];
 

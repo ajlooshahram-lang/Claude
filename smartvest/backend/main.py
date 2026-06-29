@@ -43,6 +43,7 @@ from api.routes_benchmark import router as benchmark_router
 from api.routes_drip import router as drip_router
 from api.routes_montecarlo import router as montecarlo_router
 from api.routes_strategy import router as strategy_router
+from api.routes_options_flow import router as options_flow_router
 
 # Create the app
 app = FastAPI(
@@ -90,6 +91,7 @@ app.include_router(benchmark_router)
 app.include_router(drip_router)
 app.include_router(montecarlo_router)
 app.include_router(strategy_router)
+app.include_router(options_flow_router)
 
 
 # Global error handler — returns friendly JSON instead of crashing
