@@ -12,6 +12,7 @@ import { ConfigProvider } from "@/lib/white-label/config-context";
 import { getSSRThemeScript } from "@/lib/white-label/theme-engine";
 import { AuthProvider } from "@/components/auth-provider";
 import { AuthGate } from "@/components/auth-gate";
+import { SampleDataBanner } from "@/components/sample-data-banner";
 import config from "../../smartvest.config";
 
 const geistSans = Geist({
@@ -83,6 +84,7 @@ export default function RootLayout({
             <AuthGate>
               <Sidebar />
               <main className="flex-1 overflow-y-auto p-4 pb-20 lg:p-8 lg:pb-8">
+                <SampleDataBanner />
                 {children}
               </main>
               <MobileNav />
