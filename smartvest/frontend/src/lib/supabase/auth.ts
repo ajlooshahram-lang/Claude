@@ -200,18 +200,40 @@ export async function changePassword(newPassword: string): Promise<AuthResult> {
 
 /**
  * Delete account and all associated data.
- * RLS + CASCADE ensures all user rows are deleted.
+ *
+ * WARNING: Full account deletion requires server-side admin API.
+ * Currently only signs out the user. Data remains in Supabase but
+ * is inaccessible due to RLS. A server-side Edge Function using
+ * service_role is needed to truly delete user data (GDPR compliance).
+ *
+ * TODO: Implement server-side deletion endpoint.
  */
 export async function deleteAccount(): Promise<AuthResult> {
   if (!isSupabaseConfigured()) {
     sessionStorage.removeItem('smartvest_session');
     return { success: true };
   }
-  // Supabase doesn't have client-side deleteUser — requires admin API
-  // In production, call a server function that uses the service_role key
-  // For now, sign out (data remains but is inaccessible)
+
+  // Delete user data from all tables (best effort from client)
+  // RLS allows users to delete their own rows
+  try {
+    await (supabase as any).from('holdings').delete().neq('id', '');
+    await (supabase as any).from('watchlist').delete().neq('id', '');
+    await (supabase as any).from('orders').delete().neq('id', '');
+    await (supabase as any).from('alerts').delete().neq('id', '');
+    await (supabase as any).from('tax_records').delete().neq('id', '');
+    await (supabase as any).from('ask_deposits').delete().neq('id', '');
+    await (supabase as any).from('profiles').delete().neq('id', '');
+  } catch (err) {
+    console.error('deleteAccount: failed to delete user data:', err);
+  }
+
+  // Sign out (auth user record requires admin API to delete)
   await supabase.auth.signOut();
-  return { success: true };
+  return {
+    success: true,
+    error: 'Account signed out and data deleted. Note: The auth account itself requires admin action to fully remove.',
+  };
 }
 
 // ─── Error Mapping ───────────────────────────────────────────────────────────

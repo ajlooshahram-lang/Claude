@@ -312,6 +312,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [loadingPrice, setLoadingPrice] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [watchlistItems, setWatchlistItems] = useState<{ symbol: string; name: string }[]>([]);
 
   // Load watchlist items for quick-select (async)
@@ -344,8 +345,9 @@ function AddOrderForm({ onSubmit, onCancel }: {
   function handleSubmit() {
     const s = parseFloat(shares);
     const p = parseFloat(price);
-    if (!symbol || !s || !p || s <= 0 || p <= 0) return;
+    if (!symbol || !s || !p || s <= 0 || p <= 0 || submitting) return;
 
+    setSubmitting(true);
     onSubmit({
       side,
       symbol: symbol.toUpperCase(),
@@ -480,14 +482,14 @@ function AddOrderForm({ onSubmit, onCancel }: {
       {/* Submit */}
       <button
         onClick={handleSubmit}
-        disabled={!symbol || !shares || !price || parseFloat(shares) <= 0 || parseFloat(price) <= 0}
+        disabled={!symbol || !shares || !price || parseFloat(shares) <= 0 || parseFloat(price) <= 0 || submitting}
         className={`w-full rounded-lg py-3 text-sm font-semibold transition-opacity disabled:opacity-40 ${
           side === 'buy'
             ? 'bg-[var(--gain)] text-white'
             : 'bg-[var(--loss)] text-white'
         }`}
       >
-        Log {side === 'buy' ? 'Buy' : 'Sell'} Order
+        {submitting ? 'Saving...' : `Log ${side === 'buy' ? 'Buy' : 'Sell'} Order`}
       </button>
     </div>
   );

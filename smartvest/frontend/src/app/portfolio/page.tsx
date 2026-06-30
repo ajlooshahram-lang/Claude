@@ -248,7 +248,7 @@ export default function PortfolioPage() {
         if (!quote) {
           return {
             symbol: pos.symbol,
-            name: pos.symbol,
+            name: `${pos.symbol} ⚠️`,
             shares: pos.shares,
             avgCost: pos.avgCost,
             currentPrice: pos.avgCost,
