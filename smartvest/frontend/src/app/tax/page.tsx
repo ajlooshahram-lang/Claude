@@ -6,10 +6,11 @@ import { getOrders } from '@/lib/supabase';
 import { calculateDanishTax, TaxEstimate, AccountType } from '@/lib/danish-tax';
 
 export default function TaxPage() {
-  const [orders, setOrders] = useState<{ side: string; symbol: string; shares: number; price_per_share: number; account_type: string }[]>([]);
+  const [orders, setOrders] = useState<{ side: string; symbol: string; shares: number; price_per_share: number; account_type: string; executed_at: string }[]>([]);
   const [accountType, setAccountType] = useState<AccountType>('regular');
   const [isMarried, setIsMarried] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     async function loadOrders() {
@@ -22,6 +23,7 @@ export default function TaxPage() {
           shares: o.shares,
           price_per_share: o.price_per_share,
           account_type: o.account_type || 'regular',
+          executed_at: o.executed_at || o.created_at,
         })));
       } catch {}
       setLoading(false);
@@ -29,27 +31,35 @@ export default function TaxPage() {
     loadOrders();
   }, []);
 
-  // Filter orders by the selected account type before computing tax
+  // Filter orders by account type AND tax year
   const filteredOrders = useMemo(() =>
-    orders.filter(o => o.account_type === accountType),
-    [orders, accountType]
+    orders.filter(o => {
+      if (o.account_type !== accountType) return false;
+      // Filter by tax year using executed_at timestamp
+      const orderYear = new Date(o.executed_at).getFullYear();
+      return orderYear === taxYear;
+    }),
+    [orders, accountType, taxYear]
   );
 
   // Calculate realized gains/losses from sell orders using proper FIFO
+  // IMPORTANT: Buys from ALL years provide cost basis (FIFO spans years),
+  // but only sells in the selected tax year create taxable events.
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
-    // Build FIFO lot queue per symbol: each buy is a "lot" with remaining shares
+    // Build FIFO lot queue from ALL buys for this account type (any year)
+    // because a stock bought in 2025 and sold in 2026 uses the 2025 cost basis.
+    const allBuysForAccount = orders.filter(o => o.account_type === accountType && o.side === 'buy');
     const lots: Record<string, { price: number; remaining: number }[]> = {};
-    for (const o of filteredOrders) {
-      if (o.side === 'buy') {
-        if (!lots[o.symbol]) lots[o.symbol] = [];
-        lots[o.symbol].push({ price: o.price_per_share, remaining: o.shares });
-      }
+    for (const o of allBuysForAccount) {
+      if (!lots[o.symbol]) lots[o.symbol] = [];
+      lots[o.symbol].push({ price: o.price_per_share, remaining: o.shares });
     }
 
     let gains = 0;
     let losses = 0;
     const tradeList: { symbol: string; proceeds: number; cost: number; gain: number }[] = [];
 
+    // Only sells in the selected tax year generate taxable events
     const sells = filteredOrders.filter(o => o.side === 'sell');
 
     for (const sell of sells) {
@@ -83,7 +93,7 @@ export default function TaxPage() {
     }
 
     return { realizedGains: gains, realizedLosses: losses, trades: tradeList };
-  }, [filteredOrders]);
+  }, [filteredOrders, orders, accountType]);
 
   const taxEstimate = useMemo(() =>
     calculateDanishTax(realizedGains, realizedLosses, accountType, isMarried),
@@ -96,7 +106,7 @@ export default function TaxPage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Receipt className="h-6 w-6 text-[var(--primary)]" />
-          Tax Summary ({new Date().getFullYear()})
+          Tax Summary ({taxYear})
         </h1>
         <p className="text-sm text-[var(--muted)] mt-1">
           Estimated Danish capital gains tax (aktieindkomst)
@@ -149,6 +159,29 @@ export default function TaxPage() {
             Married (doubles the 27% threshold to 158,800 DKK)
           </label>
         )}
+
+        {/* Tax year selector */}
+        <div className="mt-3 pt-3 border-t border-[var(--card-border)]">
+          <p className="text-[10px] text-[var(--muted)] mb-1.5">Tax Year</p>
+          <div className="flex gap-2">
+            {[new Date().getFullYear() - 1, new Date().getFullYear()].map((y) => (
+              <button
+                key={y}
+                onClick={() => setTaxYear(y)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  taxYear === y
+                    ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]'
+                    : 'border-[var(--card-border)] text-[var(--muted)]'
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-[var(--muted)] mt-1.5">
+            Only orders with an execution date in {taxYear} are included. If a trade is in the wrong year, edit its date in the order history.
+          </p>
+        </div>
       </div>
 
       {/* No sells yet */}
