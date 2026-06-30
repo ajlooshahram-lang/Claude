@@ -37,6 +37,11 @@ export const SAMPLE_DATA_PAGES: SampleDataEntry[] = [
   { path: '/reports', feedName: 'Portfolio market data', description: 'Numbers inside reports are sample data', realWhen: 'Connect price API + store real portfolio history in database' },
   { path: '/ai-chat', feedName: 'Live portfolio data', description: 'Answers based on demo portfolio, not your real holdings', realWhen: 'Query real holdings from Supabase database + live prices' },
   { path: '/crash-sim', feedName: 'User portfolio data', description: 'Applies real historical drawdowns to sample portfolio', realWhen: 'Run against your actual holdings stored in database' },
+  { path: '/alerts', feedName: 'Live price feed', description: 'Alert price checks use a backend that is not connected', realWhen: 'Replace localhost:8000 price fetch with getPrice() from Alpha Vantage' },
+  { path: '/dca', feedName: 'Live stock prices', description: 'DCA calculator fetches from a backend that is not connected', realWhen: 'Replace localhost:8000 quote fetch with getPrice() from Alpha Vantage' },
+  { path: '/simulator', feedName: 'Live stock prices', description: 'Trade simulator fetches from a backend that is not connected', realWhen: 'Replace localhost:8000 quote fetch with getPrice() from Alpha Vantage' },
+  { path: '/behavior', feedName: 'Order history (Supabase)', description: 'Reads from old localStorage orders instead of Supabase database', realWhen: 'Rewire from @/lib/orders to async getOrders() from @/lib/supabase' },
+  { path: '/report-card', feedName: 'Order + watchlist data (Supabase)', description: 'Reads from old localStorage instead of Supabase database', realWhen: 'Rewire from @/lib/orders and @/lib/watchlist to async Supabase calls' },
 ];
 
 /**

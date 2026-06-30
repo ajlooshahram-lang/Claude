@@ -2,22 +2,36 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Receipt, AlertTriangle, Info } from 'lucide-react';
-import { getOrders, Order } from '@/lib/orders';
+import { getOrders } from '@/lib/supabase';
 import { calculateDanishTax, TaxEstimate, AccountType } from '@/lib/danish-tax';
 
 export default function TaxPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<{ side: string; symbol: string; shares: number; price_per_share: number }[]>([]);
   const [accountType, setAccountType] = useState<AccountType>('regular');
   const [isMarried, setIsMarried] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setOrders(getOrders());
+    async function loadOrders() {
+      setLoading(true);
+      try {
+        const data = await getOrders();
+        setOrders(data.map(o => ({
+          side: o.side,
+          symbol: o.symbol,
+          shares: o.shares,
+          price_per_share: o.price_per_share,
+        })));
+      } catch {}
+      setLoading(false);
+    }
+    loadOrders();
   }, []);
 
   // Calculate realized gains/losses from sell orders
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
-    const buys = orders.filter(o => o.type === 'buy');
-    const sells = orders.filter(o => o.type === 'sell');
+    const buys = orders.filter(o => o.side === 'buy');
+    const sells = orders.filter(o => o.side === 'sell');
 
     let gains = 0;
     let losses = 0;
@@ -26,8 +40,8 @@ export default function TaxPage() {
     for (const sell of sells) {
       // Find matching buy (FIFO — first in, first out)
       const matchingBuy = buys.find(b => b.symbol === sell.symbol);
-      const costBasis = matchingBuy ? matchingBuy.pricePerShare * sell.shares : sell.pricePerShare * sell.shares;
-      const proceeds = sell.pricePerShare * sell.shares;
+      const costBasis = matchingBuy ? matchingBuy.price_per_share * sell.shares : sell.price_per_share * sell.shares;
+      const proceeds = sell.price_per_share * sell.shares;
       const gain = proceeds - costBasis;
 
       if (gain > 0) gains += gain;
