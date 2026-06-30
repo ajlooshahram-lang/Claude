@@ -1,25 +1,28 @@
 'use client';
 
 /**
- * Authentication Provider & Route Guard
+ * Authentication Provider
  *
- * Wraps the app to provide authentication state via React context.
- * Shows login page for unauthenticated users.
- * Provides login, register, and logout functions to all children.
+ * NOW USES: Supabase Auth (bcrypt, server sessions)
+ * PREVIOUSLY: Custom SHA-256 + localStorage
+ *
+ * Wraps the app with auth state. All pages get login/register/logout
+ * via the useAuth() hook.
  */
 
 import {
   createContext, useContext, useState, useEffect, useCallback, ReactNode
 } from 'react';
 import {
-  Session, getSession, loginUser, registerUser, logout as authLogout,
-  isAuthenticated, AuthResult,
-} from '@/lib/auth';
-import { migrateLegacyData } from '@/lib/user-data';
+  signUp, signIn, signOut, getSession, getUser,
+  onAuthStateChange, AuthResult,
+} from '@/lib/supabase';
+import type { User, Session } from '@supabase/supabase-js';
 
 // ─── Context Types ───────────────────────────────────────────────────────────
 
 interface AuthContextType {
+  user: User | null;
   session: Session | null;
   isLoading: boolean;
   isLoggedIn: boolean;
@@ -29,6 +32,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
+  user: null,
   session: null,
   isLoading: true,
   isLoggedIn: false,
@@ -39,58 +43,62 @@ const AuthContext = createContext<AuthContextType>({
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
   useEffect(() => {
-    const existing = getSession();
-    if (existing) {
-      setSession(existing);
-      // Migrate any legacy data on login
-      migrateLegacyData(existing.userId);
-    }
-    setIsLoading(false);
+    // Check existing session
+    getSession().then(s => {
+      setSession(s);
+      if (s) getUser().then(u => setUser(u));
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const { unsubscribe } = onAuthStateChange((event, newSession) => {
+      setSession(newSession);
+      if (newSession) {
+        getUser().then(u => setUser(u));
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
-    const result = await loginUser(email, password);
+    const result = await signIn(email, password);
     if (result.success && result.session) {
       setSession(result.session);
-      migrateLegacyData(result.session.userId);
+      setUser(result.user ?? null);
     }
     return result;
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string): Promise<AuthResult> => {
-    const result = await registerUser(email, password, name);
+    const result = await signUp(email, password, name);
     if (result.success && result.session) {
       setSession(result.session);
+      setUser(result.user ?? null);
     }
     return result;
   }, []);
 
-  const logout = useCallback(() => {
-    authLogout();
+  const logout = useCallback(async () => {
+    await signOut();
     setSession(null);
+    setUser(null);
   }, []);
 
-  const value: AuthContextType = {
-    session,
-    isLoading,
-    isLoggedIn: session !== null,
-    login,
-    register,
-    logout,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user, session, isLoading,
+      isLoggedIn: session !== null,
+      login, register, logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -98,28 +106,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
-/**
- * Access authentication state and functions.
- *
- * @example
- * const { session, isLoggedIn, login, logout } = useAuth();
- */
 export function useAuth(): AuthContextType {
   return useContext(AuthContext);
 }
 
-/**
- * Get the current user's display name.
- */
 export function useUserName(): string {
-  const { session } = useAuth();
-  return session?.displayName ?? 'Investor';
+  const { user } = useAuth();
+  return user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Investor';
 }
 
-/**
- * Get the current user's ID (null if not logged in).
- */
 export function useUserId(): string | null {
-  const { session } = useAuth();
-  return session?.userId ?? null;
+  const { user } = useAuth();
+  return user?.id ?? null;
 }

@@ -10,6 +10,9 @@ import {
 import {
   loginAdmin, isAdminSession, logout as authLogout, getSession,
 } from '@/lib/auth';
+// NOTE: Admin dashboard analytics still use old localStorage system.
+// This is acceptable because admin data is aggregate and labeled.
+// When pages are fully migrated to Supabase, admin will read from there.
 import {
   AdminDashboardData, getAdminDashboardData,
 } from '@/lib/admin';
