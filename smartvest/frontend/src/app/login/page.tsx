@@ -80,6 +80,7 @@ export default function LoginPage() {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Your name"
+                  maxLength={100}
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] text-sm focus:border-[var(--primary)] focus:outline-none transition-colors"
                   required
                 />
@@ -97,6 +98,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                maxLength={254}
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] text-sm focus:border-[var(--primary)] focus:outline-none transition-colors"
                 required
               />
@@ -113,6 +115,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder={mode === 'register' ? 'Min. 8 characters' : 'Your password'}
+                maxLength={128}
                 className="w-full pl-10 pr-11 py-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] text-sm focus:border-[var(--primary)] focus:outline-none transition-colors"
                 required
                 minLength={mode === 'register' ? 8 : undefined}

@@ -10,6 +10,7 @@ import { getCurrentUserId } from '@/lib/supabase';
 import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
 import { isAlphaVantageConfigured } from '@/lib/market-data';
 import { getProfile, RiskProfile } from '@/lib/profile';
+import { MAX_LENGTHS } from '@/lib/input-sanitize';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export default function SearchPage() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search... e.g. &quot;Apple&quot;, &quot;NOVO-B.CO&quot;, &quot;Toyota&quot;"
+            maxLength={MAX_LENGTHS.search}
             className="flex-1 bg-transparent text-base outline-none placeholder:text-[var(--muted)]"
             autoFocus
           />

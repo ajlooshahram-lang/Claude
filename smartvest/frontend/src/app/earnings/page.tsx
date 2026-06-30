@@ -95,7 +95,7 @@ export default function EarningsPage() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] text-[var(--muted)] font-medium block mb-1">Ticker</label>
-              <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="NOVO-B.CO" className="w-full px-3 py-2.5 rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-sm" required />
+              <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9.\-]/g, ''))} placeholder="NOVO-B.CO" maxLength={20} className="w-full px-3 py-2.5 rounded-lg border border-[var(--card-border)] bg-[var(--card)] text-sm" required />
             </div>
             <div>
               <label className="text-[10px] text-[var(--muted)] font-medium block mb-1">Company</label>

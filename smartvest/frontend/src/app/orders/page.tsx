@@ -8,6 +8,7 @@ import {
 import { getOrders, addOrder, getWatchlist } from '@/lib/supabase';
 import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
 import { getCurrentUserId } from '@/lib/supabase';
+import { sanitizeSymbol, MAX_LENGTHS } from '@/lib/input-sanitize';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -487,6 +488,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
           value={symbol}
           onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           placeholder="e.g. AAPL"
+          maxLength={MAX_LENGTHS.symbol}
           className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
         />
       </div>

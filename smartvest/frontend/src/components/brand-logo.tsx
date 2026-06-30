@@ -64,11 +64,20 @@ export function BrandLogo({ size = 'md', showText = true, className = '' }: Bran
 
   // ─── SVG Logo ────────────────────────────────────────────────────────────────
   if (branding.logo.type === 'svg' && branding.logo.value) {
+    // Sanitize SVG to prevent XSS via malicious SVG attributes.
+    // Even though this comes from the build-time config (not user input),
+    // defense-in-depth: strip scripts/event handlers from SVG markup.
+    const sanitizedSVG = branding.logo.value
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/data:text\/html/gi, '');
+
     return (
       <div className={`flex items-center ${s.container} ${className}`}>
         <div
           className={s.icon}
-          dangerouslySetInnerHTML={{ __html: branding.logo.value }}
+          dangerouslySetInnerHTML={{ __html: sanitizedSVG }}
         />
         {showText && (
           <span className={`${s.text} font-semibold`}>{branding.appName}</span>
