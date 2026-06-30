@@ -13,7 +13,7 @@ import {
   BookOpen, Bell, Briefcase, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  Landmark, FileText,
+  Landmark, FileText, Crown,
 } from 'lucide-react';
 import { FeatureFlags } from './types';
 import { LucideIcon } from 'lucide-react';
@@ -23,6 +23,8 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   featureKey: keyof FeatureFlags;
+  /** Subscription feature key for gating. If set, a lock badge appears for users without access. */
+  subscriptionGate?: string;
 }
 
 /**
@@ -30,29 +32,30 @@ export interface NavItem {
  * Each item is tied to a feature flag key.
  */
 export const NAV_REGISTRY: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, featureKey: 'dashboard' },
-  { name: 'Portfolio', href: '/portfolio', icon: Briefcase, featureKey: 'portfolio' },
-  { name: 'Search', href: '/search', icon: Search, featureKey: 'search' },
-  { name: 'Watchlist', href: '/watchlist', icon: Bookmark, featureKey: 'watchlist' },
-  { name: 'Alerts', href: '/alerts', icon: Bell, featureKey: 'alerts' },
-  { name: 'Simulator', href: '/simulator', icon: Calculator, featureKey: 'simulator' },
-  { name: 'DCA Calculator', href: '/dca', icon: Calendar, featureKey: 'dcaCalculator' },
-  { name: 'Sectors', href: '/sectors', icon: BarChart3, featureKey: 'sectors' },
-  { name: 'Compare', href: '/compare', icon: ArrowLeftRight, featureKey: 'compare' },
-  { name: 'Planner', href: '/planner', icon: PieChart, featureKey: 'planner' },
-  { name: 'Performance', href: '/performance', icon: TrendingUp, featureKey: 'performance' },
-  { name: 'Orders', href: '/orders', icon: Receipt, featureKey: 'orders' },
-  { name: 'Tax', href: '/tax', icon: Receipt, featureKey: 'tax' },
-  { name: 'ASK', href: '/ask', icon: Landmark, featureKey: 'ask' },
-  { name: 'Reports', href: '/reports', icon: FileText, featureKey: 'reports' },
-  { name: 'Smart Picks', href: '/picks', icon: Sparkles, featureKey: 'smartPicks' },
-  { name: 'Crash Sim', href: '/crash-sim', icon: AlertTriangle, featureKey: 'crashSim' },
-  { name: 'Backtest', href: '/backtest', icon: FlaskConical, featureKey: 'backtest' },
-  { name: 'Behavior', href: '/behavior', icon: Brain, featureKey: 'behavior' },
-  { name: 'Report Card', href: '/report-card', icon: ClipboardCheck, featureKey: 'reportCard' },
-  { name: 'Patterns', href: '/patterns', icon: Eye, featureKey: 'patterns' },
-  { name: 'Money Flow', href: '/money-flow', icon: Activity, featureKey: 'moneyFlow' },
-  { name: 'Glossary', href: '/glossary', icon: BookOpen, featureKey: 'glossary' },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, featureKey: 'dashboard', subscriptionGate: 'dashboard_basic' },
+  { name: 'Portfolio', href: '/portfolio', icon: Briefcase, featureKey: 'portfolio', subscriptionGate: 'portfolio' },
+  { name: 'Search', href: '/search', icon: Search, featureKey: 'search', subscriptionGate: 'search' },
+  { name: 'Watchlist', href: '/watchlist', icon: Bookmark, featureKey: 'watchlist', subscriptionGate: 'watchlist_basic' },
+  { name: 'Alerts', href: '/alerts', icon: Bell, featureKey: 'alerts', subscriptionGate: 'alerts' },
+  { name: 'Simulator', href: '/simulator', icon: Calculator, featureKey: 'simulator', subscriptionGate: 'simulator' },
+  { name: 'DCA Calculator', href: '/dca', icon: Calendar, featureKey: 'dcaCalculator', subscriptionGate: 'dca' },
+  { name: 'Sectors', href: '/sectors', icon: BarChart3, featureKey: 'sectors', subscriptionGate: 'sectors' },
+  { name: 'Compare', href: '/compare', icon: ArrowLeftRight, featureKey: 'compare', subscriptionGate: 'compare' },
+  { name: 'Planner', href: '/planner', icon: PieChart, featureKey: 'planner', subscriptionGate: 'planner' },
+  { name: 'Performance', href: '/performance', icon: TrendingUp, featureKey: 'performance', subscriptionGate: 'performance' },
+  { name: 'Orders', href: '/orders', icon: Receipt, featureKey: 'orders', subscriptionGate: 'orders' },
+  { name: 'Tax', href: '/tax', icon: Receipt, featureKey: 'tax', subscriptionGate: 'tax' },
+  { name: 'ASK', href: '/ask', icon: Landmark, featureKey: 'ask', subscriptionGate: 'ask' },
+  { name: 'Reports', href: '/reports', icon: FileText, featureKey: 'reports', subscriptionGate: 'reports' },
+  { name: 'Smart Picks', href: '/picks', icon: Sparkles, featureKey: 'smartPicks', subscriptionGate: 'smart_picks' },
+  { name: 'Crash Sim', href: '/crash-sim', icon: AlertTriangle, featureKey: 'crashSim', subscriptionGate: 'crash_sim' },
+  { name: 'Backtest', href: '/backtest', icon: FlaskConical, featureKey: 'backtest', subscriptionGate: 'backtest' },
+  { name: 'Behavior', href: '/behavior', icon: Brain, featureKey: 'behavior', subscriptionGate: 'behavior' },
+  { name: 'Report Card', href: '/report-card', icon: ClipboardCheck, featureKey: 'reportCard', subscriptionGate: 'report_card' },
+  { name: 'Patterns', href: '/patterns', icon: Eye, featureKey: 'patterns', subscriptionGate: 'patterns' },
+  { name: 'Money Flow', href: '/money-flow', icon: Activity, featureKey: 'moneyFlow', subscriptionGate: 'money_flow' },
+  { name: 'Glossary', href: '/glossary', icon: BookOpen, featureKey: 'glossary', subscriptionGate: 'glossary' },
+  { name: 'Pricing', href: '/pricing', icon: Crown, featureKey: 'dashboard' },
 ];
 
 /**

@@ -17,6 +17,7 @@ import { isLockEnabled, setPIN, isPINSet } from '@/lib/app-lock';
 import { useConfig } from '@/lib/white-label/config-context';
 import { getEnabledNavItems } from '@/lib/white-label/nav-config';
 import { BrandLogo } from './brand-logo';
+import { NavLockBadge } from './upgrade-gate';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -60,6 +61,7 @@ export function Sidebar() {
             >
               <item.icon className="h-[18px] w-[18px]" />
               {item.name}
+              {item.subscriptionGate && <NavLockBadge featureKey={item.subscriptionGate} />}
             </Link>
           );
         })}

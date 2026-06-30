@@ -145,6 +145,27 @@ export interface DeploymentConfig {
   poweredByUrl: string;
 }
 
+// ─── Subscription & Pricing ──────────────────────────────────────────────────
+
+export interface TierPricingConfig {
+  monthly: number;
+  yearly: number;
+  stripePriceIdMonthly: string;
+  stripePriceIdYearly: string;
+}
+
+export interface SubscriptionConfig {
+  enabled: boolean;
+  stripePublishableKey: string;
+  pricing: {
+    pro: TierPricingConfig;
+    institutional: TierPricingConfig;
+  };
+  freeWatchlistLimit: number;
+  showPricingInNav: boolean;
+  proTrialDays: number;
+}
+
 // ─── Complete Config ─────────────────────────────────────────────────────────
 
 export interface WhiteLabelConfig {
@@ -155,4 +176,5 @@ export interface WhiteLabelConfig {
   broker: BrokerConfig;
   data: DataConfig;
   deployment: DeploymentConfig;
+  subscription: SubscriptionConfig;
 }

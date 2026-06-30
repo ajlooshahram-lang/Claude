@@ -145,6 +145,36 @@ const config: WhiteLabelConfig = {
     poweredByName: '',
     poweredByUrl: '',
   },
+
+  // ─── SUBSCRIPTION & PRICING ──────────────────────────────────────────────────
+  subscription: {
+    // Enable/disable the subscription system entirely
+    enabled: true,
+    // Stripe publishable key (set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY env var in production)
+    // Leave empty for demo mode (instant upgrades without payment)
+    stripePublishableKey: '',
+    // Pricing in your configured currency (locale.defaultCurrency)
+    pricing: {
+      pro: {
+        monthly: 99,            // ← Set your Pro monthly price here
+        yearly: 899,            // ← Set your Pro yearly price here
+        stripePriceIdMonthly: 'price_pro_monthly',   // From Stripe Dashboard
+        stripePriceIdYearly: 'price_pro_yearly',     // From Stripe Dashboard
+      },
+      institutional: {
+        monthly: 499,           // ← Set your Institutional monthly price here
+        yearly: 4499,           // ← Set your Institutional yearly price here
+        stripePriceIdMonthly: 'price_inst_monthly',  // From Stripe Dashboard
+        stripePriceIdYearly: 'price_inst_yearly',    // From Stripe Dashboard
+      },
+    },
+    // Free tier watchlist limit
+    freeWatchlistLimit: 10,
+    // Show the pricing page link in navigation
+    showPricingInNav: true,
+    // Trial days for new Pro subscriptions (0 = no trial)
+    proTrialDays: 0,
+  },
 };
 
 export default config;
