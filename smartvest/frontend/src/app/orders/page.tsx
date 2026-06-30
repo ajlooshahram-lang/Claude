@@ -132,7 +132,20 @@ export default function OrdersPage() {
     });
 
     if (!result) {
-      // Order failed to save — keep form open and alert the user
+      // Could be: (a) network timeout but order saved, or (b) genuine failure.
+      // Reload orders to check if it actually went through.
+      const currentOrders = await getOrders();
+      const alreadySaved = currentOrders.some(o => o.idempotency_key === order.idempotencyKey);
+
+      if (alreadySaved) {
+        // Order DID save — the response just didn't make it back.
+        // Don't show an error. Close the form and refresh the list.
+        setShowForm(false);
+        await loadOrders();
+        return;
+      }
+
+      // Genuinely failed — tell the user.
       alert('Failed to save order. Please check your connection and try again.');
       return;
     }
@@ -352,6 +365,10 @@ function AddOrderForm({ onSubmit, onCancel }: {
   const [loadingPrice, setLoadingPrice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [watchlistItems, setWatchlistItems] = useState<{ symbol: string; name: string }[]>([]);
+  // Idempotency key generated ONCE when form mounts.
+  // Retries after timeout use the SAME key → UNIQUE constraint rejects duplicate.
+  // Only resets if user explicitly cancels and reopens the form.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   // Load watchlist items for quick-select (async)
   useEffect(() => {
@@ -386,10 +403,6 @@ function AddOrderForm({ onSubmit, onCancel }: {
     if (!symbol || !s || !p || s <= 0 || p <= 0 || submitting) return;
 
     setSubmitting(true);
-    // Generate a unique idempotency key for this submission.
-    // If the same key is submitted twice (double-click, two tabs),
-    // the database UNIQUE constraint rejects the duplicate.
-    const idempotencyKey = crypto.randomUUID();
     onSubmit({
       side,
       symbol: symbol.toUpperCase(),
