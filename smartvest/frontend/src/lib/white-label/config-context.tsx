@@ -35,7 +35,7 @@ interface ConfigProviderProps {
  */
 export function ConfigProvider({ children, overrides }: ConfigProviderProps) {
   const mergedConfig = overrides
-    ? deepMerge(appConfig, overrides) as WhiteLabelConfig
+    ? deepMerge(appConfig as any, overrides as any) as unknown as WhiteLabelConfig
     : appConfig;
 
   return (

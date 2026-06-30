@@ -18,7 +18,7 @@
 export interface CompetitorData {
   symbol: string;
   name: string;
-  sector: string;
+  sector?: string;
   description: string;          // 1-sentence differentiator
   currentPrice: number;
   currency: string;
@@ -90,8 +90,8 @@ const COMPETITOR_MAP: Record<string, {
 const DEFAULT_SECTOR = {
   sector: 'General / Unknown',
   competitors: [
-    { symbol: 'SPY', name: 'S&P 500 ETF', description: 'Benchmark index ETF — use this to compare any stock against broad market performance.', currentPrice: 589, currency: 'USD', oneYearReturn: 18.2, revenue: 0, revenueGrowth: 0, profitMargin: 0, peRatio: 24.5, beginnerScore: 75, marketCap: 0, dividendYield: 1.3 },
-    { symbol: 'IWDA.AS', name: 'iShares MSCI World', description: 'Global diversified ETF — represents the entire developed world stock market in one holding.', currentPrice: 94.5, currency: 'EUR', oneYearReturn: 15.8, revenue: 0, revenueGrowth: 0, profitMargin: 0, peRatio: 22.1, beginnerScore: 80, marketCap: 0, dividendYield: 1.6 },
+    { symbol: 'SPY', name: 'S&P 500 ETF', sector: 'Index', description: 'Benchmark index ETF — use this to compare any stock against broad market performance.', currentPrice: 589, currency: 'USD', oneYearReturn: 18.2, revenue: 0, revenueGrowth: 0, profitMargin: 0, peRatio: 24.5, beginnerScore: 75, marketCap: 0, dividendYield: 1.3 },
+    { symbol: 'IWDA.AS', name: 'iShares MSCI World', sector: 'Index', description: 'Global diversified ETF — represents the entire developed world stock market in one holding.', currentPrice: 94.5, currency: 'EUR', oneYearReturn: 15.8, revenue: 0, revenueGrowth: 0, profitMargin: 0, peRatio: 22.1, beginnerScore: 80, marketCap: 0, dividendYield: 1.6 },
   ],
 };
 

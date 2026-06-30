@@ -133,7 +133,7 @@ const EVASIVE_PATTERNS = [
   { regex: /(?:going forward|on a go-forward basis|as we move forward)/gi, pattern: 'Future-shifting', explanation: 'Shifts focus to the future to avoid discussing current performance' },
   { regex: /(?:we feel good about|we're comfortable with|we're pleased with where we are)/gi, pattern: 'Vague reassurance', explanation: 'Provides emotional reassurance without specific data — often masks concern' },
   { regex: /(?:I want to be careful|I don't want to get ahead of|let me be thoughtful about)/gi, pattern: 'Deliberate hedging', explanation: 'Explicitly signals caution about the topic — there may be something they cannot disclose yet' },
-  { regex: /(?:not something we're focused on|that's not how we think about it|we don't manage to that metric)/gi, pattern: 'Metric dismissal', explanation: 'Dismisses an analyst's metric, which sometimes means the metric looks bad' },
+  { regex: /(?:not something we're focused on|that's not how we think about it|we don't manage to that metric)/gi, pattern: 'Metric dismissal', explanation: "Dismisses an analyst's metric, which sometimes means the metric looks bad" },
 ];
 
 // ─── Section Splitting ───────────────────────────────────────────────────────
