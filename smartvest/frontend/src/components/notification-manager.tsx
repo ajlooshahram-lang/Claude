@@ -14,6 +14,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const WEEKLY_NOTIF_KEY = 'smartvest_weekly_notif_sent';
 
+// Price checking requires a live backend. If API_BASE is localhost,
+// disable all price-based checks to avoid silent failures.
+const BACKEND_CONNECTED = !API_BASE.includes('localhost');
+
 /**
  * NotificationManager — background process on every page.
  *
@@ -22,13 +26,17 @@ const WEEKLY_NOTIF_KEY = 'smartvest_weekly_notif_sent';
  *   2. Checks stop-losses → sends phone notification
  *   3. On Monday mornings → sends weekly summary notification (once)
  *
- * Also checks portfolio day-change on mount for 5%+ drops.
+ * NOTE: Price alert and stop-loss checks are currently NON-FUNCTIONAL.
+ * They require a backend that is not connected (localhost:8000).
+ * Alerts/stop-losses can be SET but will not FIRE until the backend
+ * is replaced with getPrice() from Alpha Vantage.
  */
 export function NotificationManager() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!areNotificationsEnabled()) return;
+    if (!BACKEND_CONNECTED) return; // Backend not available — skip price checks
 
     // Run immediately
     runChecks();

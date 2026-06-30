@@ -6,15 +6,25 @@ import { getActiveAlerts, triggerAlert, checkAlertTriggered, PriceAlert } from '
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Price checking requires a live backend. If API_BASE is localhost (not connected),
+// disable all checks to avoid silent failures.
+const BACKEND_CONNECTED = !API_BASE.includes('localhost');
+
 /**
  * AlertNotifier — runs in the background on every page.
  * Checks active alerts against live prices every 60 seconds.
  * Shows a visible toast notification when an alert triggers.
+ *
+ * NOTE: Currently non-functional — price checks require a backend
+ * that is not yet connected. Alerts can be SET but will not FIRE
+ * until the backend is replaced with getPrice() from Alpha Vantage.
  */
 export function AlertNotifier() {
   const [notification, setNotification] = useState<{ symbol: string; name: string; direction: string; target: number; currency: string } | null>(null);
 
   useEffect(() => {
+    if (!BACKEND_CONNECTED) return; // Skip all checks — backend not available
+
     async function check() {
       const active = getActiveAlerts();
       if (active.length === 0) return;

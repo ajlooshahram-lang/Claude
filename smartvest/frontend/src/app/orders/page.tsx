@@ -504,6 +504,18 @@ function AddOrderForm({ onSubmit, onCancel }: {
         </div>
       )}
 
+      {/* Realism warning — large orders that might be typos */}
+      {shares && parseFloat(shares) > 10000 && (
+        <p className="text-[10px] text-[var(--warning)]">
+          ⚠️ {parseFloat(shares).toLocaleString()} shares is unusually large. Double-check this matches your broker confirmation.
+        </p>
+      )}
+      {shares && price && parseFloat(shares) > 0 && parseFloat(price) > 0 && parseFloat(shares) * parseFloat(price) > 1000000 && (
+        <p className="text-[10px] text-[var(--warning)]">
+          ⚠️ Total exceeds 1,000,000 {currency}. This will affect your tax calculations — verify it matches your broker statement.
+        </p>
+      )}
+
       {/* Submit */}
       <button
         onClick={handleSubmit}

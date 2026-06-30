@@ -132,3 +132,68 @@ describe('Portfolio gain/loss — computeSummary', () => {
     expect(r.totalGainLossPct).toBe(-33.33);
   });
 });
+
+
+
+describe('Portfolio — dividend income and diversification score', () => {
+  // Extended computeSummary that includes these fields
+  function computeFull(holdings: { shares: number; avgCost: number; currentPrice: number; dayChangePct: number; sector: string; region: string; dividendYield: number; beta: number }[]) {
+    let totalValue = 0, totalCost = 0, dayChangeValue = 0;
+    for (const h of holdings) {
+      const value = h.shares * h.currentPrice;
+      const cost = h.shares * h.avgCost;
+      totalValue += value;
+      totalCost += cost;
+      dayChangeValue += value * (h.dayChangePct / 100);
+    }
+    const annualDiv = holdings.reduce((sum, h) => sum + h.shares * h.currentPrice * h.dividendYield, 0);
+    const sectors = new Set(holdings.map(h => h.sector));
+    const regions = new Set(holdings.map(h => h.region));
+    const divScore = Math.min(100, (holdings.length / 8) * 40 + (sectors.size / 5) * 30 + (regions.size / 3) * 30);
+    return {
+      totalValue: Math.round(totalValue),
+      annualDividendIncome: Math.round(annualDiv),
+      diversificationScore: Math.round(divScore),
+    };
+  }
+
+  it('dividend income = shares × price × yield, summed across holdings', () => {
+    const r = computeFull([
+      { shares: 10, avgCost: 100, currentPrice: 200, dayChangePct: 0, sector: 'Tech', region: 'US', dividendYield: 0.03, beta: 1 },
+      { shares: 5, avgCost: 50, currentPrice: 100, dayChangePct: 0, sector: 'Energy', region: 'EU', dividendYield: 0.05, beta: 1 },
+    ]);
+    // 10*200*0.03 = 60, 5*100*0.05 = 25, total = 85
+    expect(r.annualDividendIncome).toBe(85);
+  });
+
+  it('zero dividend yield — income is 0', () => {
+    const r = computeFull([
+      { shares: 100, avgCost: 50, currentPrice: 80, dayChangePct: 0, sector: 'Tech', region: 'US', dividendYield: 0, beta: 1 },
+    ]);
+    expect(r.annualDividendIncome).toBe(0);
+  });
+
+  it('diversification score — 1 holding, 1 sector, 1 region = low', () => {
+    const r = computeFull([
+      { shares: 10, avgCost: 100, currentPrice: 100, dayChangePct: 0, sector: 'Tech', region: 'US', dividendYield: 0, beta: 1 },
+    ]);
+    // (1/8)*40 + (1/5)*30 + (1/3)*30 = 5 + 6 + 10 = 21
+    expect(r.diversificationScore).toBe(21);
+  });
+
+  it('diversification score — 8 holdings, 5 sectors, 3 regions = max 100', () => {
+    const holdings = [
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Tech', region: 'US', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Health', region: 'EU', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Energy', region: 'Asia', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Finance', region: 'US', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Consumer', region: 'EU', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Tech', region: 'Asia', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Health', region: 'US', dividendYield: 0, beta: 1 },
+      { shares: 1, avgCost: 1, currentPrice: 1, dayChangePct: 0, sector: 'Energy', region: 'EU', dividendYield: 0, beta: 1 },
+    ];
+    const r = computeFull(holdings);
+    // (8/8)*40 + (5/5)*30 + (3/3)*30 = 40 + 30 + 30 = 100
+    expect(r.diversificationScore).toBe(100);
+  });
+});

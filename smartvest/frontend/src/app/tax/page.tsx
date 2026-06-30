@@ -28,22 +28,47 @@ export default function TaxPage() {
     loadOrders();
   }, []);
 
-  // Calculate realized gains/losses from sell orders
+  // Calculate realized gains/losses from sell orders using proper FIFO
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
-    const buys = orders.filter(o => o.side === 'buy');
-    const sells = orders.filter(o => o.side === 'sell');
+    // Build FIFO lot queue per symbol: each buy is a "lot" with remaining shares
+    const lots: Record<string, { price: number; remaining: number }[]> = {};
+    for (const o of orders) {
+      if (o.side === 'buy') {
+        if (!lots[o.symbol]) lots[o.symbol] = [];
+        lots[o.symbol].push({ price: o.price_per_share, remaining: o.shares });
+      }
+    }
 
     let gains = 0;
     let losses = 0;
     const tradeList: { symbol: string; proceeds: number; cost: number; gain: number }[] = [];
 
-    for (const sell of sells) {
-      // Find matching buy (FIFO — first in, first out)
-      const matchingBuy = buys.find(b => b.symbol === sell.symbol);
-      const costBasis = matchingBuy ? matchingBuy.price_per_share * sell.shares : sell.price_per_share * sell.shares;
-      const proceeds = sell.price_per_share * sell.shares;
-      const gain = proceeds - costBasis;
+    const sells = orders.filter(o => o.side === 'sell');
 
+    for (const sell of sells) {
+      const proceeds = sell.price_per_share * sell.shares;
+      let costBasis = 0;
+      let sharesToMatch = sell.shares;
+      const symbolLots = lots[sell.symbol] || [];
+
+      // Consume lots in FIFO order
+      while (sharesToMatch > 0 && symbolLots.length > 0) {
+        const lot = symbolLots[0];
+        const matched = Math.min(sharesToMatch, lot.remaining);
+        costBasis += matched * lot.price;
+        lot.remaining -= matched;
+        sharesToMatch -= matched;
+        // Remove fully consumed lots
+        if (lot.remaining <= 0) symbolLots.shift();
+      }
+
+      // If no matching buys found (sold without recorded buy), use sell price as cost
+      // This means 0 gain — conservative (won't overstate tax)
+      if (sharesToMatch > 0) {
+        costBasis += sharesToMatch * sell.price_per_share;
+      }
+
+      const gain = proceeds - costBasis;
       if (gain > 0) gains += gain;
       else losses += Math.abs(gain);
 

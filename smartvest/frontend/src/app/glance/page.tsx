@@ -47,6 +47,7 @@ export default function GlancePage() {
       let cost = 0;
       let dayVal = 0;
       let anyStale = false;
+      let failedCount = 0;
 
       // Fetch live prices for each holding
       for (const h of holdings) {
@@ -58,10 +59,14 @@ export default function GlancePage() {
             cost += h.shares * h.avg_cost_per_share;
             dayVal += v * (cached.changePct / 100);
             if (cached.isStale) anyStale = true;
+          } else {
+            // Price unavailable — don't count this holding at all
+            // (neither value nor cost) to avoid understating gain/loss
+            failedCount++;
           }
         } catch {
-          // Skip holdings where price fetch fails
-          cost += h.shares * h.avg_cost_per_share;
+          // Price fetch threw — skip entirely (don't count cost without value)
+          failedCount++;
         }
       }
 
@@ -69,7 +74,7 @@ export default function GlancePage() {
       setTotalCost(cost);
       setDayChange(dayVal);
       setDayChangePct(value > 0 ? (dayVal / value) * 100 : 0);
-      setIsStale(anyStale);
+      setIsStale(anyStale || failedCount > 0);
       setLastUpdated(new Date().toLocaleTimeString('en-DK', { hour: '2-digit', minute: '2-digit' }));
     } catch {
       // Supabase load failed

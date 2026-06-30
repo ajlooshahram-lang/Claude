@@ -466,9 +466,10 @@ function SetAlertButton({ symbol, name, currentPrice, currency }: {
       <button
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 text-[11px] text-[var(--muted)] hover:text-[var(--primary)] transition-colors"
+        title="Alerts are saved locally but cannot fire until a live price backend is connected"
       >
         <Bell className="h-3 w-3" />
-        Set alert
+        Set alert <span className="text-[8px] opacity-50">(local only)</span>
       </button>
     );
   }
