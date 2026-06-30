@@ -8,6 +8,11 @@
 export { supabase, isSupabaseConfigured, getCurrentUserId } from './client';
 export type { Database } from './types';
 export {
+  signUp, signIn, signOut, getSession, getUser,
+  onAuthStateChange, changePassword, deleteAccount,
+} from './auth';
+export type { AuthResult, AuthState } from './auth';
+export {
   getHoldings, addHolding, updateHolding, deleteHolding,
   getWatchlist, addToWatchlist, removeFromWatchlist,
   getOrders, addOrder,
