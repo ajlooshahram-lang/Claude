@@ -107,9 +107,14 @@ export async function fetchQuote(symbol: string): Promise<AlphaVantageQuote | nu
 
     recordRequest();
 
+    const price = parseFloat(gq['05. price']) || 0;
+    // Sanity check: stock prices cannot be zero or negative.
+    // If AV returns 0 or negative, treat as a failed fetch.
+    if (price <= 0) return null;
+
     return {
       symbol: gq['01. symbol'] || symbol,
-      price: parseFloat(gq['05. price']) || 0,
+      price,
       change: parseFloat(gq['09. change']) || 0,
       changePct: parseFloat(gq['10. change percent']?.replace('%', '') || '0') || 0,
       volume: parseInt(gq['06. volume'] || '0') || 0,
