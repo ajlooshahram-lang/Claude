@@ -13,7 +13,7 @@ import {
   BookOpen, Bell, Briefcase, Bookmark, Calculator,
   Calendar, BarChart3, Sparkles, ArrowLeftRight, PieChart, Receipt,
   AlertTriangle, Brain, FlaskConical, ClipboardCheck, Eye, Activity,
-  Landmark, FileText, Crown,
+  Landmark, FileText, Crown, FileSearch,
 } from 'lucide-react';
 import { FeatureFlags } from './types';
 import { LucideIcon } from 'lucide-react';
@@ -55,6 +55,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { name: 'Patterns', href: '/patterns', icon: Eye, featureKey: 'patterns', subscriptionGate: 'patterns' },
   { name: 'Money Flow', href: '/money-flow', icon: Activity, featureKey: 'moneyFlow', subscriptionGate: 'money_flow' },
   { name: 'Glossary', href: '/glossary', icon: BookOpen, featureKey: 'glossary', subscriptionGate: 'glossary' },
+  { name: 'Report Parser', href: '/report-parser', icon: FileSearch, featureKey: 'reports', subscriptionGate: 'reports' },
   { name: 'Pricing', href: '/pricing', icon: Crown, featureKey: 'dashboard' },
 ];
 
