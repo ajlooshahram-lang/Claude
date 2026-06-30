@@ -92,7 +92,7 @@ export default function OrdersPage() {
     const userId = await getCurrentUserId();
     if (!userId) return;
 
-    await addOrder({
+    const result = await addOrder({
       user_id: userId,
       symbol: order.symbol.toUpperCase(),
       side: order.side,
@@ -105,6 +105,12 @@ export default function OrdersPage() {
       notes: null,
       executed_at: new Date().toISOString(),
     });
+
+    if (!result) {
+      // Order failed to save — keep form open and alert the user
+      alert('Failed to save order. Please check your connection and try again.');
+      return;
+    }
 
     setShowForm(false);
     await loadOrders();

@@ -109,14 +109,14 @@ export async function fetchQuote(symbol: string): Promise<AlphaVantageQuote | nu
 
     return {
       symbol: gq['01. symbol'] || symbol,
-      price: parseFloat(gq['05. price']),
-      change: parseFloat(gq['09. change']),
-      changePct: parseFloat(gq['10. change percent']?.replace('%', '') || '0'),
-      volume: parseInt(gq['06. volume'] || '0'),
-      previousClose: parseFloat(gq['08. previous close'] || '0'),
-      high: parseFloat(gq['03. high'] || '0'),
-      low: parseFloat(gq['04. low'] || '0'),
-      open: parseFloat(gq['02. open'] || '0'),
+      price: parseFloat(gq['05. price']) || 0,
+      change: parseFloat(gq['09. change']) || 0,
+      changePct: parseFloat(gq['10. change percent']?.replace('%', '') || '0') || 0,
+      volume: parseInt(gq['06. volume'] || '0') || 0,
+      previousClose: parseFloat(gq['08. previous close'] || '0') || 0,
+      high: parseFloat(gq['03. high'] || '0') || 0,
+      low: parseFloat(gq['04. low'] || '0') || 0,
+      open: parseFloat(gq['02. open'] || '0') || 0,
       latestTradingDay: gq['07. latest trading day'] || '',
       fetchedAt: new Date().toISOString(),
     };
