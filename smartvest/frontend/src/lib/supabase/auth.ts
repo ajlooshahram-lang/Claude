@@ -129,14 +129,28 @@ export async function signIn(
 
 /**
  * Sign out and destroy the session.
- * Clears all tokens from browser storage.
+ *
+ * Uses scope: 'global' to revoke ALL refresh tokens across all devices.
+ * This means if you log out on your phone, your laptop session also dies
+ * (within 1 hour when the access token expires and can't refresh).
+ *
+ * SECURITY NOTE: The access token (JWT) remains valid until its natural
+ * expiry (default: 1 hour) because JWTs are stateless. To minimize this
+ * window, reduce JWT expiry in Supabase Dashboard → Settings → Auth.
+ * Recommended: 15 minutes for financial apps.
+ *
+ * What happens after signOut:
+ * - Current device: token cleared immediately, user sees login screen
+ * - Other devices: access token works until expiry (up to 1hr), then
+ *   refresh fails (revoked) and user is forced to re-authenticate
+ * - Stolen token replay: works for ≤1hr, then dies permanently
  */
 export async function signOut(): Promise<void> {
   if (!isSupabaseConfigured()) {
     sessionStorage.removeItem('smartvest_session');
     return;
   }
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'global' });
 }
 
 // ─── Session Management ──────────────────────────────────────────────────────
@@ -228,8 +242,8 @@ export async function deleteAccount(): Promise<AuthResult> {
     console.error('deleteAccount: failed to delete user data:', err);
   }
 
-  // Sign out (auth user record requires admin API to delete)
-  await supabase.auth.signOut();
+  // Sign out globally (auth user record requires admin API to fully delete)
+  await supabase.auth.signOut({ scope: 'global' });
   return {
     success: true,
     error: 'Account signed out and data deleted. Note: The auth account itself requires admin action to fully remove.',
