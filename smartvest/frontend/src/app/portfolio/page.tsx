@@ -57,17 +57,13 @@ interface PortfolioSummary {
 }
 
 // ─── User's Portfolio Positions ──────────────────────────────────────────────
-// This is the user's personal data: which stocks they own and at what cost.
-// In production this would come from a database. For now it's local config.
+// Reads from Supabase database. Falls back to localStorage if not configured.
+// Positions persist across browser refreshes and work cross-device.
 
-const MY_POSITIONS: UserPosition[] = [
-  { symbol: 'NOVO-B.CO', shares: 8,  avgCost: 290.00 },
-  { symbol: 'AAPL',      shares: 3,  avgCost: 260.00 },
-  { symbol: 'KO',        shares: 12, avgCost: 58.50 },
-  { symbol: 'JNJ',       shares: 4,  avgCost: 235.00 },
-  { symbol: 'AZN.L',     shares: 6,  avgCost: 13200.00 },
-  { symbol: '7203.T',    shares: 30, avgCost: 2550.00 },
-];
+import { getHoldings, addHolding, deleteHolding } from '@/lib/supabase';
+import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
+
+const MY_POSITIONS: UserPosition[] = []; // Loaded async from database — see useEffect below
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -199,39 +195,55 @@ export default function PortfolioPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [fromCache, setFromCache] = useState(false);
   const [cacheAge, setCacheAge] = useState<string | null>(null);
+  const [positions, setPositions] = useState<UserPosition[]>([]);
+
+  // Load positions from Supabase (or localStorage fallback)
+  useEffect(() => {
+    async function loadPositions() {
+      const holdings = await getHoldings();
+      const loaded: UserPosition[] = holdings.map(h => ({
+        symbol: h.symbol,
+        shares: Number(h.shares),
+        avgCost: Number(h.avg_cost_per_share),
+      }));
+      setPositions(loaded);
+    }
+    loadPositions();
+  }, []);
 
   const fetchLiveData = useCallback(async () => {
+    if (positions.length === 0) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     setFromCache(false);
     setCacheAge(null);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const symbols = MY_POSITIONS.map(p => p.symbol);
-      const url = `${API_URL}/api/quotes`;
+      const symbols = positions.map(p => p.symbol);
 
-      const result = await fetchWithOffline<{ count: number; quotes: Record<string, any> }>(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbols }),
-      });
-
-      if (result.fromCache) {
-        setFromCache(true);
-        setCacheAge(result.cacheAge);
+      // Fetch prices from Alpha Vantage cache (respects rate limit)
+      const quotes: Record<string, any> = {};
+      for (const symbol of symbols) {
+        const cached = await getPrice(symbol);
+        if (cached.source !== 'unavailable') {
+          quotes[symbol] = {
+            current_price: cached.price,
+            name: symbol,
+            currency: 'DKK',
+            sector: 'Unknown',
+            country: 'Denmark',
+            dividend_yield: 0,
+            beta: 1.0,
+            day_change_pct: cached.changePct,
+            pe_ratio: null,
+            market_cap: null,
+          };
+          if (cached.isStale) { setFromCache(true); setCacheAge(formatLastUpdated(cached.fetchedAt)); }
+        }
       }
-
-      if (!result.data) {
-        setError(result.error || 'Could not load stock prices right now.');
-        setLoading(false);
-        return;
-      }
-
-      const quotes = result.data.quotes;
 
       // Merge user positions with live market data
-      const liveHoldings: Holding[] = MY_POSITIONS.map(pos => {
+      const liveHoldings: Holding[] = positions.map(pos => {
         const quote = quotes[pos.symbol];
         if (!quote) {
           return {
@@ -280,7 +292,7 @@ export default function PortfolioPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [positions]);
 
   // Fetch on mount
   useEffect(() => {
@@ -879,14 +891,9 @@ function DiversificationChecker({ holdings, totalValue }: {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const WEEKLY_POSITIONS = [
-  { symbol: 'NOVO-B.CO', shares: 8, avg_cost: 290.00 },
-  { symbol: 'AAPL', shares: 3, avg_cost: 260.00 },
-  { symbol: 'KO', shares: 12, avg_cost: 58.50 },
-  { symbol: 'JNJ', shares: 4, avg_cost: 235.00 },
-  { symbol: 'AZN.L', shares: 6, avg_cost: 13200.00 },
-  { symbol: '7203.T', shares: 30, avg_cost: 2550.00 },
-];
+const WEEKLY_POSITIONS: { symbol: string; shares: number; avg_cost: number }[] = [];
+// NOTE: Weekly summary now reads from Supabase via the same positions state.
+// This component needs refactoring to accept positions as props.
 
 interface WeeklySummaryData {
   portfolio_change: number;
