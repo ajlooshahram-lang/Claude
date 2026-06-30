@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-import { fetchWithOffline } from '@/lib/offline-cache';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { getHoldings } from '@/lib/supabase';
+import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
 
 /**
  * Glance Page — ultra-minimal portfolio snapshot.
@@ -20,57 +19,49 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  *   3. Name it "Portfolio" or "SmartVest Widget"
  */
 
-const POSITIONS = [
-  { symbol: 'NOVO-B.CO', shares: 8, avgCost: 290.00 },
-  { symbol: 'AAPL', shares: 3, avgCost: 260.00 },
-  { symbol: 'KO', shares: 12, avgCost: 58.50 },
-  { symbol: 'JNJ', shares: 4, avgCost: 235.00 },
-  { symbol: 'AZN.L', shares: 6, avgCost: 13200.00 },
-  { symbol: '7203.T', shares: 30, avgCost: 2550.00 },
-];
-
 export default function GlancePage() {
   const [totalValue, setTotalValue] = useState<number | null>(null);
   const [totalCost, setTotalCost] = useState<number>(0);
   const [dayChange, setDayChange] = useState<number>(0);
   const [dayChangePct, setDayChangePct] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [fromCache, setFromCache] = useState(false);
+  const [isStale, setIsStale] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
 
   useEffect(() => {
     fetchData();
-    // Auto-refresh every 30 minutes
-    const interval = setInterval(fetchData, 30 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
 
   async function fetchData() {
     setLoading(true);
-    const symbols = POSITIONS.map(p => p.symbol);
-    const url = `${API_BASE}/api/quotes`;
 
-    const result = await fetchWithOffline<{ quotes: Record<string, any> }>(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbols }),
-    });
+    try {
+      // Load holdings from Supabase
+      const holdings = await getHoldings();
+      if (holdings.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-    if (result.fromCache) setFromCache(true);
-
-    if (result.data && result.data.quotes) {
-      const quotes = result.data.quotes;
       let value = 0;
       let cost = 0;
       let dayVal = 0;
+      let anyStale = false;
 
-      for (const pos of POSITIONS) {
-        const q = quotes[pos.symbol];
-        if (q) {
-          const v = pos.shares * q.current_price;
-          value += v;
-          cost += pos.shares * pos.avgCost;
-          dayVal += v * (q.day_change_pct / 100);
+      // Fetch live prices for each holding
+      for (const h of holdings) {
+        try {
+          const cached = await getPrice(h.symbol);
+          if (cached.source !== 'unavailable') {
+            const v = h.shares * cached.price;
+            value += v;
+            cost += h.shares * h.avg_cost_per_share;
+            dayVal += v * (cached.changePct / 100);
+            if (cached.isStale) anyStale = true;
+          }
+        } catch {
+          // Skip holdings where price fetch fails
+          cost += h.shares * h.avg_cost_per_share;
         }
       }
 
@@ -78,10 +69,13 @@ export default function GlancePage() {
       setTotalCost(cost);
       setDayChange(dayVal);
       setDayChangePct(value > 0 ? (dayVal / value) * 100 : 0);
+      setIsStale(anyStale);
       setLastUpdated(new Date().toLocaleTimeString('en-DK', { hour: '2-digit', minute: '2-digit' }));
+    } catch {
+      // Supabase load failed
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   const isUp = dayChange >= 0;
@@ -127,10 +121,18 @@ export default function GlancePage() {
             {/* Meta */}
             <div className="text-[10px] text-[var(--muted)] space-y-0.5">
               {lastUpdated && <p>Updated {lastUpdated}</p>}
-              {fromCache && <p>Cached data · may be outdated</p>}
+              {isStale && <p>Some prices may be outdated</p>}
               <p>Tap to open full portfolio →</p>
             </div>
           </>
+        )}
+
+        {/* Empty state */}
+        {!loading && totalValue === null && (
+          <div className="space-y-2">
+            <p className="text-sm text-[var(--muted)]">No holdings yet</p>
+            <p className="text-[10px] text-[var(--muted)]">Tap to open portfolio →</p>
+          </div>
         )}
       </div>
     </a>
