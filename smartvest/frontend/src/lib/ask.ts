@@ -4,7 +4,7 @@
  * The Aktiesparekonto is a Danish tax-advantaged investment account:
  * - Flat 17% tax on gains (vs 27%/42% in regular depot)
  * - Lagerbeskatning (mark-to-market): taxed on unrealized gains annually
- * - Deposit limit: 135,600 DKK (2026) — cumulative lifetime deposits
+ * - Deposit limit: 174,200 DKK (2026) — cumulative lifetime deposits
  * - Only stocks, ETFs, and investment funds listed on regulated markets
  * - One ASK per person (CPR-number linked)
  * - Cannot hold Danish government bonds or unlisted securities
@@ -14,11 +14,11 @@
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const ASK_DEPOSIT_LIMIT_2026 = 135600; // DKK - cumulative lifetime limit
+export const ASK_DEPOSIT_LIMIT_2026 = 174200; // DKK - cumulative lifetime limit (2026)
 export const ASK_TAX_RATE = 0.17;             // 17% flat
-export const REGULAR_LOW_RATE = 0.27;         // Regular depot: first 61,000
-export const REGULAR_HIGH_RATE = 0.42;        // Regular depot: above 61,000
-export const REGULAR_THRESHOLD = 61000;       // DKK threshold for 27% bracket
+export const REGULAR_LOW_RATE = 0.27;         // Regular depot: first 79,400
+export const REGULAR_HIGH_RATE = 0.42;        // Regular depot: above 79,400
+export const REGULAR_THRESHOLD = 79400;       // DKK threshold for 27% bracket (2026)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -239,7 +239,7 @@ export function calculateTaxSavings(gain: number): number {
   // ASK tax: flat 17%
   const askTax = gain * ASK_TAX_RATE;
 
-  // Regular depot tax: 27% on first 61,000, 42% on rest
+  // Regular depot tax: 27% on first 79,400, 42% on rest
   let regularTax: number;
   if (gain <= REGULAR_THRESHOLD) {
     regularTax = gain * REGULAR_LOW_RATE;

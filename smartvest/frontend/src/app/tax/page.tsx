@@ -201,7 +201,7 @@ export default function TaxPage() {
             <div className="text-[10px] text-[var(--muted)] leading-relaxed space-y-1">
               <p><strong>When do I pay?</strong> Tax on aktieindkomst is reported on your annual tax return (årsopgørelse) and collected by SKAT the following year.</p>
               <p><strong>What about dividends?</strong> Dividend tax (udbytteskat) is usually withheld automatically at 27% by your broker. This page only covers capital gains from selling.</p>
-              <p><strong>ASK advantage:</strong> The Aktiesparekonto is taxed at only 17% but has a deposit limit (currently ~135,600 DKK). Consider using it for your highest-growth investments.</p>
+              <p><strong>ASK advantage:</strong> The Aktiesparekonto is taxed at only 17% but has a deposit limit (currently 174,200 DKK). Consider using it for your highest-growth investments.</p>
             </div>
           </div>
         </>

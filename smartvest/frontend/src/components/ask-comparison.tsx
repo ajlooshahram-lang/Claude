@@ -51,7 +51,7 @@ export function ASKComparison() {
             <label className="text-[10px] text-[var(--muted)] block mb-1">Investment Amount</label>
             <div className="relative">
               <input
-                type="range" min="10000" max="135600" step="5000"
+                type="range" min="10000" max="174200" step="5000"
                 value={investment}
                 onChange={e => setInvestment(Number(e.target.value))}
                 className="w-full accent-[var(--primary)]"
@@ -246,7 +246,7 @@ export function ASKComparison() {
         <Info className="h-4 w-4 text-[var(--muted)] mt-0.5 flex-shrink-0" />
         <div className="text-[10px] text-[var(--muted)] leading-relaxed space-y-1">
           <p><strong>Lagerbeskatning trade-off:</strong> ASK taxes you every year even if you don&apos;t sell. This reduces your compounding base slightly. But the much lower rate (17% vs 27-42%) usually more than compensates.</p>
-          <p><strong>When regular depot wins:</strong> For very short holding periods (1-2 years) with gains under 61,000 DKK, the regular depot&apos;s 27% rate with deferred taxation can sometimes come out ahead.</p>
+          <p><strong>When regular depot wins:</strong> For very short holding periods (1-2 years) with gains under 79,400 DKK, the regular depot&apos;s 27% rate with deferred taxation can sometimes come out ahead.</p>
           <p><strong>Loss offset:</strong> Both accounts allow loss offset. In ASK, losses reduce your lagerbeskatning basis. In regular depots, losses offset gains in the same year or carry forward.</p>
         </div>
       </div>

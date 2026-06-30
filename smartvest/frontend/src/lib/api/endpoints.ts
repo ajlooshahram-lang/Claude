@@ -110,8 +110,8 @@ export function getTaxSummary(userId: string): TaxSummaryResponse {
     estimatedTax: 9861,
     effectiveRate: 28.7,
     taxBrackets: [
-      { bracket: 'First 61,000 DKK', rate: 27, amount: 34300, tax: 9261 },
-      { bracket: 'Above 61,000 DKK', rate: 42, amount: 0, tax: 0 },
+      { bracket: 'First 79,400 DKK', rate: 27, amount: 34300, tax: 9261 },
+      { bracket: 'Above 79,400 DKK', rate: 42, amount: 0, tax: 0 },
     ],
     lossCarryForward: 0,
     askTax: 1850,

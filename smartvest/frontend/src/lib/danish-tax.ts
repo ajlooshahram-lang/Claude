@@ -1,10 +1,10 @@
 /**
  * Danish Capital Gains Tax Calculator (Aktieindkomst)
  *
- * Danish tax rules for stock gains (2024/2025/2026 rates):
- *   - First 61,000 DKK of gains per year: 27% tax
- *   - Gains above 61,000 DKK: 42% tax
- *   - For married couples filing jointly: thresholds are doubled (122,000 DKK)
+ * Danish tax rules for stock gains (2026 rates):
+ *   - First 79,400 DKK of gains per year: 27% tax
+ *   - Gains above 79,400 DKK: 42% tax
+ *   - For married couples filing jointly: thresholds are doubled (158,800 DKK)
  *
  * Losses can offset gains in the same year.
  * Unused losses carry forward to future years.
@@ -30,8 +30,8 @@ export interface TaxEstimate {
   totalLosses: number;         // Total realized losses (positive number)
   netGain: number;             // Gain after loss offset (can be negative)
   taxableGain: number;         // Amount subject to tax (≥0)
-  taxAtLowRate: number;        // Tax at 27% (on first 61,000)
-  taxAtHighRate: number;       // Tax at 42% (on amount above 61,000)
+  taxAtLowRate: number;        // Tax at 27% (on first 79,400)
+  taxAtHighRate: number;       // Tax at 42% (on amount above 79,400)
   totalTax: number;            // Total estimated tax
   effectiveRate: number;       // Effective tax rate (%)
   netProfit: number;           // What you actually keep after tax
