@@ -100,7 +100,7 @@ export default function TaxPage() {
         {accountType === 'regular' && (
           <label className="flex items-center gap-2 mt-3 text-[10px] text-[var(--muted)]">
             <input type="checkbox" checked={isMarried} onChange={(e) => setIsMarried(e.target.checked)} className="accent-[var(--primary)]" />
-            Married (doubles the 27% threshold to 122,000 DKK)
+            Married (doubles the 27% threshold to 158,800 DKK)
           </label>
         )}
       </div>
@@ -133,7 +133,7 @@ export default function TaxPage() {
             {accountType === 'regular' ? (
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-[var(--muted)]">Gains taxed at 27% (first {isMarried ? '122,000' : '61,000'} DKK)</span>
+                  <span className="text-[var(--muted)]">Gains taxed at 27% (first {isMarried ? '158,800' : '79,400'} DKK)</span>
                   <span className="font-tabular">{taxEstimate.taxAtLowRate.toLocaleString()} DKK</span>
                 </div>
                 <div className="flex justify-between">

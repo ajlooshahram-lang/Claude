@@ -16,9 +16,11 @@
  */
 
 // 2026 thresholds (updated annually by SKAT)
-const THRESHOLD_SINGLE = 61000;  // DKK
-const RATE_LOW = 0.27;           // 27% on first 61,000
-const RATE_HIGH = 0.42;          // 42% above 61,000
+// The 2026 reform raised the progressionsgrænse from 61,000 to 79,400 DKK.
+// Source: Skatteministeriet / skat.dk — aktieindkomst progression threshold 2026.
+const THRESHOLD_SINGLE = 79400;  // DKK
+const RATE_LOW = 0.27;           // 27% on first 79,400
+const RATE_HIGH = 0.42;          // 42% above 79,400
 const RATE_ASK = 0.17;           // 17% flat for ASK accounts
 
 export type AccountType = 'regular' | 'ask';
