@@ -108,6 +108,7 @@ export default function OrdersPage() {
     pricePerShare: number;
     currency: string;
     accountType: 'regular' | 'ask';
+    idempotencyKey: string;
   }) {
     const userId = await getCurrentUserId();
     if (!userId) return;
@@ -120,6 +121,7 @@ export default function OrdersPage() {
       price_per_share: order.pricePerShare,
       total_value: order.shares * order.pricePerShare,
       account_type: order.accountType,
+      idempotency_key: order.idempotencyKey,
       order_type: 'market',
       status: 'filled',
       commission: 0,
@@ -333,6 +335,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
     pricePerShare: number;
     currency: string;
     accountType: 'regular' | 'ask';
+    idempotencyKey: string;
   }) => void;
   onCancel: () => void;
 }) {
@@ -379,6 +382,10 @@ function AddOrderForm({ onSubmit, onCancel }: {
     if (!symbol || !s || !p || s <= 0 || p <= 0 || submitting) return;
 
     setSubmitting(true);
+    // Generate a unique idempotency key for this submission.
+    // If the same key is submitted twice (double-click, two tabs),
+    // the database UNIQUE constraint rejects the duplicate.
+    const idempotencyKey = crypto.randomUUID();
     onSubmit({
       side,
       symbol: symbol.toUpperCase(),
@@ -386,6 +393,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
       pricePerShare: p,
       currency,
       accountType,
+      idempotencyKey,
     });
   }
 

@@ -65,6 +65,7 @@ export interface Database {
           price_per_share: number;
           total_value: number;
           account_type: 'regular' | 'ask';
+          idempotency_key: string;
           order_type: 'market' | 'limit' | 'stop' | 'stop_limit';
           status: 'filled' | 'pending' | 'cancelled' | 'rejected';
           commission: number;
