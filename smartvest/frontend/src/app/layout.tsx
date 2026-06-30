@@ -10,6 +10,8 @@ import { NotificationPrompt } from "@/components/notification-prompt";
 import { AppLockScreen } from "@/components/app-lock-screen";
 import { ConfigProvider } from "@/lib/white-label/config-context";
 import { getSSRThemeScript } from "@/lib/white-label/theme-engine";
+import { AuthProvider } from "@/components/auth-provider";
+import { AuthGate } from "@/components/auth-gate";
 import config from "../../smartvest.config";
 
 const geistSans = Geist({
@@ -77,17 +79,21 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen flex bg-[var(--background)] text-[var(--foreground)]">
         <ConfigProvider>
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto p-4 pb-20 lg:p-8 lg:pb-8">
-            {children}
-          </main>
-          <MobileNav />
-          {config.features.aiChat && <ChatWidget />}
-          {config.features.alerts && <AlertNotifier />}
-          <PWARegister />
-          {config.features.notifications && <NotificationManager />}
-          {config.features.notifications && <NotificationPrompt />}
-          {config.features.appLock && <AppLockScreen />}
+          <AuthProvider>
+            <AuthGate>
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto p-4 pb-20 lg:p-8 lg:pb-8">
+                {children}
+              </main>
+              <MobileNav />
+              {config.features.aiChat && <ChatWidget />}
+              {config.features.alerts && <AlertNotifier />}
+              <PWARegister />
+              {config.features.notifications && <NotificationManager />}
+              {config.features.notifications && <NotificationPrompt />}
+              {config.features.appLock && <AppLockScreen />}
+            </AuthGate>
+          </AuthProvider>
         </ConfigProvider>
       </body>
     </html>
