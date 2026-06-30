@@ -137,3 +137,44 @@ describe('estimateSellTax — sell preview with existing gains', () => {
     expect(r.netAfterTax).toBe(45800);
   });
 });
+
+
+
+describe('ASK/depot isolation — gains never leak between account types', () => {
+  it('ASK uses flat 17%, ignores 79,400 threshold even with large gain', () => {
+    const r = calculateDanishTax(200000, 0, 'ask', false);
+    // 200,000 * 0.17 = 34,000 (flat, no 42% bracket)
+    expect(r.totalTax).toBe(34000);
+    expect(r.taxAtHighRate).toBe(0); // ASK has no high rate
+    expect(r.effectiveRate).toBe(17);
+  });
+
+  it('regular depot uses progressive brackets, same 200,000 gain', () => {
+    const r = calculateDanishTax(200000, 0, 'regular', false);
+    // 79,400*0.27 + 120,600*0.42 = 21,438 + 50,652 = 72,090
+    expect(r.totalTax).toBe(72090);
+    expect(r.taxAtHighRate).toBe(50652);
+    expect(r.effectiveRate).toBe(36);
+  });
+
+  it('computing ASK and regular separately never cross-contaminates', () => {
+    // 50k ASK gain + 79.4k depot gain — computed independently
+    const ask = calculateDanishTax(50000, 0, 'ask', false);
+    const depot = calculateDanishTax(79400, 0, 'regular', false);
+
+    // ASK: 50000 * 0.17 = 8500
+    expect(ask.totalTax).toBe(8500);
+    // Depot: 79400 * 0.27 = 21438 (all at 27%, boundary not crossed)
+    expect(depot.totalTax).toBe(21438);
+    expect(depot.taxAtHighRate).toBe(0);
+
+    // WRONG way (combined): would be 129400 at regular = 21438 + 21000 = 42438
+    const wrongCombined = calculateDanishTax(50000 + 79400, 0, 'regular', false);
+    expect(wrongCombined.totalTax).toBe(42438);
+    expect(wrongCombined.taxAtHighRate).toBe(21000);
+
+    // Verify the correct separate calculation is LESS than the wrong combined
+    expect(ask.totalTax + depot.totalTax).toBe(29938);
+    expect(ask.totalTax + depot.totalTax).toBeLessThan(wrongCombined.totalTax);
+  });
+});

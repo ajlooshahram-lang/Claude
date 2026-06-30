@@ -6,7 +6,7 @@ import { getOrders } from '@/lib/supabase';
 import { calculateDanishTax, TaxEstimate, AccountType } from '@/lib/danish-tax';
 
 export default function TaxPage() {
-  const [orders, setOrders] = useState<{ side: string; symbol: string; shares: number; price_per_share: number }[]>([]);
+  const [orders, setOrders] = useState<{ side: string; symbol: string; shares: number; price_per_share: number; account_type: string }[]>([]);
   const [accountType, setAccountType] = useState<AccountType>('regular');
   const [isMarried, setIsMarried] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function TaxPage() {
           symbol: o.symbol,
           shares: o.shares,
           price_per_share: o.price_per_share,
+          account_type: o.account_type || 'regular',
         })));
       } catch {}
       setLoading(false);
@@ -28,11 +29,17 @@ export default function TaxPage() {
     loadOrders();
   }, []);
 
+  // Filter orders by the selected account type before computing tax
+  const filteredOrders = useMemo(() =>
+    orders.filter(o => o.account_type === accountType),
+    [orders, accountType]
+  );
+
   // Calculate realized gains/losses from sell orders using proper FIFO
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
     // Build FIFO lot queue per symbol: each buy is a "lot" with remaining shares
     const lots: Record<string, { price: number; remaining: number }[]> = {};
-    for (const o of orders) {
+    for (const o of filteredOrders) {
       if (o.side === 'buy') {
         if (!lots[o.symbol]) lots[o.symbol] = [];
         lots[o.symbol].push({ price: o.price_per_share, remaining: o.shares });
@@ -43,7 +50,7 @@ export default function TaxPage() {
     let losses = 0;
     const tradeList: { symbol: string; proceeds: number; cost: number; gain: number }[] = [];
 
-    const sells = orders.filter(o => o.side === 'sell');
+    const sells = filteredOrders.filter(o => o.side === 'sell');
 
     for (const sell of sells) {
       const proceeds = sell.price_per_share * sell.shares;
@@ -76,7 +83,7 @@ export default function TaxPage() {
     }
 
     return { realizedGains: gains, realizedLosses: losses, trades: tradeList };
-  }, [orders]);
+  }, [filteredOrders]);
 
   const taxEstimate = useMemo(() =>
     calculateDanishTax(realizedGains, realizedLosses, accountType, isMarried),

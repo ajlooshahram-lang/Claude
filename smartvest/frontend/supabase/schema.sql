@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS orders (
   shares NUMERIC(18, 6) NOT NULL CHECK (shares > 0),
   price_per_share NUMERIC(18, 4) NOT NULL,
   total_value NUMERIC(18, 4) NOT NULL,
+  account_type TEXT NOT NULL DEFAULT 'regular' CHECK (account_type IN ('regular', 'ask')),
   order_type TEXT NOT NULL DEFAULT 'market' CHECK (order_type IN ('market', 'limit', 'stop', 'stop_limit')),
   status TEXT NOT NULL DEFAULT 'filled' CHECK (status IN ('filled', 'pending', 'cancelled', 'rejected')),
   commission NUMERIC(10, 2) DEFAULT 0,

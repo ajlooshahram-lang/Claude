@@ -22,6 +22,7 @@ interface DisplayOrder {
   date: string;
   notes: string | null;
   status: string;
+  accountType: string;
 }
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ export default function OrdersPage() {
         date: o.executed_at || o.created_at,
         notes: o.notes,
         status: o.status,
+        accountType: o.account_type || 'regular',
       }));
       setOrders(mapped);
     } catch {
@@ -105,6 +107,7 @@ export default function OrdersPage() {
     shares: number;
     pricePerShare: number;
     currency: string;
+    accountType: 'regular' | 'ask';
   }) {
     const userId = await getCurrentUserId();
     if (!userId) return;
@@ -116,6 +119,7 @@ export default function OrdersPage() {
       shares: order.shares,
       price_per_share: order.pricePerShare,
       total_value: order.shares * order.pricePerShare,
+      account_type: order.accountType,
       order_type: 'market',
       status: 'filled',
       commission: 0,
@@ -328,6 +332,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
     shares: number;
     pricePerShare: number;
     currency: string;
+    accountType: 'regular' | 'ask';
   }) => void;
   onCancel: () => void;
 }) {
@@ -336,6 +341,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('USD');
+  const [accountType, setAccountType] = useState<'regular' | 'ask'>('regular');
   const [loadingPrice, setLoadingPrice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [watchlistItems, setWatchlistItems] = useState<{ symbol: string; name: string }[]>([]);
@@ -379,6 +385,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
       shares: s,
       pricePerShare: p,
       currency,
+      accountType,
     });
   }
 
@@ -413,6 +420,33 @@ function AddOrderForm({ onSubmit, onCancel }: {
         >
           Sell
         </button>
+      </div>
+
+      {/* Account type selector */}
+      <div>
+        <label className="text-[10px] text-[var(--muted)] block mb-1.5">Account</label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setAccountType('regular')}
+            className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
+              accountType === 'regular'
+                ? 'bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/30'
+                : 'bg-white/5 text-[var(--muted)] border border-[var(--card-border)]'
+            }`}
+          >
+            Regular Depot
+          </button>
+          <button
+            onClick={() => setAccountType('ask')}
+            className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
+              accountType === 'ask'
+                ? 'bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/30'
+                : 'bg-white/5 text-[var(--muted)] border border-[var(--card-border)]'
+            }`}
+          >
+            ASK
+          </button>
+        </div>
       </div>
 
       {/* Stock picker (from watchlist or type) */}
