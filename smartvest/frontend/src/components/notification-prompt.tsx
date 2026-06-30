@@ -8,6 +8,7 @@ import {
   requestNotificationPermission,
   areNotificationsEnabled,
 } from '@/lib/notifications';
+import { getWatchlist, getAlerts } from '@/lib/supabase';
 
 const DISMISSED_KEY = 'smartvest_notif_prompt_dismissed';
 
@@ -26,12 +27,16 @@ export function NotificationPrompt() {
     if (getNotificationPermission() === 'denied') return;
     if (localStorage.getItem(DISMISSED_KEY) === 'true') return;
 
-    // Only show if user has some activity (watchlist or alerts)
-    const hasWatchlist = (localStorage.getItem('smartvest_watchlist') || '[]') !== '[]';
-    const hasAlerts = (localStorage.getItem('smartvest_alerts') || '[]') !== '[]';
-    if (hasWatchlist || hasAlerts) {
-      setShow(true);
+    // Only show if user has some activity (watchlist or alerts from Supabase)
+    async function checkActivity() {
+      try {
+        const [watchlist, alerts] = await Promise.all([getWatchlist(), getAlerts()]);
+        if (watchlist.length > 0 || alerts.length > 0) {
+          setShow(true);
+        }
+      } catch {}
     }
+    checkActivity();
   }, []);
 
   async function handleEnable() {

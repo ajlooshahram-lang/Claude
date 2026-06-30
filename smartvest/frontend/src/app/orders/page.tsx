@@ -2,67 +2,121 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Receipt, Plus, Trash2, Loader2, TrendingUp, TrendingDown,
+  Receipt, Plus, Loader2, TrendingUp, TrendingDown,
   AlertCircle, X,
 } from 'lucide-react';
-import { getOrders, addOrder, removeOrder, Order, OrderType } from '@/lib/orders';
-import { getWatchlist } from '@/lib/watchlist';
+import { getOrders, addOrder, getWatchlist } from '@/lib/supabase';
+import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
+import { getCurrentUserId } from '@/lib/supabase';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface DisplayOrder {
+  id: string;
+  side: 'buy' | 'sell';
+  symbol: string;
+  shares: number;
+  pricePerShare: number;
+  totalValue: number;
+  currency: string;
+  date: string;
+  notes: string | null;
+  status: string;
+}
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [orders, setOrders] = useState<DisplayOrder[]>([]);
+  const [prices, setPrices] = useState<Record<string, CachedPrice>>({});
   const [loading, setLoading] = useState(true);
+  const [pricesLoading, setPricesLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    setOrders(getOrders());
-    fetchCurrentPrices();
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rawOrders = await getOrders();
+      const mapped: DisplayOrder[] = rawOrders.map((o) => ({
+        id: o.id,
+        side: o.side,
+        symbol: o.symbol,
+        shares: o.shares,
+        pricePerShare: o.price_per_share,
+        totalValue: o.total_value,
+        currency: 'USD',
+        date: o.executed_at || o.created_at,
+        notes: o.notes,
+        status: o.status,
+      }));
+      setOrders(mapped);
+    } catch {
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchCurrentPrices = useCallback(async () => {
-    setLoading(true);
-    const allOrders = getOrders();
-    const symbols = [...new Set(allOrders.map(o => o.symbol))];
+  const fetchCurrentPrices = useCallback(async (orderList: DisplayOrder[]) => {
+    if (orderList.length === 0) return;
+    setPricesLoading(true);
+    const symbols = [...new Set(orderList.map(o => o.symbol))];
+    const priceMap: Record<string, CachedPrice> = {};
 
-    const priceMap: Record<string, number> = {};
     for (const symbol of symbols) {
       try {
-        const res = await fetch(`${API_BASE}/api/quote/${symbol}`, {
-          signal: AbortSignal.timeout(10000),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          priceMap[symbol] = data.current_price;
-        }
+        priceMap[symbol] = await getPrice(symbol);
       } catch {}
     }
     setPrices(priceMap);
-    setLoading(false);
+    setPricesLoading(false);
   }, []);
 
-  function handleAddOrder(order: Omit<Order, 'id' | 'date' | 'totalCost'>) {
-    addOrder(order);
-    setOrders(getOrders());
-    setShowForm(false);
-    fetchCurrentPrices();
-  }
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
-  function handleRemove(id: string) {
-    removeOrder(id);
-    setOrders(getOrders());
+  useEffect(() => {
+    if (orders.length > 0) {
+      fetchCurrentPrices(orders);
+    }
+  }, [orders, fetchCurrentPrices]);
+
+  async function handleAddOrder(order: {
+    side: 'buy' | 'sell';
+    symbol: string;
+    shares: number;
+    pricePerShare: number;
+    currency: string;
+  }) {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+
+    await addOrder({
+      user_id: userId,
+      symbol: order.symbol.toUpperCase(),
+      side: order.side,
+      shares: order.shares,
+      price_per_share: order.pricePerShare,
+      total_value: order.shares * order.pricePerShare,
+      order_type: 'market',
+      status: 'filled',
+      commission: 0,
+      notes: null,
+      executed_at: new Date().toISOString(),
+    });
+
+    setShowForm(false);
+    await loadOrders();
   }
 
   // Calculate totals
   const totalInvested = orders
-    .filter(o => o.type === 'buy')
-    .reduce((sum, o) => sum + o.totalCost, 0);
+    .filter(o => o.side === 'buy')
+    .reduce((sum, o) => sum + o.totalValue, 0);
   const totalSold = orders
-    .filter(o => o.type === 'sell')
-    .reduce((sum, o) => sum + o.totalCost, 0);
+    .filter(o => o.side === 'sell')
+    .reduce((sum, o) => sum + o.totalValue, 0);
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -93,7 +147,7 @@ export default function OrdersPage() {
       )}
 
       {/* Empty state */}
-      {orders.length === 0 && !showForm && (
+      {!loading && orders.length === 0 && !showForm && (
         <div className="flex flex-col items-center text-center py-16">
           <div className="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
             <Receipt className="h-8 w-8 text-[var(--muted)]" />
@@ -106,14 +160,22 @@ export default function OrdersPage() {
       )}
 
       {/* Loading */}
-      {loading && orders.length > 0 && (
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--primary)]" />
+          <span className="ml-3 text-sm text-[var(--muted)]">Loading orders...</span>
+        </div>
+      )}
+
+      {/* Prices loading indicator */}
+      {pricesLoading && orders.length > 0 && (
         <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
           <Loader2 className="h-3 w-3 animate-spin" /> Fetching current prices...
         </div>
       )}
 
       {/* Orders list */}
-      {orders.length > 0 && (
+      {!loading && orders.length > 0 && (
         <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] overflow-hidden">
           {/* Table header */}
           <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2 text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider border-b border-[var(--card-border)] bg-black/20">
@@ -123,8 +185,7 @@ export default function OrdersPage() {
             <div className="col-span-1 text-right">Shares</div>
             <div className="col-span-2 text-right">Price Paid</div>
             <div className="col-span-2 text-right">Current</div>
-            <div className="col-span-1 text-right">Gain/Loss</div>
-            <div className="col-span-1"></div>
+            <div className="col-span-2 text-right">Gain/Loss</div>
           </div>
 
           <div className="divide-y divide-[var(--card-border)]">
@@ -133,7 +194,6 @@ export default function OrdersPage() {
                 key={order.id}
                 order={order}
                 currentPrice={prices[order.symbol] || null}
-                onRemove={handleRemove}
               />
             ))}
           </div>
@@ -146,15 +206,16 @@ export default function OrdersPage() {
 
 // ─── Order Row ───────────────────────────────────────────────────────────────
 
-function OrderRow({ order, currentPrice, onRemove }: {
-  order: Order; currentPrice: number | null; onRemove: (id: string) => void;
+function OrderRow({ order, currentPrice }: {
+  order: DisplayOrder; currentPrice: CachedPrice | null;
 }) {
-  const isBuy = order.type === 'buy';
-  const gainLoss = currentPrice !== null && isBuy
-    ? (currentPrice - order.pricePerShare) * order.shares
+  const isBuy = order.side === 'buy';
+  const livePrice = currentPrice && currentPrice.source !== 'unavailable' ? currentPrice.price : null;
+  const gainLoss = livePrice !== null && isBuy
+    ? (livePrice - order.pricePerShare) * order.shares
     : null;
-  const gainLossPct = currentPrice !== null && isBuy && order.pricePerShare > 0
-    ? ((currentPrice - order.pricePerShare) / order.pricePerShare) * 100
+  const gainLossPct = livePrice !== null && isBuy && order.pricePerShare > 0
+    ? ((livePrice - order.pricePerShare) / order.pricePerShare) * 100
     : null;
   const isGain = gainLoss !== null && gainLoss >= 0;
 
@@ -179,7 +240,7 @@ function OrderRow({ order, currentPrice, onRemove }: {
               {isGain ? '+' : ''}{gainLoss.toFixed(0)} ({gainLossPct?.toFixed(1)}%)
             </p>
           ) : (
-            <p className="text-xs text-[var(--muted)]">{order.currency} {order.totalCost.toFixed(0)}</p>
+            <p className="text-xs text-[var(--muted)]">{order.currency} {order.totalValue.toFixed(0)}</p>
           )}
         </div>
       </div>
@@ -198,19 +259,21 @@ function OrderRow({ order, currentPrice, onRemove }: {
         </div>
         <div className="col-span-2">
           <p className="font-medium">{order.symbol}</p>
-          <p className="text-[9px] text-[var(--muted)]">{order.name}</p>
         </div>
         <div className="col-span-1 text-right font-tabular">{order.shares}</div>
         <div className="col-span-2 text-right font-tabular">
           {order.currency} {order.pricePerShare.toFixed(2)}
         </div>
         <div className="col-span-2 text-right font-tabular">
-          {currentPrice !== null
-            ? `${order.currency} ${currentPrice.toFixed(2)}`
+          {livePrice !== null
+            ? `${order.currency} ${livePrice.toFixed(2)}`
             : <span className="text-[var(--muted)]">—</span>
           }
+          {currentPrice && currentPrice.isStale && (
+            <span className="text-[7px] text-[var(--warning)] block">may be outdated</span>
+          )}
         </div>
-        <div className="col-span-1 text-right">
+        <div className="col-span-2 text-right">
           {gainLoss !== null ? (
             <span className={`font-tabular font-medium ${isGain ? 'text-[var(--gain)]' : 'text-[var(--loss)]'}`}>
               {isGain ? '+' : ''}{gainLossPct?.toFixed(1)}%
@@ -218,15 +281,6 @@ function OrderRow({ order, currentPrice, onRemove }: {
           ) : (
             <span className="text-[var(--muted)]">—</span>
           )}
-        </div>
-        <div className="col-span-1 text-right">
-          <button
-            onClick={() => onRemove(order.id)}
-            className="p-1 rounded text-[var(--muted)] hover:text-[var(--loss)] transition-colors"
-            title="Delete order"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
         </div>
       </div>
     </div>
@@ -237,34 +291,48 @@ function OrderRow({ order, currentPrice, onRemove }: {
 // ─── Add Order Form ──────────────────────────────────────────────────────────
 
 function AddOrderForm({ onSubmit, onCancel }: {
-  onSubmit: (order: Omit<Order, 'id' | 'date' | 'totalCost'>) => void;
+  onSubmit: (order: {
+    side: 'buy' | 'sell';
+    symbol: string;
+    shares: number;
+    pricePerShare: number;
+    currency: string;
+  }) => void;
   onCancel: () => void;
 }) {
-  const [type, setType] = useState<OrderType>('buy');
+  const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [symbol, setSymbol] = useState('');
-  const [name, setName] = useState('');
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState('DKK');
+  const [currency, setCurrency] = useState('USD');
   const [loadingPrice, setLoadingPrice] = useState(false);
+  const [watchlistItems, setWatchlistItems] = useState<{ symbol: string; name: string }[]>([]);
 
-  const watchlist = getWatchlist();
-
-  function handleSelectWatchlist(sym: string, stockName: string) {
-    setSymbol(sym);
-    setName(stockName);
-    // Auto-fetch current price
-    setLoadingPrice(true);
-    fetch(`${API_BASE}/api/quote/${sym}`, { signal: AbortSignal.timeout(10000) })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data) {
-          setPrice(data.current_price.toFixed(2));
-          setCurrency(data.currency || 'DKK');
+  // Load watchlist items for quick-select (async)
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const items = await getWatchlist();
+        if (!cancelled) {
+          setWatchlistItems(items.map(i => ({ symbol: i.symbol, name: i.name })));
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingPrice(false));
+      } catch {}
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleSelectWatchlist(sym: string) {
+    setSymbol(sym);
+    setLoadingPrice(true);
+    try {
+      const p = await getPrice(sym);
+      if (p.source !== 'unavailable') {
+        setPrice(p.price.toFixed(2));
+      }
+    } catch {}
+    setLoadingPrice(false);
   }
 
   function handleSubmit() {
@@ -273,9 +341,8 @@ function AddOrderForm({ onSubmit, onCancel }: {
     if (!symbol || !s || !p || s <= 0 || p <= 0) return;
 
     onSubmit({
-      type,
+      side,
       symbol: symbol.toUpperCase(),
-      name: name || symbol.toUpperCase(),
       shares: s,
       pricePerShare: p,
       currency,
@@ -294,9 +361,9 @@ function AddOrderForm({ onSubmit, onCancel }: {
       {/* Buy / Sell toggle */}
       <div className="flex gap-2">
         <button
-          onClick={() => setType('buy')}
+          onClick={() => setSide('buy')}
           className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-            type === 'buy'
+            side === 'buy'
               ? 'bg-[var(--gain)]/10 text-[var(--gain)] border border-[var(--gain)]/30'
               : 'bg-white/5 text-[var(--muted)] border border-[var(--card-border)]'
           }`}
@@ -304,9 +371,9 @@ function AddOrderForm({ onSubmit, onCancel }: {
           Buy
         </button>
         <button
-          onClick={() => setType('sell')}
+          onClick={() => setSide('sell')}
           className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-            type === 'sell'
+            side === 'sell'
               ? 'bg-[var(--loss)]/10 text-[var(--loss)] border border-[var(--loss)]/30'
               : 'bg-white/5 text-[var(--muted)] border border-[var(--card-border)]'
           }`}
@@ -316,14 +383,14 @@ function AddOrderForm({ onSubmit, onCancel }: {
       </div>
 
       {/* Stock picker (from watchlist or type) */}
-      {watchlist.length > 0 && (
+      {watchlistItems.length > 0 && (
         <div>
           <p className="text-[10px] text-[var(--muted)] mb-1.5">From watchlist:</p>
           <div className="flex flex-wrap gap-1.5">
-            {watchlist.map((item) => (
+            {watchlistItems.map((item) => (
               <button
                 key={item.symbol}
-                onClick={() => handleSelectWatchlist(item.symbol, item.name)}
+                onClick={() => handleSelectWatchlist(item.symbol)}
                 className={`rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors ${
                   symbol === item.symbol
                     ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]'
@@ -338,27 +405,15 @@ function AddOrderForm({ onSubmit, onCancel }: {
       )}
 
       {/* Manual symbol entry */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-[var(--muted)] block mb-1">Symbol</label>
-          <input
-            type="text"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-            placeholder="e.g. AAPL"
-            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--muted)] block mb-1">Company Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Apple Inc."
-            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
-          />
-        </div>
+      <div>
+        <label className="text-[10px] text-[var(--muted)] block mb-1">Symbol</label>
+        <input
+          type="text"
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+          placeholder="e.g. AAPL"
+          className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
+        />
       </div>
 
       {/* Shares and price */}
@@ -396,8 +451,8 @@ function AddOrderForm({ onSubmit, onCancel }: {
             onChange={(e) => setCurrency(e.target.value)}
             className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
           >
-            <option value="DKK">DKK</option>
             <option value="USD">USD</option>
+            <option value="DKK">DKK</option>
             <option value="EUR">EUR</option>
             <option value="GBp">GBp</option>
             <option value="JPY">JPY</option>
@@ -409,7 +464,7 @@ function AddOrderForm({ onSubmit, onCancel }: {
       {/* Total preview */}
       {shares && price && parseFloat(shares) > 0 && parseFloat(price) > 0 && (
         <div className="rounded-lg bg-white/[0.03] border border-[var(--card-border)] p-3 text-center">
-          <p className="text-[10px] text-[var(--muted)]">Total {type === 'buy' ? 'cost' : 'proceeds'}</p>
+          <p className="text-[10px] text-[var(--muted)]">Total {side === 'buy' ? 'cost' : 'proceeds'}</p>
           <p className="text-lg font-bold font-tabular mt-0.5">
             {currency} {(parseFloat(shares) * parseFloat(price)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
@@ -421,12 +476,12 @@ function AddOrderForm({ onSubmit, onCancel }: {
         onClick={handleSubmit}
         disabled={!symbol || !shares || !price || parseFloat(shares) <= 0 || parseFloat(price) <= 0}
         className={`w-full rounded-lg py-3 text-sm font-semibold transition-opacity disabled:opacity-40 ${
-          type === 'buy'
+          side === 'buy'
             ? 'bg-[var(--gain)] text-white'
             : 'bg-[var(--loss)] text-white'
         }`}
       >
-        Log {type === 'buy' ? 'Buy' : 'Sell'} Order
+        Log {side === 'buy' ? 'Buy' : 'Sell'} Order
       </button>
     </div>
   );

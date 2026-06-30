@@ -6,19 +6,20 @@ import {
   RefreshCw, Clock, AlertCircle, Newspaper, ExternalLink, Bell,
   Share2,
 } from 'lucide-react';
-import { getWatchlist, removeFromWatchlist, WatchlistItem } from '@/lib/watchlist';
+import { getWatchlist, removeFromWatchlist } from '@/lib/supabase';
+import { getPrice, CachedPrice, formatLastUpdated } from '@/lib/market-data';
 import { getProfile, RiskProfile } from '@/lib/profile';
 import { addAlert, AlertDirection } from '@/lib/alerts';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface WatchlistStock {
+  id: string;           // Supabase row id (needed for removal)
   symbol: string;
   name: string;
   addedAt: string;
-  // Live data (fetched from backend)
+  // Live data from Alpha Vantage via getPrice()
+  cachedPrice: CachedPrice | null;
   currentPrice: number;
   currency: string;
   dayChangePct: number;
@@ -31,10 +32,10 @@ interface WatchlistStock {
   // Derived
   beginnerRating: 'Beginner Friendly' | 'Intermediate' | 'Risky';
   beginnerExplanation: string;
-  // 14-day trend
+  // 14-day trend (not available from Alpha Vantage — set to null)
   trendDirection: 'up' | 'down' | 'flat' | null;
   trendChangePct: number | null;
-  // SmartVest score
+  // SmartVest score (not available without backend — set to null)
   smartScore: number | null;
   smartLabel: string | null;
 }
@@ -84,87 +85,52 @@ export default function WatchlistPage() {
   }, []);
 
   const fetchWatchlistData = useCallback(async () => {
-    const items = getWatchlist();
-    if (items.length === 0) {
-      setStocks([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch all stocks in PARALLEL (not sequentially) for speed
+      // Load watchlist items from Supabase (async)
+      const items = await getWatchlist();
+
+      if (items.length === 0) {
+        setStocks([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch prices for all watchlist symbols via Alpha Vantage
       const results: WatchlistStock[] = [];
-      
-      const fetchOne = async (item: WatchlistItem): Promise<WatchlistStock | null> => {
+
+      for (const item of items) {
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
-          
-          // Fetch profile, trend, and score in parallel for each stock
-          const [profileRes, trendRes, scoreRes] = await Promise.allSettled([
-            fetch(`${API_BASE}/api/profile/${item.symbol}`, { signal: controller.signal }),
-            fetch(`${API_BASE}/api/trend/${item.symbol}`, { signal: controller.signal }),
-            fetch(`${API_BASE}/api/score/${item.symbol}`, { signal: controller.signal }),
-          ]);
-          clearTimeout(timeout);
+          const price = await getPrice(item.symbol);
 
-          const p = profileRes.status === 'fulfilled' && profileRes.value.ok
-            ? await profileRes.value.json() : null;
-          if (!p) return null;
+          const { rating, explanation } = assessBeginner(null, null, null);
 
-          let trendDirection: 'up' | 'down' | 'flat' | null = null;
-          let trendChangePct: number | null = null;
-          if (trendRes.status === 'fulfilled' && trendRes.value.ok) {
-            const t = await trendRes.value.json();
-            trendDirection = t.direction;
-            trendChangePct = t.change_pct;
-          }
-
-          let smartScore: number | null = null;
-          let smartLabel: string | null = null;
-          if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
-            const s = await scoreRes.value.json();
-            smartScore = s.total_score;
-            smartLabel = s.label;
-          }
-
-          const { rating, explanation } = assessBeginner(
-            p.annualized_volatility, p.beta, p.market_cap
-          );
-
-          return {
+          results.push({
+            id: item.id,
             symbol: item.symbol,
-            name: p.name || item.name,
-            addedAt: item.addedAt,
-            currentPrice: p.current_price,
-            currency: p.currency,
-            dayChangePct: p.day_change_pct,
-            beta: p.beta,
-            annualizedVolatility: p.annualized_volatility,
-            marketCap: p.market_cap,
-            sector: p.sector,
-            country: p.country,
-            dividendYield: p.dividend_yield,
+            name: item.name || item.symbol,
+            addedAt: item.added_at,
+            cachedPrice: price,
+            currentPrice: price.price,
+            currency: 'USD', // Alpha Vantage returns USD by default
+            dayChangePct: price.changePct,
+            beta: null,
+            annualizedVolatility: null,
+            marketCap: null,
+            sector: '',
+            country: '',
+            dividendYield: null,
             beginnerRating: rating,
             beginnerExplanation: explanation,
-            trendDirection,
-            trendChangePct,
-            smartScore,
-            smartLabel,
-          };
+            trendDirection: null,
+            trendChangePct: null,
+            smartScore: null,
+            smartLabel: null,
+          });
         } catch {
-          return null;
-        }
-      };
-
-      // Fetch ALL stocks in parallel
-      const settled = await Promise.allSettled(items.map(fetchOne));
-      for (const result of settled) {
-        if (result.status === 'fulfilled' && result.value) {
-          results.push(result.value);
+          // If price fetch fails for one stock, skip it
         }
       }
 
@@ -173,8 +139,7 @@ export default function WatchlistPage() {
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       }));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError(`Could not load live prices for your watchlist. Make sure the backend is running and try again.`);
+      setError('Could not load your watchlist. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -184,9 +149,9 @@ export default function WatchlistPage() {
     fetchWatchlistData();
   }, [fetchWatchlistData]);
 
-  function handleRemove(symbol: string) {
-    removeFromWatchlist(symbol);
-    setStocks(prev => prev.filter(s => s.symbol !== symbol));
+  async function handleRemove(id: string) {
+    await removeFromWatchlist(id);
+    setStocks(prev => prev.filter(s => s.id !== id));
   }
 
   // Empty state
@@ -214,7 +179,7 @@ export default function WatchlistPage() {
         <div>
           <h1 className="text-2xl font-bold">Watchlist</h1>
           <p className="text-sm text-[var(--muted)]">
-            {stocks.length} stock{stocks.length !== 1 ? 's' : ''} saved &middot; Live prices from Yahoo Finance
+            {stocks.length} stock{stocks.length !== 1 ? 's' : ''} saved &middot; Live prices from Alpha Vantage
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,7 +222,7 @@ export default function WatchlistPage() {
       {stocks.length > 0 && (
         <div className="space-y-3">
           {sortWatchlistByProfile(stocks, riskProfile).map((stock) => (
-            <WatchlistCard key={stock.symbol} stock={stock} onRemove={handleRemove} />
+            <WatchlistCard key={stock.id} stock={stock} onRemove={handleRemove} />
           ))}
         </div>
       )}
@@ -269,7 +234,7 @@ export default function WatchlistPage() {
 // ─── Watchlist Card ──────────────────────────────────────────────────────────
 
 function WatchlistCard({ stock, onRemove }: {
-  stock: WatchlistStock; onRemove: (symbol: string) => void;
+  stock: WatchlistStock; onRemove: (id: string) => void;
 }) {
   const isUp = stock.dayChangePct >= 0;
 
@@ -301,7 +266,7 @@ function WatchlistCard({ stock, onRemove }: {
               <p className="text-xs text-[var(--muted)] truncate">{stock.name}</p>
             </div>
             <p className="text-[10px] text-[var(--muted)] mt-0.5">
-              {stock.sector} &middot; {stock.country}
+              {stock.sector ? `${stock.sector} · ` : ''}{stock.country}
               {stock.marketCap ? ` · ${formatCap(stock.marketCap)} ${stock.currency}` : ''}
             </p>
           </div>
@@ -328,20 +293,31 @@ function WatchlistCard({ stock, onRemove }: {
             </div>
           )}
 
-          {/* Price */}
+          {/* Price — use PriceDisplay pattern or inline */}
           <div className="text-right">
-            <p className="font-bold font-tabular">
-              {stock.currency} {stock.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </p>
-            <p className={`text-xs font-medium flex items-center justify-end gap-0.5 ${isUp ? 'text-[var(--gain)]' : 'text-[var(--loss)]'}`}>
-              {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {isUp ? '+' : ''}{stock.dayChangePct.toFixed(2)}%
-            </p>
+            {stock.cachedPrice && stock.cachedPrice.source !== 'unavailable' ? (
+              <>
+                <p className="font-bold font-tabular">
+                  {stock.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+                <p className={`text-xs font-medium flex items-center justify-end gap-0.5 ${isUp ? 'text-[var(--gain)]' : 'text-[var(--loss)]'}`}>
+                  {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {isUp ? '+' : ''}{stock.dayChangePct.toFixed(2)}%
+                </p>
+                {stock.cachedPrice.isStale && (
+                  <p className="text-[8px] text-[var(--warning)] mt-0.5">
+                    {formatLastUpdated(stock.cachedPrice.fetchedAt)} · may be outdated
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-[var(--muted)]">No price data</p>
+            )}
           </div>
 
           {/* Remove button */}
           <button
-            onClick={() => onRemove(stock.symbol)}
+            onClick={() => onRemove(stock.id)}
             className="p-2 rounded-lg text-[var(--muted)] hover:text-[var(--loss)] hover:bg-[var(--loss)]/5 transition-colors"
             title="Remove from watchlist"
           >
@@ -402,141 +378,43 @@ function WatchlistCard({ stock, onRemove }: {
         <span className="ml-auto">Added {(() => { try { return new Date(stock.addedAt).toLocaleDateString(); } catch { return 'recently'; } })()}</span>
       </div>
 
-      {/* Set Alert + News */}
+      {/* Set Alert + last updated info */}
       <div className="mt-3 flex items-center gap-3">
         <SetAlertButton symbol={stock.symbol} name={stock.name} currentPrice={stock.currentPrice} currency={stock.currency} />
-        <WatchlistNewsSection symbol={stock.symbol} />
+        {stock.cachedPrice && stock.cachedPrice.fetchedAt && (
+          <span className="text-[9px] text-[var(--muted)]">
+            Price updated {formatLastUpdated(stock.cachedPrice.fetchedAt)}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 
-// ─── News Section (expandable per card) ──────────────────────────────────────
-
-interface NewsArticle {
-  title: string;
-  source: string;
-  date: string;
-  url: string;
-}
-
-function WatchlistNewsSection({ symbol }: { symbol: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  function handleToggle() {
-    if (!expanded && articles.length === 0) {
-      // Fetch on first expand
-      setLoading(true);
-      fetch(`${API_BASE}/api/news/${symbol}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data && data.articles) setArticles(data.articles);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }
-    setExpanded(!expanded);
-  }
-
-  return (
-    <div className="mt-3">
-      <button
-        onClick={handleToggle}
-        className="flex items-center gap-1.5 text-[11px] text-[var(--muted)] hover:text-[var(--primary)] transition-colors"
-      >
-        <Newspaper className="h-3 w-3" />
-        {expanded ? 'Hide news' : 'Show news'}
-      </button>
-
-      {expanded && (
-        <div className="mt-2 space-y-2">
-          {loading && (
-            <div className="flex items-center gap-2 text-[10px] text-[var(--muted)] py-2">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Loading headlines...
-            </div>
-          )}
-          {!loading && articles.length === 0 && (
-            <p className="text-[10px] text-[var(--muted)] py-1">No recent news found.</p>
-          )}
-          {articles.map((article, i) => (
-            <a
-              key={i}
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block rounded-lg border border-[var(--card-border)] bg-black/20 p-2.5 hover:border-[var(--primary)]/30 transition-colors"
-            >
-              <p className="text-[11px] font-medium leading-snug">
-                {article.title}
-              </p>
-              <div className="flex items-center gap-2 mt-1 text-[9px] text-[var(--muted)]">
-                <span>{article.source}</span>
-                <span>&middot;</span>
-                <span>{formatDate(article.date)}</span>
-                <ExternalLink className="h-2.5 w-2.5 ml-auto" />
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '';
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-DK', { month: 'short', day: 'numeric' });
-  } catch {
-    return dateStr.substring(0, 10);
-  }
-}
-
-
 // ─── Profile-Based Sorting for Watchlist ─────────────────────────────────────
-// Sorts watchlist stocks based on the user's risk profile.
-// Uses real data (volatility, beta, momentum) for accurate ranking:
-//
-//   Conservative → lowest volatility and beta first (safest stocks on top)
-//   Moderate → sorted by SmartVest score (best balanced picks on top)
-//   Growth → highest momentum/trend first (strongest movers on top)
 
 function sortWatchlistByProfile(stocks: WatchlistStock[], profile: RiskProfile | null): WatchlistStock[] {
   if (!profile || stocks.length <= 1) return stocks;
 
   return [...stocks].sort((a, b) => {
     if (profile === 'Conservative') {
-      // Conservative: prioritize low volatility, low beta (safest first)
       const volA = a.annualizedVolatility ?? 0.5;
       const volB = b.annualizedVolatility ?? 0.5;
       const betaA = a.beta ?? 1.0;
       const betaB = b.beta ?? 1.0;
-      // Combined safety metric: lower is better
       const safetyA = volA * 0.6 + betaA * 0.4;
       const safetyB = volB * 0.6 + betaB * 0.4;
       return safetyA - safetyB;
     }
 
     if (profile === 'Growth') {
-      // Growth: prioritize positive momentum (strongest trend first)
       const momA = a.trendChangePct ?? 0;
       const momB = b.trendChangePct ?? 0;
       return momB - momA;
     }
 
-    // Moderate: sort by SmartVest score (best overall picks first)
+    // Moderate: sort by SmartVest score
     const scoreA = a.smartScore ?? 5;
     const scoreB = b.smartScore ?? 5;
     return scoreB - scoreA;
@@ -633,7 +511,6 @@ function ShareWatchlistButton({ symbols }: { symbols: string[] }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {
-      // Fallback: select and copy via prompt
       window.prompt('Copy this link to share your watchlist:', shareUrl);
     });
   }
