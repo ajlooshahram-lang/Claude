@@ -32,11 +32,22 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
+    setNetworkError(null);
     try {
       const rawOrders = await getOrders();
+
+      // If empty and offline, it might be a network failure
+      if (rawOrders.length === 0 && typeof window !== 'undefined' && !navigator.onLine) {
+        setNetworkError('You appear to be offline. Your orders may not be loading correctly.');
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
       const mapped: DisplayOrder[] = rawOrders.map((o) => ({
         id: o.id,
         side: o.side,
@@ -51,6 +62,12 @@ export default function OrdersPage() {
       }));
       setOrders(mapped);
     } catch {
+      // Network error or Supabase down
+      if (typeof window !== 'undefined' && !navigator.onLine) {
+        setNetworkError('You are offline. Connect to the internet to see your orders.');
+      } else {
+        setNetworkError('Could not load orders. The server may be temporarily unavailable.');
+      }
       setOrders([]);
     } finally {
       setLoading(false);
@@ -150,6 +167,14 @@ export default function OrdersPage() {
       {/* Add Order Form */}
       {showForm && (
         <AddOrderForm onSubmit={handleAddOrder} onCancel={() => setShowForm(false)} />
+      )}
+
+      {/* Network error */}
+      {networkError && (
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/5 px-4 py-2.5 text-sm text-[var(--warning)]">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          {networkError}
+        </div>
       )}
 
       {/* Empty state */}

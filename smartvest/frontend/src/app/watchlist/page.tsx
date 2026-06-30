@@ -93,6 +93,14 @@ export default function WatchlistPage() {
       const items = await getWatchlist();
 
       if (items.length === 0) {
+        // Distinguish: is this genuinely empty or a network failure?
+        // If we're offline, show error instead of empty state
+        if (typeof window !== 'undefined' && !navigator.onLine) {
+          setError('You appear to be offline. Your watchlist may not be loading correctly.');
+          setStocks([]);
+          setLoading(false);
+          return;
+        }
         setStocks([]);
         setLoading(false);
         return;
@@ -139,7 +147,12 @@ export default function WatchlistPage() {
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       }));
     } catch (err: unknown) {
-      setError('Could not load your watchlist. Please try again.');
+      // Network error or Supabase down — don't show empty state
+      if (typeof window !== 'undefined' && !navigator.onLine) {
+        setError('You are offline. Connect to the internet to see your watchlist.');
+      } else {
+        setError('Could not load your watchlist. The server may be temporarily unavailable. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
