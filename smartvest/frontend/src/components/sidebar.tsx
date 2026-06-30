@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Search,
   BookOpen, Bell, Briefcase, Settings, Shield, Bookmark, Calculator,
@@ -14,35 +14,14 @@ import { getProfile, RiskProfile } from '@/lib/profile';
 import { getUserFirstName } from '@/lib/onboarding';
 import { getSavedTheme, saveTheme, applyTheme, Theme } from '@/lib/theme';
 import { isLockEnabled, setPIN, isPINSet } from '@/lib/app-lock';
-
-const nav = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
-  { name: 'Search', href: '/search', icon: Search },
-  { name: 'Watchlist', href: '/watchlist', icon: Bookmark },
-  { name: 'Alerts', href: '/alerts', icon: Bell },
-  { name: 'Simulator', href: '/simulator', icon: Calculator },
-  { name: 'DCA Calculator', href: '/dca', icon: Calendar },
-  { name: 'Sectors', href: '/sectors', icon: BarChart3 },
-  { name: 'Compare', href: '/compare', icon: ArrowLeftRight },
-  { name: 'Planner', href: '/planner', icon: PieChart },
-  { name: 'Performance', href: '/performance', icon: TrendingUp },
-  { name: 'Orders', href: '/orders', icon: Receipt },
-  { name: 'Tax', href: '/tax', icon: Receipt },
-  { name: 'ASK', href: '/ask', icon: Landmark },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Smart Picks', href: '/picks', icon: Sparkles },
-  { name: 'Crash Sim', href: '/crash-sim', icon: AlertTriangle },
-  { name: 'Backtest', href: '/backtest', icon: FlaskConical },
-  { name: 'Behavior', href: '/behavior', icon: Brain },
-  { name: 'Report Card', href: '/report-card', icon: ClipboardCheck },
-  { name: 'Patterns', href: '/patterns', icon: Eye },
-  { name: 'Money Flow', href: '/money-flow', icon: Activity },
-  { name: 'Glossary', href: '/glossary', icon: BookOpen },
-];
+import { useConfig } from '@/lib/white-label/config-context';
+import { getEnabledNavItems } from '@/lib/white-label/nav-config';
+import { BrandLogo } from './brand-logo';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { branding, features, theme: themeConfig, locale } = useConfig();
+  const nav = useMemo(() => getEnabledNavItems(features), [features]);
   const [profileLabel, setProfileLabel] = useState<RiskProfile | null>(null);
   const [firstName, setFirstName] = useState('');
   const [theme, setTheme] = useState<Theme>('dark');
@@ -60,12 +39,9 @@ export function Sidebar() {
 
   return (
     <aside className="hidden lg:flex w-60 flex-col border-r border-[var(--card-border)] bg-[var(--card)]">
-      {/* Logo */}
+      {/* Logo — driven by config */}
       <div className="flex items-center gap-2 px-5 h-16 border-b border-[var(--card-border)]">
-        <div className="h-8 w-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-          <Shield className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-lg font-semibold">SmartVest</span>
+        <BrandLogo size="md" />
       </div>
 
       {/* Navigation */}
@@ -113,7 +89,8 @@ export function Sidebar() {
             <p className="text-[9px] text-[var(--muted)] mt-0.5 pl-6">Your risk profile</p>
           </div>
         )}
-        {/* Theme Toggle */}
+        {/* Theme Toggle — only shown if config allows */}
+        {themeConfig.allowThemeToggle && (
         <button
           onClick={() => {
             const next = theme === 'dark' ? 'light' : 'dark';
@@ -134,8 +111,9 @@ export function Sidebar() {
           )}
           {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         </button>
-        {/* App Lock */}
-        {!lockActive && (
+        )}
+        {/* App Lock — only shown if config enables it */}
+        {features.appLock && !lockActive && (
           <button
             onClick={() => {
               // Trigger PIN setup by setting a flag
@@ -148,7 +126,7 @@ export function Sidebar() {
             Set Up App Lock
           </button>
         )}
-        {lockActive && (
+        {features.appLock && lockActive && (
           <div className="flex items-center gap-3 px-3 py-2.5 text-sm text-[var(--gain)]">
             <Lock className="h-[18px] w-[18px]" />
             <span className="text-[11px]">App Lock Active</span>
@@ -162,7 +140,7 @@ export function Sidebar() {
           Settings
         </Link>
         <div className="mt-3 px-3 text-[10px] text-[var(--muted)]">
-          {firstName && firstName !== 'Investor' && <span>{firstName} &middot; </span>}DKK &middot; Denmark &middot; v0.1
+          {firstName && firstName !== 'Investor' && <span>{firstName} &middot; </span>}{locale.defaultCurrency} &middot; {locale.country} &middot; v0.1
         </div>
       </div>
     </aside>
