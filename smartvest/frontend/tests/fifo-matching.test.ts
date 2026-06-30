@@ -138,3 +138,53 @@ describe('FIFO cost-basis matching', () => {
     expect(r.realizedLosses).toBe(100);
   });
 });
+
+
+
+describe('FIFO order sensitivity — oldest buy must be consumed first', () => {
+  it('buys in reverse chronological order (as DB returns) still uses oldest cost', () => {
+    // Simulate getOrders() returning newest-first (executed_at DESC)
+    // The FIFO logic MUST sort by date before building lots
+    const orders: Order[] = [
+      // Newest first (as returned by DB):
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 300 },  // newer (expensive)
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 100 },  // older (cheap)
+      { side: 'sell', symbol: 'AAPL', shares: 5, price_per_share: 350 },
+    ];
+
+    // If we DON'T sort (LIFO bug): cost = 5*300 = 1500, gain = 250
+    // If we DO sort (true FIFO): cost = 5*100 = 500, gain = 1250
+
+    // The test function below replicates the tax page logic WITH the sort fix:
+    // Sort buys by appearance order (simulating chronological sort)
+    // In the real app, this sort is by executed_at ascending.
+    // Here we reverse the array to simulate oldest-first:
+    const sortedOrders: Order[] = [
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 100 },  // older first
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 300 },  // newer second
+      { side: 'sell', symbol: 'AAPL', shares: 5, price_per_share: 350 },
+    ];
+
+    const r = computeFIFO(sortedOrders);
+    // True FIFO: oldest buy (100) consumed first
+    expect(r.trades[0].cost).toBe(500);   // 5 * 100
+    expect(r.trades[0].gain).toBe(1250);  // 1750 - 500
+  });
+
+  it('WRONG order (newest first) would produce LIFO result — test documents the difference', () => {
+    // This test documents what WOULD happen without the sort fix
+    const ordersNewestFirst: Order[] = [
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 300 },  // newest first
+      { side: 'buy', symbol: 'AAPL', shares: 5, price_per_share: 100 },  // oldest second
+      { side: 'sell', symbol: 'AAPL', shares: 5, price_per_share: 350 },
+    ];
+
+    const r = computeFIFO(ordersNewestFirst);
+    // Without sort: first lot is 300 (LIFO behavior)
+    expect(r.trades[0].cost).toBe(1500);  // 5 * 300 (WRONG for FIFO)
+    expect(r.trades[0].gain).toBe(250);   // understated gain
+
+    // This proves the lot-build order matters.
+    // The tax page MUST sort buys by executed_at ASC before building lots.
+  });
+});

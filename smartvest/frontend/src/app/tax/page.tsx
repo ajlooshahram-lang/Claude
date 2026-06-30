@@ -48,7 +48,12 @@ export default function TaxPage() {
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
     // Build FIFO lot queue from ALL buys for this account type (any year)
     // because a stock bought in 2025 and sold in 2026 uses the 2025 cost basis.
-    const allBuysForAccount = orders.filter(o => o.account_type === accountType && o.side === 'buy');
+    // CRITICAL: Sort by executed_at ASCENDING so oldest buys are consumed first.
+    // getOrders() returns newest-first; without this sort, FIFO becomes LIFO.
+    const allBuysForAccount = orders
+      .filter(o => o.account_type === accountType && o.side === 'buy')
+      .sort((a, b) => new Date(a.executed_at).getTime() - new Date(b.executed_at).getTime());
+
     const lots: Record<string, { price: number; remaining: number }[]> = {};
     for (const o of allBuysForAccount) {
       if (!lots[o.symbol]) lots[o.symbol] = [];
