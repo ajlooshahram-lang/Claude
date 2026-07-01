@@ -640,6 +640,11 @@ function HoldingRow({ holding: h, onRefresh }: { holding: Holding; onRefresh: ()
     const n = parseInt(splitNew);
     const o = parseInt(splitOld);
     if (!n || !o || n <= 0 || o <= 0 || n === o) return;
+
+    // Sensitive action — requires confirmation
+    const { confirmSensitiveAction } = await import('@/lib/sensitive-action-guard');
+    if (!confirmSensitiveAction(`Record ${n}:${o} stock split for ${h.symbol} (permanently changes cost basis and share count)`)) return;
+
     setActionLoading(true);
     const { recordStockSplit } = await import('@/lib/corporate-actions');
     const result = await recordStockSplit(h.symbol, n, o);
@@ -654,6 +659,11 @@ function HoldingRow({ holding: h, onRefresh }: { holding: Holding; onRefresh: ()
 
   async function handleTickerChange() {
     if (!newTicker || newTicker === h.symbol) return;
+
+    // Sensitive action — requires confirmation
+    const { confirmSensitiveAction } = await import('@/lib/sensitive-action-guard');
+    if (!confirmSensitiveAction(`Change ticker from ${h.symbol} to ${newTicker.toUpperCase()} (permanently renames all historical data)`)) return;
+
     setActionLoading(true);
     const { recordTickerChange } = await import('@/lib/corporate-actions');
     const result = await recordTickerChange(h.symbol, newTicker.toUpperCase());

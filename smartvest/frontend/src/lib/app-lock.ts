@@ -20,12 +20,28 @@ export function isPINSet(): boolean {
 }
 
 export function setPIN(pin: string): void {
-  localStorage.setItem(PIN_KEY, pin);
+  // Store as a simple hash (not cryptographic, but prevents plaintext exposure)
+  const hash = hashPIN(pin);
+  localStorage.setItem(PIN_KEY, hash);
   localStorage.setItem(LOCK_ENABLED_KEY, 'true');
 }
 
 export function verifyPIN(pin: string): boolean {
-  return localStorage.getItem(PIN_KEY) === pin;
+  const stored = localStorage.getItem(PIN_KEY);
+  if (!stored) return false;
+  return hashPIN(pin) === stored;
+}
+
+/** Simple hash — not cryptographic, but prevents plaintext PIN in localStorage */
+function hashPIN(pin: string): string {
+  let h = 0;
+  const salt = 'smartvest_pin_2026';
+  const input = salt + pin + salt;
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i);
+    h = ((h << 5) - h + c) | 0;
+  }
+  return 'h:' + Math.abs(h).toString(36);
 }
 
 export function removePIN(): void {
