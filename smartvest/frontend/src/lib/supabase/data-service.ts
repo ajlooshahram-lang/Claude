@@ -11,6 +11,7 @@
 
 import { supabase, isSupabaseConfigured, getCurrentUserId } from './client';
 import { Database } from './types';
+import { recordWrite } from '../data-integrity-check';
 
 type Holdings = Database['public']['Tables']['holdings'];
 type Watchlist = Database['public']['Tables']['watchlist'];
@@ -39,6 +40,7 @@ export async function addHolding(holding: Holdings['Insert']): Promise<Holdings[
     .select()
     .single();
   if (error) { console.error('addHolding:', error); return null; }
+  recordWrite();
   return data;
 }
 
@@ -75,6 +77,7 @@ export async function addToWatchlist(item: Watchlist['Insert']): Promise<Watchli
     .single();
   if (error) { console.error('addToWatchlist:', error); return null; }
   return data;
+  recordWrite();
 }
 
 export async function removeFromWatchlist(id: string): Promise<void> {
@@ -104,6 +107,7 @@ export async function addOrder(order: Orders['Insert']): Promise<Orders['Row'] |
     .single();
   if (error) { console.error('addOrder:', error); return null; }
   return data;
+  recordWrite();
 }
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
@@ -128,6 +132,7 @@ export async function addAlert(alert: Alerts['Insert']): Promise<Alerts['Row'] |
     .single();
   if (error) { console.error('addAlert:', error); return null; }
   return data;
+  recordWrite();
 }
 
 export async function deleteAlert(id: string): Promise<void> {
@@ -155,6 +160,7 @@ export async function addTaxRecord(record: TaxRecords['Insert']): Promise<TaxRec
     .select()
     .single();
   if (error) { console.error('addTaxRecord:', error); return null; }
+  recordWrite();
   return data;
 }
 
@@ -177,6 +183,7 @@ export async function addAskDeposit(deposit: AskDeposits['Insert']): Promise<Ask
     .insert(deposit)
     .select()
     .single();
+  recordWrite();
   if (error) { console.error('addAskDeposit:', error); return null; }
   return data;
 }

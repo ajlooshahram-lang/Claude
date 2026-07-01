@@ -9,6 +9,7 @@ import {
 import { api, StockQuote } from '@/lib/api';
 import { fetchWithOffline } from '@/lib/offline-cache';
 import { OfflineBanner } from '@/components/offline-banner';
+import { RollbackWarning } from '@/components/rollback-warning';
 import { LearningTip } from '@/components/learning-tip';
 import { shouldShowWeeklySummary, dismissWeeklySummary } from '@/lib/weekly-summary';
 import { BrokerConnect } from '@/components/broker-connect';
@@ -387,6 +388,9 @@ export default function PortfolioPage() {
           {error}
         </div>
       )}
+
+      {/* Data integrity check */}
+      <RollbackWarning />
 
       {/* Offline banner */}
       <OfflineBanner fromCache={fromCache} cacheAge={cacheAge} />
