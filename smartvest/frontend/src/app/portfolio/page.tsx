@@ -475,7 +475,7 @@ export default function PortfolioPage() {
           {[...holdings]
             .sort((a, b) => (b.shares * b.currentPrice) - (a.shares * a.currentPrice))
             .map((h) => (
-              <HoldingRow key={h.symbol} holding={h} />
+              <HoldingRow key={h.symbol} holding={h} onRefresh={fetchLiveData} />
             ))}
         </div>
       </div>
@@ -607,13 +607,52 @@ function MetricPill({ label, value, status, hint }: {
 }
 
 
-function HoldingRow({ holding: h }: { holding: Holding }) {
+function HoldingRow({ holding: h, onRefresh }: { holding: Holding; onRefresh: () => void }) {
   const value = h.shares * h.currentPrice;
   const cost = h.shares * h.avgCost;
   const gainLoss = value - cost;
   const gainLossPct = cost > 0 ? ((gainLoss) / cost) * 100 : 0;
   const isGain = gainLoss >= 0;
   const isDayGain = h.dayChangePct >= 0;
+
+  const [showActions, setShowActions] = useState(false);
+  const [splitForm, setSplitForm] = useState(false);
+  const [tickerForm, setTickerForm] = useState(false);
+  const [splitNew, setSplitNew] = useState('');
+  const [splitOld, setSplitOld] = useState('1');
+  const [newTicker, setNewTicker] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionResult, setActionResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function handleSplit() {
+    const n = parseInt(splitNew);
+    const o = parseInt(splitOld);
+    if (!n || !o || n <= 0 || o <= 0 || n === o) return;
+    setActionLoading(true);
+    const { recordStockSplit } = await import('@/lib/corporate-actions');
+    const result = await recordStockSplit(h.symbol, n, o);
+    setActionLoading(false);
+    if (result.success) {
+      setActionResult({ ok: true, msg: `Split recorded: ${h.symbol} ${n}:${o}. Shares and cost adjusted.` });
+      setTimeout(() => { onRefresh(); setActionResult(null); setSplitForm(false); }, 1500);
+    } else {
+      setActionResult({ ok: false, msg: result.error || 'Failed' });
+    }
+  }
+
+  async function handleTickerChange() {
+    if (!newTicker || newTicker === h.symbol) return;
+    setActionLoading(true);
+    const { recordTickerChange } = await import('@/lib/corporate-actions');
+    const result = await recordTickerChange(h.symbol, newTicker.toUpperCase());
+    setActionLoading(false);
+    if (result.success) {
+      setActionResult({ ok: true, msg: `Ticker changed: ${h.symbol} → ${newTicker.toUpperCase()}` });
+      setTimeout(() => { onRefresh(); setActionResult(null); setTickerForm(false); }, 1500);
+    } else {
+      setActionResult({ ok: false, msg: result.error || 'Failed' });
+    }
+  }
 
   return (
     <div className="px-5 py-3 hover:bg-white/[0.02] transition-colors">
@@ -639,9 +678,13 @@ function HoldingRow({ holding: h }: { holding: Holding }) {
       <div className="hidden sm:grid grid-cols-12 gap-2 items-center text-sm">
         <div className="col-span-3">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold text-[var(--muted)]">
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold text-[var(--muted)] hover:bg-white/10 transition-colors"
+              title="Actions (split, ticker change)"
+            >
               {h.symbol.substring(0, 2)}
-            </div>
+            </button>
             <div>
               <p className="font-medium text-sm">{h.symbol}</p>
               <p className="text-[10px] text-[var(--muted)]">{h.name}</p>
@@ -679,6 +722,82 @@ function HoldingRow({ holding: h }: { holding: Holding }) {
           </span>
         </div>
       </div>
+
+      {/* Actions panel (expandable) */}
+      {showActions && (
+        <div className="mt-2 ml-10 flex flex-wrap gap-2">
+          <button
+            onClick={() => { setSplitForm(!splitForm); setTickerForm(false); setActionResult(null); }}
+            className="text-[10px] px-2 py-1 rounded border border-[var(--card-border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/50 transition-colors"
+          >
+            Record Split
+          </button>
+          <button
+            onClick={() => { setTickerForm(!tickerForm); setSplitForm(false); setActionResult(null); }}
+            className="text-[10px] px-2 py-1 rounded border border-[var(--card-border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/50 transition-colors"
+          >
+            Change Ticker
+          </button>
+        </div>
+      )}
+
+      {/* Stock split form */}
+      {splitForm && (
+        <div className="mt-2 ml-10 rounded-lg border border-[var(--card-border)] bg-black/20 p-3 max-w-sm">
+          <p className="text-[10px] font-medium mb-2">Record stock split for {h.symbol}</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number" min="1" value={splitNew} onChange={e => setSplitNew(e.target.value)}
+              placeholder="New" className="w-16 rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-xs outline-none"
+            />
+            <span className="text-[10px] text-[var(--muted)]">new shares for every</span>
+            <input
+              type="number" min="1" value={splitOld} onChange={e => setSplitOld(e.target.value)}
+              placeholder="Old" className="w-16 rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-xs outline-none"
+            />
+            <span className="text-[10px] text-[var(--muted)]">old share(s)</span>
+          </div>
+          <p className="text-[9px] text-[var(--muted)] mt-1.5">
+            E.g., "4 for 1" means each share becomes 4. Your {h.shares} shares → {splitNew ? Math.round(h.shares * (parseInt(splitNew) || 1) / (parseInt(splitOld) || 1)) : '?'} shares. Total cost unchanged.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button onClick={handleSplit} disabled={actionLoading || !splitNew}
+              className="text-[10px] px-3 py-1 rounded bg-[var(--primary)] text-white disabled:opacity-40">
+              {actionLoading ? 'Applying...' : 'Apply Split'}
+            </button>
+            <button onClick={() => setSplitForm(false)} className="text-[10px] text-[var(--muted)]">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Ticker change form */}
+      {tickerForm && (
+        <div className="mt-2 ml-10 rounded-lg border border-[var(--card-border)] bg-black/20 p-3 max-w-sm">
+          <p className="text-[10px] font-medium mb-2">Change ticker from {h.symbol} to:</p>
+          <input
+            type="text" value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())}
+            placeholder="NEW-TICKER" maxLength={20}
+            className="w-32 rounded border border-[var(--card-border)] bg-[var(--background)] px-2 py-1 text-xs outline-none uppercase"
+          />
+          <p className="text-[9px] text-[var(--muted)] mt-1.5">
+            Updates this holding + all historical orders so tax FIFO still matches. Use when a company changes its ticker symbol.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button onClick={handleTickerChange} disabled={actionLoading || !newTicker || newTicker === h.symbol}
+              className="text-[10px] px-3 py-1 rounded bg-[var(--primary)] text-white disabled:opacity-40">
+              {actionLoading ? 'Updating...' : 'Change Ticker'}
+            </button>
+            <button onClick={() => setTickerForm(false)} className="text-[10px] text-[var(--muted)]">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Action result */}
+      {actionResult && (
+        <div className={`mt-2 ml-10 text-[10px] ${actionResult.ok ? 'text-[var(--gain)]' : 'text-[var(--loss)]'}`}>
+          {actionResult.ok ? '✓' : '✕'} {actionResult.msg}
+        </div>
+      )}
     </div>
   );
 }
