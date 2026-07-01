@@ -650,8 +650,18 @@ function HoldingRow({ holding: h, onRefresh }: { holding: Holding; onRefresh: ()
     const result = await recordStockSplit(h.symbol, n, o);
     setActionLoading(false);
     if (result.success) {
-      setActionResult({ ok: true, msg: `Split recorded: ${h.symbol} ${n}:${o}. Shares and cost adjusted.` });
-      setTimeout(() => { onRefresh(); setActionResult(null); setSplitForm(false); }, 1500);
+      // Invalidate the price cache for this symbol — the cached price is pre-split
+      // and would produce a phantom gain if multiplied by post-split shares.
+      try {
+        const cacheRaw = localStorage.getItem('smartvest_price_cache');
+        if (cacheRaw) {
+          const cache = JSON.parse(cacheRaw);
+          delete cache[h.symbol];
+          localStorage.setItem('smartvest_price_cache', JSON.stringify(cache));
+        }
+      } catch {}
+      setActionResult({ ok: true, msg: `Split recorded: ${h.symbol} ${n}:${o}. Shares and cost adjusted. ⚠️ Cached price was pre-split and has been cleared — portfolio value will be correct once prices refresh.` });
+      setTimeout(() => { onRefresh(); setActionResult(null); setSplitForm(false); }, 3000);
     } else {
       setActionResult({ ok: false, msg: result.error || 'Failed' });
     }

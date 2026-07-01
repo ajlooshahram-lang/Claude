@@ -569,6 +569,20 @@ function AddOrderForm({ onSubmit, onCancel }: {
         <p className="text-[9px] text-[var(--muted)] mt-1">
           Use the execution date from your broker, not today. This determines which tax year the trade belongs to.
         </p>
+        {/* Clock sanity check: warn if the default date is near a year boundary */}
+        {(() => {
+          const d = new Date(tradeDate);
+          const month = d.getMonth(); // 0=Jan, 11=Dec
+          const day = d.getDate();
+          if ((month === 11 && day >= 29) || (month === 0 && day <= 3)) {
+            return (
+              <p className="text-[9px] text-[var(--warning)] mt-1 font-medium">
+                ⚠️ This date is near a year boundary (Dec 31 / Jan 1). Double-check it matches your broker confirmation — a wrong date here puts the trade in the wrong tax year.
+              </p>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* Total preview */}
