@@ -43,3 +43,4 @@ price-integrity-log.csv
 scripts/broker-statement.csv
 scripts/app-portfolio-export.csv
 scripts/reconciliation-*.csv
+scripts/backups/
