@@ -16,6 +16,7 @@ import { BrokerConnect } from '@/components/broker-connect';
 import { StopLossPanel } from '@/components/stop-loss-panel';
 import { CurrencyBreakdown } from '@/components/currency-breakdown';
 import { AnomalyAlerts } from '@/components/anomaly-alerts';
+import { generateFingerprint } from '@/lib/tamper-detect';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -302,6 +303,7 @@ export default function PortfolioPage() {
 
   const summary = computeSummary(holdings);
   const insights = generateInsights(holdings, summary);
+  const fingerprint = generateFingerprint(summary.totalValue, summary.totalCost, holdings.length);
 
   // Loading state
   if (loading && holdings.length === 0) {
@@ -354,6 +356,12 @@ export default function PortfolioPage() {
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
+        {/* Integrity fingerprint — verify this matches manual calculation */}
+        {holdings.length > 0 && (
+          <span className="text-[8px] text-[var(--muted)] font-mono opacity-50" title="Integrity check: V=value, C=cost, #=holdings, H=hash. If displayed numbers were tampered, this won't match manual recalculation.">
+            {fingerprint.display}
+          </span>
+        )}
       </div>
 
       {/* Broker Connection */}
