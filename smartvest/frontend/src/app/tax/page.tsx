@@ -47,9 +47,7 @@ export default function TaxPage() {
   // but only sells in the selected tax year create taxable events.
   const { realizedGains, realizedLosses, trades } = useMemo(() => {
     // Build FIFO lot queue from ALL buys for this account type (any year)
-    // because a stock bought in 2025 and sold in 2026 uses the 2025 cost basis.
     // CRITICAL: Sort by executed_at ASCENDING so oldest buys are consumed first.
-    // getOrders() returns newest-first; without this sort, FIFO becomes LIFO.
     const allBuysForAccount = orders
       .filter(o => o.account_type === accountType && o.side === 'buy')
       .sort((a, b) => new Date(a.executed_at).getTime() - new Date(b.executed_at).getTime());
@@ -60,6 +58,27 @@ export default function TaxPage() {
       lots[o.symbol].push({ price: o.price_per_share, remaining: o.shares });
     }
 
+    // CRITICAL: Replay all PRIOR-YEAR sells to consume their lots first.
+    // Without this, the current year would reuse cost basis that was already
+    // consumed by sells in previous years (overstating or understating gains).
+    const priorYearSells = orders
+      .filter(o => o.account_type === accountType && o.side === 'sell' &&
+        new Date(o.executed_at).getFullYear() < taxYear)
+      .sort((a, b) => new Date(a.executed_at).getTime() - new Date(b.executed_at).getTime());
+
+    for (const priorSell of priorYearSells) {
+      let sharesToConsume = priorSell.shares;
+      const symbolLots = lots[priorSell.symbol] || [];
+      while (sharesToConsume > 0 && symbolLots.length > 0) {
+        const lot = symbolLots[0];
+        const matched = Math.min(sharesToConsume, lot.remaining);
+        lot.remaining -= matched;
+        sharesToConsume -= matched;
+        if (lot.remaining <= 0) symbolLots.shift();
+      }
+    }
+
+    // NOW process current-year sells against the REMAINING lots
     let gains = 0;
     let losses = 0;
     const tradeList: { symbol: string; proceeds: number; cost: number; gain: number }[] = [];
