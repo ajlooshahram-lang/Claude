@@ -120,7 +120,15 @@ ALTER TABLE ask_deposits ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: users can read/update their own profile
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+-- Users can update their own profile BUT cannot change is_admin or subscription_tier.
+-- Those fields can only be changed by server-side functions using the service_role key.
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (
+    auth.uid() = id
+    AND is_admin = (SELECT p.is_admin FROM profiles p WHERE p.id = auth.uid())
+    AND subscription_tier = (SELECT p.subscription_tier FROM profiles p WHERE p.id = auth.uid())
+  );
 
 -- Holdings: full CRUD on own data only
 CREATE POLICY "Users can view own holdings" ON holdings FOR SELECT USING (auth.uid() = user_id);
